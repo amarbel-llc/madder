@@ -1,0 +1,17 @@
+package sku
+
+import (
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+)
+
+type (
+	Seq = interfaces.SeqError[*Transacted]
+
+	InventoryListStore interface {
+		WriteInventoryListObject(*Transacted) (err error)
+		ReadLast() (max *Transacted, err error)
+		AllInventoryListContents(domain_interfaces.MarklId) Seq
+		AllInventoryLists() Seq
+	}
+)

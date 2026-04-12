@@ -1,0 +1,42 @@
+package string_format_writer
+
+import (
+	"github.com/amarbel-llc/madder/go/internal/0/options_print"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+)
+
+func StringPrefixFromOptions(
+	options options_print.Options,
+) string {
+	if options.Newlines {
+		return "\n  " + StringIndent
+	} else {
+		return " "
+	}
+}
+
+func WriteStringPrefixFormat(
+	w interfaces.WriterAndStringWriter,
+	prefix, body string,
+) (n int64, err error) {
+	var n1 int
+
+	n1, err = w.WriteString(prefix)
+	n += int64(n1)
+
+	if err != nil {
+		err = errors.Wrap(err)
+		return n, err
+	}
+
+	n1, err = w.WriteString(body)
+	n += int64(n1)
+
+	if err != nil {
+		err = errors.Wrap(err)
+		return n, err
+	}
+
+	return n, err
+}

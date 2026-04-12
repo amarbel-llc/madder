@@ -1,0 +1,108 @@
+package object_metadata_fmt_hyphence
+
+import (
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/script_config"
+)
+
+type Factory struct {
+	EnvDir        env_dir.Env
+	BlobStore     domain_interfaces.BlobStore
+	BlobFormatter script_config.RemoteScript
+	BlobTreeDir   string
+
+	AllowMissingTypeSig bool
+}
+
+func (factory Factory) Make() Format {
+	return Format{
+		Parser:          factory.MakeTextParser(),
+		FormatterFamily: factory.MakeFormatterFamily(),
+	}
+}
+
+func (factory Factory) MakeFormatterFamily() FormatterFamily {
+	return FormatterFamily{
+		BlobPath:     factory.makeFormatterMetadataBlobPath(),
+		InlineBlob:   factory.makeFormatterMetadataInlineBlob(),
+		MetadataOnly: factory.makeFormatterMetadataOnly(),
+		BlobOnly:     factory.makeFormatterExcludeMetadata(),
+	}
+}
+
+func (factory Factory) MakeTextParser() Parser {
+	if factory.BlobStore == nil {
+		panic("nil BlobWriterFactory")
+	}
+
+	return textParser{
+		hashType:      factory.getBlobDigestType(),
+		blobWriter:    factory.BlobStore,
+		blobFormatter: factory.BlobFormatter,
+	}
+}
+
+func (factory Factory) getBlobDigestType() domain_interfaces.FormatHash {
+	hashType := factory.BlobStore.GetDefaultHashType()
+
+	if hashType == nil {
+		panic("no hash type set")
+	}
+
+	return hashType
+}
+
+func (factory Factory) makeFormatterMetadataBlobPath() formatter {
+	formatterComponents := formatterComponents(factory)
+
+	return formatter{
+		formatterComponents.writeBoundary,
+		formatterComponents.writeCommonMetadataFormat,
+		formatterComponents.writeBlobPath,
+		formatterComponents.getWriteTypeAndSigFunc(),
+		formatterComponents.writeReferencedObjects,
+		formatterComponents.writeBlobReferences,
+		formatterComponents.writeComments,
+		formatterComponents.writeBoundary,
+	}
+}
+
+func (factory Factory) makeFormatterMetadataOnly() formatter {
+	formatterComponents := formatterComponents(factory)
+
+	return formatter{
+		formatterComponents.writeBoundary,
+		formatterComponents.writeCommonMetadataFormat,
+		formatterComponents.writeBlobDigest,
+		formatterComponents.getWriteTypeAndSigFunc(),
+		formatterComponents.writeReferencedObjects,
+		formatterComponents.writeBlobReferences,
+		formatterComponents.writeComments,
+		formatterComponents.writeBoundary,
+	}
+}
+
+func (factory Factory) makeFormatterMetadataInlineBlob() formatter {
+	formatterComponents := formatterComponents(factory)
+
+	return formatter{
+		formatterComponents.writeBoundary,
+		formatterComponents.writeCommonMetadataFormat,
+		formatterComponents.getWriteTypeAndSigFunc(),
+		formatterComponents.writeReferencedObjects,
+		formatterComponents.writeBlobReferences,
+		formatterComponents.writeComments,
+		formatterComponents.writeBoundary,
+		formatterComponents.writeNewLine,
+		formatterComponents.writeBlob,
+	}
+}
+
+func (factory Factory) makeFormatterExcludeMetadata() formatter {
+	formatterComponents := formatterComponents(factory)
+
+	return formatter{
+		formatterComponents.writeBlob,
+	}
+}

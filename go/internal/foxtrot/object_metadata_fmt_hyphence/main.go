@@ -1,0 +1,45 @@
+package object_metadata_fmt_hyphence
+
+import (
+	"io"
+
+	"github.com/amarbel-llc/madder/go/internal/alfa/checkout_options"
+	"github.com/amarbel-llc/madder/go/internal/delta/objects"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+)
+
+type (
+	Formatter interface {
+		FormatMetadata(io.Writer, FormatterContext) (int64, error)
+	}
+
+	Parser interface {
+		ParseMetadata(io.Reader, ParserContext) (int64, error)
+	}
+
+	FormatterOptions = checkout_options.TextFormatterOptions
+
+	// TODO make a reliable constructor for this
+	FormatterContext struct {
+		FormatterOptions
+		objects.EncoderContext
+	}
+
+	ParserContext interface {
+		objects.DecoderContext
+	}
+
+	FormatterFamily struct {
+		BlobPath     Formatter
+		InlineBlob   Formatter
+		MetadataOnly Formatter
+		BlobOnly     Formatter
+	}
+
+	Format struct {
+		FormatterFamily
+		Parser
+	}
+
+	funcWrite = interfaces.FuncWriterElementInterface[FormatterContext]
+)
