@@ -7,8 +7,8 @@ import (
 	"crypto/sha256"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/age"
 )
 

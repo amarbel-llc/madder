@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
-	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func TestBridgeUnknownCommand(t *testing.T) {
-	utility := command.MakeUtility("madder", config_cli.Default())
+	utility := command.NewUtility("madder", "test")
 	bridge := MakeBridge(utility)
 	_, err := bridge.RunCommand(
 		context.Background(),

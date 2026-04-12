@@ -84,6 +84,6 @@ func (t Typee) GetPrefix() rune {
 		return '_'
 
 	default:
-		panic(errors.Errorf("unsupported location type: %q", t))
+		panic(errors.Errorf("unsupported location type: %d", t))
 	}
 }

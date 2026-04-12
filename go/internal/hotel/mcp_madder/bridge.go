@@ -2,10 +2,10 @@ package mcp_madder
 
 import (
 	"context"
+	"io"
+	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 type BridgeResult struct {
@@ -16,10 +16,10 @@ type BridgeResult struct {
 }
 
 type Bridge struct {
-	utility command.Utility
+	utility *command.Utility
 }
 
-func MakeBridge(utility command.Utility) Bridge {
+func MakeBridge(utility *command.Utility) Bridge {
 	return Bridge{
 		utility: utility,
 	}
@@ -34,47 +34,57 @@ func (b Bridge) RunCommand(
 	outWriter := MakeLimitingWriter(maxBytes)
 	errWriter := MakeLimitingWriter(maxBytes)
 
-	config := &config_cli.Config{
-		CustomOut: outWriter,
-		CustomErr: errWriter,
+	// Redirect stdout/stderr to capture output
+	oldOut, oldErr := os.Stdout, os.Stderr
+
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		return BridgeResult{}, err
 	}
 
-	utility := command.MakeUtility("madder", config)
-
-	for name, cmd := range b.utility.AllCmds() {
-		utility.AddCmd(name, cmd)
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		outR.Close()
+		outW.Close()
+		return BridgeResult{}, err
 	}
 
-	errCtx := errors.MakeContext(ctx)
+	os.Stdout = outW
+	os.Stderr = errW
 
-	args := make([]string, 0, 2+len(cliArgs))
-	args = append(args, "madder", cmdName)
-	args = append(args, cliArgs...)
+	// Capture output in background
+	outDone := make(chan struct{})
+	errDone := make(chan struct{})
 
-	var result BridgeResult
+	go func() {
+		io.Copy(outWriter, outR)
+		close(outDone)
+	}()
 
-	if err := errCtx.Run(func(ctx errors.Context) {
-		cmd, flagSet, ok := utility.MakeCmdAndFlagSet(ctx, args)
-		if !ok {
-			return
-		}
+	go func() {
+		io.Copy(errWriter, errR)
+		close(errDone)
+	}()
 
-		req, ok := utility.MakeRequest(ctx, cmd, flagSet)
-		if !ok {
-			return
-		}
+	args := append([]string{cmdName}, cliArgs...)
+	runErr := b.utility.RunCLI(ctx, args, command.StubPrompter{})
 
-		cmd.Run(req)
-	}); err != nil {
-		return result, err
-	}
+	outW.Close()
+	errW.Close()
+	os.Stdout = oldOut
+	os.Stderr = oldErr
 
-	result = BridgeResult{
+	<-outDone
+	<-errDone
+	outR.Close()
+	errR.Close()
+
+	result := BridgeResult{
 		Stdout:    outWriter.String(),
 		Stderr:    errWriter.String(),
 		Truncated: outWriter.Truncated(),
 		BytesSeen: outWriter.BytesSeen(),
 	}
 
-	return result, nil
+	return result, runErr
 }

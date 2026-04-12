@@ -6,9 +6,9 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 // TODO remove and replace with BlobStore

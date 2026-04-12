@@ -8,10 +8,11 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -30,17 +31,17 @@ type Pack struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Pack)(nil)
-	_ command.CommandWithArgs           = (*Pack)(nil)
+	_ command.CommandWithParams         = (*Pack)(nil)
 )
 
-func (cmd *Pack) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *Pack) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "store-ids",
 			Description: "blob store IDs to pack (defaults to all packable stores)",
 			Variadic:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd Pack) GetDescription() command.Description {

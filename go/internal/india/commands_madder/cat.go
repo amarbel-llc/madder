@@ -9,15 +9,16 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/quiter"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/delim_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -34,17 +35,17 @@ type Cat struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Cat)(nil)
-	_ command.CommandWithArgs           = (*Cat)(nil)
+	_ command.CommandWithParams         = (*Cat)(nil)
 )
 
-func (cmd *Cat) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *Cat) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "args",
 			Description: "markl IDs to retrieve, or blob store IDs to switch the active store",
 			Variadic:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd Cat) GetDescription() command.Description {

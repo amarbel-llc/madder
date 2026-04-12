@@ -2,9 +2,10 @@ package commands_madder
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -15,16 +16,16 @@ type PackCatIds struct {
 	command_components_madder.EnvBlobStore
 }
 
-var _ command.CommandWithArgs = (*PackCatIds)(nil)
+var _ command.CommandWithParams = (*PackCatIds)(nil)
 
-func (cmd *PackCatIds) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *PackCatIds) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "archive-checksums",
 			Description: "archive checksums to filter (defaults to all archives)",
 			Variadic:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd PackCatIds) GetDescription() command.Description {

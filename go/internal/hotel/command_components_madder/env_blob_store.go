@@ -1,41 +1,33 @@
 package command_components_madder
 
 import (
-	"fmt"
-
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/charlie/repo_config_cli"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
+
+// DefaultConfig is the CLI config used by madder commands.
+// Set by commands_madder.init before any command runs.
+var DefaultConfig = config_cli.Default()
 
 type EnvBlobStore struct{}
 
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req command.Request,
 ) env_repo.BlobStoreEnv {
-	configAny := req.Utility.GetConfigAny()
+	config := DefaultConfig
 
 	var debugOptions debug.Options
-	var cliConfig domain_interfaces.CLIConfigProvider
 	var envOptions env_ui.Options
 
-	switch c := configAny.(type) {
-	case *config_cli.Config:
-		debugOptions = c.Debug
-		cliConfig = c
-		envOptions.CustomOut = c.CustomOut
-		envOptions.CustomErr = c.CustomErr
-	case *repo_config_cli.Config:
-		debugOptions = c.Debug
-		cliConfig = c
-	default:
-		panic(fmt.Sprintf("unsupported config type: %T", configAny))
+	if config != nil {
+		debugOptions = config.Debug
+		envOptions.CustomOut = config.CustomOut
+		envOptions.CustomErr = config.CustomErr
 	}
 
 	dir := env_dir.MakeDefault(
@@ -46,7 +38,7 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 
 	envUI := env_ui.Make(
 		req,
-		cliConfig,
+		config,
 		debugOptions,
 		envOptions,
 	)

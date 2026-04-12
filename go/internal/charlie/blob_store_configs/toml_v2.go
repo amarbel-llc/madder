@@ -4,9 +4,9 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 // TomlLocalHashBucketedV2 is the V2 configuration for the local hash-bucketed blob store.

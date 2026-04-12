@@ -1,22 +1,21 @@
 package commands_madder
 
 import (
-	"fmt"
 	"io"
 	"slices"
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/charlie/repo_config_cli"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -32,10 +31,10 @@ type Complete struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Complete)(nil)
-	_ command.CommandWithArgs           = (*Complete)(nil)
+	_ command.CommandWithParams         = (*Complete)(nil)
 )
 
-func (cmd *Complete) GetArgs() []command.ArgGroup { return nil }
+func (cmd *Complete) GetParams() []command.Param { return nil }
 
 func (cmd Complete) GetDescription() command.Description {
 	return command.Description{
@@ -51,20 +50,14 @@ func (cmd *Complete) SetFlagDefinitions(
 }
 
 func (cmd Complete) makeEnv(req command.Request) env_local.Env {
-	configAny := req.Utility.GetConfigAny()
+	config := command_components_madder.DefaultConfig
 
 	var debugOptions debug.Options
 	var cliConfig domain_interfaces.CLIConfigProvider
 
-	switch c := configAny.(type) {
-	case *config_cli.Config:
-		debugOptions = c.Debug
-		cliConfig = c
-	case *repo_config_cli.Config:
-		debugOptions = c.Debug
-		cliConfig = c
-	default:
-		panic(fmt.Sprintf("unsupported config type: %T", configAny))
+	if config != nil {
+		debugOptions = config.Debug
+		cliConfig = config
 	}
 
 	dir := env_dir.MakeDefault(
@@ -111,7 +104,7 @@ func (cmd Complete) Run(req command.Request) {
 	}
 
 	name := req.PopArg("name")
-	subcmd, foundSubcmd := utility.GetCmd(name)
+	subcmd, foundSubcmd := utility.GetCommand(name)
 
 	if !foundSubcmd {
 		cmd.completeSubcommands(envLocal, commandLine, utility)
@@ -122,9 +115,8 @@ func (cmd Complete) Run(req command.Request) {
 	flagSet.SetOutput(io.Discard)
 	(&config_cli.Config{}).SetFlagDefinitions(flagSet)
 
-	if subcmd, ok := subcmd.(interfaces.CommandComponentWriter); ok {
-		subcmd.SetFlagDefinitions(flagSet)
-	}
+	// TODO: migrate flag completion to use subcmd.Params instead of
+	// SetFlagDefinitions interface (subcmd is *Command, not an interface)
 
 	var containsDoubleHyphen bool
 
@@ -150,9 +142,9 @@ func (cmd Complete) Run(req command.Request) {
 func (cmd Complete) completeSubcommands(
 	envLocal env_local.Env,
 	commandLine command.CommandLineInput,
-	utility command.Utility,
+	utility *command.Utility,
 ) {
-	for name, subcmd := range utility.AllCmds() {
+	for name, subcmd := range utility.AllCommands() {
 		cmd.completeSubcommand(envLocal, name, subcmd)
 	}
 }
@@ -160,14 +152,9 @@ func (cmd Complete) completeSubcommands(
 func (cmd Complete) completeSubcommand(
 	envLocal env_local.Env,
 	name string,
-	subcmd command.Cmd,
+	subcmd *command.Command,
 ) {
-	var shortDescription string
-
-	if hasDescription, ok := subcmd.(command.CommandWithDescription); ok {
-		description := hasDescription.GetDescription()
-		shortDescription = description.Short
-	}
+	shortDescription := subcmd.Description.Short
 
 	if shortDescription != "" {
 		envLocal.GetUI().Printf("%s\t%s", name, shortDescription)
@@ -179,26 +166,24 @@ func (cmd Complete) completeSubcommand(
 func (cmd Complete) completeSubcommandArgs(
 	req command.Request,
 	envLocal env_local.Env,
-	subcmd command.Cmd,
+	subcmd *command.Command,
 	commandLine command.CommandLineInput,
 ) {
 	if subcmd == nil {
 		return
 	}
 
-	completer, isCompleter := subcmd.(command.Completer)
-
-	if !isCompleter {
-		return
-	}
-
-	completer.Complete(req, envLocal, commandLine)
+	// TODO: migrate arg completion to use subcmd.Params enum values
+	// instead of Completer interface (subcmd is *Command, not an interface)
+	_ = req
+	_ = envLocal
+	_ = commandLine
 }
 
 func (cmd Complete) completeSubcommandFlags(
 	req command.Request,
 	envLocal env_local.Env,
-	subcmd command.Cmd,
+	subcmd *command.Command,
 	flagSet *flags.FlagSet, commandLine command.CommandLineInput,
 	lastArg string,
 ) (shouldNotCompleteArgs bool) {
@@ -239,7 +224,7 @@ func (cmd Complete) completeSubcommandFlags(
 func (cmd Complete) completeSubcommandFlagOnParseError(
 	req command.Request,
 	envLocal env_local.Env,
-	subcmd command.Cmd,
+	subcmd *command.Command,
 	flagSet *flags.FlagSet,
 	commandLine command.CommandLineInput,
 	err error,

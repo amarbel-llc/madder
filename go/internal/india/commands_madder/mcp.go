@@ -1,8 +1,8 @@
 package commands_madder
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/mcp_madder"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -11,9 +11,9 @@ func init() {
 
 type Mcp struct{}
 
-var _ command.CommandWithArgs = (*Mcp)(nil)
+var _ command.CommandWithParams = (*Mcp)(nil)
 
-func (cmd *Mcp) GetArgs() []command.ArgGroup { return nil }
+func (cmd *Mcp) GetParams() []command.Param { return nil }
 
 func (cmd Mcp) GetDescription() command.Description {
 	return command.Description{

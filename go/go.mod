@@ -3,9 +3,8 @@ module github.com/amarbel-llc/madder/go
 go 1.26
 
 require (
-	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.1.0
-	github.com/amarbel-llc/purse-first/libs/dewey v0.0.0-20260412123521-907f94cc2048
+	github.com/amarbel-llc/purse-first/libs/dewey v0.0.0-20260412143445-31147ce442d7
 	github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.12
 	github.com/amarbel-llc/tommy v0.0.0-20260405143331-87255e87bf37
 	github.com/brandondube/tai v0.1.0
@@ -21,6 +20,7 @@ require (
 require (
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
+	github.com/DataDog/zstd v1.5.7 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/catppuccin/go v0.3.0 // indirect

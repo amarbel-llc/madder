@@ -1,12 +1,11 @@
 package commands_madder
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
-	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
-var utility = command.MakeUtility("madder", config_cli.Default())
+var utility = command.NewUtility("madder", "content-addressable blob store operations")
 
-func GetUtility() command.Utility {
+func GetUtility() *command.Utility {
 	return utility
 }

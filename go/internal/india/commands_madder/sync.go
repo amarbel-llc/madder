@@ -10,7 +10,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/golf/sku"
 	"github.com/amarbel-llc/madder/go/internal/hotel/blob_transfers"
@@ -18,6 +17,8 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -34,17 +35,17 @@ type Sync struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Sync)(nil)
-	_ command.CommandWithArgs           = (*Sync)(nil)
+	_ command.CommandWithParams         = (*Sync)(nil)
 )
 
-func (cmd *Sync) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *Sync) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "store-ids",
 			Description: "source store ID followed by destination store IDs (defaults to all)",
 			Variadic:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd Sync) GetDescription() command.Description {

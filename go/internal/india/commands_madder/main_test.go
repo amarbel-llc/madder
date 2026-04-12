@@ -5,7 +5,11 @@ import (
 )
 
 func TestUtilityHasCommands(t *testing.T) {
-	if utility.LenCmds() == 0 {
+	count := 0
+	for range utility.AllCommands() {
+		count++
+	}
+	if count == 0 {
 		t.Fatal("expected commands to be registered")
 	}
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -21,9 +21,9 @@ type Read struct {
 	command_components_madder.EnvBlobStore
 }
 
-var _ command.CommandWithArgs = (*Read)(nil)
+var _ command.CommandWithParams = (*Read)(nil)
 
-func (cmd *Read) GetArgs() []command.ArgGroup { return nil }
+func (cmd *Read) GetParams() []command.Param { return nil }
 
 func (cmd Read) GetDescription() command.Description {
 	return command.Description{

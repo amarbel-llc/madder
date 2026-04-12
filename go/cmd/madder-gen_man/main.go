@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/man"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_madder"
 )
 
@@ -16,22 +15,10 @@ func main() {
 
 	outputDir := os.Args[1]
 
-	config := man.PageConfig{
-		BinaryName:  "madder",
-		Section:     1,
-		Version:     "0.0.1",
-		Source:      "Madder",
-		Description: "content-addressable blob store operations",
-		LongDescription: "Madder provides low-level operations for " +
-			"content-addressable blob stores, including reading, " +
-			"writing, packing, and synchronizing blobs.",
-	}
+	utility := commands_madder.GetUtility()
+	utility.Version = "0.0.1"
 
-	if err := man.GenerateAll(
-		config,
-		commands_madder.GetUtility(),
-		outputDir,
-	); err != nil {
+	if err := utility.GenerateManpages(outputDir); err != nil {
 		fmt.Fprintf(os.Stderr, "madder-gen_man: %s\n", err)
 		os.Exit(1)
 	}

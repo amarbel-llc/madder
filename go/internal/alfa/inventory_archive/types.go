@@ -5,8 +5,8 @@ import (
 	"crypto/sha512"
 	"hash"
 
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"golang.org/x/crypto/blake2b"
 )
 

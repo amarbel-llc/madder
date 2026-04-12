@@ -1,9 +1,9 @@
 package commands_madder
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -16,10 +16,10 @@ type List struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*List)(nil)
-	_ command.CommandWithArgs           = (*List)(nil)
+	_ command.CommandWithParams         = (*List)(nil)
 )
 
-func (cmd *List) GetArgs() []command.ArgGroup { return nil }
+func (cmd *List) GetParams() []command.Param { return nil }
 
 func (cmd List) GetDescription() command.Description {
 	return command.Description{

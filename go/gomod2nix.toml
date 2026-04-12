@@ -22,8 +22,8 @@ schema = 3
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/purse-first/libs/dewey']
-    version = 'v0.0.0-20260412123521-907f94cc2048'
-    hash = 'sha256-+gZnzrhkdMr6nYFZbPgIBLLYwtpR5tSzdsEL6bjrDc8='
+    version = 'v0.0.0-20260412143445-31147ce442d7'
+    hash = 'sha256-DY+ke/Bn0CmJKyuqX68khjqXFehwdloyMONR3B2z/kY='
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/purse-first/libs/go-mcp']

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/protocol"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/server"
 	"github.com/amarbel-llc/purse-first/libs/go-mcp/transport"
@@ -31,7 +31,7 @@ var (
 	}
 )
 
-func RunServer(utility command.Utility) error {
+func RunServer(utility *command.Utility) error {
 	bridge := MakeBridge(utility)
 	tools := server.NewToolRegistryV1()
 

@@ -17,7 +17,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestPackV1WithDelta(t *testing.T) {

@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -17,7 +18,7 @@ func init() {
 
 type EncodeIds struct{}
 
-var _ command.CommandWithArgs = (*EncodeIds)(nil)
+var _ command.CommandWithParams = (*EncodeIds)(nil)
 
 func (cmd EncodeIds) GetDescription() command.Description {
 	return command.Description{
@@ -29,16 +30,12 @@ func (cmd EncodeIds) GetDescription() command.Description {
 	}
 }
 
-func (cmd EncodeIds) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{
-		{
-			Args: []command.Arg{
-				{
-					Name:        "hash-type",
-					Description: "hash algorithm (e.g. sha256, blake2b256)",
-					Required:    true,
-				},
-			},
+func (cmd EncodeIds) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
+			Name:        "hash-type",
+			Description: "hash algorithm (e.g. sha256, blake2b256)",
+			Required:    true,
 		},
 	}
 }

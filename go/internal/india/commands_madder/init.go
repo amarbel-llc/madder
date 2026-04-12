@@ -9,13 +9,14 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -147,17 +148,17 @@ type Init struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Init)(nil)
-	_ command.CommandWithArgs           = (*Init)(nil)
+	_ command.CommandWithParams         = (*Init)(nil)
 )
 
-func (cmd *Init) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *Init) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "store-id",
 			Description: "identifier for the new blob store (e.g. 'default', '.archive')",
 			Required:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd Init) GetDescription() command.Description {

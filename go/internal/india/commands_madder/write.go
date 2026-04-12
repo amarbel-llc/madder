@@ -13,11 +13,12 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -35,17 +36,17 @@ type Write struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Write)(nil)
-	_ command.CommandWithArgs           = (*Write)(nil)
+	_ command.CommandWithParams         = (*Write)(nil)
 )
 
-func (cmd *Write) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{{
+func (cmd *Write) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
 			Name:        "args",
 			Description: "file paths, '-' for stdin, or blob store IDs to switch the active store",
 			Variadic:    true,
-		}},
-	}}
+		},
+	}
 }
 
 func (cmd Write) GetDescription() command.Description {

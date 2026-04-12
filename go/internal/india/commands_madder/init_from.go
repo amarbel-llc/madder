@@ -10,10 +10,11 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -27,24 +28,22 @@ type InitFrom struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*InitFrom)(nil)
-	_ command.CommandWithArgs           = (*InitFrom)(nil)
+	_ command.CommandWithParams         = (*InitFrom)(nil)
 )
 
-func (cmd *InitFrom) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{
-			{
-				Name:        "store-name",
-				Description: "name for the new blob store",
-				Required:    true,
-			},
-			{
-				Name:        "config-path",
-				Description: "path to the blob store configuration file",
-				Required:    true,
-			},
+func (cmd *InitFrom) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
+			Name:        "store-name",
+			Description: "name for the new blob store",
+			Required:    true,
 		},
-	}}
+		command.Arg[*values.String]{
+			Name:        "config-path",
+			Description: "path to the blob store configuration file",
+			Required:    true,
+		},
+	}
 }
 
 func (cmd InitFrom) GetDescription() command.Description {

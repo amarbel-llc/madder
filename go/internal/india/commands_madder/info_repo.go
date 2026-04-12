@@ -6,10 +6,11 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
@@ -22,22 +23,20 @@ type InfoRepo struct {
 	command_components_madder.BlobStore
 }
 
-var _ command.CommandWithArgs = (*InfoRepo)(nil)
+var _ command.CommandWithParams = (*InfoRepo)(nil)
 
-func (cmd *InfoRepo) GetArgs() []command.ArgGroup {
-	return []command.ArgGroup{{
-		Args: []command.Arg{
-			{
-				Name:        "store-id",
-				Description: "blob store to query (defaults to default store)",
-			},
-			{
-				Name:        "keys",
-				Description: "config keys to display (defaults to config-immutable)",
-				Variadic:    true,
-			},
+func (cmd *InfoRepo) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
+			Name:        "store-id",
+			Description: "blob store to query (defaults to default store)",
 		},
-	}}
+		command.Arg[*values.String]{
+			Name:        "keys",
+			Description: "config keys to display (defaults to config-immutable)",
+			Variadic:    true,
+		},
+	}
 }
 
 func (cmd InfoRepo) GetDescription() command.Description {

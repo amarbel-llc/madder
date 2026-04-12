@@ -4,7 +4,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 // Re-export all types from charlie/blob_store_configs

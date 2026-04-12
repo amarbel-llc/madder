@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 type DataReaderV1 struct {

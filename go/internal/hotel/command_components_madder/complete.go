@@ -3,10 +3,10 @@ package command_components_madder
 import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 type Complete struct {
@@ -20,9 +20,10 @@ func (cmd Complete) GetFlagValueBlobIds(
 		FlagValue: blobStoreId,
 		FuncCompleter: func(
 			req command.Request,
-			envLocal env_local.Env,
+			envLocalAny any,
 			commandLine command.CommandLineInput,
 		) {
+			envLocal := envLocalAny.(env_local.Env)
 			envBlobStore := cmd.MakeEnvBlobStore(req)
 			blobStoresAll := envBlobStore.GetBlobStores()
 
