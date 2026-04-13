@@ -124,17 +124,42 @@ go-mcp imports (`github.com/amarbel-llc/purse-first/libs/go-mcp/*`) stay unchang
     generating pages in postInstall).
 19. **`go test ./...`** - run all unit tests.
 
+### Phase 8: BATS integration tests _(added 2026-04-13)_
+
+20. **BATS conformance suite** in `zz-tests_bats/` — DONE. Uses batman (from
+    bob) for bats-support, bats-assert, bats-emo via `bats_load_library`.
+    Binary injection via `require_bin MADDER_BIN madder`. Three-layer justfile
+    architecture (root builds + injects, inner justfile only runs tests).
+
+21. **Test coverage**: 21 tests across 7 files (init, write_read, fsck, mcp,
+    pack, sync, info_repo). 2 MCP tests passing, 19 skipped pending
+    purse-first#38.
+
+22. **Blocker**: dewey `golf/command.AddCmd` doesn't populate
+    `Request.input.Args` from `GetParams()` — all commands with positional
+    args panic on both CLI and MCP paths. Tracked in madder#2,
+    purse-first#38. Once fixed, remove `skip` lines from all blocked tests.
+
+### Phase 9: Known test bugs to fix after unblock
+
+23. **`init_default`** (init.bats) — missing `set_xdg "$BATS_TEST_TMPDIR"`.
+24. **`write_from_stdin`** (write_read.bats) — BATS `run` disconnects stdin,
+    so `run_madder write -` gets EOF. Needs stdin piping and content assertion.
+25. **`pack.bats` config path** — creates config at `.madder/local/share/`
+    but `set_xdg` points XDG_DATA_HOME to `.xdg/data/`. Verify after unblock.
+
 ## Verification
 
 - `nix build` succeeds, produces `bin/madder`, and installs man pages to
   `share/man/man1/` (madder command pages) and `share/man/man7/` (concept pages)
 - `go test ./...` passes
-- `madder init /tmp/test-repo` creates a blob store
-- `echo hello | madder write -repo /tmp/test-repo` -> prints blob ID
-- `madder read -repo /tmp/test-repo <id>` -> prints "hello"
-- `madder list -repo /tmp/test-repo` -> shows the blob
-- `madder fsck -repo /tmp/test-repo` -> reports clean
-- `madder mcp` starts and responds to MCP initialize request
+- `just test-bats` — 2 MCP tests pass, 19 skipped (madder#2)
+- `madder init /tmp/test-repo` creates a blob store _(blocked: purse-first#38)_
+- `echo hello | madder write -repo /tmp/test-repo` -> prints blob ID _(blocked)_
+- `madder read -repo /tmp/test-repo <id>` -> prints "hello" _(blocked)_
+- `madder list -repo /tmp/test-repo` -> shows the blob _(blocked)_
+- `madder fsck -repo /tmp/test-repo` -> reports clean _(blocked)_
+- `madder mcp` starts and responds to MCP initialize request ✓
 - `man madder` shows the man page (once MANPATH propagation is fixed, see eng#25)
 
 ## Risks
@@ -147,3 +172,5 @@ go-mcp imports (`github.com/amarbel-llc/purse-first/libs/go-mcp/*`) stay unchang
   owns its copies going forward.
 - **Man page propagation**: man pages may not be discoverable via `man` until
   eng#25 / dodder#106 are resolved.
+- **dewey golf/command positional arg bug**: all CLI and MCP commands with
+  positional args are broken until purse-first#38 is fixed.
