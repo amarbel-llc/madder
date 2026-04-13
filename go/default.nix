@@ -3,6 +3,7 @@
   nixpkgs-master,
   tommy,
   gomod2nix,
+  bob,
   system,
   man7Src ? null,
 }:
@@ -60,6 +61,7 @@ in
     packages = [
       gomod2nix.packages.${system}.default
       tommy.packages.${system}.default
+      bob.packages.${system}.batman
     ]
     ++ (with pkgs-master; [
       delve

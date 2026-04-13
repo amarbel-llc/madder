@@ -13,6 +13,13 @@
       url = "github:amarbel-llc/tommy";
       inputs.utils.follows = "utils";
     };
+
+    bob = {
+      url = "github:amarbel-llc/bob";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+    };
   };
 
   outputs =
@@ -23,6 +30,7 @@
       utils,
       gomod2nix,
       tommy,
+      bob,
       ...
     }:
     (utils.lib.eachDefaultSystem (
@@ -34,6 +42,7 @@
             nixpkgs-master
             gomod2nix
             tommy
+            bob
             system
             ;
           man7Src = ./docs/man.7;
