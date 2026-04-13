@@ -6,7 +6,7 @@ setup() {
 # bats file_tags=fsck
 
 function tap14_output { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
   run_madder fsck
@@ -17,7 +17,7 @@ function tap14_output { # @test
 }
 
 function with_blobs { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
 
