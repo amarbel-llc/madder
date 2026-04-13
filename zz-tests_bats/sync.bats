@@ -6,7 +6,7 @@ setup() {
 # bats file_tags=sync
 
 function cross_hash_sync { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
 
@@ -32,7 +32,7 @@ function cross_hash_sync { # @test
 }
 
 function sync_idempotent { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
 

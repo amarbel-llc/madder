@@ -43,7 +43,7 @@ shared_blob_prefix() {
 }
 
 function pack_with_delta { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
   create_archive_config "archive" "true"
@@ -95,7 +95,7 @@ function pack_with_delta { # @test
 }
 
 function pack_without_delta { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
+  skip "blocked on dewey AddCmd bugs (purse-first#39, purse-first#40)"
   set_xdg "$BATS_TEST_TMPDIR"
   init_store
   create_archive_config "archive" "false"
