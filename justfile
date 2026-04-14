@@ -77,6 +77,13 @@ update-dewey version:
   cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
   just gomod2nix
 
+# Tag a Go module release (e.g. just tag v0.0.1).
+[group("maint")]
+[confirm("Tag go/{{version}} on HEAD and push?")]
+tag version:
+  git tag -s "go/{{version}}" -m "go/{{version}}"
+  git push origin "go/{{version}}"
+
 [group("maint")]
 gomod2nix:
   cd go && gomod2nix
