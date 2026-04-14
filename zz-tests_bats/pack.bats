@@ -43,7 +43,7 @@ shared_blob_prefix() {
 }
 
 function pack_with_delta { # @test
-  skip "flag parsing or encryption bug — investigating (madder#2)"
+
   init_store
   create_archive_config "archive" "true"
 
@@ -73,7 +73,7 @@ function pack_with_delta { # @test
   assert_success
   hash3="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
-  run timeout --preserve-status 10s madder pack
+  run timeout --preserve-status 10s "$MADDER_BIN" pack
   assert_success
 
   run_madder cat "$hash1"
@@ -94,7 +94,7 @@ function pack_with_delta { # @test
 }
 
 function pack_without_delta { # @test
-  skip "flag parsing or encryption bug — investigating (madder#2)"
+
   init_store
   create_archive_config "archive" "false"
 
@@ -112,7 +112,7 @@ function pack_without_delta { # @test
   assert_success
   hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
-  run timeout --preserve-status 10s madder pack
+  run timeout --preserve-status 10s "$MADDER_BIN" pack
   assert_success
 
   run_madder cat "$hash1"

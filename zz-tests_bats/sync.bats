@@ -6,7 +6,7 @@ setup() {
 # bats file_tags=sync
 
 function cross_hash_sync { # @test
-  skip "flag parsing or encryption bug — investigating (madder#2)"
+  skip "XDG vs CWD override path mismatch — stores created in different locations"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -31,7 +31,7 @@ function cross_hash_sync { # @test
 }
 
 function sync_idempotent { # @test
-  skip "flag parsing or encryption bug — investigating (madder#2)"
+  skip "XDG vs CWD override path mismatch — stores created in different locations"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
