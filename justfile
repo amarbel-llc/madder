@@ -77,12 +77,22 @@ update-dewey version:
   cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
   just gomod2nix
 
-# Tag a Go module release (e.g. just tag v0.0.1).
+# Tag a Go module release. Usage: just tag v0.0.1 "feat: public blob store API"
 [group("maint")]
-[confirm("Tag go/{{version}} on HEAD and push?")]
-tag version:
-  git tag -s "go/{{version}}" -m "go/{{version}}"
-  git push origin "go/{{version}}"
+tag version message:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  tag="go/v{{version}}"
+  prev=$(git tag --sort=-v:refname -l "go/v*" | head -1)
+  if [[ -n "$prev" ]]; then
+    gum log --level info "Previous: $prev"
+    git log --oneline "$prev"..HEAD -- go/
+  fi
+  git tag -s -m "{{message}}" "$tag"
+  gum log --level info "Created tag: $tag"
+  git push origin "$tag"
+  gum log --level info "Pushed $tag"
+  git tag -v "$tag"
 
 [group("maint")]
 gomod2nix:
