@@ -2,15 +2,12 @@ package env_repo
 
 import (
 	"maps"
-	"path/filepath"
 	"slices"
 	"sort"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/store_version"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -197,36 +194,3 @@ func (env BlobStoreEnv) GetDefaultBlobStoreAndRemaining() (blob_stores.BlobStore
 	return defaultBlobStore, remaining
 }
 
-func (env *BlobStoreEnv) writeBlobStoreConfigIfNecessary(
-	bigBang BigBang,
-	directoryLayout directory_layout.BlobStore,
-) {
-	if !bigBang.BlobStoreId.IsEmpty() {
-		return
-	}
-
-	blobStoreConfigPath := directory_layout.GetDefaultBlobStore(
-		directoryLayout,
-	).GetConfig()
-
-	blobStoreConfigDir := filepath.Dir(blobStoreConfigPath)
-
-	if err := env.MakeDirs(blobStoreConfigDir); err != nil {
-		env.Cancel(err)
-		return
-	}
-
-	blobStoreConfig := bigBang.TypedBlobStoreConfig
-
-	if err := hyphence.EncodeToFile(
-		blob_store_configs.Coder,
-		&blob_store_configs.TypedConfig{
-			Type: blobStoreConfig.Type,
-			Blob: blobStoreConfig.Blob,
-		},
-		blobStoreConfigPath,
-	); err != nil {
-		env.Cancel(err)
-		return
-	}
-}

@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
@@ -396,23 +395,6 @@ func (fd *FD) Exists() bool {
 	return files.Exists(fd.path)
 }
 
-func (fd *FD) Remove(directoryLayout directory_layout.Mutable) (err error) {
-	if fd.path == "" {
-		return err
-	}
-
-	if err = directoryLayout.Delete(fd.path); err != nil {
-		if errors.IsNotExist(err) {
-			err = nil
-		} else {
-			err = errors.Wrap(err)
-		}
-
-		return err
-	}
-
-	return err
-}
 
 func (fd *FD) Reset() {
 	fd.state = StateUnknown

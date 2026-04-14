@@ -20,48 +20,11 @@ type (
 		Common
 		MakePathBlobStore(...string) interfaces.DirectoryLayoutPath
 	}
-
-	Repo interface {
-		MakeDirData(p ...string) interfaces.DirectoryLayoutPath
-
-		DirDataIndex(p ...string) string
-		DirCacheRemoteInventoryListsLog() string
-		DirIndexObjectPointers() string
-		DirIndexObjects() string
-
-		DirCacheRepo(p ...string) string
-
-		DirLostAndFound() string
-		DirObjectId() string
-
-		FileCacheDormant() string
-		FileCacheObjectId() string
-		FileConfig() string
-		FileConfigTags() string
-		FileConfigTypes() string
-		FileConfigRepos() string
-		FileLock() string
-		FileTags() string
-		FileInventoryListLog() string
-		FileZettelIdLog() string
-
-		DirsGenesis() []string
-	}
-
-	Mutable interface {
-		Delete(...string) error
-	}
-
-	RepoMutable interface {
-		Repo
-		Mutable
-	}
 )
 
 type (
 	uninitializedXDG interface {
 		BlobStore
-		Repo
 		initialize(XDG) error
 	}
 
@@ -69,26 +32,7 @@ type (
 		BlobStore
 		uninitializedXDG
 	}
-
-	repoUninitialized interface {
-		Repo
-		uninitializedXDG
-	}
 )
-
-func MakeRepo(
-	storeVersion store_version.Version,
-	xdg XDG,
-) (Repo, error) {
-	var repo repoUninitialized = &v3{}
-
-	if err := repo.initialize(xdg); err != nil {
-		err = errors.Wrap(err)
-		return nil, err
-	}
-
-	return repo, nil
-}
 
 func MakeBlobStore(
 	storeVersion store_version.Version,
