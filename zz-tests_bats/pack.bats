@@ -43,7 +43,7 @@ shared_blob_prefix() {
 }
 
 function pack_with_delta { # @test
-  skip "unsupported hash type bug — investigating"
+  skip "flag parsing or encryption bug — investigating (madder#2)"
   init_store
   create_archive_config "archive" "true"
 
@@ -94,7 +94,7 @@ function pack_with_delta { # @test
 }
 
 function pack_without_delta { # @test
-  skip "unsupported hash type bug — investigating"
+  skip "flag parsing or encryption bug — investigating (madder#2)"
   init_store
   create_archive_config "archive" "false"
 

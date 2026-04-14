@@ -6,7 +6,7 @@ setup() {
 # bats file_tags=info_repo
 
 function compression_type { # @test
-  skip "unsupported hash type bug — investigating"
+
   init_store
   run_madder info-repo compression-type
   assert_success
@@ -14,7 +14,7 @@ function compression_type { # @test
 }
 
 function encryption_none { # @test
-  skip "unsupported hash type bug — investigating"
+
   init_store
   run_madder info-repo encryption
   assert_success

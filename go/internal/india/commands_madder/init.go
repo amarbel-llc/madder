@@ -25,6 +25,8 @@ func init() {
 	utility.AddCmd("init", &Init{
 		tipe: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		blobStoreConfig: &blob_store_configs.DefaultType{
+			HashTypeId:        blob_store_configs.HashTypeDefault,
+			HashBuckets:       blob_store_configs.DefaultHashBuckets,
 			CompressionType:   compression_type.CompressionTypeDefault,
 			LockInternalFiles: true,
 		},
