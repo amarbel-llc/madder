@@ -6,14 +6,14 @@ setup() {
 # bats file_tags=sync
 
 function cross_hash_sync { # @test
-  skip "XDG vs CWD override path mismatch — stores created in different locations"
+
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "cross-hash-test" >"$blob"
   run_madder write "$blob"
   assert_success
-  blake_sha="$(echo "$output" | grep -oP 'blake2b256-\S+')"
+  blake_sha="$(echo "$output" | grep -oP 'blake2b256-\S+' | head -1)"
 
   run_madder init -hash_type-id sha256 -encryption none -lock-internal-files=false .sha256
   assert_success
@@ -31,7 +31,7 @@ function cross_hash_sync { # @test
 }
 
 function sync_idempotent { # @test
-  skip "XDG vs CWD override path mismatch — stores created in different locations"
+
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
