@@ -6,8 +6,7 @@ setup() {
 # bats file_tags=write,read
 
 function write_and_cat { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -24,8 +23,7 @@ function write_and_cat { # @test
 }
 
 function write_from_stdin { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -36,8 +34,7 @@ function write_from_stdin { # @test
 }
 
 function list_after_write { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"

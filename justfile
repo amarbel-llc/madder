@@ -71,6 +71,11 @@ fmt:
 tidy:
   cd go && go mod tidy
 
+# Update dewey to latest commit on master.
+[group("maint")]
+update-dewey:
+  cd go && GONOSUMCHECK='*' GOFLAGS='' go get github.com/amarbel-llc/purse-first/libs/dewey@master && go mod tidy
+
 [group("maint")]
 gomod2nix:
   cd go && gomod2nix

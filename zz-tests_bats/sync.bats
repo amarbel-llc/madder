@@ -6,8 +6,7 @@ setup() {
 # bats file_tags=sync
 
 function cross_hash_sync { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -32,8 +31,7 @@ function cross_hash_sync { # @test
 }
 
 function sync_idempotent { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"

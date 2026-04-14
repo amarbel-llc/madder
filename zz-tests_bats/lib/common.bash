@@ -24,7 +24,10 @@ pushd "$BATS_TEST_TMPDIR" >/dev/null || exit 1
 bats_load_library bats-support
 bats_load_library bats-assert
 bats_load_library bats-emo
+bats_load_library bats-island
 
+setup_test_home
+export MADDER_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR"
 require_bin MADDER_BIN madder
 
 run_madder() {
@@ -35,14 +38,4 @@ run_madder() {
 init_store() {
   run_madder init -encryption none -lock-internal-files=false "${1:-.default}"
   assert_success
-}
-
-set_xdg() {
-  local base="$1"
-  mkdir -p "$base/.xdg/data" "$base/.xdg/config" "$base/.xdg/state" "$base/.xdg/cache" "$base/.xdg/runtime"
-  export XDG_DATA_HOME="$base/.xdg/data"
-  export XDG_CONFIG_HOME="$base/.xdg/config"
-  export XDG_STATE_HOME="$base/.xdg/state"
-  export XDG_CACHE_HOME="$base/.xdg/cache"
-  export XDG_RUNTIME_DIR="$base/.xdg/runtime"
 }

@@ -6,8 +6,7 @@ setup() {
 # bats file_tags=fsck
 
 function tap14_output { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
   run_madder fsck
   assert_success
@@ -17,8 +16,7 @@ function tap14_output { # @test
 }
 
 function with_blobs { # @test
-  skip "blocked on dewey golf/command bug (madder#2, purse-first#38)"
-  set_xdg "$BATS_TEST_TMPDIR"
+  skip "unsupported hash type bug — investigating"
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
