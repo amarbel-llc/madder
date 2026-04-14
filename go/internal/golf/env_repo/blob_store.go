@@ -193,4 +193,3 @@ func (env BlobStoreEnv) GetDefaultBlobStoreAndRemaining() (blob_stores.BlobStore
 
 	return defaultBlobStore, remaining
 }
-

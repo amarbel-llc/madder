@@ -395,7 +395,6 @@ func (fd *FD) Exists() bool {
 	return files.Exists(fd.path)
 }
 
-
 func (fd *FD) Reset() {
 	fd.state = StateUnknown
 	fd.isDir = false
