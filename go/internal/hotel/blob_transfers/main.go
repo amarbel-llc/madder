@@ -7,7 +7,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
-	"github.com/amarbel-llc/madder/go/internal/golf/sku"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
@@ -27,7 +26,7 @@ func MakeBlobImporter(
 
 type BlobImporter struct {
 	EnvBlobStore           env_repo.BlobStoreEnv
-	CopierDelegate         interfaces.FuncIter[sku.BlobCopyResult]
+	CopierDelegate         interfaces.FuncIter[blob_stores.CopyResult]
 	Src                    blob_stores.BlobStoreInitialized
 	Dsts                   blob_stores.BlobStoreMap
 	UseDestinationHashType bool
@@ -44,17 +43,15 @@ type Counts struct {
 
 func (blobImporter *BlobImporter) ImportBlobIfNecessary(
 	blobId domain_interfaces.MarklId,
-	object *sku.Transacted,
 ) (err error) {
 	if len(blobImporter.Dsts) == 0 {
-		return blobImporter.emitMissingBlob(blobId, object)
+		return blobImporter.emitMissingBlob(blobId)
 	}
 
 	for _, blobStore := range blobImporter.Dsts {
 		copyResult := blobImporter.ImportBlobToStoreIfNecessary(
 			blobStore,
 			blobId,
-			object,
 		)
 
 		if err = copyResult.GetError(); err != nil {
@@ -68,25 +65,18 @@ func (blobImporter *BlobImporter) ImportBlobIfNecessary(
 
 func (blobImporter *BlobImporter) emitMissingBlob(
 	blobId domain_interfaces.MarklId,
-	object *sku.Transacted,
 ) (err error) {
-	blobCopyResult := sku.BlobCopyResult{
-		ObjectOrNil: object,
-		CopyResult: blob_stores.CopyResult{
-			BlobId: blobId,
-		},
+	copyResult := blob_stores.CopyResult{
+		BlobId: blobId,
 	}
 
-	// when this is a dumb HTTP remote, we expect local to push the missing
-	// objects to us after the import call
-
-	blobCopyResult.SetBlobMissingLocally()
+	copyResult.SetBlobMissingLocally()
 
 	if blobImporter.Src.HasBlob(blobId) {
-		blobCopyResult.SetBlobExistsLocally()
+		copyResult.SetBlobExistsLocally()
 	}
 
-	if err = blobImporter.emitCopyResultIfNecessary(blobCopyResult); err != nil {
+	if err = blobImporter.emitCopyResultIfNecessary(copyResult); err != nil {
 		err = errors.Wrap(err)
 		return err
 	}
@@ -95,7 +85,7 @@ func (blobImporter *BlobImporter) emitMissingBlob(
 }
 
 func (blobImporter *BlobImporter) emitCopyResultIfNecessary(
-	copyResult sku.BlobCopyResult,
+	copyResult blob_stores.CopyResult,
 ) (err error) {
 	if blobImporter.CopierDelegate == nil {
 		return err
@@ -112,10 +102,7 @@ func (blobImporter *BlobImporter) emitCopyResultIfNecessary(
 func (blobImporter *BlobImporter) ImportBlobToStoreIfNecessary(
 	dst blob_stores.BlobStoreInitialized,
 	blobId domain_interfaces.MarklId,
-	object *sku.Transacted,
-) (copyResult sku.BlobCopyResult) {
-	copyResult.ObjectOrNil = object
-
+) (copyResult blob_stores.CopyResult) {
 	var progressWriter env_ui.ProgressWriter
 
 	if err := errors.RunChildContextWithPrintTicker(
@@ -129,7 +116,7 @@ func (blobImporter *BlobImporter) ImportBlobToStoreIfNecessary(
 				hashType = dst.GetDefaultHashType()
 			}
 
-			copyResult.CopyResult = blob_stores.CopyBlobIfNecessary(
+			copyResult = blob_stores.CopyBlobIfNecessary(
 				blobImporter.EnvBlobStore,
 				dst.GetBlobStore(),
 				blobImporter.Src.GetBlobStore(),

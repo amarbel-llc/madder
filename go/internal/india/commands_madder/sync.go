@@ -11,7 +11,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
-	"github.com/amarbel-llc/madder/go/internal/golf/sku"
 	"github.com/amarbel-llc/madder/go/internal/hotel/blob_transfers"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -169,7 +168,7 @@ func (cmd Sync) runStore(
 
 	var lastBytesWritten int64
 
-	blobImporter.CopierDelegate = func(result sku.BlobCopyResult) error {
+	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
 		bytesWritten, _ := result.GetBytesWrittenAndState()
 		lastBytesWritten = bytesWritten
 		return nil
@@ -203,7 +202,7 @@ func (cmd Sync) runStore(
 			continue
 		}
 
-		if err := blobImporter.ImportBlobIfNecessary(blobId, nil); err != nil {
+		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
 			if env_dir.IsErrBlobAlreadyExists(err) {
 				tw.Ok(formatBlobTestPoint(blobId, lastBytesWritten))
 			} else {
