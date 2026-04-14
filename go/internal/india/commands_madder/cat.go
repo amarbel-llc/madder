@@ -27,7 +27,6 @@ func init() {
 
 type Cat struct {
 	command_components_madder.EnvBlobStore
-	command_components_madder.BlobStoreLocal
 
 	Utility   script_value.Utility
 	PrefixSha bool

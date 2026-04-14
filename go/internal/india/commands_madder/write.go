@@ -27,7 +27,6 @@ func init() {
 
 type Write struct {
 	command_components_madder.EnvBlobStore
-	command_components_madder.BlobStoreLocal
 
 	Check         bool
 	UtilityBefore script_value.Utility

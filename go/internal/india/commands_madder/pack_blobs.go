@@ -25,7 +25,6 @@ func init() {
 
 type PackBlobs struct {
 	command_components_madder.EnvBlobStore
-	command_components_madder.BlobStoreLocal
 
 	DeleteLoose bool
 	MaxPackSize ui.HumanReadableBytes

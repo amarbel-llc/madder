@@ -8,16 +8,12 @@ type (
 	XDG           = internal.XDG
 	Common        = internal.Common
 	BlobStore     = internal.BlobStore
-	Repo          = internal.Repo
-	Mutable       = internal.Mutable
-	RepoMutable   = internal.RepoMutable
 	BlobStorePath = internal.BlobStorePath
 )
 
 const FileNameBlobStoreConfig = internal.FileNameBlobStoreConfig
 
 var (
-	MakeRepo              = internal.MakeRepo
 	MakeBlobStore         = internal.MakeBlobStore
 	CloneBlobStoreWithXDG = internal.CloneBlobStoreWithXDG
 
