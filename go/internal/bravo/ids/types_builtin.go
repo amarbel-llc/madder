@@ -3,7 +3,6 @@ package ids
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/genres"
 )
 
@@ -175,63 +174,13 @@ func registerBuiltinType(bt BuiltinType) {
 	}
 }
 
-func ObjectIdToTypeStruct(id domain_interfaces.ObjectId) TypeStruct {
-	var tipe TypeStruct
-
-	switch id := id.(type) {
-	default:
-		panic(fmt.Sprintf("not a type: %T", id))
-
-	case SeqId:
-		tipe = id.ToType()
-
-	case *SeqId:
-		tipe = id.ToType()
-
-	case TypeStruct:
-		tipe = id
-
-	case *TypeStruct:
-		tipe = *id
-	}
-
-	return tipe
-}
-
-func IsBuiltin(id domain_interfaces.ObjectId) bool {
-	tipe := ObjectIdToTypeStruct(id)
-	_, ok := allMap[tipe]
-	return ok
-}
-
-func Get(id domain_interfaces.ObjectId) (BuiltinType, bool) {
-	tipe := ObjectIdToTypeStruct(id)
-	bt, ok := allMap[tipe]
-	return bt, ok
-}
-
 func GetOrPanic(idString string) BuiltinType {
 	tipe := MustTypeStruct(idString)
-	bt, ok := Get(tipe)
+	bt, ok := allMap[tipe]
 
 	if !ok {
 		panic(fmt.Sprintf("no builtin type found for %q", tipe))
 	}
 
 	return bt
-}
-
-func Default(genre genres.Genre) (TypeStruct, bool) {
-	bt, ok := defaults[genre]
-	return bt.TypeStruct, ok
-}
-
-func DefaultOrPanic(genre genres.Genre) TypeStruct {
-	t, ok := Default(genre)
-
-	if !ok {
-		panic(fmt.Sprintf("default missing for genre %q", genre))
-	}
-
-	return t
 }
