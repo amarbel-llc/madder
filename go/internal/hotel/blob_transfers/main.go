@@ -6,14 +6,14 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
+	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 )
 
 func MakeBlobImporter(
-	envRepo env_repo.BlobStoreEnv,
+	envRepo command_components_madder.BlobStoreEnv,
 	src blob_stores.BlobStoreInitialized,
 	dsts blob_stores.BlobStoreMap,
 ) BlobImporter {
@@ -25,7 +25,7 @@ func MakeBlobImporter(
 }
 
 type BlobImporter struct {
-	EnvBlobStore           env_repo.BlobStoreEnv
+	EnvBlobStore           command_components_madder.BlobStoreEnv
 	CopierDelegate         interfaces.FuncIter[blob_stores.CopyResult]
 	Src                    blob_stores.BlobStoreInitialized
 	Dsts                   blob_stores.BlobStoreMap

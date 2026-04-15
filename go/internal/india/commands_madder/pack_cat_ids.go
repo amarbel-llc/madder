@@ -2,7 +2,6 @@ package commands_madder
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
@@ -53,7 +52,7 @@ func (cmd PackCatIds) Run(req command.Request) {
 }
 
 func (cmd PackCatIds) runOne(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore command_components_madder.BlobStoreEnv,
 	blobStore blob_stores.BlobStoreInitialized,
 	archiveFilter map[string]struct{},
 ) {

@@ -7,7 +7,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -16,7 +15,7 @@ type Init struct{}
 
 func (cmd Init) InitBlobStore(
 	ctx interfaces.ActiveContext,
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 	id blob_store_id.Id,
 	config *blob_store_configs.TypedConfig,
 ) (path directory_layout.BlobStorePath) {

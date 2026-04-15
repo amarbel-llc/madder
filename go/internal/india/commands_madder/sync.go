@@ -10,7 +10,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/blob_transfers"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -104,7 +103,7 @@ func (cmd Sync) Run(req command.Request) {
 
 func (cmd Sync) runStore(
 	req command.Request,
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore command_components_madder.BlobStoreEnv,
 	source blob_stores.BlobStoreInitialized,
 	destination blob_stores.BlobStoreMap,
 ) {

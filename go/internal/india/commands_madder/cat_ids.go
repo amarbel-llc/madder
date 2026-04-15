@@ -4,7 +4,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
@@ -88,7 +87,7 @@ func (cmd CatIds) Run(req command.Request) {
 }
 
 func (cmd CatIds) runOne(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore command_components_madder.BlobStoreEnv,
 	blobStore blob_stores.BlobStoreInitialized,
 	blobErrors *collections_slice.Slice[command_components_madder.BlobError],
 ) {

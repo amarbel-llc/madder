@@ -4,7 +4,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
@@ -18,7 +17,7 @@ type EnvBlobStore struct{}
 
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req command.Request,
-) env_repo.BlobStoreEnv {
+) BlobStoreEnv {
 	config := DefaultConfig
 
 	var debugOptions debug.Options
@@ -45,5 +44,5 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 
 	envLocal := env_local.Make(envUI, dir)
 
-	return env_repo.MakeBlobStoreEnv(envLocal)
+	return MakeBlobStoreEnv(envLocal)
 }

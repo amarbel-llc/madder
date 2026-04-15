@@ -7,7 +7,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
@@ -15,7 +14,7 @@ import (
 type BlobStore struct{}
 
 func (cmd *BlobStore) MakeBlobStoreFromConfigPath(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 	basePath string,
 	configPath string,
 ) (blobStore blob_stores.BlobStoreInitialized) {
@@ -58,7 +57,7 @@ func (cmd *BlobStore) MakeBlobStoreFromConfigPath(
 }
 
 func (cmd *BlobStore) MakeBlobStoreFromIdOrConfigPath(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 	basePath string,
 	blobStoreIndexOrConfigPath string,
 ) (blobStore blob_stores.BlobStoreInitialized) {
@@ -119,7 +118,7 @@ tryDefaultBlobStore:
 }
 
 func (cmd *BlobStore) MakeBlobStoreFromIdString(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 	blobStoreIdString string,
 ) (blobStore blob_stores.BlobStoreInitialized) {
 	var blobStoreId blob_store_id.Id
@@ -134,7 +133,7 @@ func (cmd *BlobStore) MakeBlobStoreFromIdString(
 
 func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 	req command.Request,
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 ) blob_stores.BlobStoreMap {
 	blobStores := make(
 		blob_stores.BlobStoreMap,
@@ -161,7 +160,7 @@ func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 
 func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 	req command.Request,
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore BlobStoreEnv,
 ) (source blob_stores.BlobStoreInitialized, destinations blob_stores.BlobStoreMap) {
 	destinations = make(
 		blob_stores.BlobStoreMap,

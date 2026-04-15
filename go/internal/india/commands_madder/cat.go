@@ -9,7 +9,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/env_repo"
 	"github.com/amarbel-llc/madder/go/internal/hotel/command_components_madder"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -87,7 +86,7 @@ type blobIdWithReadCloser struct {
 }
 
 func (cmd Cat) makeBlobWriter(
-	envRepo env_repo.BlobStoreEnv,
+	envRepo command_components_madder.BlobStoreEnv,
 	blobStore blob_stores.BlobStoreInitialized,
 ) interfaces.FuncIter[blobIdWithReadCloser] {
 	if cmd.Utility.IsEmpty() {
@@ -189,7 +188,7 @@ func (cmd Cat) Run(req command.Request) {
 }
 
 func (cmd Cat) copy(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore command_components_madder.BlobStoreEnv,
 	blobStore blob_stores.BlobStoreInitialized,
 	readCloser blobIdWithReadCloser,
 ) (err error) {
@@ -220,7 +219,7 @@ func (cmd Cat) copy(
 }
 
 func (cmd Cat) blobFromRemainingStores(
-	envBlobStore env_repo.BlobStoreEnv,
+	envBlobStore command_components_madder.BlobStoreEnv,
 	blobId domain_interfaces.MarklId,
 ) (err error) {
 	_, remaining := envBlobStore.GetDefaultBlobStoreAndRemaining()
