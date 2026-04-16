@@ -21,21 +21,6 @@ type (
 	BlobForeignDigestAdder = internal.BlobForeignDigestAdder
 )
 
-// ID types
-type (
-	Genre                  = internal.Genre
-	GenreGetter            = internal.GenreGetter
-	ObjectId               = internal.ObjectId
-	ExternalObjectId       = internal.ExternalObjectId
-	ExternalObjectIdGetter = internal.ExternalObjectIdGetter
-	RepoId                 = internal.RepoId
-	RepoIdGetter           = internal.RepoIdGetter
-	Abbreviatable          = internal.Abbreviatable
-	FuncExpandString       = internal.FuncExpandString
-	FuncAbbreviateString   = internal.FuncAbbreviateString
-	Abbreviator            = internal.Abbreviator
-)
-
 // Markl types
 type (
 	MarklFormat       = internal.MarklFormat
@@ -57,26 +42,4 @@ type (
 	MutableConfig         = internal.MutableConfig
 	CLIConfigProvider     = internal.CLIConfigProvider
 	RepoCLIConfigProvider = internal.RepoCLIConfigProvider
-)
-
-// Object IO types
-type (
-	ObjectIOFactory     = internal.ObjectIOFactory
-	ObjectReaderFactory = internal.ObjectReaderFactory
-	ObjectWriterFactory = internal.ObjectWriterFactory
-	FuncObjectReader    = internal.FuncObjectReader
-	FuncObjectWriter    = internal.FuncObjectWriter
-)
-
-// Other types
-type (
-	WorkspaceStoreReadAllExternalItems = internal.WorkspaceStoreReadAllExternalItems
-	StoreVersion                       = internal.StoreVersion
-)
-
-// Functions
-var (
-	MakeBespokeObjectReadWriterFactory = internal.MakeBespokeObjectReadWriterFactory
-	MakeBespokeObjectReadFactory       = internal.MakeBespokeObjectReadFactory
-	MakeBespokeObjectWriteFactory      = internal.MakeBespokeObjectWriteFactory
 )
