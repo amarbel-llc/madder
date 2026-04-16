@@ -2,7 +2,6 @@ package directory_layout
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/alfa/store_version"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
@@ -35,7 +34,6 @@ type (
 )
 
 func MakeBlobStore(
-	storeVersion store_version.Version,
 	xdg XDG,
 ) (BlobStore, error) {
 	var blobStore blobStoreUninitialized = &v3{}

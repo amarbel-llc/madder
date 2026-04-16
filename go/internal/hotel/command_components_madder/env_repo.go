@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/alfa/store_version"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -37,7 +36,6 @@ func makeBlobStoreEnvBase(
 	var err error
 
 	if env.BlobStore, err = directory_layout.MakeBlobStore(
-		store_version.VCurrent,
 		envLocal.GetXDGForBlobStores(),
 	); err != nil {
 		envLocal.Cancel(err)
