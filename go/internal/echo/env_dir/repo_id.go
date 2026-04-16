@@ -1,24 +1,24 @@
-package repo_id
+package env_dir
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
-type Id struct {
+type RepoId struct {
 	locationType xdg_location_type.Typee
 	isSet        bool
 }
 
-func (id Id) IsEmpty() bool {
+func (id RepoId) IsEmpty() bool {
 	return !id.isSet
 }
 
-func (id Id) GetLocationType() xdg_location_type.Type {
+func (id RepoId) GetLocationType() xdg_location_type.Type {
 	return id.locationType
 }
 
-func (id *Id) Set(value string) (err error) {
+func (id *RepoId) Set(value string) (err error) {
 	switch value {
 	case "":
 		id.isSet = false
@@ -48,7 +48,7 @@ func (id *Id) Set(value string) (err error) {
 	}
 }
 
-func (id Id) String() string {
+func (id RepoId) String() string {
 	if !id.isSet {
 		return ""
 	}
@@ -61,10 +61,10 @@ func (id Id) String() string {
 	return string(prefix)
 }
 
-func (id Id) IsCwd() bool {
+func (id RepoId) IsCwd() bool {
 	return id.isSet && id.locationType == xdg_location_type.Cwd
 }
 
-func (id Id) IsSystem() bool {
+func (id RepoId) IsSystem() bool {
 	return id.isSet && id.locationType == xdg_location_type.XDGSystem
 }

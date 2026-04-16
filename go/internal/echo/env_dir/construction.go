@@ -3,7 +3,6 @@ package env_dir
 import (
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/repo_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
@@ -77,7 +76,7 @@ func MakeDefaultAndInitialize(
 	context errors.Context,
 	utilityName string,
 	do debug.Options,
-	repoId repo_id.Id,
+	repoId RepoId,
 ) env {
 	if repoId.IsSystem() {
 		panic(errors.WithoutStack(errors.Err501NotImplemented))
