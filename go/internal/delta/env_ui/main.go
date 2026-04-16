@@ -5,8 +5,6 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/0/options_print"
-	"github.com/amarbel-llc/madder/go/internal/alfa/string_format_writer"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -32,20 +30,6 @@ type Env interface {
 
 	Confirm(title, description string) (success bool)
 	Retry(header, retry string, err error) (tryAgain bool)
-
-	FormatOutputOptions(
-		options_print.Options,
-	) (o string_format_writer.OutputOptions)
-	FormatColorOptionsOut(
-		options_print.Options,
-	) (o string_format_writer.ColorOptions)
-	FormatColorOptionsErr(
-		options_print.Options,
-	) (o string_format_writer.ColorOptions)
-	StringFormatWriterFields(
-		truncate string_format_writer.CliFormatTruncation,
-		co string_format_writer.ColorOptions,
-	) interfaces.StringEncoderTo[string_format_writer.Box]
 }
 
 type env struct {
