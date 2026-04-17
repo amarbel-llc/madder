@@ -33,9 +33,15 @@ let
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
 
-    nativeBuildInputs = pkgs-master.lib.optionals (man7Src != null) [
+    nativeBuildInputs = [
+      purse-first.packages.${system}.dagnabit
+    ] ++ pkgs-master.lib.optionals (man7Src != null) [
       pkgs-master.pandoc
     ];
+
+    preBuild = ''
+      dagnabit export
+    '';
 
     # madder-gen_man takes a *prefix* and writes to {prefix}/share/man/man1/
     postInstall = ''
