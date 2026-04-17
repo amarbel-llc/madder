@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/hotel/mcp"
+	"github.com/amarbel-llc/madder/go/internal/0/mcp"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 

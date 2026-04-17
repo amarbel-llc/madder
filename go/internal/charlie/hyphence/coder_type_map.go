@@ -3,7 +3,7 @@ package hyphence
 import (
 	"bufio"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
+	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"

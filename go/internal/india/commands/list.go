@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/hotel/command_components"
+	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )

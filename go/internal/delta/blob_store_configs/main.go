@@ -3,7 +3,7 @@ package blob_store_configs
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
+	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
