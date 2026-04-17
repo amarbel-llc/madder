@@ -1,5 +1,7 @@
 package xdg_location_type
 
+//go:generate dagnabit export
+
 import "github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 
 type (

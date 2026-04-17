@@ -1,5 +1,7 @@
 package blob_store_configs
 
+//go:generate dagnabit export
+
 import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/ids"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"

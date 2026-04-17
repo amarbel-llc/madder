@@ -1,5 +1,7 @@
 package blob_store_id
 
+//go:generate dagnabit export
+
 import (
 	"encoding"
 	"fmt"

@@ -1,5 +1,7 @@
 package domain_interfaces
 
+//go:generate dagnabit export
+
 import (
 	"io"
 

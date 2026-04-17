@@ -4,6 +4,7 @@
   tommy,
   gomod2nix,
   bob,
+  purse-first,
   system,
   man7Src ? null,
 }:
@@ -62,6 +63,7 @@ in
       gomod2nix.packages.${system}.default
       tommy.packages.${system}.default
       bob.packages.${system}.batman
+      purse-first.packages.${system}.dagnabit
     ]
     ++ (with pkgs-master; [
       delve

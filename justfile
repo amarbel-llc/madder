@@ -17,6 +17,11 @@ build:
 build-go:
   cd go && go build ./...
 
+# Regenerate pkgs/ facades from internal/ packages via dagnabit.
+[group("build")]
+generate-facades:
+  cd go && dagnabit export
+
 #   _____         _
 #  |_   _|__  ___| |_
 #    | |/ _ \/ __| __|

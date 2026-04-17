@@ -20,6 +20,13 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
     };
+
+    purse-first = {
+      url = "github:amarbel-llc/purse-first";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+    };
   };
 
   outputs =
@@ -31,6 +38,7 @@
       gomod2nix,
       tommy,
       bob,
+      purse-first,
       ...
     }:
     (utils.lib.eachDefaultSystem (
@@ -43,6 +51,7 @@
             gomod2nix
             tommy
             bob
+            purse-first
             system
             ;
           man7Src = ./docs/man.7;

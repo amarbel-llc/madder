@@ -1,5 +1,7 @@
 package blob_stores
 
+//go:generate dagnabit export
+
 import (
 	"fmt"
 	"maps"
