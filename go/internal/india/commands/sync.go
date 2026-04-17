@@ -1,0 +1,234 @@
+package commands
+
+import (
+	"fmt"
+	"os"
+
+	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+	"github.com/amarbel-llc/madder/go/internal/hotel/blob_transfers"
+	"github.com/amarbel-llc/madder/go/internal/hotel/command_components"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+)
+
+func init() {
+	utility.AddCmd("sync", &Sync{})
+}
+
+type Sync struct {
+	command_components.EnvBlobStore
+	command_components.BlobStore
+
+	AllowRehashing bool
+	Limit          int
+}
+
+var (
+	_ interfaces.CommandComponentWriter = (*Sync)(nil)
+	_ command.CommandWithParams         = (*Sync)(nil)
+)
+
+func (cmd *Sync) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
+			Name:        "store-ids",
+			Description: "source store ID followed by destination store IDs (defaults to all)",
+			Variadic:    true,
+		},
+	}
+}
+
+func (cmd Sync) GetDescription() command.Description {
+	return command.Description{
+		Short: "synchronize blobs between stores",
+		Long: "Copy blobs from a source blob store to one or more destination " +
+			"stores. The first store ID argument is the source; remaining " +
+			"arguments are destinations. With no arguments, the default " +
+			"store is the source and all other configured stores are " +
+			"destinations. When source and destination use different hash " +
+			"types, blobs are rehashed (source digests are not preserved in " +
+			"single-hash destinations). Use -limit to cap the number of " +
+			"blobs transferred. Output is TAP format with per-blob status.",
+	}
+}
+
+func (cmd *Sync) SetFlagDefinitions(
+	flagSet interfaces.CLIFlagDefinitions,
+) {
+	flagSet.BoolVar(
+		&cmd.AllowRehashing,
+		"allow-rehashing",
+		false,
+		"allow syncing to stores with a different hash type (source digests not preserved in single-hash destinations)",
+	)
+
+	flagSet.IntVar(
+		&cmd.Limit,
+		"limit",
+		0,
+		"number of blobs to sync before stopping. 0 means don't stop (full consent)",
+	)
+}
+
+func (cmd Sync) Complete(
+	req command.Request,
+	envLocal env_local.Env,
+	commandLine command.CommandLineInput,
+) {
+	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	for id, blobStore := range envBlobStore.GetBlobStores() {
+		envLocal.GetOut().Printf("%s\t%s", id, blobStore.GetBlobStoreDescription())
+	}
+}
+
+func (cmd Sync) Run(req command.Request) {
+	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	source, destinations := cmd.MakeSourceAndDestinationBlobStoresFromIdsOrAll(
+		req,
+		envBlobStore,
+	)
+
+	cmd.runStore(req, envBlobStore, source, destinations)
+}
+
+func (cmd Sync) runStore(
+	req command.Request,
+	envBlobStore command_components.BlobStoreEnv,
+	source blob_stores.BlobStoreInitialized,
+	destination blob_stores.BlobStoreMap,
+) {
+	tw := tap.NewWriter(os.Stdout)
+
+	if len(destination) == 0 {
+		tw.BailOut("only one blob store, nothing to sync")
+
+		errors.ContextCancelWithBadRequestf(
+			req,
+			"only one blob store, nothing to sync",
+		)
+
+		return
+	}
+
+	sourceHashType := source.GetDefaultHashType()
+	useDestinationHashType := false
+
+	for _, dst := range destination {
+		dstHashType := dst.GetDefaultHashType()
+
+		if sourceHashType.GetMarklFormatId() == dstHashType.GetMarklFormatId() {
+			continue
+		}
+
+		_, isAdder := dst.GetBlobStore().(domain_interfaces.BlobForeignDigestAdder)
+
+		if !isAdder && !cmd.AllowRehashing {
+			if !envBlobStore.Confirm(
+				fmt.Sprintf(
+					"Destination %q uses %s but source uses %s. Rehashing will not preserve source digests. Continue?",
+					dst.GetId(),
+					dstHashType.GetMarklFormatId(),
+					sourceHashType.GetMarklFormatId(),
+				),
+				"",
+			) {
+				errors.ContextCancelWithBadRequestf(
+					req,
+					"cross-hash sync refused: destination %q uses %s, source uses %s. Use -allow-rehashing to skip this check",
+					dst.GetId(),
+					dstHashType.GetMarklFormatId(),
+					sourceHashType.GetMarklFormatId(),
+				)
+
+				return
+			}
+		}
+
+		useDestinationHashType = true
+	}
+
+	blobImporter := blob_transfers.MakeBlobImporter(
+		envBlobStore,
+		source,
+		destination,
+	)
+
+	blobImporter.UseDestinationHashType = useDestinationHashType
+
+	var lastBytesWritten int64
+
+	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
+		bytesWritten, _ := result.GetBytesWrittenAndState()
+		lastBytesWritten = bytesWritten
+		return nil
+	}
+
+	defer req.Must(
+		func(_ interfaces.ActiveContext) error {
+			tw.Comment(fmt.Sprintf(
+				"Successes: %d, Failures: %d, Ignored: %d, Total: %d",
+				blobImporter.Counts.Succeeded,
+				blobImporter.Counts.Failed,
+				blobImporter.Counts.Ignored,
+				blobImporter.Counts.Total,
+			))
+
+			tw.Plan()
+
+			return nil
+		},
+	)
+
+	for blobId, errIter := range source.AllBlobs() {
+		lastBytesWritten = 0
+
+		if errIter != nil {
+			tw.NotOk(
+				fmt.Sprintf("%s", blobId),
+				tap_diagnostics.FromError(errIter),
+			)
+
+			continue
+		}
+
+		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
+			if env_dir.IsErrBlobAlreadyExists(err) {
+				tw.Ok(formatBlobTestPoint(blobId, lastBytesWritten))
+			} else {
+				tw.NotOk(
+					formatBlobTestPoint(blobId, lastBytesWritten),
+					tap_diagnostics.FromError(err),
+				)
+			}
+		} else {
+			tw.Ok(formatBlobTestPoint(blobId, lastBytesWritten))
+		}
+
+		if cmd.Limit > 0 &&
+			(blobImporter.Counts.Succeeded+blobImporter.Counts.Failed) > cmd.Limit {
+			tw.Comment("limit hit, stopping")
+			break
+		}
+	}
+}
+
+func formatBlobTestPoint(
+	blobId domain_interfaces.MarklId,
+	bytesWritten int64,
+) string {
+	if bytesWritten > 0 {
+		return fmt.Sprintf("%s (%s)", blobId, ui.GetHumanBytesStringOrError(bytesWritten))
+	}
+
+	return fmt.Sprintf("%s", blobId)
+}

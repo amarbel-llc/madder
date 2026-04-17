@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/india/commands_madder"
+	"github.com/amarbel-llc/madder/go/internal/india/commands"
 )
 
 func main() {
@@ -15,7 +15,7 @@ func main() {
 
 	outputDir := os.Args[1]
 
-	utility := commands_madder.GetUtility()
+	utility := commands.GetUtility()
 	utility.Version = "0.0.1"
 
 	if err := utility.GenerateManpages(outputDir); err != nil {
