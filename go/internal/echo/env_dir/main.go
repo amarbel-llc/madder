@@ -100,22 +100,24 @@ func (env env) GetXDG() xdg.XDG {
 }
 
 func (env env) GetXDGForBlobStores() xdg.XDG {
-	xdg := env.XDG.CloneWithUtilityName("madder")
-	return xdg
+	return env.XDG.CloneWithUtilityName(env.XDG.UtilityName)
 }
 
 func (env env) GetXDGForBlobStoreId(id blob_store_id.Id) xdg.XDG {
-	madderXDG := env.GetXDGForBlobStores()
+	xdg := env.GetXDGForBlobStores()
 
 	switch id.GetLocationType() {
-	default:
-		return madderXDG
-
 	case blob_store_id.LocationTypeXDGUser:
-		return madderXDG.CloneWithoutOverride()
+		return xdg.CloneWithoutOverride()
+
+	case blob_store_id.LocationTypeXDGCache:
+		return xdg.CloneWithoutOverride()
 
 	case blob_store_id.LocationTypeCwd:
-		return madderXDG
+		return xdg
+
+	default:
+		return xdg
 	}
 }
 

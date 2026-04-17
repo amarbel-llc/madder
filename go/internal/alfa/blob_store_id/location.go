@@ -12,4 +12,5 @@ var (
 	LocationTypeCwd       = xdg_location_type.Cwd
 	LocationTypeXDGUser   = xdg_location_type.XDGUser
 	LocationTypeXDGSystem = xdg_location_type.XDGSystem
+	LocationTypeXDGCache  = xdg_location_type.XDGCache
 )

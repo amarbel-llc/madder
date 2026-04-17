@@ -24,6 +24,7 @@ const (
 	Cwd
 	XDGUser
 	XDGSystem
+	XDGCache
 )
 
 var (
@@ -49,6 +50,9 @@ func (t *Typee) SetPrefix(firstChar rune) (err error) {
 	case '_':
 		*t = Unknown
 
+	case '%':
+		*t = XDGCache
+
 	default:
 		err = errors.Errorf(
 			"unsupported rune for location type: %q",
@@ -63,7 +67,7 @@ func (t *Typee) SetPrefix(firstChar rune) (err error) {
 
 func (t Typee) IsPrefix(r rune) bool {
 	switch r {
-	case '/', '~', '.', '_':
+	case '/', '~', '.', '_', '%':
 		return true
 
 	default:
@@ -84,6 +88,9 @@ func (t Typee) GetPrefix() rune {
 
 	case Unknown:
 		return '_'
+
+	case XDGCache:
+		return '%'
 
 	default:
 		panic(errors.Errorf("unsupported location type: %d", t))

@@ -48,6 +48,19 @@ func MakeBlobStore(
 	return blobStore, nil
 }
 
+func MakeBlobStoreCache(
+	xdg XDG,
+) (BlobStore, error) {
+	var blobStore blobStoreUninitialized = &v3Cache{}
+
+	if err := blobStore.initialize(xdg); err != nil {
+		err = errors.Wrap(err)
+		return nil, err
+	}
+
+	return blobStore, nil
+}
+
 func CloneBlobStoreWithXDG(layout BlobStore, xdg XDG) (BlobStore, error) {
 	clone := layout.cloneUninitialized()
 

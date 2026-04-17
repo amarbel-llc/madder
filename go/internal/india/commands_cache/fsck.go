@@ -1,0 +1,127 @@
+package commands_cache
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"sync/atomic"
+	"time"
+
+	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+)
+
+func init() {
+	utility.AddCmd("fsck", &Fsck{})
+}
+
+type Fsck struct {
+	command_components.EnvBlobStore
+	command_components.BlobStore
+}
+
+var _ command.CommandWithParams = (*Fsck)(nil)
+
+func (cmd *Fsck) GetParams() []command.Param {
+	return []command.Param{
+		command.Arg[*values.String]{
+			Name:        "store-ids",
+			Description: "blob store IDs to verify (defaults to all configured stores)",
+			Variadic:    true,
+		},
+	}
+}
+
+func (cmd Fsck) GetDescription() command.Description {
+	return command.Description{
+		Short: "verify cache blob store integrity",
+		Long: "Verify the integrity of one or more cache blob stores by " +
+			"reading every blob and recomputing its content-addressable " +
+			"digest. Output is TAP format.",
+	}
+}
+
+func (cmd Fsck) Run(req command.Request) {
+	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	blobStores := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)
+
+	tw := tap.NewWriter(os.Stdout)
+
+	for storeId, blobStore := range blobStores {
+		tw.Comment(fmt.Sprintf("(blob_store: %s) starting fsck...", storeId))
+
+		var count atomic.Uint32
+		var errorCount atomic.Uint32
+		var progressWriter env_ui.ProgressWriter
+
+		if err := errors.RunChildContextWithPrintTicker(
+			envBlobStore,
+			func(ctx errors.Context) {
+				for digest, err := range blobStore.AllBlobs() {
+					errors.ContextContinueOrPanic(ctx)
+
+					if err != nil {
+						tw.NotOk("(unknown blob)", tap_diagnostics.FromError(err))
+						errorCount.Add(1)
+						count.Add(1)
+
+						continue
+					}
+
+					count.Add(1)
+
+					if !blobStore.HasBlob(digest) {
+						tw.NotOk(fmt.Sprintf("%s", digest), map[string]string{"severity": "fail", "message": "blob missing"})
+						errorCount.Add(1)
+
+						continue
+					}
+
+					if err = blob_stores.VerifyBlob(
+						ctx,
+						blobStore,
+						digest,
+						io.MultiWriter(&progressWriter, io.Discard),
+					); err != nil {
+						tw.NotOk(fmt.Sprintf("%s", digest), tap_diagnostics.FromError(err))
+						errorCount.Add(1)
+
+						continue
+					}
+
+					tw.Ok(fmt.Sprintf("%s", digest))
+				}
+			},
+			func(time time.Time) {
+				tw.Comment(fmt.Sprintf(
+					"(blob_store: %s) %d blobs / %s verified, %d errors",
+					storeId,
+					count.Load(),
+					progressWriter.GetWrittenHumanString(),
+					errorCount.Load(),
+				))
+			},
+			3*time.Second,
+		); err != nil {
+			tw.BailOut(err.Error())
+			envBlobStore.Cancel(err)
+			return
+		}
+
+		tw.Comment(fmt.Sprintf(
+			"(blob_store: %s) blobs verified: %d, bytes verified: %s",
+			storeId,
+			count.Load(),
+			progressWriter.GetWrittenHumanString(),
+		))
+	}
+
+	tw.Plan()
+}

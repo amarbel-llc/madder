@@ -4,6 +4,7 @@ import (
 	"maps"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
@@ -33,11 +34,17 @@ func makeBlobStoreEnvBase(
 		Env: envLocal,
 	}
 
+	xdg := envLocal.GetXDGForBlobStores()
+
 	var err error
 
-	if env.BlobStore, err = directory_layout.MakeBlobStore(
-		envLocal.GetXDGForBlobStores(),
-	); err != nil {
+	if strings.HasSuffix(xdg.UtilityName, "-cache") {
+		env.BlobStore, err = directory_layout.MakeBlobStoreCache(xdg)
+	} else {
+		env.BlobStore, err = directory_layout.MakeBlobStore(xdg)
+	}
+
+	if err != nil {
 		envLocal.Cancel(err)
 		return env, false
 	}

@@ -27,6 +27,7 @@ let
     pwd = ./.;
     subPackages = [
       "cmd/madder"
+      "cmd/madder-cache"
       "cmd/madder-gen_man"
     ];
     modules = ./gomod2nix.toml;

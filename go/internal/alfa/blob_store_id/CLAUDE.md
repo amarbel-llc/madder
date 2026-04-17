@@ -23,9 +23,10 @@ Unprefixed IDs default to XDG user location.
 | `.`        | CWD                 | `.archive` | `$PWD/.madder/local/share/blob_stores/` |
 | `/`        | XDG system          | `/system`  | system data dir                         |
 | `_`        | Unknown             | `_custom`  | (custom path)                           |
+| `%`        | XDG cache           | `%scratch` | `$XDG_CACHE_HOME/madder-cache/blob_stores/` |
 | `~`        | *(backward compat)* | `~default` | same as unprefixed (parsed as XDG user) |
 
-`Set()` checks if the first character is a known prefix (`.`, `/`, `_`, `~`).
+`Set()` checks if the first character is a known prefix (`.`, `/`, `_`, `~`, `%`).
 If so, it splits prefix + remainder. Otherwise the entire value is the name with
 XDG user location. `String()` omits the prefix for XDG user IDs. `~` is accepted
 on parse for backward compatibility but is never emitted.
