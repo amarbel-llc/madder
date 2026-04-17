@@ -36,9 +36,9 @@ let
       pkgs-master.pandoc
     ];
 
+    # madder-gen_man takes a *prefix* and writes to {prefix}/share/man/man1/
     postInstall = ''
-      mkdir -p $out/share/man/man1
-      $out/bin/madder-gen_man $out/share/man/man1
+      $out/bin/madder-gen_man $out
       rm $out/bin/madder-gen_man
     ''
     + pkgs-master.lib.optionalString (man7Src != null) ''
