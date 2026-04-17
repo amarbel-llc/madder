@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
+	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
+	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func main() {
@@ -15,11 +17,17 @@ func main() {
 
 	outputDir := os.Args[1]
 
-	utility := commands.GetUtility()
-	utility.Version = "0.0.1"
+	utilities := []*command.Utility{
+		commands.GetUtility(),
+		commands_cache.GetUtility(),
+	}
 
-	if err := utility.GenerateManpages(outputDir); err != nil {
-		fmt.Fprintf(os.Stderr, "madder-gen_man: %s\n", err)
-		os.Exit(1)
+	for _, utility := range utilities {
+		utility.Version = "0.0.1"
+
+		if err := utility.GenerateManpages(outputDir); err != nil {
+			fmt.Fprintf(os.Stderr, "madder-gen_man: %s\n", err)
+			os.Exit(1)
+		}
 	}
 }
