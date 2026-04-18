@@ -478,10 +478,11 @@ func (mover *sftpMover) initialize(hash domain_interfaces.Hash) (err error) {
 		mover.tempFile,
 		hash,
 	); err != nil {
-		mover.tempFile.Close()
-		mover.store.sftpClient.Remove(mover.tempPath)
-		err = errors.Wrap(err)
-		return err
+		return errors.Join(
+			errors.Wrap(err),
+			mover.tempFile.Close(),
+			mover.store.sftpClient.Remove(mover.tempPath),
+		)
 	}
 
 	return err
@@ -512,14 +513,21 @@ func (mover *sftpMover) Close() (err error) {
 
 	mover.closed = true
 
-	// Ensure cleanup happens
-	// TODO capture errors using errors.Deferred*
+	// Deferred cleanup joins its errors into err so temp-file or
+	// temp-path leaks on the remote are not silent. mover.tempFile and
+	// mover.tempPath are niled out as they are consumed in the success
+	// paths below so the defer becomes a no-op and we do not double-
+	// close or attempt to remove a renamed file.
 	defer func() {
+		var cerr, rerr error
 		if mover.tempFile != nil {
-			mover.tempFile.Close()
+			cerr = mover.tempFile.Close()
 		}
 		if mover.tempPath != "" {
-			mover.store.sftpClient.Remove(mover.tempPath)
+			rerr = mover.store.sftpClient.Remove(mover.tempPath)
+		}
+		if joined := errors.Join(err, cerr, rerr); joined != nil {
+			err = joined
 		}
 	}()
 
@@ -540,6 +548,7 @@ func (mover *sftpMover) Close() (err error) {
 		err = errors.Wrap(err)
 		return err
 	}
+	mover.tempFile = nil
 
 	// Get the calculated digest and determine final path
 	blobDigest := mover.writer.GetDigest()
@@ -556,21 +565,23 @@ func (mover *sftpMover) Close() (err error) {
 	if err = mover.store.sftpClient.Rename(mover.tempPath, finalPath); err != nil {
 		// Check if file already exists
 		if _, statErr := mover.store.sftpClient.Stat(finalPath); statErr == nil {
-			// File already exists, this is OK - just remove temp file
-			mover.store.sftpClient.Remove(mover.tempPath)
+			// File already exists, this is OK — leave tempPath set so
+			// the deferred cleanup removes the temp file and surfaces
+			// any error from that removal.
 			err = nil
 		} else {
 			err = errors.Wrap(err)
 			return err
 		}
+	} else {
+		// Rename succeeded: the temp file is already gone, don't let
+		// the deferred cleanup try to remove it.
+		mover.tempPath = ""
 	}
 
 	mover.store.blobCacheLock.Lock()
 	mover.store.blobCache[string(blobDigest.GetBytes())] = struct{}{}
 	mover.store.blobCacheLock.Unlock()
-
-	// Clear temp path so cleanup doesn't try to remove it
-	mover.tempPath = ""
 
 	return err
 }
