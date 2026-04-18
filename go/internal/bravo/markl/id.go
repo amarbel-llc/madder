@@ -217,11 +217,19 @@ func (id *Id) SetMarklId(formatId string, bites []byte) (err error) {
 	}
 
 	if err = id.setFormatId(formatId); err != nil {
+		// setFormatId may have partially mutated id.format — reset to
+		// preserve the ADR-0001 invariant (never format-set with empty
+		// data in an observable state).
+		id.Reset()
 		err = errors.Wrap(err)
 		return err
 	}
 
 	if err = id.setData(bites); err != nil {
+		// Same rationale: setData rejected the bytes after setFormatId
+		// already pinned a format; clear both to leave the Id in the
+		// null state.
+		id.Reset()
 		err = errors.Wrap(err)
 		return err
 	}
@@ -229,14 +237,25 @@ func (id *Id) SetMarklId(formatId string, bites []byte) (err error) {
 	return err
 }
 
-func (id *Id) allocDataIfNecessary(size int) {
-	id.data = id.data[:0]
-	id.data = slices.Grow(id.data, size)
-}
+// resetDataForFormat is the sole mutation primitive for id.data. It pins
+// id.format to format and returns a writable buffer of exactly
+// format.GetSize() bytes. Callers fill the buffer in place — since its
+// length equals format.GetSize() by construction, the ADR-0001 invariant
+// cannot be broken by length mismatch.
+//
+// Panics (wrapping ErrNilFormat) when format is nil: a non-empty Id has no
+// meaningful interpretation without a format, and every call site in this
+// package can produce one.
+func (id *Id) resetDataForFormat(format domain_interfaces.MarklFormat) []byte {
+	if format == nil {
+		panic(errors.WrapSkip(1, ErrNilFormat))
+	}
 
-func (id *Id) allocDataAndSetToCapIfNecessary(size int) {
-	id.allocDataIfNecessary(size)
-	id.data = id.data[:size]
+	id.format = format
+	size := format.GetSize()
+	id.data = slices.Grow(id.data[:0], size)[:size]
+
+	return id.data
 }
 
 func (id *Id) setData(bites []byte) (err error) {
@@ -246,8 +265,7 @@ func (id *Id) setData(bites []byte) (err error) {
 	}
 
 	// ADR-0001: an Id with non-empty data must have a format, and
-	// len(data) must equal format.GetSize(). Enforced here at the only
-	// byte-copy boundary so no in-package path can break the invariant.
+	// len(data) must equal format.GetSize().
 	if id.format == nil {
 		err = errors.Errorf(
 			"cannot set %d bytes on Id with nil format",
@@ -270,8 +288,7 @@ func (id *Id) setData(bites []byte) (err error) {
 		return err
 	}
 
-	id.allocDataAndSetToCapIfNecessary(len(bites))
-	copy(id.data, bites)
+	copy(id.resetDataForFormat(id.format), bites)
 
 	return err
 }

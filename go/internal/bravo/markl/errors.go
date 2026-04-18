@@ -20,6 +20,12 @@ func newPkgError(text string) pkgError {
 
 var ErrEmptyType = newPkgError("type is empty")
 
+// ErrNilFormat signals that an Id mutation requires a non-nil MarklFormat
+// but received nil. Raised via panic from resetDataForFormat — the sole
+// mutation primitive — so any in-package bug that tries to populate an Id
+// without first supplying a format surfaces at the point of mutation.
+var ErrNilFormat = newPkgError("markl format is nil")
+
 func MakeErrEmptyType(id domain_interfaces.MarklId) error {
 	if id.GetMarklFormat() == nil {
 		return errors.WrapSkip(1, ErrEmptyType)

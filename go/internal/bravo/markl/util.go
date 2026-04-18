@@ -81,10 +81,9 @@ func ReadFrom(
 	id *Id,
 	formatHash FormatHash,
 ) (n int, err error) {
-	id.format = formatHash
-	id.allocDataAndSetToCapIfNecessary(formatHash.GetSize())
+	buf := id.resetDataForFormat(formatHash)
 
-	if n, err = io.ReadFull(reader, id.data); err != nil {
+	if n, err = io.ReadFull(reader, buf); err != nil {
 		errors.WrapExceptSentinel(err, io.EOF)
 		return n, err
 	}
@@ -99,9 +98,9 @@ func CompareToReader(
 	actual, repool := idPool.GetWithRepool()
 	defer repool()
 
-	actual.allocDataAndSetToCapIfNecessary(expected.GetSize())
+	buf := actual.resetDataForFormat(expected.GetMarklFormat())
 
-	if _, err := io.ReadFull(reader, actual.data); err != nil {
+	if _, err := io.ReadFull(reader, buf); err != nil {
 		panic(errors.Wrap(err))
 	}
 
@@ -116,9 +115,9 @@ func CompareToReaderAt(
 	actual, repool := idPool.GetWithRepool()
 	defer repool()
 
-	actual.allocDataAndSetToCapIfNecessary(expected.GetSize())
+	buf := actual.resetDataForFormat(expected.GetMarklFormat())
 
-	if _, err := readerAt.ReadAt(actual.data, offset); err != nil {
+	if _, err := readerAt.ReadAt(buf, offset); err != nil {
 		panic(errors.Wrap(err))
 	}
 
@@ -133,7 +132,9 @@ func SetHexBytes(
 	bites = bytes.TrimSpace(bites)
 
 	if id, ok := dst.(*Id); ok {
-		if id.format, err = GetFormatOrError(formatId); err != nil {
+		var format domain_interfaces.MarklFormat
+
+		if format, err = GetFormatOrError(formatId); err != nil {
 			err = errors.Wrapf(
 				err,
 				"failed to SetHexBytes with type %s and bites %s",
@@ -143,20 +144,29 @@ func SetHexBytes(
 			return err
 		}
 
-		id.allocDataAndSetToCapIfNecessary(hex.DecodedLen(len(bites)))
+		expectedSize := format.GetSize()
+		decodedLen := hex.DecodedLen(len(bites))
 
-		var numberOfBytesDecoded int
-
-		numberOfBytesDecoded, err = hex.Decode(id.data, bites)
-		id.data = id.data[:numberOfBytesDecoded]
-
-		if err != nil {
-			err = errors.Wrapf(
-				err,
-				"N: %d, Data: %q",
-				numberOfBytesDecoded,
+		if decodedLen != expectedSize {
+			err = errors.Errorf(
+				"SetHexBytes: decoded length %d does not match format %q size %d (hex input: %q)",
+				decodedLen,
+				formatId,
+				expectedSize,
 				bites,
 			)
+
+			return err
+		}
+
+		buf := id.resetDataForFormat(format)
+
+		if _, err = hex.Decode(buf, bites); err != nil {
+			// Decode may have written partial bytes into buf — reset so
+			// the Id returns to the null state rather than surfacing
+			// corrupt content alongside an error.
+			id.Reset()
+			err = errors.Wrapf(err, "Data: %q", bites)
 			return err
 		}
 	} else {

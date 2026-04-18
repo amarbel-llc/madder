@@ -74,9 +74,8 @@ func makeFormatHash(
 	}
 
 	hash := constructor()
-	formatHash.null.format = self
-	formatHash.null.allocDataIfNecessary(hash.Size())
-	formatHash.null.data = hash.Sum(formatHash.null.data)
+	buf := formatHash.null.resetDataForFormat(self)
+	formatHash.null.data = hash.Sum(buf[:0])
 
 	formats[id] = formatHash
 	formatHashes[id] = formatHash
