@@ -26,6 +26,16 @@ var ErrEmptyType = newPkgError("type is empty")
 // without first supplying a format surfaces at the point of mutation.
 var ErrNilFormat = newPkgError("markl format is nil")
 
+// ErrEd25519SeedNotPrivateKey signals that Ed25519GetPublicKey received a
+// 32-byte value. RFC 8032 uses a 32-byte seed as the canonical private key,
+// but Go's crypto/ed25519 uses a 64-byte representation (seed ‖ pubkey) —
+// and so does madder (see FormatSec{Id: FormatIdEd25519Sec, Size:
+// ed25519.PrivateKeySize}). Callers with a seed must explicitly expand it
+// via ed25519.NewKeyFromSeed before presenting it as a private-key MarklId.
+var ErrEd25519SeedNotPrivateKey = newPkgError(
+	"ed25519 input is seed-sized (32 bytes); expected full private key (64 bytes)",
+)
+
 func MakeErrEmptyType(id domain_interfaces.MarklId) error {
 	if id.GetMarklFormat() == nil {
 		return errors.WrapSkip(1, ErrEmptyType)

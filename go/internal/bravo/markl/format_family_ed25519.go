@@ -20,19 +20,24 @@ func Ed25519GeneratePrivateKey(rand io.Reader) (bites []byte, err error) {
 
 func Ed25519GetPublicKey(private domain_interfaces.MarklId) (bites []byte, err error) {
 	privateBytes := private.GetBytes()
-	var privateKey ed25519.PrivateKey
 
 	switch len(privateBytes) {
 	case ed25519.SeedSize:
-		// TODO emit error
-		// err = errors.Errorf(
-		// 	"private key is just seed, not full go ed25519 private key",
-		// )
-		// return
-		privateKey = ed25519.NewKeyFromSeed(privateBytes)
+		// RFC 8032 uses a 32-byte seed as the canonical private key, but
+		// Go's crypto/ed25519 uses a 64-byte representation (seed ‖ pubkey)
+		// and madder stores the 64-byte form (FormatSec.Size ==
+		// ed25519.PrivateKeySize). Callers holding a seed must expand it
+		// explicitly via ed25519.NewKeyFromSeed rather than relying on
+		// implicit conversion here — otherwise they'll drift against
+		// Ed25519Sign, which panics on non-64-byte input.
+		err = errors.WrapSkip(1, ErrEd25519SeedNotPrivateKey)
+		return bites, err
 
 	case ed25519.PrivateKeySize:
-		privateKey = ed25519.PrivateKey(privateBytes)
+		privateKey := ed25519.PrivateKey(privateBytes)
+		pubKey := privateKey.Public()
+		bites = pubKey.(ed25519.PublicKey)
+		return bites, err
 
 	default:
 		err = errors.Errorf(
@@ -41,11 +46,6 @@ func Ed25519GetPublicKey(private domain_interfaces.MarklId) (bites []byte, err e
 		)
 		return bites, err
 	}
-
-	pubKey := privateKey.Public()
-	bites = pubKey.(ed25519.PublicKey)
-
-	return bites, err
 }
 
 func Ed25519Verify(pub, message, sig domain_interfaces.MarklId) (err error) {
