@@ -48,11 +48,7 @@ func (hash *Hash) GetMarklId() (domain_interfaces.MarklIdMutable, interfaces.Fun
 	id, repool := idPool.GetWithRepool()
 	id.format = hash.GetMarklFormat()
 	id.allocDataIfNecessary(hash.Size())
-
-	if hash.written > 0 {
-		// TODO verify this works as expected
-		id.data = hash.hash.Sum(id.data)
-	}
+	id.data = hash.hash.Sum(id.data)
 
 	return id, repool
 }
