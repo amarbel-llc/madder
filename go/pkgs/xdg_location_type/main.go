@@ -13,6 +13,7 @@ type (
 const (
 	Cwd       = internal.Cwd
 	Unknown   = internal.Unknown
+	XDGCache  = internal.XDGCache
 	XDGSystem = internal.XDGSystem
 	XDGUser   = internal.XDGUser
 )

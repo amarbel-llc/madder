@@ -19,6 +19,7 @@ var (
 	GetBlobStorePathForCustomPath = internal.GetBlobStorePathForCustomPath
 	GetDefaultBlobStore           = internal.GetDefaultBlobStore
 	MakeBlobStore                 = internal.MakeBlobStore
+	MakeBlobStoreCache            = internal.MakeBlobStoreCache
 	MakeBlobStorePath             = internal.MakeBlobStorePath
 	PathBlobStore                 = internal.PathBlobStore
 )

@@ -13,6 +13,7 @@ type (
 var (
 	LocationTypeCwd       = internal.LocationTypeCwd
 	LocationTypeUnknown   = internal.LocationTypeUnknown
+	LocationTypeXDGCache  = internal.LocationTypeXDGCache
 	LocationTypeXDGSystem = internal.LocationTypeXDGSystem
 	LocationTypeXDGUser   = internal.LocationTypeXDGUser
 	Make                  = internal.Make
