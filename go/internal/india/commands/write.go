@@ -137,6 +137,25 @@ func (cmd Write) Run(req command.Request) {
 			continue
 		}
 
+		// The arg resolved to a file. If any configured blob store shares
+		// the arg's bare name (regardless of XDG scope), the caller
+		// probably intended the store-switch — warn them and point at the
+		// disambiguating forms. Prefixed names (/, ~, ., _, %) bypass the
+		// filesystem lookup entirely so this only fires for unprefixed
+		// args.
+		var shadowedId blob_store_id.Id
+		if err := shadowedId.Set(arg); err == nil {
+			for _, store := range envBlobStore.GetBlobStores() {
+				if store.Path.GetId().GetName() == shadowedId.GetName() {
+					tw.Comment(fmt.Sprintf(
+						"warning: %q shadows blob store %q; use './%s' for the file or %q for the store",
+						arg, store.Path.GetId(), arg, store.Path.GetId().String(),
+					))
+					break
+				}
+			}
+		}
+
 		result.MarklId, result.error = cmd.doOne(blobStore, resolved.BlobReader)
 
 		if result.error != nil {
