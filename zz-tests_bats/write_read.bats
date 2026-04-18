@@ -64,7 +64,7 @@ function write_warns_when_file_shadows_store { # @test
   assert_success
   assert_output --partial "shadows blob store"
   assert_output --partial "'./shadowed'"
-  assert_output --partial "\".shadowed\""
+  assert_output --partial '".shadowed"'
 }
 
 function write_no_warning_when_no_store_collision { # @test

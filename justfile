@@ -111,3 +111,62 @@ debug-gen_man page="madder.1":
   out=$(mktemp -d)
   cd go && go run ./cmd/madder-gen_man "$out"
   cat "$out/share/man/man1/{{page}}"
+
+# Repro for #21: try `madder init` with and without the flags bats uses.
+# Runs in an isolated tmp HOME/workdir under a ceiling that prevents madder
+# from walking into any real config. All variants keep MADDER_CEILING_DIRECTORIES
+# pinned at the tmp workdir — do not remove it, see note below. Usage:
+# just debug-init-repro [storeid]
+#
+# Safety: without a ceiling, madder walks CWD upward looking for
+# .madder-workspace/.dodder-workspace. Because this recipe's tmp workdir
+# lives under the repo's .tmp/, an uncapped walk would reach the repo root
+# and potentially the host's $HOME. Every variant sets the ceiling.
+[group("debug")]
+debug-init-repro storeid="default":
+  #!/usr/bin/env bash
+  set -u
+  root={{justfile_directory()}}
+  run_case() {
+    local label="$1"; shift
+    local storeid="$1"; shift
+    echo "=== $label ==="
+    echo "  env:"
+    echo "    HOME=${HOME:-<unset>}"
+    echo "    XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-<unset>}"
+    echo "    XDG_DATA_HOME=${XDG_DATA_HOME:-<unset>}"
+    echo "    MADDER_CEILING_DIRECTORIES=${MADDER_CEILING_DIRECTORIES:-<unset>}"
+    echo "    CWD=$(pwd)"
+    set +e
+    (cd "$root/go" && go run ./cmd/madder init "$@" "$storeid")
+    local rc=$?
+    set -e
+    echo "  exit=$rc"
+    echo
+  }
+
+  home=$(mktemp -d)
+  workdir=$(mktemp -d)
+  cd "$workdir"
+
+  # Scrub any inherited XDG_* so variants that claim "XDG_* unset" really
+  # start clean. Set HOME to tmp everywhere so defaulted XDG paths fall
+  # under tmp (not the host user's ~).
+  unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME
+  export HOME="$home"
+  export MADDER_CEILING_DIRECTORIES="$workdir"
+
+  # Variant A: all XDG_* explicitly set to subpaths of tmp home.
+  XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" \
+    XDG_CACHE_HOME="$home/.cache" XDG_STATE_HOME="$home/.local/state" \
+    run_case "A: all XDG set + ceiling, bare init" "{{storeid}}A"
+
+  # Variant B: XDG_* unset (Go will default to $HOME subpaths).
+  run_case "B: XDG_* unset + ceiling, bare init" "{{storeid}}B"
+
+  # Variant C: XDG_* unset + the bats workaround flags.
+  run_case "C: XDG_* unset + ceiling, workaround flags" "{{storeid}}C" \
+    -encryption none -lock-internal-files=false
+
+  echo "(tmp workdir: $workdir)"
+  echo "(tmp home:    $home)"
