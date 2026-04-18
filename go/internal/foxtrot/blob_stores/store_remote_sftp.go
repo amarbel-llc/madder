@@ -219,13 +219,29 @@ func (blobStore *remoteSftp) initialize() (err error) {
 		}
 
 		blobStore.uiPrinter.Printf("checking directory %q...", currentPath)
-		if _, err = blobStore.sftpClient.Stat(currentPath); err != nil {
-			// TODO check error
-			blobStore.uiPrinter.Printf("creating directory %q...", currentPath)
-			if err = blobStore.sftpClient.Mkdir(currentPath); err != nil {
-				// Directory might exist, continue
-				err = nil
+		_, err = blobStore.sftpClient.Stat(currentPath)
+		if err == nil {
+			continue
+		}
+		if !errors.IsNotExist(err) {
+			err = errors.Wrapf(err, "stat %q", currentPath)
+			return err
+		}
+
+		blobStore.uiPrinter.Printf("creating directory %q...", currentPath)
+		if err = blobStore.sftpClient.Mkdir(currentPath); err != nil {
+			// Another client may have created the directory between
+			// our Stat and Mkdir. Re-Stat to confirm existence before
+			// treating the Mkdir error as benign.
+			if _, statErr := blobStore.sftpClient.Stat(currentPath); statErr != nil {
+				err = errors.Wrapf(
+					err,
+					"mkdir %q failed and path still missing",
+					currentPath,
+				)
+				return err
 			}
+			err = nil
 		}
 	}
 
