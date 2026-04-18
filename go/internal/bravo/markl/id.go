@@ -240,25 +240,34 @@ func (id *Id) allocDataAndSetToCapIfNecessary(size int) {
 }
 
 func (id *Id) setData(bites []byte) (err error) {
-	// empty is permitted
+	// empty is permitted — it represents the null/unset Id state
 	if len(bites) == 0 {
 		return err
 	}
 
-	// TODO enforce non-nil formats
-	if id.format != nil {
-		expected := id.format.GetSize()
-		actual := len(bites)
+	// ADR-0001: an Id with non-empty data must have a format, and
+	// len(data) must equal format.GetSize(). Enforced here at the only
+	// byte-copy boundary so no in-package path can break the invariant.
+	if id.format == nil {
+		err = errors.Errorf(
+			"cannot set %d bytes on Id with nil format",
+			len(bites),
+		)
 
-		if actual != expected {
-			err = errors.Errorf(
-				"wrong size for bytes: expected %d, but got %d",
-				expected,
-				actual,
-			)
+		return err
+	}
 
-			return err
-		}
+	expected := id.format.GetSize()
+	actual := len(bites)
+
+	if actual != expected {
+		err = errors.Errorf(
+			"wrong size for bytes: expected %d, but got %d",
+			expected,
+			actual,
+		)
+
+		return err
 	}
 
 	id.allocDataAndSetToCapIfNecessary(len(bites))
