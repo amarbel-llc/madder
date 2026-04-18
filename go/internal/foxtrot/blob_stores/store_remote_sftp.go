@@ -749,14 +749,10 @@ func (reader *sftpReader) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (reader *sftpReader) Close() error {
-	// TODO capture both errors using errors.Join
-	err1 := reader.expander.Close()
-	err2 := reader.file.Close()
-
-	if err1 != nil {
-		return err1
-	}
-	return err2
+	return errors.Join(
+		reader.expander.Close(),
+		reader.file.Close(),
+	)
 }
 
 func (reader *sftpReader) GetMarklId() domain_interfaces.MarklId {
