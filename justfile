@@ -102,3 +102,12 @@ tag version message:
 [group("maint")]
 gomod2nix:
   cd go && gomod2nix
+
+# Regenerate man pages into a tmp dir and print one by name. Usage: just debug-gen_man madder.1
+[group("debug")]
+debug-gen_man page="madder.1":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out=$(mktemp -d)
+  cd go && go run ./cmd/madder-gen_man "$out"
+  cat "$out/share/man/man1/{{page}}"
