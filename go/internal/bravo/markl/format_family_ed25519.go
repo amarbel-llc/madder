@@ -49,12 +49,30 @@ func Ed25519GetPublicKey(private domain_interfaces.MarklId) (bites []byte, err e
 }
 
 func Ed25519Verify(pub, message, sig domain_interfaces.MarklId) (err error) {
-	pubBites := ed25519.PublicKey(pub.GetBytes())
+	pubBytes := pub.GetBytes()
+
+	if len(pubBytes) != ed25519.PublicKeySize {
+		err = errors.Errorf(
+			"unsupported ed25519 public key size: %d (expected %d)",
+			len(pubBytes), ed25519.PublicKeySize,
+		)
+		return err
+	}
+
+	sigBytes := sig.GetBytes()
+
+	if len(sigBytes) != ed25519.SignatureSize {
+		err = errors.Errorf(
+			"unsupported ed25519 signature size: %d (expected %d)",
+			len(sigBytes), ed25519.SignatureSize,
+		)
+		return err
+	}
 
 	if err = ed25519.VerifyWithOptions(
-		pubBites,
+		ed25519.PublicKey(pubBytes),
 		message.GetBytes(),
-		sig.GetBytes(),
+		sigBytes,
 		&ed25519.Options{},
 	); err != nil {
 		err = errors.Err422UnprocessableEntity.Errorf(
@@ -77,7 +95,28 @@ func Ed25519Sign(
 		readerRand = rand.Reader
 	}
 
-	privateKey := ed25519.PrivateKey(sec.GetBytes())
+	privateBytes := sec.GetBytes()
+
+	switch len(privateBytes) {
+	case ed25519.SeedSize:
+		// Same RFC 8032 seed-vs-privkey distinction Ed25519GetPublicKey
+		// catches (see #15); keep the pair symmetric so external callers
+		// can errors.Is against one sentinel for either function.
+		err = errors.WrapSkip(1, ErrEd25519SeedNotPrivateKey)
+		return sigBites, err
+
+	case ed25519.PrivateKeySize:
+		// ok
+
+	default:
+		err = errors.Errorf(
+			"unsupported ed25519 private key size: %d",
+			len(privateBytes),
+		)
+		return sigBites, err
+	}
+
+	privateKey := ed25519.PrivateKey(privateBytes)
 
 	if sigBites, err = privateKey.Sign(
 		readerRand,

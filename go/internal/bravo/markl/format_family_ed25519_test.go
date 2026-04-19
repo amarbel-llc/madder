@@ -99,3 +99,131 @@ func TestIdGetPublicKey_Ed25519_MatchesStdlib(t *testing.T) {
 		t.Errorf("pubkey mismatch: got %x, want %x", pubId.GetBytes(), expected)
 	}
 }
+
+// Ed25519Sign: same size-validation contract as Ed25519GetPublicKey (#15).
+// Internal callers reach it through Id.Sign → FormatSec.Sign and can't
+// reach these branches (FormatSec enforces 64-byte size by construction);
+// the checks guard external callers of go/pkgs/markl.Ed25519Sign that
+// pass a foreign MarklId of the wrong size. See #23.
+
+func TestEd25519Sign_RejectsSeedSizedBytes(t *testing.T) {
+	seed := bytes.Repeat([]byte{0x01}, ed25519.SeedSize) // 32 bytes
+
+	// Bypass SetMarklId to simulate an external caller presenting an Id
+	// with raw data of the wrong size (matches the Get test pattern).
+	secId := Id{data: append([]byte(nil), seed...)}
+	msgId := Id{data: []byte("hello")}
+
+	_, err := Ed25519Sign(&secId, &msgId, nil)
+	if err == nil {
+		t.Fatal("Ed25519Sign on 32-byte seed should error, got nil")
+	}
+
+	if !errors.Is(err, ErrEd25519SeedNotPrivateKey) {
+		t.Errorf("expected ErrEd25519SeedNotPrivateKey, got: %v", err)
+	}
+}
+
+func TestEd25519Sign_RejectsOtherSizes(t *testing.T) {
+	msgId := Id{data: []byte("hello")}
+
+	for _, size := range []int{0, 16, 33, 63, 65, 128} {
+		size := size
+		t.Run("", func(t *testing.T) {
+			secId := Id{data: make([]byte, size)}
+
+			_, err := Ed25519Sign(&secId, &msgId, nil)
+			if err == nil {
+				t.Errorf("size %d should error", size)
+			}
+		})
+	}
+}
+
+func TestEd25519Sign_RoundTripMatchesStdlib(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var secId Id
+	if err := secId.SetMarklId(FormatIdEd25519Sec, priv); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := []byte("hello, world")
+	msgId := Id{data: msg}
+
+	sig, err := Ed25519Sign(&secId, &msgId, nil)
+	if err != nil {
+		t.Fatalf("Ed25519Sign on valid 64-byte key should succeed, got: %v", err)
+	}
+
+	if !ed25519.Verify(pub, msg, sig) {
+		t.Error("signature produced by Ed25519Sign did not verify against stdlib ed25519.Verify")
+	}
+}
+
+// Ed25519Verify: external callers could pass a MarklId with a pubkey or
+// signature of the wrong size; stdlib VerifyWithOptions panics. See #23.
+
+func TestEd25519Verify_RejectsWrongPubkeySize(t *testing.T) {
+	msgId := Id{data: []byte("hello")}
+	sigId := Id{data: make([]byte, ed25519.SignatureSize)}
+
+	for _, size := range []int{0, 16, 31, 33, 64} {
+		size := size
+		t.Run("", func(t *testing.T) {
+			pubId := Id{data: make([]byte, size)}
+
+			err := Ed25519Verify(&pubId, &msgId, &sigId)
+			if err == nil {
+				t.Errorf("pubkey size %d should error", size)
+			}
+		})
+	}
+}
+
+func TestEd25519Verify_RejectsWrongSigSize(t *testing.T) {
+	pubId := Id{data: make([]byte, ed25519.PublicKeySize)}
+	msgId := Id{data: []byte("hello")}
+
+	for _, size := range []int{0, 32, 63, 65, 128} {
+		size := size
+		t.Run("", func(t *testing.T) {
+			sigId := Id{data: make([]byte, size)}
+
+			err := Ed25519Verify(&pubId, &msgId, &sigId)
+			if err == nil {
+				t.Errorf("sig size %d should error", size)
+			}
+		})
+	}
+}
+
+func TestEd25519Verify_RoundTripAcceptsValidSignature(t *testing.T) {
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var secId Id
+	if err := secId.SetMarklId(FormatIdEd25519Sec, priv); err != nil {
+		t.Fatal(err)
+	}
+
+	msg := []byte("round-trip")
+	msgId := Id{data: msg}
+
+	sig, err := Ed25519Sign(&secId, &msgId, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubId := Id{data: append([]byte(nil), pub...)}
+	sigId := Id{data: sig}
+
+	if err := Ed25519Verify(&pubId, &msgId, &sigId); err != nil {
+		t.Errorf("Ed25519Verify on valid inputs should succeed, got: %v", err)
+	}
+}
