@@ -44,7 +44,7 @@ var (
 func (cmd *Init) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
-			Name:        "store-id",
+			Name:        "blob-store-id",
 			Description: "identifier for the new blob store (e.g. '%default')",
 			Required:    true,
 		},
@@ -69,7 +69,7 @@ func (cmd *Init) SetFlagDefinitions(
 func (cmd *Init) Run(req command.Request) {
 	var blobStoreId blob_store_id.Id
 
-	if err := blobStoreId.Set(req.PopArg("blob store id")); err != nil {
+	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)
 	}
 

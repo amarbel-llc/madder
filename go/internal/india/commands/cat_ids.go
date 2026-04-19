@@ -36,8 +36,8 @@ func (cmd *CatIds) SetFlagDefinitions(
 func (cmd *CatIds) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
-			Name:        "store-ids",
-			Description: "blob store IDs to query (defaults to all)",
+			Name:        "blob-store-ids",
+			Description: "blob-store-ids to query (defaults to all)",
 			Variadic:    true,
 		},
 	}
@@ -48,10 +48,10 @@ func (cmd CatIds) GetDescription() command.Description {
 		Short: "list all blob digests in a store",
 		Long: "Output every blob digest stored in one or more blob stores. " +
 			"With no arguments, lists digests from all configured stores. " +
-			"Pass store IDs to query specific stores. Store IDs support " +
-			"optional prefixes that select the XDG scope ('.', '/', '%', " +
-			"'_', or none) — see blob-store(7). Use -format to control " +
-			"the output encoding of blob digests.",
+			"Pass blob-store-ids to query specific stores. Blob-store-ids " +
+			"support optional prefixes that select the XDG scope ('.', " +
+			"'/', '%', '_', or none) — see blob-store(7). Use -format to " +
+			"control the output encoding of blob digests.",
 	}
 }
 

@@ -157,12 +157,12 @@ func (cmd Cat) Run(req command.Request) {
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			blobWriter = cmd.makeBlobWriter(envBlobStore, blobStore)
 			explicitStore = true
-			ui.Err().Printf("switched to blob store: %s", blobStoreId)
+			ui.Err().Printf("switched to blob-store-id: %s", blobStoreId)
 			continue
 		}
 
 		ui.Err().Print(
-			errors.Errorf("invalid argument (not a blob id or store id): %s", arg),
+			errors.Errorf("invalid argument (not a blob-id or blob-store-id): %s", arg),
 		)
 	}
 }

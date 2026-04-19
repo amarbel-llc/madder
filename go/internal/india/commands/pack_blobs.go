@@ -9,6 +9,7 @@ import (
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -45,7 +46,7 @@ func (cmd *PackBlobs) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
 			Name:        "args",
-			Description: "file paths, '-' for stdin, or blob store IDs to switch the active store",
+			Description: "file paths, '-' for stdin, or blob-store-ids to switch the active store",
 			Variadic:    true,
 		},
 	}
@@ -56,7 +57,7 @@ func (cmd PackBlobs) GetDescription() command.Description {
 		Short: "write files and pack them into an archive",
 		Long: "Write files into the blob store and then pack just those " +
 			"blobs into an archive. Arguments are file paths, '-' for " +
-			"stdin, or blob store IDs that switch the active store. " +
+			"stdin, or blob-store-ids that switch the active store. " +
 			"Store IDs support the same XDG-scope prefixes as 'write' " +
 			"('.', '/', '%', '_', or none) — see blob-store(7). " +
 			"Unlike 'pack', which packs all loose blobs, this command " +
@@ -148,19 +149,33 @@ func (cmd PackBlobs) Run(req command.Request) {
 			sawStdin = true
 		}
 
-		resolved := command_components.ResolveFileOrBlobStoreId(arg)
+		resolved := arg_resolver.Resolve(
+			arg,
+			arg_resolver.ModeFile|arg_resolver.ModeStoreSwitch,
+		)
 
-		if resolved.Err != nil {
+		switch resolved.Kind {
+		case arg_resolver.KindError:
 			sink.Failure(arg, resolved.Err)
 			continue
-		}
 
-		if resolved.IsStoreSwitch {
+		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			storeIdString = blobStoreId.String()
-			sink.Notice(fmt.Sprintf("switched to blob store: %s", storeIdString))
+			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", storeIdString))
 			continue
+		}
+
+		// KindFile — same shadow warning as write, now centralized.
+		if shadowed, ok := arg_resolver.DetectShadow(
+			arg,
+			command_components.BlobStoreIds(envBlobStore.GetBlobStores()),
+		); ok {
+			sink.Notice(fmt.Sprintf(
+				"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
+				arg, shadowed, arg, shadowed.String(),
+			))
 		}
 
 		blobId, _, err := cmd.doOne(blobStore, resolved.BlobReader)

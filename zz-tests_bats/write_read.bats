@@ -53,7 +53,7 @@ function write_warns_when_file_shadows_store { # @test
   # Init two stores: the default .default (CWD-scoped) plus one named
   # "shadowed" (XDG user). Then create a file with the same bare name in
   # the CWD. A bare `write shadowed` should resolve to the file but emit
-  # a warning comment pointing at the store collision.
+  # a warning comment pointing at the blob-store-id collision.
   init_store
   run_madder init -encryption none -lock-internal-files=false shadowed
   assert_success
@@ -62,9 +62,26 @@ function write_warns_when_file_shadows_store { # @test
 
   run_madder write -format tap shadowed
   assert_success
-  assert_output --partial "shadows blob store"
+  assert_output --partial "shadows blob-store-id"
   assert_output --partial "'./shadowed'"
   assert_output --partial '".shadowed"'
+}
+
+function pack_blobs_warns_when_file_shadows_store { # @test
+
+  # Regression for #25: the shadow warning previously lived only in
+  # write; pack-blobs had the same ambiguity class but no warning. The
+  # shared arg_resolver fixes that.
+  init_store
+  run_madder init -encryption none -lock-internal-files=false shadowed
+  assert_success
+
+  echo "file content" >shadowed
+
+  run_madder pack-blobs -format tap shadowed
+  # Pack will fail (.default isn't packable) but the shadow warning
+  # must fire before that on stdout/stderr.
+  assert_output --partial "shadows blob-store-id"
 }
 
 function write_no_warning_when_no_store_collision { # @test
@@ -181,5 +198,5 @@ function write_json_warning_goes_to_stderr { # @test
   local n
   n="$(echo "$output" | grep -c '^{')"
   [[ $n -eq 1 ]] || fail "expected 1 NDJSON record, got $n"
-  assert_output --partial 'shadows blob store'
+  assert_output --partial 'shadows blob-store-id'
 }

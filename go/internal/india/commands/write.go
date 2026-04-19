@@ -9,6 +9,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -45,7 +46,7 @@ func (cmd *Write) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
 			Name:        "args",
-			Description: "file paths, '-' for stdin, or blob store IDs to switch the active store",
+			Description: "file paths, '-' for stdin, or blob-store-ids to switch the active store",
 			Variadic:    true,
 		},
 	}
@@ -55,22 +56,23 @@ func (cmd Write) GetDescription() command.Description {
 	return command.Description{
 		Short: "write blobs to a store",
 		Long: "Write files or stdin into the content-addressable blob store. " +
-			"Each argument is a file path, '-' for stdin, or a blob store ID " +
-			"that switches the active store for subsequent writes. Store IDs " +
-			"support optional prefixes that select the XDG scope: '.' for " +
-			"CWD-relative, '/' for system-wide, '%' for cache, '_' for " +
-			"custom-rooted, and no prefix for the user default — see " +
-			"blob-store(7). Unprefixed names are resolved as files first; " +
-			"to target a store that shares a name with a file in CWD use " +
-			"an explicit prefix (e.g. '~mystore', '_mystore'). Output " +
-			"defaults to TAP on an interactive terminal and to NDJSON " +
-			"(one JSON object per blob, suitable for programmatic consumers) " +
-			"when stdout is piped; pass -format to force a specific encoding. " +
-			"Each JSON record has fields \"id\", \"size\", and \"source\", plus " +
-			"\"store\" when a non-default store is active, \"present\" under " +
-			"-check, \"error\" on per-arg failures, and \"skipped\" for null " +
-			"digests. Use -check to verify that files already exist in the " +
-			"store without writing them.",
+			"Each argument is a file path, '-' for stdin, or a " +
+			"blob-store-id that switches the active store for subsequent " +
+			"writes. Blob-store-ids support optional prefixes that select " +
+			"the XDG scope: '.' for CWD-relative, '/' for system-wide, '%' " +
+			"for cache, '_' for custom-rooted, and no prefix for the user " +
+			"default — see blob-store(7). Unprefixed names are resolved " +
+			"as files first; to target a store that shares a name with a " +
+			"file in CWD use an explicit prefix (e.g. '~mystore', " +
+			"'_mystore'). Output defaults to TAP on an interactive " +
+			"terminal and to NDJSON (one JSON object per blob, suitable " +
+			"for programmatic consumers) when stdout is piped; pass " +
+			"-format to force a specific encoding. Each JSON record has " +
+			"fields \"id\", \"size\", and \"source\", plus \"store\" when a " +
+			"non-default store is active, \"present\" under -check, " +
+			"\"error\" on per-arg failures, and \"skipped\" for null " +
+			"digests. Use -check to verify that files already exist in " +
+			"the store without writing them.",
 	}
 }
 
@@ -136,38 +138,35 @@ func (cmd Write) Run(req command.Request) {
 			sawStdin = true
 		}
 
-		resolved := command_components.ResolveFileOrBlobStoreId(arg)
+		resolved := arg_resolver.Resolve(
+			arg,
+			arg_resolver.ModeFile|arg_resolver.ModeStoreSwitch,
+		)
 
-		if resolved.Err != nil {
+		switch resolved.Kind {
+		case arg_resolver.KindError:
 			sink.Failure(arg, resolved.Err)
 			failCount.Add(1)
 			continue
-		}
 
-		if resolved.IsStoreSwitch {
+		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
-			sink.Notice(fmt.Sprintf("switched to blob store: %s", blobStoreId))
+			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", blobStoreId))
 			continue
 		}
 
-		// The arg resolved to a file. If any configured blob store shares
-		// the arg's bare name (regardless of XDG scope), the caller
-		// probably intended the store-switch — warn them and point at the
-		// disambiguating forms. Prefixed names (/, ~, ., _, %) bypass the
-		// filesystem lookup entirely so this only fires for unprefixed
-		// args.
-		var shadowedId blob_store_id.Id
-		if err := shadowedId.Set(arg); err == nil {
-			for _, store := range envBlobStore.GetBlobStores() {
-				if store.Path.GetId().GetName() == shadowedId.GetName() {
-					sink.Notice(fmt.Sprintf(
-						"warning: %q shadows blob store %q; use './%s' for the file or %q for the store",
-						arg, store.Path.GetId(), arg, store.Path.GetId().String(),
-					))
-					break
-				}
-			}
+		// KindFile — warn if the file's bare name shadows a configured
+		// blob-store-id, so the caller can disambiguate with an explicit
+		// prefix (`./file` for the file, `.name`/`~name` for the store).
+		if shadowed, ok := arg_resolver.DetectShadow(
+			arg,
+			command_components.BlobStoreIds(envBlobStore.GetBlobStores()),
+		); ok {
+			sink.Notice(fmt.Sprintf(
+				"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
+				arg, shadowed, arg, shadowed.String(),
+			))
 		}
 
 		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)

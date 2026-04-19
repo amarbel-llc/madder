@@ -34,11 +34,11 @@ func init() {
 			Short: "initialize a local blob store",
 			Long: "Create a new local content-addressable blob store with " +
 				"hash-bucketed directory layout. The store is registered " +
-				"under the given store ID and uses the default compression " +
-				"and hash settings. The store ID selects the XDG scope via " +
-				"an optional prefix ('.', '/', '%', '_', or none) — see " +
-				"blob-store(7). Examples: 'default' (XDG user), '.archive' " +
-				"(CWD-relative), '%scratch' (XDG cache).",
+				"under the given blob-store-id and uses the default " +
+				"compression and hash settings. The blob-store-id selects " +
+				"the XDG scope via an optional prefix ('.', '/', '%', '_', " +
+				"or none) — see blob-store(7). Examples: 'default' (XDG " +
+				"user), '.archive' (CWD-relative), '%scratch' (XDG cache).",
 		},
 	})
 
@@ -158,7 +158,7 @@ var (
 func (cmd *Init) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
-			Name:        "store-id",
+			Name:        "blob-store-id",
 			Description: "identifier for the new blob store (e.g. 'default', '.archive')",
 			Required:    true,
 		},
@@ -187,7 +187,7 @@ func (cmd *Init) SetFlagDefinitions(
 func (cmd *Init) Run(req command.Request) {
 	var blobStoreId blob_store_id.Id
 
-	if err := blobStoreId.Set(req.PopArg("blob store id")); err != nil {
+	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)
 	}
 

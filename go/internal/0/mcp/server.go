@@ -112,7 +112,7 @@ func registerTools(tools *server.ToolRegistryV1, bridge Bridge) {
 					"blob_store_ids": {
 						"type": "array",
 						"items": {"type": "string"},
-						"description": "Blob store IDs to list from (defaults to all stores if omitted)"
+						"description": "Blob-store-ids to list from (defaults to all stores if omitted)"
 					}
 				},
 				"additionalProperties": false
@@ -184,7 +184,7 @@ func registerTools(tools *server.ToolRegistryV1, bridge Bridge) {
 					"blob_store_ids": {
 						"type": "array",
 						"items": {"type": "string"},
-						"description": "Blob store IDs to check (defaults to all stores if omitted)"
+						"description": "Blob-store-ids to check (defaults to all stores if omitted)"
 					}
 				},
 				"additionalProperties": false
@@ -205,7 +205,7 @@ func registerTools(tools *server.ToolRegistryV1, bridge Bridge) {
 	tools.Register(
 		protocol.ToolV1{
 			Name:        "madder_write",
-			Description: "Write files into the blob store. Paths are file paths or '-' for stdin. Can also accept a blob store ID to target a specific store.",
+			Description: "Write files into the blob store. Paths are file paths or '-' for stdin. Can also accept a blob-store-id to target a specific store.",
 			InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
@@ -267,18 +267,18 @@ func registerTools(tools *server.ToolRegistryV1, bridge Bridge) {
 	tools.Register(
 		protocol.ToolV1{
 			Name:        "madder_sync",
-			Description: "Sync blobs between stores. With no args, syncs default store to all others. With args, first is source store ID, rest are destination store IDs.",
+			Description: "Sync blobs between stores. With no args, syncs default store to all others. With args, first is source blob-store-id, rest are destination blob-store-ids.",
 			InputSchema: json.RawMessage(`{
 				"type": "object",
 				"properties": {
 					"source": {
 						"type": "string",
-						"description": "Source blob store ID (omit to use default)"
+						"description": "Source blob-store-id (omit to use default)"
 					},
 					"destinations": {
 						"type": "array",
 						"items": {"type": "string"},
-						"description": "Destination blob store IDs (omit to sync to all non-source stores)"
+						"description": "Destination blob-store-ids (omit to sync to all non-source stores)"
 					},
 					"limit": {
 						"type": "integer",
@@ -462,7 +462,7 @@ func registerTools(tools *server.ToolRegistryV1, bridge Bridge) {
 				"properties": {
 					"store": {
 						"type": "string",
-						"description": "Inventory archive store ID to pack (omit to pack all)"
+						"description": "Inventory archive blob-store-id to pack (omit to pack all)"
 					},
 					"delete_loose": {
 						"type": "boolean",

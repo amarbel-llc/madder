@@ -20,7 +20,7 @@ ID.
 Blob stores are managed by the **madder** utility or via dodder's
 **blob_store-** prefixed commands.
 
-# STORE IDS
+# BLOB-STORE-IDS
 
 Every blob store has an ID that determines its storage scope. The first
 character of the ID is an optional prefix indicating the backing XDG
@@ -57,7 +57,7 @@ location:
 
 The ID portion after the prefix may contain only **\[a-zA-Z0-9_-\]**.
 
-Two store IDs that share a name but differ in prefix refer to
+Two blob-store-ids that share a name but differ in prefix refer to
 **different stores** at different filesystem locations. For example,
 **default** and **.default** are distinct stores.
 
@@ -109,13 +109,15 @@ and writes to the target store.
 # INLINE STORE SWITCHING
 
 Several madder commands accept positional arguments that can be either data
-arguments (file paths, markl IDs) or store IDs. When an argument parses as a
-store ID, it switches the active store for all subsequent arguments.
+arguments (file paths, markl IDs) or blob-store-ids. When an argument parses
+as a blob-store-id, it switches the active store for all subsequent
+arguments.
 
 For file-accepting commands (**write**, **pack-blobs**), the shared helper tries
-to open the argument as a file first, falling back to store ID parsing. For
-digest-accepting commands (**cat**), store ID parsing is tried first since markl
-IDs are unambiguous (they start with a hash algorithm name).
+to open the argument as a file first, falling back to blob-store-id parsing.
+For digest-accepting commands (**cat**, **has**), blob-id parsing is tried
+first since markl IDs are unambiguous (they start with a hash algorithm
+name).
 
 Example:
 

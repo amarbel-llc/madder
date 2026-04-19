@@ -1,12 +1,13 @@
 package commands
 
 import (
+	"fmt"
 	"io"
 	"os/exec"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -40,7 +41,7 @@ func (cmd *Cat) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
 			Name:        "args",
-			Description: "markl IDs to retrieve, or blob store IDs to switch the active store",
+			Description: "markl IDs to retrieve, or blob-store-ids to switch the active store",
 			Variadic:    true,
 		},
 	}
@@ -51,7 +52,7 @@ func (cmd Cat) GetDescription() command.Description {
 		Short: "output blob contents by digest",
 		Long: "Retrieve and output the raw contents of one or more blobs " +
 			"identified by their content-addressable digest. Arguments are " +
-			"markl IDs (e.g. blake2b256-...) or blob store IDs that switch " +
+			"markl IDs (e.g. blake2b256-...) or blob-store-ids that switch " +
 			"the active store for subsequent lookups. Store IDs support " +
 			"optional prefixes that select the XDG scope: '.' for " +
 			"CWD-relative, '/' for system-wide, '%' for cache, '_' for " +
@@ -155,38 +156,51 @@ func (cmd Cat) Run(req command.Request) {
 
 	var blobStoreId blob_store_id.Id
 	explicitStore := false
+	var missCount int
 
 	for _, arg := range req.PopArgs() {
-		var blobId markl.Id
+		resolved := arg_resolver.Resolve(
+			arg,
+			arg_resolver.ModeBlobId|arg_resolver.ModeStoreSwitch,
+		)
 
-		if err := blobId.Set(arg); err == nil {
-			if err := cmd.blob(blobStore, &blobId, blobWriter); err != nil {
+		switch resolved.Kind {
+		case arg_resolver.KindBlobId:
+			if err := cmd.blob(blobStore, &resolved.BlobId, blobWriter); err != nil {
 				if explicitStore {
 					ui.Err().Print(err)
+					missCount++
 					continue
 				}
 
 				if err := cmd.blobFromRemainingStores(
 					envBlobStore,
-					&blobId,
+					&resolved.BlobId,
 				); err != nil {
 					ui.Err().Print(err)
+					missCount++
 				}
 			}
 
-			continue
-		}
-
-		if err := blobStoreId.Set(arg); err == nil {
+		case arg_resolver.KindStoreSwitch:
+			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			blobWriter = cmd.makeBlobWriter(envBlobStore, blobStore)
 			explicitStore = true
-			ui.Err().Printf("switched to blob store: %s", blobStoreId)
-			continue
-		}
+			ui.Err().Printf("switched to blob-store-id: %s", blobStoreId)
 
-		ui.Err().Print(
-			errors.Errorf("invalid argument (not a blob id or store id): %s", arg),
+		case arg_resolver.KindError:
+			ui.Err().Print(resolved.Err)
+			missCount++
+		}
+	}
+
+	if missCount > 0 {
+		errors.ContextCancelWithError(
+			req,
+			errors.MakeErrNotFoundString(
+				fmt.Sprintf("%d blob(s) not found", missCount),
+			),
 		)
 	}
 }

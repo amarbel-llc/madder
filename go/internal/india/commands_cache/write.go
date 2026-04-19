@@ -9,6 +9,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -104,20 +105,29 @@ func (cmd Write) Run(req command.Request) {
 			sawStdin = true
 		}
 
-		resolved := command_components.ResolveFileOrBlobStoreId(arg)
+		resolved := arg_resolver.Resolve(
+			arg,
+			arg_resolver.ModeFile|arg_resolver.ModeStoreSwitch,
+		)
 
-		if resolved.Err != nil {
+		switch resolved.Kind {
+		case arg_resolver.KindError:
 			sink.Failure(arg, resolved.Err)
 			failCount.Add(1)
 			continue
-		}
 
-		if resolved.IsStoreSwitch {
+		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
-			sink.Notice(fmt.Sprintf("switched to blob store: %s", blobStoreId))
+			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", blobStoreId))
 			continue
 		}
+
+		// KindFile — cache-write currently skips the shadow warning
+		// because cache stores live under $XDG_CACHE_HOME, not CWD —
+		// a file in CWD with the same bare name as a cache store
+		// can't reach the cache root by accident. If that assumption
+		// ever changes, lift the DetectShadow call from write.go.
 
 		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)
 		if err != nil {

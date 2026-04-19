@@ -37,8 +37,8 @@ var _ command.CommandWithParams = (*Fsck)(nil)
 func (cmd *Fsck) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
-			Name:        "store-ids",
-			Description: "blob store IDs to verify (defaults to all configured stores)",
+			Name:        "blob-store-ids",
+			Description: "blob-store-ids to verify (defaults to all configured stores)",
 			Variadic:    true,
 		},
 	}
@@ -50,7 +50,8 @@ func (cmd Fsck) GetDescription() command.Description {
 		Long: "Verify the integrity of one or more blob stores by reading " +
 			"every blob and recomputing its content-addressable digest. " +
 			"Reports corrupt, missing, or unreadable blobs. With no " +
-			"arguments, all configured stores are checked. Pass store IDs " +
+			"arguments, all configured stores are checked. Pass " +
+			"blob-store-ids " +
 			"to check specific stores. Store IDs support optional prefixes " +
 			"that select the XDG scope ('.', '/', '%', '_', or none) — " +
 			"see blob-store(7). Output defaults to TAP on an interactive " +

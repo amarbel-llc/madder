@@ -45,8 +45,8 @@ var (
 func (cmd *Sync) GetParams() []command.Param {
 	return []command.Param{
 		command.Arg[*values.String]{
-			Name:        "store-ids",
-			Description: "source store ID followed by destination store IDs (defaults to all)",
+			Name:        "blob-store-ids",
+			Description: "source blob-store-id followed by destination blob-store-ids (defaults to all)",
 			Variadic:    true,
 		},
 	}
@@ -56,11 +56,11 @@ func (cmd Sync) GetDescription() command.Description {
 	return command.Description{
 		Short: "synchronize blobs between stores",
 		Long: "Copy blobs from a source blob store to one or more destination " +
-			"stores. The first store ID argument is the source; remaining " +
-			"arguments are destinations. Store IDs support optional " +
-			"prefixes that select the XDG scope ('.', '/', '%', '_', or " +
-			"none) — see blob-store(7). With no arguments, the default " +
-			"store is the source and all other configured stores are " +
+			"stores. The first blob-store-id argument is the source; " +
+			"remaining arguments are destinations. Blob-store-ids support " +
+			"optional prefixes that select the XDG scope ('.', '/', '%', " +
+			"'_', or none) — see blob-store(7). With no arguments, the " +
+			"default store is the source and all other configured stores are " +
 			"destinations. When source and destination use different hash " +
 			"types, blobs are rehashed (source digests are not preserved in " +
 			"single-hash destinations). Use -limit to cap the number of " +

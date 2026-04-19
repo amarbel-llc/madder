@@ -139,6 +139,16 @@ func (cmd *BlobStore) MakeBlobStoreFromIdString(
 	return envBlobStore.GetBlobStore(blobStoreId)
 }
 
+// BlobStoreIds returns every configured blob-store-id as a slice, suitable
+// for passing to arg_resolver.DetectShadow.
+func BlobStoreIds(m blob_stores.BlobStoreMap) []blob_store_id.Id {
+	ids := make([]blob_store_id.Id, 0, len(m))
+	for _, s := range m {
+		ids = append(ids, s.Path.GetId())
+	}
+	return ids
+}
+
 func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 	req command.Request,
 	envBlobStore BlobStoreEnv,
@@ -155,7 +165,7 @@ func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 	for range req.RemainingArgCount() {
 		blobStoreId := command.PopRequestArg[blob_store_id.Id](
 			req,
-			"blob store id",
+			"blob-store-id",
 		)
 
 		blobStores[blobStoreId.String()] = envBlobStore.GetBlobStore(
@@ -181,7 +191,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 
 	sourceBlobStoreId := command.PopRequestArg[blob_store_id.Id](
 		req,
-		"source blob store id",
+		"source blob-store-id",
 	)
 
 	source = envBlobStore.GetBlobStore(*sourceBlobStoreId)
@@ -189,7 +199,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 	for range req.RemainingArgCount() {
 		blobStoreId := command.PopRequestArg[blob_store_id.Id](
 			req,
-			"destination blob store id",
+			"destination blob-store-id",
 		)
 
 		destinations[blobStoreId.String()] = envBlobStore.GetBlobStore(

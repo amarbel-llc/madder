@@ -27,7 +27,7 @@ func init() {
 				"affecting non-cache madder state.",
 		},
 		command.FilePath{
-			Path: "<store-root>/dodder-blob_store-config",
+			Path:        "<store-root>/dodder-blob_store-config",
 			Description: "Per-store configuration file in hyphence format.",
 		},
 	)
