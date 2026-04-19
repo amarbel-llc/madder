@@ -35,8 +35,10 @@ func init() {
 			Long: "Create a new local content-addressable blob store with " +
 				"hash-bucketed directory layout. The store is registered " +
 				"under the given store ID and uses the default compression " +
-				"and hash settings. Requires a store ID argument " +
-				"(e.g. 'default', '.archive').",
+				"and hash settings. The store ID selects the XDG scope via " +
+				"an optional prefix ('.', '/', '%', '_', or none) — see " +
+				"blob-store(7). Examples: 'default' (XDG user), '.archive' " +
+				"(CWD-relative), '%scratch' (XDG cache).",
 		},
 	})
 

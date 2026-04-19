@@ -48,8 +48,10 @@ func (cmd CatIds) GetDescription() command.Description {
 		Short: "list all blob digests in a store",
 		Long: "Output every blob digest stored in one or more blob stores. " +
 			"With no arguments, lists digests from all configured stores. " +
-			"Pass store IDs to query specific stores. Use -format to " +
-			"control the output encoding of blob digests.",
+			"Pass store IDs to query specific stores. Store IDs support " +
+			"optional prefixes that select the XDG scope ('.', '/', '%', " +
+			"'_', or none) — see blob-store(7). Use -format to control " +
+			"the output encoding of blob digests.",
 	}
 }
 

@@ -51,13 +51,15 @@ func (cmd Fsck) GetDescription() command.Description {
 			"every blob and recomputing its content-addressable digest. " +
 			"Reports corrupt, missing, or unreadable blobs. With no " +
 			"arguments, all configured stores are checked. Pass store IDs " +
-			"to check specific stores. Output defaults to TAP on an " +
-			"interactive terminal and to NDJSON when stdout is piped; pass " +
-			"-format to force a specific encoding. Each JSON record has " +
-			"fields \"id\" (for per-blob events), \"store\", \"state\" " +
-			"(verified, missing, corrupt, read_error, bail_out), and " +
-			"\"error\" on failures. Progress ticks and summaries route to " +
-			"stderr in JSON mode.",
+			"to check specific stores. Store IDs support optional prefixes " +
+			"that select the XDG scope ('.', '/', '%', '_', or none) — " +
+			"see blob-store(7). Output defaults to TAP on an interactive " +
+			"terminal and to NDJSON when stdout is piped; pass -format to " +
+			"force a specific encoding. Each JSON record has fields " +
+			"\"id\" (for per-blob events), \"store\", \"state\" (verified, " +
+			"missing, corrupt, read_error, bail_out), and \"error\" on " +
+			"failures. Progress ticks and summaries route to stderr in " +
+			"JSON mode.",
 	}
 }
 

@@ -52,11 +52,15 @@ func (cmd Cat) GetDescription() command.Description {
 		Long: "Retrieve and output the raw contents of one or more blobs " +
 			"identified by their content-addressable digest. Arguments are " +
 			"markl IDs (e.g. blake2b256-...) or blob store IDs that switch " +
-			"the active store for subsequent lookups. When a digest is not " +
-			"found in the active store, remaining stores are searched " +
-			"automatically. Use -utility to pipe each blob through an " +
-			"external command before output, or -prefix-sha to prepend " +
-			"each output line with the blob digest.",
+			"the active store for subsequent lookups. Store IDs support " +
+			"optional prefixes that select the XDG scope: '.' for " +
+			"CWD-relative, '/' for system-wide, '%' for cache, '_' for " +
+			"custom-rooted, and no prefix for the user default — see " +
+			"blob-store(7). When a digest is not found in the active " +
+			"store, remaining stores are searched automatically. Use " +
+			"-utility to pipe each blob through an external command " +
+			"before output, or -prefix-sha to prepend each output line " +
+			"with the blob digest.",
 	}
 }
 

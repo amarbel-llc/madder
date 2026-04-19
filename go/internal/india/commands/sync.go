@@ -57,7 +57,9 @@ func (cmd Sync) GetDescription() command.Description {
 		Short: "synchronize blobs between stores",
 		Long: "Copy blobs from a source blob store to one or more destination " +
 			"stores. The first store ID argument is the source; remaining " +
-			"arguments are destinations. With no arguments, the default " +
+			"arguments are destinations. Store IDs support optional " +
+			"prefixes that select the XDG scope ('.', '/', '%', '_', or " +
+			"none) — see blob-store(7). With no arguments, the default " +
 			"store is the source and all other configured stores are " +
 			"destinations. When source and destination use different hash " +
 			"types, blobs are rehashed (source digests are not preserved in " +

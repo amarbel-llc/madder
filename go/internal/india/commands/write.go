@@ -56,8 +56,14 @@ func (cmd Write) GetDescription() command.Description {
 		Short: "write blobs to a store",
 		Long: "Write files or stdin into the content-addressable blob store. " +
 			"Each argument is a file path, '-' for stdin, or a blob store ID " +
-			"that switches the active store for subsequent writes. " +
-			"Output defaults to TAP on an interactive terminal and to NDJSON " +
+			"that switches the active store for subsequent writes. Store IDs " +
+			"support optional prefixes that select the XDG scope: '.' for " +
+			"CWD-relative, '/' for system-wide, '%' for cache, '_' for " +
+			"custom-rooted, and no prefix for the user default — see " +
+			"blob-store(7). Unprefixed names are resolved as files first; " +
+			"to target a store that shares a name with a file in CWD use " +
+			"an explicit prefix (e.g. '~mystore', '_mystore'). Output " +
+			"defaults to TAP on an interactive terminal and to NDJSON " +
 			"(one JSON object per blob, suitable for programmatic consumers) " +
 			"when stdout is piped; pass -format to force a specific encoding. " +
 			"Each JSON record has fields \"id\", \"size\", and \"source\", plus " +

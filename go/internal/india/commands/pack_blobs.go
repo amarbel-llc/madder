@@ -57,6 +57,8 @@ func (cmd PackBlobs) GetDescription() command.Description {
 		Long: "Write files into the blob store and then pack just those " +
 			"blobs into an archive. Arguments are file paths, '-' for " +
 			"stdin, or blob store IDs that switch the active store. " +
+			"Store IDs support the same XDG-scope prefixes as 'write' " +
+			"('.', '/', '%', '_', or none) — see blob-store(7). " +
 			"Unlike 'pack', which packs all loose blobs, this command " +
 			"targets only the blobs written from the given files. " +
 			"Output defaults to TAP on an interactive terminal and to " +
