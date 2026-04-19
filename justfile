@@ -17,6 +17,22 @@ build:
 build-go:
   cd go && go build ./...
 
+# Build race-instrumented CLI binaries under .tmp/race/, for use by
+# test-bats-race. Kept out of the default build because the race
+# instrumentation is slow and the binaries are unsuitable for release.
+[group("build")]
+build-go-race:
+  mkdir -p {{justfile_directory()}}/.tmp/race
+  cd go && go build -race -o {{justfile_directory()}}/.tmp/race/ ./cmd/madder ./cmd/madder-cache
+
+# Build coverage-instrumented CLI binaries under .tmp/cover-bin/, for
+# use by test-bats-cover. The -cover flag wires the binaries to write
+# per-process coverage to $GOCOVERDIR at runtime.
+[group("build")]
+build-go-cover:
+  mkdir -p {{justfile_directory()}}/.tmp/cover-bin
+  cd go && go build -cover -covermode=atomic -o {{justfile_directory()}}/.tmp/cover-bin/ ./cmd/madder ./cmd/madder-cache
+
 # Regenerate pkgs/ facades from internal/ packages via dagnabit.
 [group("build")]
 generate-facades:
@@ -38,10 +54,63 @@ test: test-go test-bats
 test-go *flags:
   cd go && go test -tags test {{flags}} ./...
 
+# Run Go unit tests under the race detector. Not included in the
+# default `test` target because race builds are substantially slower.
+[group("test")]
+test-go-race *flags:
+  cd go && go test -tags test -race {{flags}} ./...
+
+# Run Go unit tests with coverage collection. Writes the profile to
+# .tmp/go-cover.out and prints the total coverage. View the full HTML
+# report with `cd go && go tool cover -html=../.tmp/go-cover.out`.
+[group("test")]
+test-go-cover *flags:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  out="{{justfile_directory()}}/.tmp/go-cover.out"
+  mkdir -p "$(dirname "$out")"
+  cd go
+  go test -tags test -coverprofile="$out" -covermode=atomic {{flags}} ./...
+  echo "==> Coverage written to $out"
+  go tool cover -func="$out" | tail -n 1
+
 # Run bats integration tests.
 [group("test")]
 test-bats: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test
+
+# Run bats integration tests against race-instrumented binaries built
+# by build-go-race. Catches data races that the unit-test -race pass
+# won't, since several code paths only execute in the real CLI.
+[group("test")]
+test-bats-race: build-go-race
+  MADDER_BIN={{justfile_directory()}}/.tmp/race/madder just zz-tests_bats/test
+
+# Run bats integration tests against coverage-instrumented binaries.
+# Collects GOCOVERDIR fragments into a per-run temp dir and converts
+# them to a Go coverage profile at .tmp/cover-data/bats-coverage.out.
+#
+# GOCOVERDIR is placed under /tmp explicitly (not TMPDIR) because the
+# bats sandcastle harness restricts the binary's write roots to /tmp
+# and the test's own BATS_TEST_TMPDIR. A GOCOVERDIR inside the repo's
+# .tmp/ (which is where $TMPDIR often points in nix-shell) trips
+# "read-only file system" errors from the cover runtime.
+[group("test")]
+test-bats-cover: build-go-cover
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cover_data="$(mktemp -d /tmp/madder-cover-XXXXXX)"
+  trap 'rm -rf "$cover_data"' EXIT
+
+  GOCOVERDIR="$cover_data" \
+    MADDER_BIN="{{justfile_directory()}}/.tmp/cover-bin/madder" \
+    just zz-tests_bats/test
+
+  out_dir="{{justfile_directory()}}/.tmp/cover-data"
+  mkdir -p "$out_dir"
+  (cd go && go tool covdata textfmt -i="$cover_data" -o="$out_dir/bats-coverage.out")
+  echo "==> Coverage written to $out_dir/bats-coverage.out"
+  (cd go && go tool cover -func="$out_dir/bats-coverage.out" | tail -n 1)
 
 # Run specific bats test files.
 [group("test")]
