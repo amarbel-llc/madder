@@ -27,7 +27,11 @@ func (cmd *BlobStore) MakeBlobStoreFromConfigPath(
 			blob_store_configs.Coder,
 			configPath,
 		); err != nil {
-			envBlobStore.Cancel(err)
+			envBlobStore.Cancel(errors.Wrapf(
+				err,
+				"blob store config at %q",
+				configPath,
+			))
 			return blobStore
 		}
 	}
@@ -80,7 +84,11 @@ func (cmd *BlobStore) MakeBlobStoreFromIdOrConfigPath(
 					err = nil
 					goto tryBlobStoreId
 				} else {
-					envBlobStore.Cancel(err)
+					envBlobStore.Cancel(errors.Wrapf(
+						err,
+						"blob store config at %q",
+						configPath,
+					))
 					return blobStore
 				}
 			}

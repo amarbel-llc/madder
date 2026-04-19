@@ -55,3 +55,36 @@ function init_inventory_archive_with_encryption { # @test
   assert_success
   assert_output --regexp '.+'
 }
+
+function init_error_includes_store_id_and_path { # @test
+
+  # Regression for #21: when store discovery hits an invalid config on
+  # disk, the error must identify which store and which config file.
+  # Pre-populate a .broken store with hash_type-id = "", then try to
+  # init a new store. Discovery will try to decode .broken first and
+  # the error should name both the store id and the config path.
+
+  local store_dir=".madder/local/share/blob_stores/broken"
+  mkdir -p "$store_dir"
+
+  cat >"$store_dir/dodder-blob_store-config" <<-'HEADER'
+	---
+	! toml-blob_store_config-v3
+	---
+HEADER
+
+  cat >>"$store_dir/dodder-blob_store-config" <<-'EOM'
+
+	hash_type-id = ""
+	compression-type = "zstd"
+	encryption = ""
+	lock-internal-files = false
+	hash-buckets = [2]
+EOM
+
+  run_madder init -encryption none -lock-internal-files=false .default
+  assert_failure
+  assert_output --partial '".broken"'
+  assert_output --partial "$store_dir/dodder-blob_store-config"
+  assert_output --partial "unsupported hash type"
+}

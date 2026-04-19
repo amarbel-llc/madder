@@ -59,7 +59,12 @@ func makeBlobStoreConfigs(
 			blob_store_configs.Coder,
 			configPath,
 		); err != nil {
-			ctx.Cancel(err)
+			ctx.Cancel(errors.Wrapf(
+				err,
+				"blob store %q at %q",
+				blobStoreIdString,
+				configPath,
+			))
 			return blobStores
 		} else {
 			blobStore.Config = typedConfig
@@ -181,6 +186,22 @@ func MakeBlobStore(
 	configNamed blob_store_configs.ConfigNamed,
 	blobStores BlobStoreMap,
 ) (store domain_interfaces.BlobStore, err error) {
+	// Any error that bubbles out of the construction helpers (hash type
+	// validation, SFTP connection, archive open, pointer resolution)
+	// needs the blob-store id and config path to be debuggable — a bare
+	// "unsupported hash type: \"\"" with no pointer to which store
+	// misconfigured it wastes time. See #21.
+	defer func() {
+		if err != nil {
+			err = errors.Wrapf(
+				err,
+				"blob store %q at %q",
+				configNamed.Path.GetId(),
+				configNamed.Path.GetConfig(),
+			)
+		}
+	}()
+
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
 		fmt.Sprintf("(blob_store: %s) ", configNamed.Path.GetId()),
@@ -301,7 +322,11 @@ func MakeBlobStore(
 			blob_store_configs.Coder,
 			otherStorePath.GetConfig(),
 		); err != nil {
-			err = errors.Wrap(err)
+			err = errors.Wrapf(
+				err,
+				"pointer target at %q",
+				otherStorePath.GetConfig(),
+			)
 			return store, err
 		}
 
