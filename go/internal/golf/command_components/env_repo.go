@@ -65,6 +65,18 @@ func MakeBlobStoreEnv(
 	return env
 }
 
+// MakeBlobStoreEnvWithoutStores returns a BlobStoreEnv with the directory
+// layout wired up but no blob stores discovered or initialized. Use this from
+// commands that operate on the on-disk layout directly and must not trigger
+// blob store discovery (e.g. the legacy-config migration command, which needs
+// to run before discovery would succeed).
+func MakeBlobStoreEnvWithoutStores(
+	envLocal env_local.Env,
+) BlobStoreEnv {
+	env, _ := makeBlobStoreEnvBase(envLocal)
+	return env
+}
+
 func MakeBlobStoreEnvWithOrder(
 	envLocal env_local.Env,
 	blobStoreIds []blob_store_id.Id,

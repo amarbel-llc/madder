@@ -18,6 +18,22 @@ type EnvBlobStore struct{}
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req command.Request,
 ) BlobStoreEnv {
+	return MakeBlobStoreEnv(cmd.makeEnvLocal(req))
+}
+
+// MakeEnvBlobStoreWithoutStores returns a BlobStoreEnv with the directory
+// layout wired up but no blob stores discovered or initialized. Use this from
+// commands that must operate before discovery would succeed, such as the
+// legacy-config migration command.
+func (cmd EnvBlobStore) MakeEnvBlobStoreWithoutStores(
+	req command.Request,
+) BlobStoreEnv {
+	return MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req))
+}
+
+func (cmd EnvBlobStore) makeEnvLocal(
+	req command.Request,
+) env_local.Env {
 	config := DefaultConfig
 
 	var debugOptions debug.Options
@@ -42,7 +58,5 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 		envOptions,
 	)
 
-	envLocal := env_local.Make(envUI, dir)
-
-	return MakeBlobStoreEnv(envLocal)
+	return env_local.Make(envUI, dir)
 }
