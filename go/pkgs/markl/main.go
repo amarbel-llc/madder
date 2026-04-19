@@ -68,7 +68,9 @@ var (
 	EqualsReader                       = internal.EqualsReader
 	ErrEcdsaP256SSHAgentNotConnected   = internal.ErrEcdsaP256SSHAgentNotConnected
 	ErrEd25519SSHAgentNotConnected     = internal.ErrEd25519SSHAgentNotConnected
+	ErrEd25519SeedNotPrivateKey        = internal.ErrEd25519SeedNotPrivateKey
 	ErrEmptyType                       = internal.ErrEmptyType
+	ErrNilFormat                       = internal.ErrNilFormat
 	FormatBytesAsHex                   = internal.FormatBytesAsHex
 	FormatHashBlake2b256               = internal.FormatHashBlake2b256
 	FormatHashSha256                   = internal.FormatHashSha256
