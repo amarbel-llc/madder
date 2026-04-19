@@ -127,3 +127,21 @@ function pack_without_delta { # @test
   assert_success
   assert_output
 }
+
+function pack_blobs_json_emits_per_arg_and_final_record { # @test
+
+  # pack-blobs writes each arg as a blob, then packs those blobs. In JSON
+  # mode, per-arg writes are NDJSON records with id/size/source; the
+  # final record has state:"packed" or "pack_failed".
+  init_store
+  create_archive_config "archive" "false"
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "pack-json" >"$blob"
+
+  run_madder pack-blobs -format json "$blob"
+  assert_success
+  # One per-arg record (id/source) plus one final state:"packed".
+  assert_output --regexp '"id":"[^"]+".*"source":"[^"]+blob\.txt"'
+  assert_output --partial '"state":"packed"'
+}

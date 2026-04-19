@@ -7,24 +7,29 @@ import (
 	"sync/atomic"
 	"time"
 
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/madder/go/internal/charlie/blob_verify_sink"
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {
-	utility.AddCmd("fsck", &Fsck{})
+	utility.AddCmd("fsck", &Fsck{
+		Format: output_format.Default,
+	})
 }
 
 type Fsck struct {
 	command_components.EnvBlobStore
 	command_components.BlobStore
+
+	Format output_format.Format
 }
 
 var _ command.CommandWithParams = (*Fsck)(nil)
@@ -46,9 +51,20 @@ func (cmd Fsck) GetDescription() command.Description {
 			"every blob and recomputing its content-addressable digest. " +
 			"Reports corrupt, missing, or unreadable blobs. With no " +
 			"arguments, all configured stores are checked. Pass store IDs " +
-			"to check specific stores. Output is TAP format with progress " +
-			"updates every 3 seconds.",
+			"to check specific stores. Output defaults to TAP on an " +
+			"interactive terminal and to NDJSON when stdout is piped; pass " +
+			"-format to force a specific encoding. Each JSON record has " +
+			"fields \"id\" (for per-blob events), \"store\", \"state\" " +
+			"(verified, missing, corrupt, read_error, bail_out), and " +
+			"\"error\" on failures. Progress ticks and summaries route to " +
+			"stderr in JSON mode.",
 	}
+}
+
+func (cmd *Fsck) SetFlagDefinitions(
+	flagSet interfaces.CLIFlagDefinitions,
+) {
+	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 }
 
 func (cmd Fsck) Complete(
@@ -68,10 +84,16 @@ func (cmd Fsck) Run(req command.Request) {
 
 	blobStores := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)
 
-	tw := tap.NewWriter(os.Stdout)
+	var sink blob_verify_sink.Sink
+	switch cmd.Format.Resolve(os.Stdout) {
+	case output_format.FormatJSON:
+		sink = blob_verify_sink.NewJSON(os.Stdout, os.Stderr)
+	default:
+		sink = blob_verify_sink.NewTAP(os.Stdout)
+	}
 
 	for storeId, blobStore := range blobStores {
-		tw.Comment(fmt.Sprintf("(blob_store: %s) starting fsck...", storeId))
+		sink.Notice(fmt.Sprintf("(blob_store: %s) starting fsck...", storeId))
 
 		var count atomic.Uint32
 		var errorCount atomic.Uint32
@@ -84,7 +106,7 @@ func (cmd Fsck) Run(req command.Request) {
 					errors.ContextContinueOrPanic(ctx)
 
 					if err != nil {
-						tw.NotOk("(unknown blob)", tap_diagnostics.FromError(err))
+						sink.ReadError(storeId, err)
 						errorCount.Add(1)
 						count.Add(1)
 
@@ -94,7 +116,7 @@ func (cmd Fsck) Run(req command.Request) {
 					count.Add(1)
 
 					if !blobStore.HasBlob(digest) {
-						tw.NotOk(fmt.Sprintf("%s", digest), map[string]string{"severity": "fail", "message": "blob missing"})
+						sink.Missing(digest, storeId)
 						errorCount.Add(1)
 
 						continue
@@ -106,17 +128,17 @@ func (cmd Fsck) Run(req command.Request) {
 						digest,
 						io.MultiWriter(&progressWriter, io.Discard),
 					); err != nil {
-						tw.NotOk(fmt.Sprintf("%s", digest), tap_diagnostics.FromError(err))
+						sink.Corrupt(digest, storeId, err)
 						errorCount.Add(1)
 
 						continue
 					}
 
-					tw.Ok(fmt.Sprintf("%s", digest))
+					sink.Verified(digest, storeId)
 				}
 			},
 			func(time time.Time) {
-				tw.Comment(fmt.Sprintf(
+				sink.Notice(fmt.Sprintf(
 					"(blob_store: %s) %d blobs / %s verified, %d errors",
 					storeId,
 					count.Load(),
@@ -126,12 +148,12 @@ func (cmd Fsck) Run(req command.Request) {
 			},
 			3*time.Second,
 		); err != nil {
-			tw.BailOut(err.Error())
+			sink.BailOut(err.Error())
 			envBlobStore.Cancel(err)
 			return
 		}
 
-		tw.Comment(fmt.Sprintf(
+		sink.Notice(fmt.Sprintf(
 			"(blob_store: %s) blobs verified: %d, bytes verified: %s",
 			storeId,
 			count.Load(),
@@ -139,5 +161,5 @@ func (cmd Fsck) Run(req command.Request) {
 		))
 	}
 
-	tw.Plan()
+	sink.Finalize()
 }

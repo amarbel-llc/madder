@@ -1,11 +1,14 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -20,7 +23,9 @@ import (
 )
 
 func init() {
-	utility.AddCmd("sync", &Sync{})
+	utility.AddCmd("sync", &Sync{
+		Format: output_format.Default,
+	})
 }
 
 type Sync struct {
@@ -28,6 +33,7 @@ type Sync struct {
 	command_components.BlobStore
 
 	AllowRehashing bool
+	Format         output_format.Format
 	Limit          int
 }
 
@@ -56,7 +62,12 @@ func (cmd Sync) GetDescription() command.Description {
 			"destinations. When source and destination use different hash " +
 			"types, blobs are rehashed (source digests are not preserved in " +
 			"single-hash destinations). Use -limit to cap the number of " +
-			"blobs transferred. Output is TAP format with per-blob status.",
+			"blobs transferred. Output defaults to TAP on an interactive " +
+			"terminal and to NDJSON when stdout is piped; pass -format to " +
+			"force a specific encoding. Each JSON record has fields \"id\", " +
+			"\"state\" (transferred, exists, failed, list_error), \"size\" " +
+			"for transferred blobs, and \"error\" for failures. Summary and " +
+			"limit notices route to stderr in JSON mode.",
 	}
 }
 
@@ -69,6 +80,8 @@ func (cmd *Sync) SetFlagDefinitions(
 		false,
 		"allow syncing to stores with a different hash type (source digests not preserved in single-hash destinations)",
 	)
+
+	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 
 	flagSet.IntVar(
 		&cmd.Limit,
@@ -101,16 +114,124 @@ func (cmd Sync) Run(req command.Request) {
 	cmd.runStore(req, envBlobStore, source, destinations)
 }
 
+// syncSink is Sync-local because the per-blob event shape (transfer with
+// byte count + exists + failed) differs from blob_write_sink's record.
+type syncSink interface {
+	// transferred reports a blob copied from source to destinations with
+	// bytesWritten known.
+	transferred(id domain_interfaces.MarklId, bytesWritten int64)
+	// exists reports a blob skipped because it was already in all
+	// destinations (bytesWritten is 0).
+	exists(id domain_interfaces.MarklId)
+	// failed reports a transfer failure for a known id.
+	failed(id domain_interfaces.MarklId, bytesWritten int64, err error)
+	// listError reports a failure reading the source's blob list (no id).
+	listError(err error)
+	// notice reports informational events (limit-hit, summary); stderr in
+	// JSON mode.
+	notice(msg string)
+	// bailOut reports a fatal error that stops the stream.
+	bailOut(msg string)
+	// finalize flushes. TAP emits the plan; JSON is a no-op.
+	finalize()
+}
+
+type syncTapSink struct {
+	tw *tap.Writer
+}
+
+func (s *syncTapSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
+	s.tw.Ok(formatSyncTestPoint(id, bytesWritten))
+}
+
+func (s *syncTapSink) exists(id domain_interfaces.MarklId) {
+	s.tw.Ok(formatSyncTestPoint(id, 0))
+}
+
+func (s *syncTapSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
+	s.tw.NotOk(formatSyncTestPoint(id, bytesWritten), tap_diagnostics.FromError(err))
+}
+
+func (s *syncTapSink) listError(err error) {
+	s.tw.NotOk("(unknown blob)", tap_diagnostics.FromError(err))
+}
+
+func (s *syncTapSink) notice(msg string) {
+	s.tw.Comment(msg)
+}
+
+func (s *syncTapSink) bailOut(msg string) {
+	s.tw.BailOut(msg)
+}
+
+func (s *syncTapSink) finalize() {
+	s.tw.Plan()
+}
+
+type syncRecord struct {
+	Id    string `json:"id,omitempty"`
+	Size  *int64 `json:"size,omitempty"`
+	State string `json:"state,omitempty"`
+	Error string `json:"error,omitempty"`
+}
+
+type syncJsonSink struct {
+	enc    *json.Encoder
+	errOut io.Writer
+}
+
+func (s *syncJsonSink) emit(rec syncRecord) {
+	_ = s.enc.Encode(rec)
+}
+
+func (s *syncJsonSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
+	size := bytesWritten
+	s.emit(syncRecord{Id: id.String(), Size: &size, State: "transferred"})
+}
+
+func (s *syncJsonSink) exists(id domain_interfaces.MarklId) {
+	s.emit(syncRecord{Id: id.String(), State: "exists"})
+}
+
+func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
+	rec := syncRecord{Id: id.String(), State: "failed", Error: err.Error()}
+	if bytesWritten > 0 {
+		size := bytesWritten
+		rec.Size = &size
+	}
+	s.emit(rec)
+}
+
+func (s *syncJsonSink) listError(err error) {
+	s.emit(syncRecord{State: "list_error", Error: err.Error()})
+}
+
+func (s *syncJsonSink) notice(msg string) {
+	fmt.Fprintln(s.errOut, msg)
+}
+
+func (s *syncJsonSink) bailOut(msg string) {
+	s.emit(syncRecord{State: "bail_out", Error: msg})
+}
+
+func (s *syncJsonSink) finalize() {}
+
 func (cmd Sync) runStore(
 	req command.Request,
 	envBlobStore command_components.BlobStoreEnv,
 	source blob_stores.BlobStoreInitialized,
 	destination blob_stores.BlobStoreMap,
 ) {
-	tw := tap.NewWriter(os.Stdout)
+	var sink syncSink
+	switch cmd.Format.Resolve(os.Stdout) {
+	case output_format.FormatJSON:
+		sink = &syncJsonSink{enc: json.NewEncoder(os.Stdout), errOut: os.Stderr}
+	default:
+		sink = &syncTapSink{tw: tap.NewWriter(os.Stdout)}
+	}
 
 	if len(destination) == 0 {
-		tw.BailOut("only one blob store, nothing to sync")
+		sink.bailOut("only one blob store, nothing to sync")
 
 		errors.ContextCancelWithBadRequestf(
 			req,
@@ -175,7 +296,7 @@ func (cmd Sync) runStore(
 
 	defer req.Must(
 		func(_ interfaces.ActiveContext) error {
-			tw.Comment(fmt.Sprintf(
+			sink.notice(fmt.Sprintf(
 				"Successes: %d, Failures: %d, Ignored: %d, Total: %d",
 				blobImporter.Counts.Succeeded,
 				blobImporter.Counts.Failed,
@@ -183,7 +304,7 @@ func (cmd Sync) runStore(
 				blobImporter.Counts.Total,
 			))
 
-			tw.Plan()
+			sink.finalize()
 
 			return nil
 		},
@@ -193,36 +314,29 @@ func (cmd Sync) runStore(
 		lastBytesWritten = 0
 
 		if errIter != nil {
-			tw.NotOk(
-				fmt.Sprintf("%s", blobId),
-				tap_diagnostics.FromError(errIter),
-			)
-
+			sink.listError(errIter)
 			continue
 		}
 
 		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
 			if env_dir.IsErrBlobAlreadyExists(err) {
-				tw.Ok(formatBlobTestPoint(blobId, lastBytesWritten))
+				sink.transferred(blobId, lastBytesWritten)
 			} else {
-				tw.NotOk(
-					formatBlobTestPoint(blobId, lastBytesWritten),
-					tap_diagnostics.FromError(err),
-				)
+				sink.failed(blobId, lastBytesWritten, err)
 			}
 		} else {
-			tw.Ok(formatBlobTestPoint(blobId, lastBytesWritten))
+			sink.transferred(blobId, lastBytesWritten)
 		}
 
 		if cmd.Limit > 0 &&
 			(blobImporter.Counts.Succeeded+blobImporter.Counts.Failed) > cmd.Limit {
-			tw.Comment("limit hit, stopping")
+			sink.notice("limit hit, stopping")
 			break
 		}
 	}
 }
 
-func formatBlobTestPoint(
+func formatSyncTestPoint(
 	blobId domain_interfaces.MarklId,
 	bytesWritten int64,
 ) string {

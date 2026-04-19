@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -8,7 +9,8 @@ import (
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -20,13 +22,16 @@ import (
 )
 
 func init() {
-	utility.AddCmd("pack-blobs", &PackBlobs{})
+	utility.AddCmd("pack-blobs", &PackBlobs{
+		Format: output_format.Default,
+	})
 }
 
 type PackBlobs struct {
 	command_components.EnvBlobStore
 
 	DeleteLoose bool
+	Format      output_format.Format
 	MaxPackSize ui.HumanReadableBytes
 	Delta       bool
 }
@@ -53,7 +58,13 @@ func (cmd PackBlobs) GetDescription() command.Description {
 			"blobs into an archive. Arguments are file paths, '-' for " +
 			"stdin, or blob store IDs that switch the active store. " +
 			"Unlike 'pack', which packs all loose blobs, this command " +
-			"targets only the blobs written from the given files.",
+			"targets only the blobs written from the given files. " +
+			"Output defaults to TAP on an interactive terminal and to " +
+			"NDJSON when stdout is piped; pass -format to force a specific " +
+			"encoding. Per-arg writes share madder-write(1)'s JSON record " +
+			"shape; a final {\"state\":\"packed\" or \"pack_failed\",\"store\":\"...\"} " +
+			"record closes the stream. In JSON mode, the internal packer's " +
+			"phase-level TAP output routes to stderr so stdout stays NDJSON.",
 	}
 }
 
@@ -77,16 +88,47 @@ func (cmd *PackBlobs) SetFlagDefinitions(
 		"validate archive then delete packed loose blobs")
 	flagSet.BoolVar(&cmd.Delta, "delta", false,
 		"enable delta compression during packing")
+	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 	flagSet.Var(&cmd.MaxPackSize, "max-pack-size",
 		"override max pack size (e.g. 100M, 1G, 0 = unlimited)",
 	)
+}
+
+// packFinalRecord is emitted in JSON mode after all args and the pack
+// phase complete, so consumers can detect end-of-stream and pack outcome.
+type packFinalRecord struct {
+	State string `json:"state"`
+	Store string `json:"store,omitempty"`
+	Error string `json:"error,omitempty"`
 }
 
 func (cmd PackBlobs) Run(req command.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 
-	tw := tap.NewWriter(os.Stdout)
+	format := cmd.Format.Resolve(os.Stdout)
+
+	// In TAP mode, per-arg sink and the pack internals share one tap.Writer
+	// so all test points numbered consecutively on stdout. In JSON mode,
+	// the pack internals write TAP to stderr (diagnostic-only); per-arg
+	// events are NDJSON on stdout.
+	var (
+		sink            blob_write_sink.Sink
+		packTapWriter   *tap.Writer
+		emitFinal       func(success bool, err error)
+		jsonFinalWriter io.Writer
+	)
+
+	switch format {
+	case output_format.FormatJSON:
+		sink = blob_write_sink.NewJSON(os.Stdout, os.Stderr, false)
+		packTapWriter = tap.NewWriter(os.Stderr)
+		jsonFinalWriter = os.Stdout
+	default:
+		tw := tap.NewWriter(os.Stdout)
+		sink = blob_write_sink.NewTAPWithWriter(tw)
+		packTapWriter = tw
+	}
 
 	var blobStoreId blob_store_id.Id
 	storeIdString := ".default"
@@ -97,7 +139,7 @@ func (cmd PackBlobs) Run(req command.Request) {
 	for _, arg := range req.PopArgs() {
 		switch {
 		case arg == "-" && sawStdin:
-			tw.Comment("'-' passed in more than once. Ignoring")
+			sink.Notice("'-' passed in more than once. Ignoring")
 			continue
 
 		case arg == "-":
@@ -107,7 +149,7 @@ func (cmd PackBlobs) Run(req command.Request) {
 		resolved := command_components.ResolveFileOrBlobStoreId(arg)
 
 		if resolved.Err != nil {
-			tw.NotOk(arg, tap_diagnostics.FromError(resolved.Err))
+			sink.Failure(arg, resolved.Err)
 			continue
 		}
 
@@ -115,40 +157,75 @@ func (cmd PackBlobs) Run(req command.Request) {
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			storeIdString = blobStoreId.String()
-			tw.Comment(fmt.Sprintf("switched to blob store: %s", storeIdString))
+			sink.Notice(fmt.Sprintf("switched to blob store: %s", storeIdString))
 			continue
 		}
 
-		blobId, err := cmd.doOne(blobStore, resolved.BlobReader)
+		blobId, _, err := cmd.doOne(blobStore, resolved.BlobReader)
 		if err != nil {
-			tw.NotOk(arg, tap_diagnostics.FromError(err))
+			sink.Failure(arg, err)
 			continue
 		}
 
 		if blobId.IsNull() {
-			tw.Skip(arg, "null digest")
+			sink.Skip(arg, "null digest")
 			continue
 		}
 
-		tw.Ok(fmt.Sprintf("%s %s", blobId, arg))
+		storeName := ""
+		if !blobStoreId.IsEmpty() {
+			storeName = blobStoreId.String()
+		}
+
+		// Blob size for the record — cheapest to recompute from the filter
+		// isn't possible without a re-read, so just pass 0 for now. TAP
+		// already discards it. NDJSON consumers can stat the source file
+		// themselves if they need the exact byte count.
+		sink.Success(blobId, 0, arg, storeName)
 		blobFilter[blobId.String()] = blobId
 	}
 
+	// Build the finalizer closure now that storeIdString is settled.
+	if format == output_format.FormatJSON {
+		enc := json.NewEncoder(jsonFinalWriter)
+		emitFinal = func(success bool, err error) {
+			rec := packFinalRecord{Store: storeIdString}
+			if success {
+				rec.State = "packed"
+			} else {
+				rec.State = "pack_failed"
+				if err != nil {
+					rec.Error = err.Error()
+				}
+			}
+			_ = enc.Encode(rec)
+		}
+	} else {
+		emitFinal = func(success bool, err error) {
+			if success {
+				packTapWriter.Ok(fmt.Sprintf("pack %s", storeIdString))
+			} else {
+				msg := "pack failed"
+				if err != nil {
+					msg = err.Error()
+				}
+				packTapWriter.NotOk(
+					fmt.Sprintf("pack %s", storeIdString),
+					map[string]string{"severity": "fail", "message": msg},
+				)
+			}
+		}
+	}
+
 	if len(blobFilter) == 0 {
-		tw.Plan()
+		sink.Finalize()
 		return
 	}
 
 	packable, ok := blobStore.BlobStore.(blob_stores.PackableArchive)
 	if !ok {
-		tw.NotOk(
-			fmt.Sprintf("pack %s", storeIdString),
-			map[string]string{
-				"severity": "fail",
-				"message":  "not packable",
-			},
-		)
-		tw.Plan()
+		emitFinal(false, fmt.Errorf("not packable"))
+		sink.Finalize()
 		return
 	}
 
@@ -159,41 +236,38 @@ func (cmd PackBlobs) Run(req command.Request) {
 		BlobFilter:           blobFilter,
 		MaxPackSize:          cmd.MaxPackSize.GetByteCount(),
 		Delta:                cmd.Delta,
-		TapWriter:            tw,
+		TapWriter:            packTapWriter,
 	}); err != nil {
-		tw.NotOk(
-			fmt.Sprintf("pack %s", storeIdString),
-			tap_diagnostics.FromError(err),
-		)
-		tw.Plan()
+		emitFinal(false, err)
+		sink.Finalize()
 		return
 	}
 
-	tw.Ok(fmt.Sprintf("pack %s", storeIdString))
-	tw.Plan()
+	emitFinal(true, nil)
+	sink.Finalize()
 }
 
 func (cmd PackBlobs) doOne(
 	blobStore blob_stores.BlobStoreInitialized,
 	blobReader domain_interfaces.BlobReader,
-) (blobId domain_interfaces.MarklId, err error) {
+) (blobId domain_interfaces.MarklId, size int64, err error) {
 	defer errors.DeferredCloser(&err, blobReader)
 
 	var writeCloser domain_interfaces.BlobWriter
 
 	if writeCloser, err = blobStore.MakeBlobWriter(nil); err != nil {
 		err = errors.Wrap(err)
-		return blobId, err
+		return blobId, size, err
 	}
 
 	defer errors.DeferredCloser(&err, writeCloser)
 
-	if _, err = io.Copy(writeCloser, blobReader); err != nil {
+	if size, err = io.Copy(writeCloser, blobReader); err != nil {
 		err = errors.Wrap(err)
-		return blobId, err
+		return blobId, size, err
 	}
 
 	blobId = writeCloser.GetMarklId()
 
-	return blobId, err
+	return blobId, size, err
 }

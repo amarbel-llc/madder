@@ -48,3 +48,22 @@ function sync_idempotent { # @test
   run_madder sync .default .sha256
   assert_success
 }
+
+function sync_json_auto_detects { # @test
+
+  # Default (auto) + piped stdout -> NDJSON with transferred records.
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sync-json-test" >"$blob"
+  run_madder write -format tap "$blob"
+  assert_success
+
+  run_madder init -hash_type-id sha256 -encryption none -lock-internal-files=false .sha256
+  assert_success
+
+  run_madder sync .default .sha256
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial 'TAP version 14'
+}

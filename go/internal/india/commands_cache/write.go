@@ -6,11 +6,11 @@ import (
 	"os"
 	"sync/atomic"
 
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -21,13 +21,16 @@ import (
 )
 
 func init() {
-	utility.AddCmd("write", &Write{})
+	utility.AddCmd("write", &Write{
+		Format: output_format.Default,
+	})
 }
 
 type Write struct {
 	command_components.EnvBlobStore
 
 	Check         bool
+	Format        output_format.Format
 	UtilityBefore script_value.Utility
 	UtilityAfter  script_value.Utility
 }
@@ -51,8 +54,10 @@ func (cmd Write) GetDescription() command.Description {
 	return command.Description{
 		Short: "write blobs to a cache store",
 		Long: "Write files or stdin into a purgeable content-addressable " +
-			"blob store under XDG_CACHE_HOME. Output is TAP format with " +
-			"the computed digest and source path for each blob.",
+			"blob store under XDG_CACHE_HOME. Output defaults to TAP on an " +
+			"interactive terminal and to NDJSON when stdout is piped; pass " +
+			"-format to force a specific encoding. See madder-write(1) for " +
+			"the per-blob JSON record shape.",
 	}
 }
 
@@ -66,21 +71,23 @@ func (cmd *Write) SetFlagDefinitions(
 		"only check if the object already exists",
 	)
 
+	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
+
 	flagSet.Var(&cmd.UtilityBefore, "utility-before", "")
 	flagSet.Var(&cmd.UtilityAfter, "utility-after", "")
-}
-
-type blobWriteResult struct {
-	error
-	domain_interfaces.MarklId
-	Path string
 }
 
 func (cmd Write) Run(req command.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 
-	tw := tap.NewWriter(os.Stdout)
+	var sink blob_write_sink.Sink
+	switch cmd.Format.Resolve(os.Stdout) {
+	case output_format.FormatJSON:
+		sink = blob_write_sink.NewJSON(os.Stdout, os.Stderr, cmd.Check)
+	default:
+		sink = blob_write_sink.NewTAP(os.Stdout)
+	}
 
 	var failCount atomic.Uint32
 	var blobStoreId blob_store_id.Id
@@ -90,19 +97,17 @@ func (cmd Write) Run(req command.Request) {
 	for _, arg := range req.PopArgs() {
 		switch {
 		case arg == "-" && sawStdin:
-			tw.Comment("'-' passed in more than once. Ignoring")
+			sink.Notice("'-' passed in more than once. Ignoring")
 			continue
 
 		case arg == "-":
 			sawStdin = true
 		}
 
-		result := blobWriteResult{Path: arg}
-
 		resolved := command_components.ResolveFileOrBlobStoreId(arg)
 
 		if resolved.Err != nil {
-			tw.NotOk(arg, tap_diagnostics.FromError(resolved.Err))
+			sink.Failure(arg, resolved.Err)
 			failCount.Add(1)
 			continue
 		}
@@ -110,44 +115,42 @@ func (cmd Write) Run(req command.Request) {
 		if resolved.IsStoreSwitch {
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
-			tw.Comment(fmt.Sprintf("switched to blob store: %s", blobStoreId))
+			sink.Notice(fmt.Sprintf("switched to blob store: %s", blobStoreId))
 			continue
 		}
 
-		result.MarklId, result.error = cmd.doOne(blobStore, resolved.BlobReader)
-
-		if result.error != nil {
-			tw.NotOk(arg, tap_diagnostics.FromError(result.error))
+		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)
+		if err != nil {
+			sink.Failure(arg, err)
 			failCount.Add(1)
 			continue
 		}
 
-		if result.IsNull() {
-			tw.Skip(arg, "null digest")
+		if blobId.IsNull() {
+			sink.Skip(arg, "null digest")
 			continue
 		}
 
-		hasBlob := blobStore.HasBlob(result.MarklId)
+		storeName := ""
+		if !blobStoreId.IsEmpty() {
+			storeName = blobStoreId.String()
+		}
+
+		hasBlob := blobStore.HasBlob(blobId)
 
 		if hasBlob {
-			tw.Ok(fmt.Sprintf("%s %s", result.MarklId, result.Path))
+			sink.Success(blobId, size, arg, storeName)
 		} else {
 			if cmd.Check {
-				tw.NotOk(
-					fmt.Sprintf("%s %s", result.MarklId, result.Path),
-					map[string]string{
-						"severity": "fail",
-						"message":  "untracked",
-					},
-				)
+				sink.CheckMiss(blobId, size, arg, storeName)
 				failCount.Add(1)
 			} else {
-				tw.Ok(fmt.Sprintf("%s %s", result.MarklId, result.Path))
+				sink.Success(blobId, size, arg, storeName)
 			}
 		}
 	}
 
-	tw.Plan()
+	sink.Finalize()
 
 	fc := failCount.Load()
 
@@ -164,7 +167,7 @@ func (cmd Write) Run(req command.Request) {
 func (cmd Write) doOne(
 	blobStore blob_stores.BlobStoreInitialized,
 	blobReader domain_interfaces.BlobReader,
-) (blobId domain_interfaces.MarklId, err error) {
+) (blobId domain_interfaces.MarklId, size int64, err error) {
 	defer errors.DeferredCloser(&err, blobReader)
 
 	var writeCloser domain_interfaces.BlobWriter
@@ -182,18 +185,18 @@ func (cmd Write) doOne(
 	} else {
 		if writeCloser, err = blobStore.MakeBlobWriter(nil); err != nil {
 			err = errors.Wrap(err)
-			return blobId, err
+			return blobId, size, err
 		}
 	}
 
 	defer errors.DeferredCloser(&err, writeCloser)
 
-	if _, err = io.Copy(writeCloser, blobReader); err != nil {
+	if size, err = io.Copy(writeCloser, blobReader); err != nil {
 		err = errors.Wrap(err)
-		return blobId, err
+		return blobId, size, err
 	}
 
 	blobId = writeCloser.GetMarklId()
 
-	return blobId, err
+	return blobId, size, err
 }
