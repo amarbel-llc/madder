@@ -67,13 +67,13 @@ function init_error_includes_store_id_and_path { # @test
   local store_dir=".madder/local/share/blob_stores/broken"
   mkdir -p "$store_dir"
 
-  cat >"$store_dir/dodder-blob_store-config" <<-'HEADER'
+  cat >"$store_dir/blob_store-config" <<-'HEADER'
 	---
 	! toml-blob_store_config-v3
 	---
 HEADER
 
-  cat >>"$store_dir/dodder-blob_store-config" <<-'EOM'
+  cat >>"$store_dir/blob_store-config" <<-'EOM'
 
 	hash_type-id = ""
 	compression-type = "zstd"
@@ -85,6 +85,6 @@ EOM
   run_madder init -encryption none -lock-internal-files=false .default
   assert_failure
   assert_output --partial '".broken"'
-  assert_output --partial "$store_dir/dodder-blob_store-config"
+  assert_output --partial "$store_dir/blob_store-config"
   assert_output --partial "unsupported hash type"
 }

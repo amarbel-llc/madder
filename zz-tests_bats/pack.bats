@@ -12,13 +12,13 @@ create_archive_config() {
 
   mkdir -p "$config_dir"
 
-  cat >"${config_dir}/dodder-blob_store-config" <<-'HEADER'
+  cat >"${config_dir}/blob_store-config" <<-'HEADER'
 	---
 	! toml-blob_store_config-inventory_archive-v1
 	---
 HEADER
 
-  cat >>"${config_dir}/dodder-blob_store-config" <<-EOM
+  cat >>"${config_dir}/blob_store-config" <<-EOM
 
 	hash_type-id = "blake2b256"
 	compression-type = "zstd"

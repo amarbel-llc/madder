@@ -31,7 +31,7 @@ func init() {
 			Path: "$XDG_DATA_HOME/madder/blob_stores/",
 			Description: "Root directory for unprefixed (XDG user) blob " +
 				"stores. Each store lives in a subdirectory containing a " +
-				"dodder-blob_store-config file.",
+				"blob_store-config file.",
 		},
 		command.FilePath{
 			Path: "$PWD/.madder/local/share/blob_stores/",
@@ -45,7 +45,7 @@ func init() {
 				"madder-cache(1).",
 		},
 		command.FilePath{
-			Path: "<store-root>/dodder-blob_store-config",
+			Path: "<store-root>/blob_store-config",
 			Description: "Per-store configuration file in hyphence format. " +
 				"Specifies hash type, compression, encryption, and " +
 				"store-type-specific fields.",
