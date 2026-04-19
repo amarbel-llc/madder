@@ -66,7 +66,7 @@ func (cmd Has) Run(req command.Request) {
 		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			explicitStore = true
-			ui.Err().Printf("switched to blob-store-id: %s", blobStoreId)
+			ui.Err().Print(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 			continue
 
 		case arg_resolver.KindError:

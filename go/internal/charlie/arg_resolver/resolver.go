@@ -21,10 +21,10 @@
 // diagnostic that lists which modes were tried; the caller renders it.
 //
 // DetectShadow reports when a file-resolved arg shares a bare name with
-// a configured blob-store-id — the warning surfaced in #22 that tells
-// the caller "your file shadows a blob-store-id; use './foo' or the
-// prefixed form to disambiguate." Any command with both ModeFile and
-// ModeStoreSwitch should call DetectShadow on a KindFile result.
+// a configured blob-store-id — the warning that tells the caller "your
+// file shadows a blob-store-id; use './foo' or the prefixed form to
+// disambiguate." Any command with both ModeFile and ModeStoreSwitch
+// should call DetectShadow on a KindFile result.
 package arg_resolver
 
 import (
@@ -140,6 +140,22 @@ func DetectShadow(arg string, candidates []blob_store_id.Id) (shadowed blob_stor
 		}
 	}
 	return shadowed, false
+}
+
+// FormatShadowWarning builds the canonical message for a file arg that
+// shadows a configured blob-store-id. Centralized so every caller of
+// DetectShadow emits the same phrasing and disambiguation hint.
+func FormatShadowWarning(arg string, shadowed blob_store_id.Id) string {
+	return fmt.Sprintf(
+		"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
+		arg, shadowed, arg, shadowed.String(),
+	)
+}
+
+// FormatStoreSwitchNotice builds the canonical message callers emit when
+// a KindStoreSwitch arg rebinds the active store.
+func FormatStoreSwitchNotice(id blob_store_id.Id) string {
+	return fmt.Sprintf("switched to blob-store-id: %s", id)
 }
 
 func unresolvedError(arg string, mode Mode) error {

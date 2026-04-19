@@ -1,7 +1,6 @@
 package commands_cache
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sync/atomic"
@@ -119,15 +118,12 @@ func (cmd Write) Run(req command.Request) {
 		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
-			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", blobStoreId))
+			sink.Notice(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 			continue
 		}
 
-		// KindFile — cache-write currently skips the shadow warning
-		// because cache stores live under $XDG_CACHE_HOME, not CWD —
-		// a file in CWD with the same bare name as a cache store
-		// can't reach the cache root by accident. If that assumption
-		// ever changes, lift the DetectShadow call from write.go.
+		// Cache stores live under $XDG_CACHE_HOME, so a file in CWD
+		// can't shadow one by accident. No DetectShadow call here.
 
 		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)
 		if err != nil {

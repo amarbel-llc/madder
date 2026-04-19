@@ -12,6 +12,7 @@
 package blob_verify_sink
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -35,9 +36,12 @@ func NewTAP(w io.Writer) Sink {
 	return &tapSink{tw: tap.NewWriter(w)}
 }
 
+// NewJSON constructs an NDJSON sink. The record stream is buffered; Finalize flushes.
 func NewJSON(out, errOut io.Writer) Sink {
+	buf := bufio.NewWriter(out)
 	return &jsonSink{
-		enc:    json.NewEncoder(out),
+		buf:    buf,
+		enc:    json.NewEncoder(buf),
 		errOut: errOut,
 	}
 }
@@ -47,18 +51,18 @@ type tapSink struct {
 }
 
 func (s *tapSink) Verified(id domain_interfaces.MarklId, _ string) {
-	s.tw.Ok(fmt.Sprintf("%s", id))
+	s.tw.Ok(id.String())
 }
 
 func (s *tapSink) Missing(id domain_interfaces.MarklId, _ string) {
-	s.tw.NotOk(fmt.Sprintf("%s", id), map[string]string{
+	s.tw.NotOk(id.String(), map[string]string{
 		"severity": "fail",
 		"message":  "blob missing",
 	})
 }
 
 func (s *tapSink) Corrupt(id domain_interfaces.MarklId, _ string, err error) {
-	s.tw.NotOk(fmt.Sprintf("%s", id), tap_diagnostics.FromError(err))
+	s.tw.NotOk(id.String(), tap_diagnostics.FromError(err))
 }
 
 func (s *tapSink) ReadError(_ string, err error) {
@@ -85,7 +89,18 @@ type record struct {
 	Error string `json:"error,omitempty"`
 }
 
+// State values emitted on NDJSON records. These are part of the CLI
+// wire contract — external consumers switch on them.
+const (
+	StateVerified  = "verified"
+	StateMissing   = "missing"
+	StateCorrupt   = "corrupt"
+	StateReadError = "read_error"
+	StateBailOut   = "bail_out"
+)
+
 type jsonSink struct {
+	buf    *bufio.Writer
 	enc    *json.Encoder
 	errOut io.Writer
 }
@@ -95,29 +110,31 @@ func (s *jsonSink) emit(rec record) {
 }
 
 func (s *jsonSink) Verified(id domain_interfaces.MarklId, store string) {
-	s.emit(record{Id: id.String(), Store: store, State: "verified"})
+	s.emit(record{Id: id.String(), Store: store, State: StateVerified})
 }
 
 func (s *jsonSink) Missing(id domain_interfaces.MarklId, store string) {
-	s.emit(record{Id: id.String(), Store: store, State: "missing"})
+	s.emit(record{Id: id.String(), Store: store, State: StateMissing})
 }
 
 func (s *jsonSink) Corrupt(id domain_interfaces.MarklId, store string, err error) {
-	s.emit(record{Id: id.String(), Store: store, State: "corrupt", Error: err.Error()})
+	s.emit(record{Id: id.String(), Store: store, State: StateCorrupt, Error: err.Error()})
 }
 
 func (s *jsonSink) ReadError(store string, err error) {
-	s.emit(record{Store: store, State: "read_error", Error: err.Error()})
+	s.emit(record{Store: store, State: StateReadError, Error: err.Error()})
 }
 
 func (s *jsonSink) Notice(msg string) {
 	fmt.Fprintln(s.errOut, msg)
 }
 
-func (s *jsonSink) BailOut(msg string) {
-	// Bail-out in JSON becomes a final error record. Consumers key on
-	// state:"bail_out" to know the stream was cut short.
-	s.emit(record{State: "bail_out", Error: msg})
+func (s *jsonSink) Finalize() {
+	_ = s.buf.Flush()
 }
 
-func (s *jsonSink) Finalize() {}
+func (s *jsonSink) BailOut(msg string) {
+	// Bail-out becomes a final error record so consumers can detect the
+	// stream was cut short by a caller-side abort rather than by EOF.
+	s.emit(record{State: StateBailOut, Error: msg})
+}

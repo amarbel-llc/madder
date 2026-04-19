@@ -3,8 +3,7 @@
 //
 // The Format type is a flag.Value with three values: auto, tap, and json
 // (NDJSON, one object per line). auto is the default; Resolve collapses it
-// to tap when stdout is a TTY and json when stdout is piped, matching the
-// contract from #26.
+// to tap when stdout is a TTY and json when stdout is piped.
 //
 // Each consuming command defines its own sink interface (TAP vs NDJSON)
 // because per-command event shapes differ. This package only supplies the

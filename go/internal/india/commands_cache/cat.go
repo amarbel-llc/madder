@@ -6,7 +6,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -133,10 +133,14 @@ func (cmd Cat) Run(req command.Request) {
 	explicitStore := false
 
 	for _, arg := range req.PopArgs() {
-		var blobId markl.Id
+		resolved := arg_resolver.Resolve(
+			arg,
+			arg_resolver.ModeBlobId|arg_resolver.ModeStoreSwitch,
+		)
 
-		if err := blobId.Set(arg); err == nil {
-			if err := cmd.blob(blobStore, &blobId, blobWriter); err != nil {
+		switch resolved.Kind {
+		case arg_resolver.KindBlobId:
+			if err := cmd.blob(blobStore, &resolved.BlobId, blobWriter); err != nil {
 				if explicitStore {
 					ui.Err().Print(err)
 					continue
@@ -144,26 +148,22 @@ func (cmd Cat) Run(req command.Request) {
 
 				if err := cmd.blobFromRemainingStores(
 					envBlobStore,
-					&blobId,
+					&resolved.BlobId,
 				); err != nil {
 					ui.Err().Print(err)
 				}
 			}
 
-			continue
-		}
-
-		if err := blobStoreId.Set(arg); err == nil {
+		case arg_resolver.KindStoreSwitch:
+			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			blobWriter = cmd.makeBlobWriter(envBlobStore, blobStore)
 			explicitStore = true
-			ui.Err().Printf("switched to blob-store-id: %s", blobStoreId)
-			continue
-		}
+			ui.Err().Print(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 
-		ui.Err().Print(
-			errors.Errorf("invalid argument (not a blob-id or blob-store-id): %s", arg),
-		)
+		case arg_resolver.KindError:
+			ui.Err().Print(resolved.Err)
+		}
 	}
 }
 

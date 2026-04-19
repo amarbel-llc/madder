@@ -186,11 +186,10 @@ func MakeBlobStore(
 	configNamed blob_store_configs.ConfigNamed,
 	blobStores BlobStoreMap,
 ) (store domain_interfaces.BlobStore, err error) {
-	// Any error that bubbles out of the construction helpers (hash type
-	// validation, SFTP connection, archive open, pointer resolution)
-	// needs the blob-store id and config path to be debuggable — a bare
-	// "unsupported hash type: \"\"" with no pointer to which store
-	// misconfigured it wastes time. See #21.
+	// Errors from the construction helpers (hash type validation, SFTP
+	// connection, archive open, pointer resolution) are otherwise opaque
+	// — a bare "unsupported hash type" tells the caller nothing about
+	// which blob-store-id or config file is misconfigured.
 	defer func() {
 		if err != nil {
 			err = errors.Wrapf(

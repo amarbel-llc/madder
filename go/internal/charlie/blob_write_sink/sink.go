@@ -8,6 +8,7 @@
 package blob_write_sink
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -53,10 +54,12 @@ func NewTAPWithWriter(tw *tap.Writer) Sink {
 
 // NewJSON constructs an NDJSON sink. out is the record stream; errOut
 // receives Notice messages. isCheck controls whether Success records carry
-// present:true.
+// present:true. The record stream is buffered; Finalize flushes.
 func NewJSON(out, errOut io.Writer, isCheck bool) Sink {
+	buf := bufio.NewWriter(out)
 	return &jsonSink{
-		enc:     json.NewEncoder(out),
+		buf:     buf,
+		enc:     json.NewEncoder(buf),
 		errOut:  errOut,
 		isCheck: isCheck,
 	}
@@ -109,13 +112,13 @@ type record struct {
 }
 
 type jsonSink struct {
+	buf     *bufio.Writer
 	enc     *json.Encoder
 	errOut  io.Writer
 	isCheck bool
 }
 
 func (s *jsonSink) emit(rec record) {
-	// json.Encoder already appends a newline, giving NDJSON framing.
 	_ = s.enc.Encode(rec)
 }
 
@@ -164,4 +167,6 @@ func (s *jsonSink) Notice(msg string) {
 	fmt.Fprintln(s.errOut, msg)
 }
 
-func (s *jsonSink) Finalize() {}
+func (s *jsonSink) Finalize() {
+	_ = s.buf.Flush()
+}

@@ -187,7 +187,7 @@ func (cmd Cat) Run(req command.Request) {
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			blobWriter = cmd.makeBlobWriter(envBlobStore, blobStore)
 			explicitStore = true
-			ui.Err().Printf("switched to blob-store-id: %s", blobStoreId)
+			ui.Err().Print(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 
 		case arg_resolver.KindError:
 			ui.Err().Print(resolved.Err)

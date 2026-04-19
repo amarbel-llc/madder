@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -177,7 +178,16 @@ type syncRecord struct {
 	Error string `json:"error,omitempty"`
 }
 
+const (
+	syncStateTransferred = "transferred"
+	syncStateExists      = "exists"
+	syncStateFailed      = "failed"
+	syncStateListError   = "list_error"
+	syncStateBailOut     = "bail_out"
+)
+
 type syncJsonSink struct {
+	buf    *bufio.Writer
 	enc    *json.Encoder
 	errOut io.Writer
 }
@@ -188,15 +198,15 @@ func (s *syncJsonSink) emit(rec syncRecord) {
 
 func (s *syncJsonSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
 	size := bytesWritten
-	s.emit(syncRecord{Id: id.String(), Size: &size, State: "transferred"})
+	s.emit(syncRecord{Id: id.String(), Size: &size, State: syncStateTransferred})
 }
 
 func (s *syncJsonSink) exists(id domain_interfaces.MarklId) {
-	s.emit(syncRecord{Id: id.String(), State: "exists"})
+	s.emit(syncRecord{Id: id.String(), State: syncStateExists})
 }
 
 func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
-	rec := syncRecord{Id: id.String(), State: "failed", Error: err.Error()}
+	rec := syncRecord{Id: id.String(), State: syncStateFailed, Error: err.Error()}
 	if bytesWritten > 0 {
 		size := bytesWritten
 		rec.Size = &size
@@ -205,7 +215,7 @@ func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, 
 }
 
 func (s *syncJsonSink) listError(err error) {
-	s.emit(syncRecord{State: "list_error", Error: err.Error()})
+	s.emit(syncRecord{State: syncStateListError, Error: err.Error()})
 }
 
 func (s *syncJsonSink) notice(msg string) {
@@ -213,10 +223,12 @@ func (s *syncJsonSink) notice(msg string) {
 }
 
 func (s *syncJsonSink) bailOut(msg string) {
-	s.emit(syncRecord{State: "bail_out", Error: msg})
+	s.emit(syncRecord{State: syncStateBailOut, Error: msg})
 }
 
-func (s *syncJsonSink) finalize() {}
+func (s *syncJsonSink) finalize() {
+	_ = s.buf.Flush()
+}
 
 func (cmd Sync) runStore(
 	req command.Request,
@@ -227,7 +239,12 @@ func (cmd Sync) runStore(
 	var sink syncSink
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
-		sink = &syncJsonSink{enc: json.NewEncoder(os.Stdout), errOut: os.Stderr}
+		buf := bufio.NewWriter(os.Stdout)
+		sink = &syncJsonSink{
+			buf:    buf,
+			enc:    json.NewEncoder(buf),
+			errOut: os.Stderr,
+		}
 	default:
 		sink = &syncTapSink{tw: tap.NewWriter(os.Stdout)}
 	}

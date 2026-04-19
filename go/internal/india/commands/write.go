@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"io"
 	"os"
 	"sync/atomic"
@@ -126,6 +125,11 @@ func (cmd Write) Run(req command.Request) {
 	var failCount atomic.Uint32
 	var blobStoreId blob_store_id.Id
 
+	// Invariant across all args — hoist out of the loop.
+	shadowCandidates := command_components.BlobStoreIds(
+		envBlobStore.GetBlobStores(),
+	)
+
 	sawStdin := false
 
 	for _, arg := range req.PopArgs() {
@@ -152,21 +156,12 @@ func (cmd Write) Run(req command.Request) {
 		case arg_resolver.KindStoreSwitch:
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
-			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", blobStoreId))
+			sink.Notice(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 			continue
 		}
 
-		// KindFile — warn if the file's bare name shadows a configured
-		// blob-store-id, so the caller can disambiguate with an explicit
-		// prefix (`./file` for the file, `.name`/`~name` for the store).
-		if shadowed, ok := arg_resolver.DetectShadow(
-			arg,
-			command_components.BlobStoreIds(envBlobStore.GetBlobStores()),
-		); ok {
-			sink.Notice(fmt.Sprintf(
-				"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
-				arg, shadowed, arg, shadowed.String(),
-			))
+		if shadowed, ok := arg_resolver.DetectShadow(arg, shadowCandidates); ok {
+			sink.Notice(arg_resolver.FormatShadowWarning(arg, shadowed))
 		}
 
 		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)

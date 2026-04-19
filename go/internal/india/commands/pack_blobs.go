@@ -12,6 +12,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
+	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -105,16 +106,21 @@ type packFinalRecord struct {
 	Error string `json:"error,omitempty"`
 }
 
+const (
+	packStatePacked = "packed"
+	packStateFailed = "pack_failed"
+)
+
 func (cmd PackBlobs) Run(req command.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 
 	format := cmd.Format.Resolve(os.Stdout)
 
-	// In TAP mode, per-arg sink and the pack internals share one tap.Writer
-	// so all test points numbered consecutively on stdout. In JSON mode,
-	// the pack internals write TAP to stderr (diagnostic-only); per-arg
-	// events are NDJSON on stdout.
+	// In TAP mode the per-arg sink and the pack internals share one
+	// tap.Writer so all test points are numbered consecutively on
+	// stdout. In JSON mode the internals write TAP to stderr so stdout
+	// stays valid NDJSON.
 	var (
 		sink            blob_write_sink.Sink
 		packTapWriter   *tap.Writer
@@ -136,6 +142,10 @@ func (cmd PackBlobs) Run(req command.Request) {
 	var blobStoreId blob_store_id.Id
 	storeIdString := ".default"
 	blobFilter := make(map[string]domain_interfaces.MarklId)
+
+	shadowCandidates := command_components.BlobStoreIds(
+		envBlobStore.GetBlobStores(),
+	)
 
 	sawStdin := false
 
@@ -163,22 +173,15 @@ func (cmd PackBlobs) Run(req command.Request) {
 			blobStoreId = resolved.BlobStoreId
 			blobStore = envBlobStore.GetBlobStore(blobStoreId)
 			storeIdString = blobStoreId.String()
-			sink.Notice(fmt.Sprintf("switched to blob-store-id: %s", storeIdString))
+			sink.Notice(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
 			continue
 		}
 
-		// KindFile — same shadow warning as write, now centralized.
-		if shadowed, ok := arg_resolver.DetectShadow(
-			arg,
-			command_components.BlobStoreIds(envBlobStore.GetBlobStores()),
-		); ok {
-			sink.Notice(fmt.Sprintf(
-				"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
-				arg, shadowed, arg, shadowed.String(),
-			))
+		if shadowed, ok := arg_resolver.DetectShadow(arg, shadowCandidates); ok {
+			sink.Notice(arg_resolver.FormatShadowWarning(arg, shadowed))
 		}
 
-		blobId, _, err := cmd.doOne(blobStore, resolved.BlobReader)
+		blobId, size, err := cmd.doOne(blobStore, resolved.BlobReader)
 		if err != nil {
 			sink.Failure(arg, err)
 			continue
@@ -194,23 +197,18 @@ func (cmd PackBlobs) Run(req command.Request) {
 			storeName = blobStoreId.String()
 		}
 
-		// Blob size for the record — cheapest to recompute from the filter
-		// isn't possible without a re-read, so just pass 0 for now. TAP
-		// already discards it. NDJSON consumers can stat the source file
-		// themselves if they need the exact byte count.
-		sink.Success(blobId, 0, arg, storeName)
+		sink.Success(blobId, size, arg, storeName)
 		blobFilter[blobId.String()] = blobId
 	}
 
-	// Build the finalizer closure now that storeIdString is settled.
 	if format == output_format.FormatJSON {
 		enc := json.NewEncoder(jsonFinalWriter)
 		emitFinal = func(success bool, err error) {
 			rec := packFinalRecord{Store: storeIdString}
 			if success {
-				rec.State = "packed"
+				rec.State = packStatePacked
 			} else {
-				rec.State = "pack_failed"
+				rec.State = packStateFailed
 				if err != nil {
 					rec.Error = err.Error()
 				}
@@ -219,18 +217,15 @@ func (cmd PackBlobs) Run(req command.Request) {
 		}
 	} else {
 		emitFinal = func(success bool, err error) {
+			point := fmt.Sprintf("pack %s", storeIdString)
 			if success {
-				packTapWriter.Ok(fmt.Sprintf("pack %s", storeIdString))
-			} else {
-				msg := "pack failed"
-				if err != nil {
-					msg = err.Error()
-				}
-				packTapWriter.NotOk(
-					fmt.Sprintf("pack %s", storeIdString),
-					map[string]string{"severity": "fail", "message": msg},
-				)
+				packTapWriter.Ok(point)
+				return
 			}
+			if err == nil {
+				err = fmt.Errorf("pack failed")
+			}
+			packTapWriter.NotOk(point, tap_diagnostics.FromError(err))
 		}
 	}
 
