@@ -14,7 +14,7 @@ function write_prints_digest_to_stdout { # @test
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "contract test content" >"$blob"
 
-  run_madder write "$blob"
+  run_madder write -format tap "$blob"
   assert_success
 
   hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
@@ -37,7 +37,7 @@ function has_exits_zero_for_existing_blob { # @test
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "has test content" >"$blob"
 
-  run_madder write "$blob"
+  run_madder write -format tap "$blob"
   assert_success
   hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
   [[ -n $hash ]] || fail "write did not print digest"
@@ -63,7 +63,7 @@ function has_mixed_found_and_missing { # @test
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "mixed test content" >"$blob"
 
-  run_madder write "$blob"
+  run_madder write -format tap "$blob"
   assert_success
   hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
   [[ -n $hash ]] || fail "write did not print digest"

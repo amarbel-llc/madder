@@ -11,7 +11,7 @@ function cross_hash_sync { # @test
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "cross-hash-test" >"$blob"
-  run_madder write "$blob"
+  run_madder write -format tap "$blob"
   assert_success
   blake_sha="$(echo "$output" | grep -oP 'blake2b256-\S+' | head -1)"
 

@@ -60,16 +60,16 @@ function pack_with_delta { # @test
 
   local hash1 hash2 hash3
 
-  run_madder write "$blob1"
+  run_madder write -format tap "$blob1"
   assert_success
   hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
   [[ -n $hash1 ]] || fail "write returned empty hash for blob one"
 
-  run_madder write "$blob2"
+  run_madder write -format tap "$blob2"
   assert_success
   hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
-  run_madder write "$blob3"
+  run_madder write -format tap "$blob3"
   assert_success
   hash3="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
@@ -104,11 +104,11 @@ function pack_without_delta { # @test
   echo "no delta alpha" >"$blob1"
   echo "no delta beta" >"$blob2"
 
-  run_madder write "$blob1"
+  run_madder write -format tap "$blob1"
   assert_success
   hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
-  run_madder write "$blob2"
+  run_madder write -format tap "$blob2"
   assert_success
   hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
 
