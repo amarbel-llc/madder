@@ -82,7 +82,8 @@ update-dewey version:
   cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
   just gomod2nix
 
-# Tag a Go module release. Usage: just tag v0.0.1 "feat: public blob store API"
+# Tag a Go module release. The "go/v" prefix is added for you, so pass
+# the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
 [group("maint")]
 tag version message:
   #!/usr/bin/env bash
@@ -98,6 +99,31 @@ tag version message:
   git push origin "$tag"
   gum log --level info "Pushed $tag"
   git tag -v "$tag"
+
+# Cut a release: assemble a changelog-style message from commits
+# since the last go/v* tag, then call `tag` to sign, push, and
+# verify. The "go/v" prefix is added for you, so pass the semver
+# without it. Usage: just release 0.0.2
+#
+# Use `just tag <version> <message>` directly if you want to
+# control the commit message yourself.
+[group("maint")]
+release version:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  prev=$(git tag --sort=-v:refname -l "go/v*" | head -1)
+  header="release v{{version}}"
+  if [[ -n "$prev" ]]; then
+    summary=$(git log --format='- %s' "$prev"..HEAD -- go/)
+    if [[ -n "$summary" ]]; then
+      msg="$header"$'\n\n'"$summary"
+    else
+      msg="$header"
+    fi
+  else
+    msg="$header"
+  fi
+  just tag "{{version}}" "$msg"
 
 [group("maint")]
 gomod2nix:
