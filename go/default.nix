@@ -78,6 +78,7 @@ in
       gofumpt
       gopls
       gotools
+      just
       pandoc
       shfmt
     ]);
