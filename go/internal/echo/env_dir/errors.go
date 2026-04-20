@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -15,20 +14,6 @@ type (
 
 func IsErrBlobAlreadyExists(err error) bool {
 	return errors.Is(err, ErrBlobAlreadyExists{})
-}
-
-func MakeErrBlobAlreadyExists(
-	blobId domain_interfaces.MarklId,
-	path string,
-) ErrBlobAlreadyExists {
-	errors.PanicIfError(markl.AssertIdIsNotNull(blobId))
-
-	clonedId, _ := markl.Clone(blobId) //repool:owned
-
-	return ErrBlobAlreadyExists{
-		Path:   path,
-		BlobId: clonedId,
-	}
 }
 
 type ErrBlobAlreadyExists struct {

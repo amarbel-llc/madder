@@ -2,6 +2,7 @@ package env_dir
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
@@ -13,7 +14,6 @@ import (
 
 type MoveOptions struct {
 	TemporaryFS
-	ErrorOnAttemptedOverwrite   bool
 	FinalPathOrDir              string
 	GenerateFinalPathFromDigest bool
 }
@@ -23,10 +23,9 @@ type localFileMover struct {
 	file     *os.File
 	domain_interfaces.BlobWriter
 
-	basePath                  string
-	blobPath                  string
-	lockFile                  bool
-	errorOnAttemptedOverwrite bool
+	basePath string
+	blobPath string
+	lockFile bool
 }
 
 func NewMover(
@@ -46,8 +45,7 @@ func newMover(
 	moveOptions MoveOptions,
 ) (mover *localFileMover, err error) {
 	mover = &localFileMover{
-		funcJoin:                  config.funcJoin,
-		errorOnAttemptedOverwrite: moveOptions.ErrorOnAttemptedOverwrite,
+		funcJoin: config.funcJoin,
 	}
 
 	if moveOptions.GenerateFinalPathFromDigest {
@@ -93,12 +91,12 @@ func (mover *localFileMover) Close() (err error) {
 		return err
 	}
 
-	// var fi os.FileInfo
-
-	// if fi, err = m.file.Stat(); err != nil {
-	// 	err = errors.Wrap(err)
-	// 	return
-	// }
+	// fsync file data to disk before rename so a crash between rename and
+	// the next fsync cannot leave a zero-byte file at blobPath.
+	if err = mover.file.Sync(); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
 
 	if err = mover.file.Close(); err != nil {
 		err = errors.Wrap(err)
@@ -142,28 +140,47 @@ func (mover *localFileMover) Close() (err error) {
 
 	path := mover.file.Name()
 
+	// Per ADR 0002 (content-addressed overwrite-is-fine): os.Rename silently
+	// replaces any existing file at mover.blobPath, which is the desired
+	// behaviour for a strong-hash content-addressed store. A racing writer
+	// that produced the same digest produced the same bytes, so the
+	// replacement is semantically a no-op.
 	if err = os.Rename(path, mover.blobPath); err != nil {
-		if files.Exists(mover.blobPath) {
-			if mover.errorOnAttemptedOverwrite {
-				err = MakeErrBlobAlreadyExists(digest, mover.blobPath)
-			} else {
-				err = nil
-			}
-
-			return err
-		} else {
-			err = errors.Wrap(err)
-			return err
-		}
+		err = errors.Wrap(err)
+		return err
 	}
 
-	// log.Log().Printf("moved %s to %s", p, m.objectPath)
+	// fsync the parent directory so the rename's directory-entry update is
+	// durable across crashes. POSIX does not persist rename metadata until
+	// the containing directory is fsynced.
+	if err = fsyncDir(filepath.Dir(mover.blobPath)); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
 
 	if mover.lockFile {
 		if err = files.SetDisallowUserChanges(mover.blobPath); err != nil {
 			err = errors.Wrap(err)
 			return err
 		}
+	}
+
+	return err
+}
+
+func fsyncDir(path string) (err error) {
+	var dir *os.File
+
+	if dir, err = os.Open(path); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	defer errors.DeferredCloser(&err, dir)
+
+	if err = dir.Sync(); err != nil {
+		err = errors.Wrap(err)
+		return err
 	}
 
 	return err
