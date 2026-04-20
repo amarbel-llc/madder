@@ -23,6 +23,11 @@ Markl IDs appear throughout dodder: as blob digests in object metadata, as
 signatures in inventory lists, as type locks in hyphence documents, and as
 repository public keys.
 
+Because a markl ID for a blob is a deterministic function of the bytes
+it names, two independent writers that produce the same bytes produce the
+same ID. Deduplication and concurrent-write safety of the blob store
+follow from this property — see **blob-store**(7).
+
 # STRUCTURE
 
 A markl ID has the text form:
@@ -116,6 +121,6 @@ See RFC 0002 (docs/rfcs/0002-markl-id-format.md) for the complete registry.
 
 # SEE ALSO
 
-**dodder**(1), **doddish**(7)
+**dodder**(1), **doddish**(7), **blob-store**(7)
 
 RFC 0002: Markl ID Format (docs/rfcs/0002-markl-id-format.md)

@@ -106,6 +106,47 @@ A store that delegates to another store by reference. Created with **madder
 init-pointer**. The pointer store does not hold blobs itself but redirects reads
 and writes to the target store.
 
+# CONCURRENCY AND DURABILITY
+
+## Concurrent writes
+
+For the **local hash-bucketed** store, concurrent writers on the same host
+may write the same or different blobs simultaneously without coordination.
+Two writers producing the same bytes produce the same digest and therefore
+the same final path; the publishing rename is atomic, and either outcome
+is semantically correct. Writers producing different bytes produce
+different paths and do not interact.
+
+This guarantee depends on the configured hash being collision-resistant —
+**sha256** and **blake2b256**, the only hashes madder supports, satisfy
+this — and on the digest being computed from the bytes being written
+rather than supplied by the caller. The full rationale and audit live in
+**docs/decisions/0002-content-addressed-overwrite-is-fine.md**.
+
+The **SFTP** store serialises blob-cache updates through an internal
+mutex; safety at the remote end depends on the remote filesystem's own
+rename semantics and is not verified by madder's tests. The
+**inventory-archive** store's concurrent-write behaviour follows from the
+loose blob store it delegates to (typically local hash-bucketed).
+
+## Durability
+
+Writes use a temp-file + rename pattern with **fsync**(2) at both the
+data and the containing-directory level. After a crash, any blob at a
+digest's final path has digest-matching bytes; partial or zero-byte
+blobs are never observable. Writers require the temp directory and the
+store's base path to be on the same filesystem (both default to XDG
+locations under the user's home; custom configurations should preserve
+this).
+
+## Known limitations
+
+Stores configured with **lock-internal-files = true** have a brief
+window between the rename and the chmod-to-read-only step in which the
+published blob is writable to the invoking user (issue #29). Content is
+never corrupted; only the transient mode is unusual. The planned
+hardlink-based finalize (issue #30) would eliminate the window.
+
 # INLINE STORE SWITCHING
 
 Several madder commands accept positional arguments that can be either data
@@ -136,3 +177,6 @@ init-from** to initialize a store from an existing configuration file.
 # SEE ALSO
 
 **madder**(1), **markl-id**(7)
+
+ADR 0002: Content-addressed overwrite-is-fine semantics
+(docs/decisions/0002-content-addressed-overwrite-is-fine.md)
