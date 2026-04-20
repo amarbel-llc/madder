@@ -1,4 +1,4 @@
-//go:build test && debug
+//go:build test
 
 package blob_stores
 

@@ -1,4 +1,4 @@
-//go:build test && debug
+//go:build test
 
 package blob_stores
 
@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -111,18 +112,36 @@ func TestMakeBlobReaderFromArchive(t *testing.T) {
 
 type stubBlobStore struct {
 	domain_interfaces.BlobStore
+
+	// mu guards makeBlobReaderCalled and makeBlobReaderId. MakeBlobReader is
+	// called concurrently by collectBlobMetasParallel (see pack_parallel.go),
+	// so these fields need synchronisation; the blobData map is read-only
+	// after construction and does not.
+	mu                   sync.Mutex
 	makeBlobReaderCalled bool
 	makeBlobReaderId     domain_interfaces.MarklId
-	allBlobIds           []domain_interfaces.MarklId
-	blobData             map[string][]byte
-	deletedBlobIds       []string
+
+	allBlobIds     []domain_interfaces.MarklId
+	blobData       map[string][]byte
+	deletedBlobIds []string
+}
+
+// wasMakeBlobReaderCalled returns the mutex-guarded makeBlobReaderCalled flag.
+// Callers running after goroutines have joined do not strictly need the lock,
+// but taking it keeps the stub safe under any future concurrent reader.
+func (s *stubBlobStore) wasMakeBlobReaderCalled() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.makeBlobReaderCalled
 }
 
 func (s *stubBlobStore) MakeBlobReader(
 	id domain_interfaces.MarklId,
 ) (domain_interfaces.BlobReader, error) {
+	s.mu.Lock()
 	s.makeBlobReaderCalled = true
 	s.makeBlobReaderId = id
+	s.mu.Unlock()
 
 	if s.blobData != nil {
 		if data, ok := s.blobData[id.String()]; ok {
@@ -189,7 +208,7 @@ func TestMakeBlobReaderFallsBackToLoose(t *testing.T) {
 
 	defer reader.Close() //defer:err-checked
 
-	if !stub.makeBlobReaderCalled {
+	if !stub.wasMakeBlobReaderCalled() {
 		t.Fatal("expected MakeBlobReader to delegate to loose blob store")
 	}
 }
