@@ -23,7 +23,7 @@ func GetBlobStoreConfigPaths(
 	if len(legacyPaths) > 0 {
 		ctx.Cancel(errors.Errorf(
 			"found legacy blob store config file(s) at:\n\t%s\n"+
-				"run `madder migrate-legacy-configs` to rename them to %q",
+				"rename each to %q to continue",
 			strings.Join(legacyPaths, "\n\t"),
 			FileNameBlobStoreConfig,
 		))
@@ -66,23 +66,6 @@ func GetLegacyBlobStoreConfigPaths(
 	}
 
 	return legacyPaths
-}
-
-func RenameLegacyBlobStoreConfig(legacyPath string) (newPath string, err error) {
-	dir := filepath.Dir(legacyPath)
-	base := filepath.Base(legacyPath)
-
-	if base != fileNameBlobStoreConfigLegacy {
-		return "", errors.Errorf(
-			"path %q does not have legacy filename %q",
-			legacyPath,
-			fileNameBlobStoreConfigLegacy,
-		)
-	}
-
-	newPath = filepath.Join(dir, FileNameBlobStoreConfig)
-
-	return newPath, nil
 }
 
 func PathBlobStore(

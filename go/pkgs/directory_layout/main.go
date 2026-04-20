@@ -23,7 +23,6 @@ var (
 	MakeBlobStoreCache            = internal.MakeBlobStoreCache
 	MakeBlobStorePath             = internal.MakeBlobStorePath
 	PathBlobStore                 = internal.PathBlobStore
-	RenameLegacyBlobStoreConfig   = internal.RenameLegacyBlobStoreConfig
 )
 
 const (
