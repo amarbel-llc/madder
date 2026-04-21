@@ -61,6 +61,16 @@ test-go *flags:
 vet-go *flags:
   cd go && go vet -tags test {{flags}} ./...
 
+# Build, vet, and test a single internal subpackage tree — the standard
+# verification triple, but scoped to ./internal/<subpath>/... so we don't
+# wait for the whole module when iterating on one package.
+# Usage: just verify-internal-pkg futility
+[group("test")]
+verify-internal-pkg subpath:
+  cd go && go build ./internal/{{subpath}}/...
+  cd go && go vet -tags test ./internal/{{subpath}}/...
+  cd go && go test -tags test ./internal/{{subpath}}/...
+
 # Run Go unit tests under the race detector. Not included in the
 # default `test` target because race builds are substantially slower.
 [group("test")]
@@ -204,6 +214,50 @@ release version:
 [group("maint")]
 gomod2nix:
   cd go && gomod2nix
+
+# Copy a subpackage from the cached dewey module into go/internal/<dest>/
+# so we can iterate on it in-tree without a purse-first release cycle.
+# Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,
+# copies recursively, and chmods writable. Destination must not exist.
+# Usage: just incubate-dewey-pkg golf/command futility
+[group("debug")]
+incubate-dewey-pkg subpath dest:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+  mod_cache=$(cd go && go env GOMODCACHE)
+  ver=$(cd go && go list -m -f '{{{{.Version}}}}' github.com/amarbel-llc/purse-first/libs/dewey)
+  src="$mod_cache/github.com/amarbel-llc/purse-first/libs/dewey@${ver}/{{subpath}}"
+  dst="go/internal/{{dest}}"
+  if [ ! -d "$src" ]; then
+    echo "source not found: $src" >&2
+    exit 1
+  fi
+  if [ -e "$dst" ]; then
+    echo "destination already exists: $dst (remove or choose another name)" >&2
+    exit 1
+  fi
+  cp -r "$src" "$dst"
+  chmod -R u+w "$dst"
+  echo "copied $src -> $dst"
+
+# Rewrite `package <old>` → `package <new>` in every .go file under a
+# directory tree. Also rewrites `package <old>_test` for external test
+# files. Does not touch import statements — rename consumers separately.
+# Usage: just rename-go-package go/internal/futility command futility
+[group("debug")]
+rename-go-package dir old new:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+  if [ ! -d "{{dir}}" ]; then
+    echo "not a directory: {{dir}}" >&2
+    exit 1
+  fi
+  find "{{dir}}" -name '*.go' -type f -print0 | xargs -0 sed -i \
+    -e 's/^package {{old}}$/package {{new}}/' \
+    -e 's/^package {{old}}_test$/package {{new}}_test/'
+  echo "renamed package {{old}} -> {{new}} in {{dir}}"
 
 # Regenerate man pages into a tmp dir and print one by name. Usage: just debug-gen_man madder.1
 [group("debug")]
