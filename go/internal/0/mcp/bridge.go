@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 )
 
 type BridgeResult struct {
@@ -16,10 +16,10 @@ type BridgeResult struct {
 }
 
 type Bridge struct {
-	utility *command.Utility
+	utility *futility.Utility
 }
 
-func MakeBridge(utility *command.Utility) Bridge {
+func MakeBridge(utility *futility.Utility) Bridge {
 	return Bridge{
 		utility: utility,
 	}
@@ -67,7 +67,7 @@ func (b Bridge) RunCommand(
 	}()
 
 	args := append([]string{cmdName}, cliArgs...)
-	runErr := b.utility.RunCLI(ctx, args, command.StubPrompter{})
+	runErr := b.utility.RunCLI(ctx, args, futility.StubPrompter{})
 
 	outW.Close()
 	errW.Close()

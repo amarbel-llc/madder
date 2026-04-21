@@ -8,7 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
@@ -31,12 +31,12 @@ type Pack struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Pack)(nil)
-	_ command.CommandWithParams         = (*Pack)(nil)
+	_ futility.CommandWithParams         = (*Pack)(nil)
 )
 
-func (cmd *Pack) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Pack) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "store-ids",
 			Description: "blob store IDs to pack (defaults to all packable stores)",
 			Variadic:    true,
@@ -44,8 +44,8 @@ func (cmd *Pack) GetParams() []command.Param {
 	}
 }
 
-func (cmd Pack) GetDescription() command.Description {
-	return command.Description{
+func (cmd Pack) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "pack loose blobs into archive files",
 		Long: "Consolidate loose blobs in inventory archive stores into " +
 			"packed archive files for more efficient storage. With no " +
@@ -57,9 +57,9 @@ func (cmd Pack) GetDescription() command.Description {
 }
 
 func (cmd Pack) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
@@ -83,7 +83,7 @@ func (cmd *Pack) SetFlagDefinitions(
 	)
 }
 
-func (cmd Pack) Run(req command.Request) {
+func (cmd Pack) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStoreMap := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)
 

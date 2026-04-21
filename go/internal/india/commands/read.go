@@ -8,7 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -21,12 +21,12 @@ type Read struct {
 	command_components.EnvBlobStore
 }
 
-var _ command.CommandWithParams = (*Read)(nil)
+var _ futility.CommandWithParams = (*Read)(nil)
 
-func (cmd *Read) GetParams() []command.Param { return nil }
+func (cmd *Read) GetParams() []futility.Param { return nil }
 
-func (cmd Read) GetDescription() command.Description {
-	return command.Description{
+func (cmd Read) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "read blobs from JSON on stdin",
 		Long: "Read JSON objects from stdin and write each blob value into " +
 			"the content-addressable store. Each JSON object must have a " +
@@ -42,7 +42,7 @@ type readBlobEntry struct {
 	Store string `json:"store,omitempty"`
 }
 
-func (cmd Read) Run(dep command.Request) {
+func (cmd Read) Run(dep futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(dep)
 
 	decoder := json.NewDecoder(envBlobStore.GetInFile())

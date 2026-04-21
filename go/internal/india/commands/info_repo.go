@@ -6,7 +6,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -23,15 +23,15 @@ type InfoRepo struct {
 	command_components.BlobStore
 }
 
-var _ command.CommandWithParams = (*InfoRepo)(nil)
+var _ futility.CommandWithParams = (*InfoRepo)(nil)
 
-func (cmd *InfoRepo) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *InfoRepo) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "store-id",
 			Description: "blob store to query (defaults to default store)",
 		},
-		command.Arg[*values.String]{
+		futility.Arg[*values.String]{
 			Name:        "keys",
 			Description: "config keys to display (defaults to config-immutable)",
 			Variadic:    true,
@@ -39,8 +39,8 @@ func (cmd *InfoRepo) GetParams() []command.Param {
 	}
 }
 
-func (cmd InfoRepo) GetDescription() command.Description {
-	return command.Description{
+func (cmd InfoRepo) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "display blob store configuration",
 		Long: "Show the configuration of a blob store in hyphence format. " +
 			"With no arguments, shows the default store's immutable config. " +
@@ -50,7 +50,7 @@ func (cmd InfoRepo) GetDescription() command.Description {
 	}
 }
 
-func (cmd InfoRepo) Run(req command.Request) {
+func (cmd InfoRepo) Run(req futility.Request) {
 	env := cmd.MakeEnvBlobStore(req)
 
 	var blobStore blob_stores.BlobStoreInitialized

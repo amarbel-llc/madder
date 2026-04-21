@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	gomcp_command "github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 )
 
@@ -11,17 +11,17 @@ func init() {
 
 type InstallMcp struct{}
 
-var _ command.CommandWithParams = (*InstallMcp)(nil)
+var _ futility.CommandWithParams = (*InstallMcp)(nil)
 
-func (cmd *InstallMcp) GetParams() []command.Param { return nil }
+func (cmd *InstallMcp) GetParams() []futility.Param { return nil }
 
-func (cmd InstallMcp) GetDescription() command.Description {
-	return command.Description{
+func (cmd InstallMcp) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "install MCP server configuration",
 	}
 }
 
-func (cmd InstallMcp) Run(req command.Request) {
+func (cmd InstallMcp) Run(req futility.Request) {
 	app := gomcp_command.NewApp("madder", "Blob store MCP server")
 	app.MCPArgs = []string{"mcp"}
 

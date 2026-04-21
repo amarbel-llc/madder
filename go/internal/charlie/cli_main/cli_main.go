@@ -10,15 +10,15 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 )
 
 // Run invokes utility.RunCLI with os.Args, writes any error to stderr
 // as a prefixed tree, and exits 0 on success or 1 on error. name is
 // the stderr prefix shown before the tree — typically the binary name.
-func Run(utility *command.Utility, name string) {
-	err := utility.RunCLI(context.Background(), os.Args[1:], command.StubPrompter{})
+func Run(utility *futility.Utility, name string) {
+	err := utility.RunCLI(context.Background(), os.Args[1:], futility.StubPrompter{})
 	if err == nil {
 		return
 	}

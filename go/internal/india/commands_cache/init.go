@@ -8,7 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -38,12 +38,12 @@ type Init struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Init)(nil)
-	_ command.CommandWithParams         = (*Init)(nil)
+	_ futility.CommandWithParams         = (*Init)(nil)
 )
 
-func (cmd *Init) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Init) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "blob-store-id",
 			Description: "identifier for the new blob store (e.g. '%default')",
 			Required:    true,
@@ -51,8 +51,8 @@ func (cmd *Init) GetParams() []command.Param {
 	}
 }
 
-func (cmd Init) GetDescription() command.Description {
-	return command.Description{
+func (cmd Init) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "initialize a purgeable blob store",
 		Long: "Create a new local content-addressable blob store under " +
 			"XDG_CACHE_HOME with hash-bucketed directory layout. " +
@@ -66,7 +66,7 @@ func (cmd *Init) SetFlagDefinitions(
 	cmd.blobStoreConfig.SetFlagDefinitions(flagDefinitions)
 }
 
-func (cmd *Init) Run(req command.Request) {
+func (cmd *Init) Run(req futility.Request) {
 	var blobStoreId blob_store_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {

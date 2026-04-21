@@ -7,7 +7,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -150,7 +150,7 @@ func BlobStoreIds(m blob_stores.BlobStoreMap) []blob_store_id.Id {
 }
 
 func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
-	req command.Request,
+	req futility.Request,
 	envBlobStore BlobStoreEnv,
 ) blob_stores.BlobStoreMap {
 	blobStores := make(
@@ -163,7 +163,7 @@ func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 	}
 
 	for range req.RemainingArgCount() {
-		blobStoreId := command.PopRequestArg[blob_store_id.Id](
+		blobStoreId := futility.PopRequestArg[blob_store_id.Id](
 			req,
 			"blob-store-id",
 		)
@@ -177,7 +177,7 @@ func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 }
 
 func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
-	req command.Request,
+	req futility.Request,
 	envBlobStore BlobStoreEnv,
 ) (source blob_stores.BlobStoreInitialized, destinations blob_stores.BlobStoreMap) {
 	destinations = make(
@@ -189,7 +189,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 		return envBlobStore.GetDefaultBlobStoreAndRemaining()
 	}
 
-	sourceBlobStoreId := command.PopRequestArg[blob_store_id.Id](
+	sourceBlobStoreId := futility.PopRequestArg[blob_store_id.Id](
 		req,
 		"source blob-store-id",
 	)
@@ -197,7 +197,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 	source = envBlobStore.GetBlobStore(*sourceBlobStoreId)
 
 	for range req.RemainingArgCount() {
-		blobStoreId := command.PopRequestArg[blob_store_id.Id](
+		blobStoreId := futility.PopRequestArg[blob_store_id.Id](
 			req,
 			"destination blob-store-id",
 		)

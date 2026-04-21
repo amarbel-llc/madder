@@ -9,7 +9,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -31,13 +31,13 @@ type Complete struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Complete)(nil)
-	_ command.CommandWithParams         = (*Complete)(nil)
+	_ futility.CommandWithParams         = (*Complete)(nil)
 )
 
-func (cmd *Complete) GetParams() []command.Param { return nil }
+func (cmd *Complete) GetParams() []futility.Param { return nil }
 
-func (cmd Complete) GetDescription() command.Description {
-	return command.Description{
+func (cmd Complete) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "complete a command-line",
 	}
 }
@@ -49,7 +49,7 @@ func (cmd *Complete) SetFlagDefinitions(
 	flagDefinitions.StringVar(&cmd.inProgress, "in-progress", "", "")
 }
 
-func (cmd Complete) makeEnv(req command.Request) env_local.Env {
+func (cmd Complete) makeEnv(req futility.Request) env_local.Env {
 	config := command_components.DefaultConfig
 
 	var debugOptions debug.Options
@@ -77,14 +77,14 @@ func (cmd Complete) makeEnv(req command.Request) env_local.Env {
 	)
 }
 
-func (cmd Complete) Run(req command.Request) {
+func (cmd Complete) Run(req futility.Request) {
 	utility := req.Utility
 	envLocal := cmd.makeEnv(req)
 
 	// TODO extract into constructor
 	// TODO find double-hyphen
 	// TODO keep track of all args
-	commandLine := command.CommandLineInput{
+	commandLine := futility.CommandLineInput{
 		FlagsOrArgs: req.PeekArgs(),
 		InProgress:  cmd.inProgress,
 	}
@@ -141,8 +141,8 @@ func (cmd Complete) Run(req command.Request) {
 
 func (cmd Complete) completeSubcommands(
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
-	utility *command.Utility,
+	commandLine futility.CommandLineInput,
+	utility *futility.Utility,
 ) {
 	for name, subcmd := range utility.AllCommands() {
 		cmd.completeSubcommand(envLocal, name, subcmd)
@@ -152,7 +152,7 @@ func (cmd Complete) completeSubcommands(
 func (cmd Complete) completeSubcommand(
 	envLocal env_local.Env,
 	name string,
-	subcmd *command.Command,
+	subcmd *futility.Command,
 ) {
 	shortDescription := subcmd.Description.Short
 
@@ -164,10 +164,10 @@ func (cmd Complete) completeSubcommand(
 }
 
 func (cmd Complete) completeSubcommandArgs(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	subcmd *command.Command,
-	commandLine command.CommandLineInput,
+	subcmd *futility.Command,
+	commandLine futility.CommandLineInput,
 ) {
 	if subcmd == nil {
 		return
@@ -181,10 +181,10 @@ func (cmd Complete) completeSubcommandArgs(
 }
 
 func (cmd Complete) completeSubcommandFlags(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	subcmd *command.Command,
-	flagSet *flags.FlagSet, commandLine command.CommandLineInput,
+	subcmd *futility.Command,
+	flagSet *flags.FlagSet, commandLine futility.CommandLineInput,
 	lastArg string,
 ) (shouldNotCompleteArgs bool) {
 	if subcmd == nil {
@@ -222,11 +222,11 @@ func (cmd Complete) completeSubcommandFlags(
 }
 
 func (cmd Complete) completeSubcommandFlagOnParseError(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	subcmd *command.Command,
+	subcmd *futility.Command,
 	flagSet *flags.FlagSet,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 	err error,
 ) {
 	if subcmd == nil {
@@ -273,7 +273,7 @@ func (cmd Complete) completeSubcommandFlagOnParseError(
 			}
 		}
 
-	case command.Completer:
+	case futility.Completer:
 		flagValue.Complete(req, envLocal, commandLine)
 
 	default:

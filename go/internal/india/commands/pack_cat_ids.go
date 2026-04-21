@@ -2,7 +2,7 @@ package commands
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
@@ -15,11 +15,11 @@ type PackCatIds struct {
 	command_components.EnvBlobStore
 }
 
-var _ command.CommandWithParams = (*PackCatIds)(nil)
+var _ futility.CommandWithParams = (*PackCatIds)(nil)
 
-func (cmd *PackCatIds) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *PackCatIds) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "archive-checksums",
 			Description: "archive checksums to filter (defaults to all archives)",
 			Variadic:    true,
@@ -27,8 +27,8 @@ func (cmd *PackCatIds) GetParams() []command.Param {
 	}
 }
 
-func (cmd PackCatIds) GetDescription() command.Description {
-	return command.Description{
+func (cmd PackCatIds) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "list blob digests contained in archive files",
 		Long: "Output the blob digests stored in inventory archive pack " +
 			"files. With no arguments, lists digests from all archives " +
@@ -37,7 +37,7 @@ func (cmd PackCatIds) GetDescription() command.Description {
 	}
 }
 
-func (cmd PackCatIds) Run(req command.Request) {
+func (cmd PackCatIds) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStoreMap := envBlobStore.GetBlobStores()
 

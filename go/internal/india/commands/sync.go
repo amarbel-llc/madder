@@ -14,7 +14,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/madder/go/internal/hotel/blob_transfers"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -40,12 +40,12 @@ type Sync struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Sync)(nil)
-	_ command.CommandWithParams         = (*Sync)(nil)
+	_ futility.CommandWithParams         = (*Sync)(nil)
 )
 
-func (cmd *Sync) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Sync) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "blob-store-ids",
 			Description: "source blob-store-id followed by destination blob-store-ids (defaults to all)",
 			Variadic:    true,
@@ -53,8 +53,8 @@ func (cmd *Sync) GetParams() []command.Param {
 	}
 }
 
-func (cmd Sync) GetDescription() command.Description {
-	return command.Description{
+func (cmd Sync) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "synchronize blobs between stores",
 		Long: "Copy blobs from a source blob store to one or more destination " +
 			"stores. The first blob-store-id argument is the source; " +
@@ -95,9 +95,9 @@ func (cmd *Sync) SetFlagDefinitions(
 }
 
 func (cmd Sync) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
@@ -106,7 +106,7 @@ func (cmd Sync) Complete(
 	}
 }
 
-func (cmd Sync) Run(req command.Request) {
+func (cmd Sync) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	source, destinations := cmd.MakeSourceAndDestinationBlobStoresFromIdsOrAll(
@@ -231,7 +231,7 @@ func (s *syncJsonSink) finalize() {
 }
 
 func (cmd Sync) runStore(
-	req command.Request,
+	req futility.Request,
 	envBlobStore command_components.BlobStoreEnv,
 	source blob_stores.BlobStoreInitialized,
 	destination blob_stores.BlobStoreMap,

@@ -3,7 +3,7 @@ package command_components
 import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -16,12 +16,12 @@ type Complete struct {
 func (cmd Complete) GetFlagValueBlobIds(
 	blobStoreId *blob_store_id.Id,
 ) interfaces.FlagValue {
-	return command.FlagValueCompleter{
+	return futility.FlagValueCompleter{
 		FlagValue: blobStoreId,
 		FuncCompleter: func(
-			req command.Request,
+			req futility.Request,
 			envLocalAny any,
-			commandLine command.CommandLineInput,
+			commandLine futility.CommandLineInput,
 		) {
 			envLocal := envLocalAny.(env_local.Env)
 			envBlobStore := cmd.MakeEnvBlobStore(req)

@@ -241,6 +241,34 @@ incubate-dewey-pkg subpath dest:
   chmod -R u+w "$dst"
   echo "copied $src -> $dst"
 
+# Rewrite an import path and its unqualified package identifier across
+# every .go file in the module. Skips files whose path matches any of the
+# optional `skip` arguments (find's -path form, trailing /* for subtrees).
+# Use to migrate consumers after moving a package (e.g. incubation ->
+# upstream swap, or this repo's golf/command -> futility cutover).
+# Usage:
+#   just rename-go-import \
+#     github.com/amarbel-llc/madder/go/internal/golf/command \
+#     github.com/amarbel-llc/madder/go/internal/futility \
+#     command futility \
+#     'go/internal/golf/command/*' 'go/internal/futility/*'
+[group("debug")]
+rename-go-import old_path new_path old_ident new_ident *skips:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  set -f  # disable globbing so skip patterns with `*` aren't expanded against CWD
+  cd {{justfile_directory()}}
+  args=(go -name '*.go' -type f)
+  for skip in {{skips}}; do
+    args+=(! -path "$skip")
+  done
+  set +f
+  find "${args[@]}" -print0 | xargs -0 sed -i \
+    -e "s|{{old_path}}\"|{{new_path}}\"|g" \
+    -e "s|{{old_path}}/|{{new_path}}/|g" \
+    -e "s/\\b{{old_ident}}\\.\\([A-Z]\\)/{{new_ident}}.\\1/g"
+  echo "rewrote import {{old_path}} -> {{new_path}} and {{old_ident}}.* -> {{new_ident}}.*"
+
 # Rewrite `package <old>` → `package <new>` in every .go file under a
 # directory tree. Also rewrites `package <old>_test` for external test
 # files. Does not touch import statements — rename consumers separately.

@@ -4,7 +4,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
 )
@@ -16,7 +16,7 @@ var DefaultConfig = config_cli.Default()
 type EnvBlobStore struct{}
 
 func (cmd EnvBlobStore) MakeEnvBlobStore(
-	req command.Request,
+	req futility.Request,
 ) BlobStoreEnv {
 	return MakeBlobStoreEnv(cmd.makeEnvLocal(req))
 }
@@ -26,13 +26,13 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 // commands that must operate before discovery would succeed, such as the
 // legacy-config migration command.
 func (cmd EnvBlobStore) MakeEnvBlobStoreWithoutStores(
-	req command.Request,
+	req futility.Request,
 ) BlobStoreEnv {
 	return MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req))
 }
 
 func (cmd EnvBlobStore) makeEnvLocal(
-	req command.Request,
+	req futility.Request,
 ) env_local.Env {
 	config := DefaultConfig
 

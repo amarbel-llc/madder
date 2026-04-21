@@ -11,7 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -31,11 +31,11 @@ type Fsck struct {
 	Format output_format.Format
 }
 
-var _ command.CommandWithParams = (*Fsck)(nil)
+var _ futility.CommandWithParams = (*Fsck)(nil)
 
-func (cmd *Fsck) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Fsck) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "store-ids",
 			Description: "blob store IDs to verify (defaults to all configured stores)",
 			Variadic:    true,
@@ -43,8 +43,8 @@ func (cmd *Fsck) GetParams() []command.Param {
 	}
 }
 
-func (cmd Fsck) GetDescription() command.Description {
-	return command.Description{
+func (cmd Fsck) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "verify cache blob store integrity",
 		Long: "Verify the integrity of one or more cache blob stores by " +
 			"reading every blob and recomputing its content-addressable " +
@@ -61,7 +61,7 @@ func (cmd *Fsck) SetFlagDefinitions(
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 }
 
-func (cmd Fsck) Run(req command.Request) {
+func (cmd Fsck) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	blobStores := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)

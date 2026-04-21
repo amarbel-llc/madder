@@ -12,7 +12,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -37,12 +37,12 @@ type Write struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Write)(nil)
-	_ command.CommandWithParams         = (*Write)(nil)
+	_ futility.CommandWithParams         = (*Write)(nil)
 )
 
-func (cmd *Write) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Write) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "args",
 			Description: "file paths, '-' for stdin, or blob store IDs to switch the active store",
 			Variadic:    true,
@@ -50,8 +50,8 @@ func (cmd *Write) GetParams() []command.Param {
 	}
 }
 
-func (cmd Write) GetDescription() command.Description {
-	return command.Description{
+func (cmd Write) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "write blobs to a cache store",
 		Long: "Write files or stdin into a purgeable content-addressable " +
 			"blob store under XDG_CACHE_HOME. Output defaults to TAP on an " +
@@ -77,7 +77,7 @@ func (cmd *Write) SetFlagDefinitions(
 	flagSet.Var(&cmd.UtilityAfter, "utility-after", "")
 }
 
-func (cmd Write) Run(req command.Request) {
+func (cmd Write) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 

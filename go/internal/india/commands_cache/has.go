@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
@@ -19,11 +19,11 @@ type Has struct {
 	command_components.EnvBlobStore
 }
 
-var _ command.CommandWithParams = (*Has)(nil)
+var _ futility.CommandWithParams = (*Has)(nil)
 
-func (cmd *Has) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Has) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "markl-ids",
 			Description: "markl IDs to check for existence",
 			Variadic:    true,
@@ -31,8 +31,8 @@ func (cmd *Has) GetParams() []command.Param {
 	}
 }
 
-func (cmd Has) GetDescription() command.Description {
-	return command.Description{
+func (cmd Has) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "check if blobs exist in cache stores",
 		Long: "Check whether one or more blobs exist in any configured cache " +
 			"blob store. Exits 0 if all blobs are found, nonzero if any are " +
@@ -41,7 +41,7 @@ func (cmd Has) GetDescription() command.Description {
 	}
 }
 
-func (cmd Has) Run(req command.Request) {
+func (cmd Has) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	var missCount int

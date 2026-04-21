@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
@@ -18,10 +18,10 @@ func init() {
 
 type EncodeIds struct{}
 
-var _ command.CommandWithParams = (*EncodeIds)(nil)
+var _ futility.CommandWithParams = (*EncodeIds)(nil)
 
-func (cmd EncodeIds) GetDescription() command.Description {
-	return command.Description{
+func (cmd EncodeIds) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "convert hex digests to native markl IDs",
 		Long: "Read hex-encoded digests from stdin (one per line) and " +
 			"convert each to the native blech32-encoded markl ID format " +
@@ -30,9 +30,9 @@ func (cmd EncodeIds) GetDescription() command.Description {
 	}
 }
 
-func (cmd EncodeIds) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd EncodeIds) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "hash-type",
 			Description: "hash algorithm (e.g. sha256, blake2b256)",
 			Required:    true,
@@ -40,7 +40,7 @@ func (cmd EncodeIds) GetParams() []command.Param {
 	}
 }
 
-func (cmd EncodeIds) Run(req command.Request) {
+func (cmd EncodeIds) Run(req futility.Request) {
 	hashType := req.PopArg("hash-type")
 
 	if _, err := markl.GetFormatHashOrError(hashType); err != nil {

@@ -15,7 +15,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -40,12 +40,12 @@ type PackBlobs struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*PackBlobs)(nil)
-	_ command.CommandWithParams         = (*PackBlobs)(nil)
+	_ futility.CommandWithParams         = (*PackBlobs)(nil)
 )
 
-func (cmd *PackBlobs) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *PackBlobs) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "args",
 			Description: "file paths, '-' for stdin, or blob-store-ids to switch the active store",
 			Variadic:    true,
@@ -53,8 +53,8 @@ func (cmd *PackBlobs) GetParams() []command.Param {
 	}
 }
 
-func (cmd PackBlobs) GetDescription() command.Description {
-	return command.Description{
+func (cmd PackBlobs) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "write files and pack them into an archive",
 		Long: "Write files into the blob store and then pack just those " +
 			"blobs into an archive. Arguments are file paths, '-' for " +
@@ -73,9 +73,9 @@ func (cmd PackBlobs) GetDescription() command.Description {
 }
 
 func (cmd PackBlobs) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
@@ -111,7 +111,7 @@ const (
 	packStateFailed = "pack_failed"
 )
 
-func (cmd PackBlobs) Run(req command.Request) {
+func (cmd PackBlobs) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 

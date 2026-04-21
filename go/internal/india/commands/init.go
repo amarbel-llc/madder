@@ -10,7 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -30,7 +30,7 @@ func init() {
 			CompressionType:   compression_type.CompressionTypeDefault,
 			LockInternalFiles: true,
 		},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize a local blob store",
 			Long: "Create a new local content-addressable blob store with " +
 				"hash-bucketed directory layout. The store is registered " +
@@ -47,7 +47,7 @@ func init() {
 			ids.TypeTomlBlobStoreConfigPointerV0,
 		).TypeStruct,
 		blobStoreConfig: &blob_store_configs.TomlPointerV0{},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize a pointer blob store",
 			Long: "Create a blob store that delegates to another store by " +
 				"reference. The pointer store does not hold blobs itself " +
@@ -60,7 +60,7 @@ func init() {
 			ids.TypeTomlBlobStoreConfigSftpExplicitV0,
 		).TypeStruct,
 		blobStoreConfig: &blob_store_configs.TomlSFTPV0{},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize an SFTP blob store with explicit credentials",
 			Long: "Create a blob store backed by an SFTP remote, using " +
 				"explicitly provided host, port, user, and key path. " +
@@ -74,7 +74,7 @@ func init() {
 			ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0,
 		).TypeStruct,
 		blobStoreConfig: &blob_store_configs.TomlSFTPViaSSHConfigV0{},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize an SFTP blob store via ssh_config",
 			Long: "Create a blob store backed by an SFTP remote, resolving " +
 				"connection parameters from ~/.ssh/config host entries. " +
@@ -96,7 +96,7 @@ func init() {
 				SizeRatio:   2.0,
 			},
 		},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize an inventory archive blob store",
 			Long: "Create a blob store using the inventory archive format, " +
 				"which packs blobs into indexed archive files for efficient " +
@@ -118,7 +118,7 @@ func init() {
 				SizeRatio:   2.0,
 			},
 		},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize an inventory archive blob store (v1)",
 			Long: "Create a blob store using inventory archive format " +
 				"version 1 with delta compression support. Prefer " +
@@ -131,7 +131,7 @@ func init() {
 			ids.TypeTomlBlobStoreConfigInventoryArchiveV0,
 		).TypeStruct,
 		blobStoreConfig: &blob_store_configs.TomlInventoryArchiveV0{},
-		desc: command.Description{
+		desc: futility.Description{
 			Short: "initialize an inventory archive blob store (v0)",
 			Long: "Create a blob store using the original inventory " +
 				"archive format (v0) without delta compression. Prefer " +
@@ -144,7 +144,7 @@ type Init struct {
 	tipe            ids.TypeStruct
 	blobStoreConfig blob_store_configs.ConfigMutable
 	discover        bool
-	desc            command.Description
+	desc            futility.Description
 
 	command_components.EnvBlobStore
 	command_components.Init
@@ -152,12 +152,12 @@ type Init struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Init)(nil)
-	_ command.CommandWithParams         = (*Init)(nil)
+	_ futility.CommandWithParams         = (*Init)(nil)
 )
 
-func (cmd *Init) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Init) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "blob-store-id",
 			Description: "identifier for the new blob store (e.g. 'default', '.archive')",
 			Required:    true,
@@ -165,7 +165,7 @@ func (cmd *Init) GetParams() []command.Param {
 	}
 }
 
-func (cmd Init) GetDescription() command.Description {
+func (cmd Init) GetDescription() futility.Description {
 	return cmd.desc
 }
 
@@ -184,7 +184,7 @@ func (cmd *Init) SetFlagDefinitions(
 	}
 }
 
-func (cmd *Init) Run(req command.Request) {
+func (cmd *Init) Run(req futility.Request) {
 	var blobStoreId blob_store_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
@@ -217,7 +217,7 @@ func (cmd *Init) Run(req command.Request) {
 }
 
 func (cmd *Init) runDiscover(
-	req command.Request,
+	req futility.Request,
 	blobStoreId blob_store_id.Id,
 	tw *tap.Writer,
 ) {

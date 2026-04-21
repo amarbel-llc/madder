@@ -10,7 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -34,12 +34,12 @@ type Cat struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Cat)(nil)
-	_ command.CommandWithParams         = (*Cat)(nil)
+	_ futility.CommandWithParams         = (*Cat)(nil)
 )
 
-func (cmd *Cat) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *Cat) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "args",
 			Description: "markl IDs to retrieve, or blob-store-ids to switch the active store",
 			Variadic:    true,
@@ -47,8 +47,8 @@ func (cmd *Cat) GetParams() []command.Param {
 	}
 }
 
-func (cmd Cat) GetDescription() command.Description {
-	return command.Description{
+func (cmd Cat) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "output blob contents by digest",
 		Long: "Retrieve and output the raw contents of one or more blobs " +
 			"identified by their content-addressable digest. Arguments are " +
@@ -66,9 +66,9 @@ func (cmd Cat) GetDescription() command.Description {
 }
 
 func (cmd Cat) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
@@ -148,7 +148,7 @@ func (cmd Cat) makeBlobWriter(
 	}
 }
 
-func (cmd Cat) Run(req command.Request) {
+func (cmd Cat) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStore := envBlobStore.GetDefaultBlobStore()
 

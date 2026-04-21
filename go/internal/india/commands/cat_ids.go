@@ -4,7 +4,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
@@ -25,7 +25,7 @@ type CatIds struct {
 	command_components.BlobStore
 }
 
-var _ command.CommandWithParams = (*CatIds)(nil)
+var _ futility.CommandWithParams = (*CatIds)(nil)
 
 func (cmd *CatIds) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
@@ -33,9 +33,9 @@ func (cmd *CatIds) SetFlagDefinitions(
 	flagSet.Var(&cmd.Format, "format", "output format for blob ids")
 }
 
-func (cmd *CatIds) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *CatIds) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "blob-store-ids",
 			Description: "blob-store-ids to query (defaults to all)",
 			Variadic:    true,
@@ -43,8 +43,8 @@ func (cmd *CatIds) GetParams() []command.Param {
 	}
 }
 
-func (cmd CatIds) GetDescription() command.Description {
-	return command.Description{
+func (cmd CatIds) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "list all blob digests in a store",
 		Long: "Output every blob digest stored in one or more blob stores. " +
 			"With no arguments, lists digests from all configured stores. " +
@@ -56,9 +56,9 @@ func (cmd CatIds) GetDescription() command.Description {
 }
 
 func (cmd CatIds) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
@@ -74,7 +74,7 @@ func (cmd CatIds) Complete(
 	}
 }
 
-func (cmd CatIds) Run(req command.Request) {
+func (cmd CatIds) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	blobStores := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)

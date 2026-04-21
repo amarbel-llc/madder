@@ -10,7 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -28,17 +28,17 @@ type InitFrom struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*InitFrom)(nil)
-	_ command.CommandWithParams         = (*InitFrom)(nil)
+	_ futility.CommandWithParams         = (*InitFrom)(nil)
 )
 
-func (cmd *InitFrom) GetParams() []command.Param {
-	return []command.Param{
-		command.Arg[*values.String]{
+func (cmd *InitFrom) GetParams() []futility.Param {
+	return []futility.Param{
+		futility.Arg[*values.String]{
 			Name:        "store-name",
 			Description: "name for the new blob store",
 			Required:    true,
 		},
-		command.Arg[*values.String]{
+		futility.Arg[*values.String]{
 			Name:        "config-path",
 			Description: "path to the blob store configuration file",
 			Required:    true,
@@ -46,8 +46,8 @@ func (cmd *InitFrom) GetParams() []command.Param {
 	}
 }
 
-func (cmd InitFrom) GetDescription() command.Description {
-	return command.Description{
+func (cmd InitFrom) GetDescription() futility.Description {
+	return futility.Description{
 		Short: "initialize a blob store from a configuration file",
 		Long: "Create a new blob store by reading its type and settings " +
 			"from a hyphence-encoded configuration file. The config is " +
@@ -63,14 +63,14 @@ func (cmd *InitFrom) SetFlagDefinitions(
 }
 
 func (cmd InitFrom) Complete(
-	req command.Request,
+	req futility.Request,
 	envLocal env_local.Env,
-	commandLine command.CommandLineInput,
+	commandLine futility.CommandLineInput,
 ) {
 	// TODO support completion for config path
 }
 
-func (cmd *InitFrom) Run(req command.Request) {
+func (cmd *InitFrom) Run(req futility.Request) {
 	var blobStoreId blob_store_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob store name")); err != nil {
