@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 )
 
 type BridgeResult struct {

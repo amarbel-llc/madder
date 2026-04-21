@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 )
 
 func TestBridgeUnknownCommand(t *testing.T) {

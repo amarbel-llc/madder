@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func main() {

@@ -8,6 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -16,7 +17,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/delim_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {

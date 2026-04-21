@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 // Run invokes utility.RunCLI with os.Args, writes any error to stderr

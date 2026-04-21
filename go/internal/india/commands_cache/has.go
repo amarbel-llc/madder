@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 func init() {

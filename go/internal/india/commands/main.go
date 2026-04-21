@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 )
 
 var utility = command.NewUtility("madder", "content-addressable blob store operations")

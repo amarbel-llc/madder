@@ -54,6 +54,13 @@ test: test-go test-bats
 test-go *flags:
   cd go && go test -tags test {{flags}} ./...
 
+# Run `go vet` across the module with the test build tag, which gates
+# several internal test-only symbols. Without -tags test, vet reports
+# false positives on test-tagged source files.
+[group("test")]
+vet-go *flags:
+  cd go && go vet -tags test {{flags}} ./...
+
 # Run Go unit tests under the race detector. Not included in the
 # default `test` target because race builds are substantially slower.
 [group("test")]

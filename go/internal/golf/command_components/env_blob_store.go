@@ -4,9 +4,9 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
 )
 
 // DefaultConfig is the CLI config used by madder commands.

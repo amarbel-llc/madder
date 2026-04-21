@@ -1,6 +1,6 @@
 package commands_cache
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+import "github.com/amarbel-llc/madder/go/internal/golf/command"
 
 var utility = command.NewUtility(
 	"madder-cache",

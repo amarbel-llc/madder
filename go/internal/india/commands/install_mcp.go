@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/command"
+	"github.com/amarbel-llc/madder/go/internal/golf/command"
 	gomcp_command "github.com/amarbel-llc/purse-first/libs/go-mcp/command"
 )
 
