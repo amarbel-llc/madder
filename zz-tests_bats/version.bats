@@ -38,8 +38,8 @@ function version_matches_flake_version { # @test
   local flake_version
   flake_version="$(grep 'madderVersion = ' "${BATS_TEST_DIRNAME}/../flake.nix" | sed 's/.*"\(.*\)".*/\1/')"
 
-  [[ "$got_version" == "$flake_version" ]] \
-    || fail "madder version prefix '$got_version' does not match flake.nix madderVersion '$flake_version'"
+  [[ $got_version == "$flake_version" ]] ||
+    fail "madder version prefix '$got_version' does not match flake.nix madderVersion '$flake_version'"
 }
 
 function version_madder_cache_matches_madder { # @test
@@ -59,6 +59,6 @@ function version_madder_cache_matches_madder { # @test
   assert_success
   local madder_cache_version="$output"
 
-  [[ "$madder_version" == "$madder_cache_version" ]] \
-    || fail "madder=\"$madder_version\" madder-cache=\"$madder_cache_version\" disagree"
+  [[ $madder_version == "$madder_cache_version" ]] ||
+    fail "madder=\"$madder_version\" madder-cache=\"$madder_cache_version\" disagree"
 }
