@@ -38,6 +38,18 @@ build-go-cover:
 generate-facades:
   cd go && dagnabit export
 
+# Regenerate tommy codegen output for the blob_store_configs package.
+# Deletes all *_tommy.go files first so that tommy's analyze step sees
+# only the hand-written structs as source of truth — decoupling
+# regeneration from whatever stale state the previous generated files
+# happened to be in.
+[group("build")]
+generate-tommy:
+  find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \
+    -maxdepth 1 -type f -name '*_tommy.go' -delete
+  cd go && go generate ./internal/charlie/blob_store_configs/...
+  goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
+
 #   _____         _
 #  |_   _|__  ___| |_
 #    | |/ _ \/ __| __|
