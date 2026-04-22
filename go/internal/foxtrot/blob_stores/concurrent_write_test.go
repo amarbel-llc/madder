@@ -25,15 +25,23 @@ import (
 // in tests mirroring the production expectation that XDG_CACHE_HOME and
 // the blob store's base path share a mount.
 func makeTestStore(t *testing.T) localHashBucketed {
+	return makeTestStoreWithVerify(t, false)
+}
+
+// makeTestStoreWithVerify is the variant used by the #31 happy-path test.
+// When verifyOnCollision is true, the EEXIST branch in blob_mover.Close
+// opens both paths as BlobReaders and byte-compares their decoded streams.
+func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBucketed {
 	t.Helper()
 
 	basePath := t.TempDir()
 	tempPath := t.TempDir()
 
 	config := &blob_store_configs.DefaultType{
-		HashBuckets:     blob_store_configs.DefaultHashBuckets,
-		HashTypeId:      charlie_bsc.HashTypeSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		HashBuckets:       blob_store_configs.DefaultHashBuckets,
+		HashTypeId:        charlie_bsc.HashTypeSha256,
+		CompressionType:   compression_type.CompressionTypeNone,
+		VerifyOnCollision: verifyOnCollision,
 	}
 
 	return localHashBucketed{
@@ -43,6 +51,7 @@ func makeTestStore(t *testing.T) localHashBucketed {
 		buckets:           config.GetHashBuckets(),
 		basePath:          basePath,
 		tempFS:            env_dir.TemporaryFS{BasePath: tempPath},
+		verifyOnCollision: verifyOnCollision,
 	}
 }
 
@@ -288,5 +297,52 @@ func TestConcurrentBlobWritesMixed(t *testing.T) {
 		if !bytes.Equal(got, pair.want) {
 			t.Fatalf("payload %s read-back mismatch: got %q, want %q", pair.payload, got, pair.want)
 		}
+	}
+}
+
+// TestConcurrentBlobWritesSameContent_VerifyOnCollision is the happy-path
+// exercise of the #31 verify-on-collision flag: a store with the flag on
+// runs the same 32-goroutine same-content write pattern as
+// TestConcurrentBlobWritesSameContent. Because all goroutines write the
+// same bytes, every EEXIST branch should pass checkCollision and unlink
+// the temp cleanly. All writers must succeed, the resulting blob must be
+// readable, and no temp files should remain.
+func TestConcurrentBlobWritesSameContent_VerifyOnCollision(t *testing.T) {
+	const n = 32
+
+	store := makeTestStoreWithVerify(t, true)
+	payload := []byte("shared payload for verify-on-collision happy path")
+
+	digests := runConcurrent(t, n, func(int) (domain_interfaces.MarklId, error) {
+		return writeBlob(store, payload)
+	})
+
+	first := digests[0].String()
+	for i, d := range digests {
+		if d.String() != first {
+			t.Fatalf("goroutine %d produced digest %s, expected %s", i, d, first)
+		}
+	}
+
+	if !store.HasBlob(digests[0]) {
+		t.Fatalf("HasBlob(%s) = false after concurrent verify-on-collision writes", digests[0])
+	}
+
+	got := readBlob(t, store, digests[0])
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("read-back mismatch: got %q, want %q", got, payload)
+	}
+
+	entries, err := os.ReadDir(store.tempFS.BasePath)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", store.tempFS.BasePath, err)
+	}
+	if len(entries) != 0 {
+		names := make([]string, len(entries))
+		for i, e := range entries {
+			names[i] = e.Name()
+		}
+		t.Errorf("temp dir %s has %d leftover entries after verify-on-collision run: %v",
+			store.tempFS.BasePath, len(entries), names)
 	}
 }

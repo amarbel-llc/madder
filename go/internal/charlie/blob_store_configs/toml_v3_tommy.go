@@ -74,6 +74,11 @@ func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
 				}
 				d.consumed["compression-type"] = true
 			}
+		case "verify-on-collision":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				d.data.VerifyOnCollision = v
+				d.consumed["verify-on-collision"] = true
+			}
 		}
 	}
 	return d, nil
@@ -122,6 +127,11 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 			return nil, fmt.Errorf("compression-type: %w", err)
 		}
 		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", string(v)); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	}
+	if d.data.VerifyOnCollision != false || cst.HasValue(d.cstDoc.Root(), "verify-on-collision") {
+		if err := cst.SetAny(d.cstDoc.Root(), "verify-on-collision", d.data.VerifyOnCollision); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
@@ -182,6 +192,11 @@ func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node,
 				}
 				consumed[keyPrefix+"compression-type"] = true
 			}
+		case "verify-on-collision":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				data.VerifyOnCollision = v
+				consumed[keyPrefix+"verify-on-collision"] = true
+			}
 		}
 	}
 	return nil
@@ -227,6 +242,11 @@ func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node)
 			return fmt.Errorf("compression-type: %w", err)
 		}
 		if err := cst.SetAny(container, "compression-type", string(v)); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	}
+	if data.VerifyOnCollision != false || cst.HasValue(container, "verify-on-collision") {
+		if err := cst.SetAny(container, "verify-on-collision", data.VerifyOnCollision); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 	}

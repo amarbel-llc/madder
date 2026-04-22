@@ -159,6 +159,20 @@ under concurrent same-digest writes. Blob deletion is unaffected because
 **unlink**(2) requires write permission on the parent directory, not on
 the file itself.
 
+## Collision verification (optional)
+
+Local hash-bucketed stores support an opt-in **verify-on-collision**
+config flag. When enabled, the **link**(2) publish step's **EEXIST**
+branch does not treat the duplicate as a silent no-op; it opens both
+the temp file and the existing blob as decoded streams and
+byte-compares them. On mismatch the write fails with an explicit
+collision error and the temp file is preserved for forensics. The
+runtime override **MADDER_VERIFY_ON_COLLISION=1** turns it on for the
+current invocation regardless of config (tracked for CLI-flag promotion
+in issue #38). Off by default; unnecessary for the collision-resistant
+hashes madder supports today, but built as infrastructure for future
+weak-hash modes or compliance settings (issue #31).
+
 # INLINE STORE SWITCHING
 
 Several madder commands accept positional arguments that can be either data

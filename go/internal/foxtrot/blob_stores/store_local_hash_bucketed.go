@@ -25,6 +25,11 @@ type localHashBucketed struct {
 
 	basePath string
 	tempFS   env_dir.TemporaryFS
+
+	// verifyOnCollision is the OR of the per-store config flag and the
+	// MADDER_VERIFY_ON_COLLISION env-var override, resolved at store
+	// construction. See ADR 0003 and issue #31.
+	verifyOnCollision bool
 }
 
 var (
@@ -56,6 +61,11 @@ func makeLocalHashBucketed(
 	// and the caller gets a clear error pointing at ADR 0003 and
 	// blob-store(7).
 	store.tempFS = envDir.GetTempLocal()
+
+	// Per issue #31: either the store config or the runtime env var
+	// override enables byte-level collision verification on EEXIST.
+	store.verifyOnCollision = config.GetVerifyOnCollision() ||
+		envDir.GetVerifyOnCollisionOverride()
 
 	return store, err
 }
@@ -180,6 +190,7 @@ func (blobStore localHashBucketed) blobWriterTo(
 			FinalPathOrDir:              path,
 			GenerateFinalPathFromDigest: true,
 			TemporaryFS:                 blobStore.tempFS,
+			VerifyOnCollision:           blobStore.verifyOnCollision,
 		},
 	); err != nil {
 		err = errors.Wrap(err)

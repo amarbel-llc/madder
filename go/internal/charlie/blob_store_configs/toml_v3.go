@@ -17,6 +17,12 @@ type TomlV3 struct {
 	Encryption []markl.Id `toml:"encryption"`
 
 	CompressionType compression_type.CompressionType `toml:"compression-type"`
+
+	// VerifyOnCollision opts this store into git-style byte-level
+	// collision verification: on EEXIST from the blob-mover's link(2)
+	// publish, compare the temp file against the existing blob and fail
+	// if they differ. Off by default. See issue #31, ADR 0002, ADR 0003.
+	VerifyOnCollision bool `toml:"verify-on-collision"`
 }
 
 func (TomlV3) GetBlobStoreType() string {
@@ -45,6 +51,13 @@ func (blobStoreConfig *TomlV3) SetFlagDefinitions(
 	)
 
 	setMultiEncryptionFlagDefinition(flagSet, &blobStoreConfig.Encryption)
+
+	flagSet.BoolVar(
+		&blobStoreConfig.VerifyOnCollision,
+		"verify-on-collision",
+		blobStoreConfig.VerifyOnCollision,
+		"byte-compare on EEXIST during publish to catch hash collisions",
+	)
 }
 
 func (blobStoreConfig TomlV3) getBasePath() string {
@@ -61,6 +74,10 @@ func (blobStoreConfig TomlV3) GetBlobCompression() interfaces.IOWrapper {
 
 func (blobStoreConfig TomlV3) GetBlobEncryption() domain_interfaces.MarklId {
 	return EncryptionKeys(blobStoreConfig.Encryption)
+}
+
+func (blobStoreConfig TomlV3) GetVerifyOnCollision() bool {
+	return blobStoreConfig.VerifyOnCollision
 }
 
 func (blobStoreConfig TomlV3) SupportsMultiHash() bool {

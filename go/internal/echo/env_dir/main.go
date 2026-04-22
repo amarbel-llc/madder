@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -39,6 +40,13 @@ type Env interface {
 	MakeRelativePathStringFormatWriter() interfaces.StringEncoderTo[string]
 	AbsFromCwdOrSame(p string) (p1 string)
 
+	// GetVerifyOnCollisionOverride returns true when the runtime env var
+	// MADDER_VERIFY_ON_COLLISION is set to a truthy value. It is OR'd
+	// with the per-store config field by callers that publish blobs;
+	// see issue #31 and ADR 0003 for rationale. See #38 for the eventual
+	// migration from env var to CLI global flag.
+	GetVerifyOnCollisionOverride() bool
+
 	Delete(paths ...string) (err error)
 }
 
@@ -47,6 +55,8 @@ type env struct {
 	beforeXDG
 
 	TempLocal, TempOS TemporaryFS
+
+	verifyOnCollisionOverride bool
 
 	xdg.XDG
 }
@@ -64,7 +74,28 @@ func (env *env) initializeXDG() (err error) {
 		return err
 	}
 
+	env.verifyOnCollisionOverride = parseBoolEnv(
+		os.Getenv("MADDER_VERIFY_ON_COLLISION"),
+	)
+
 	return err
+}
+
+// parseBoolEnv returns true if the env-var value is a truthy string
+// ("1", "true", "yes", "on" — case-insensitive). Everything else,
+// including empty, is false. The accepted set mirrors what other
+// env-var driven toggles in the Go ecosystem typically accept.
+func parseBoolEnv(v string) bool {
+	switch strings.ToLower(strings.TrimSpace(v)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
+
+func (env env) GetVerifyOnCollisionOverride() bool {
+	return env.verifyOnCollisionOverride
 }
 
 func (env env) GetActiveContext() interfaces.ActiveContext {

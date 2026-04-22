@@ -54,6 +54,7 @@ type (
 		ConfigHashType
 		domain_interfaces.BlobIOWrapper
 		GetHashBuckets() []int
+		GetVerifyOnCollision() bool
 	}
 
 	ConfigInventoryArchive interface {

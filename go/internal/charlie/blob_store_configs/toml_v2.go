@@ -68,6 +68,13 @@ func (blobStoreConfig TomlLocalHashBucketedV2) GetBlobEncryption() domain_interf
 	return blobStoreConfig.Encryption
 }
 
+// GetVerifyOnCollision is always false on v2; the flag was introduced in
+// TomlV3. Stores pinned to v2 that want byte-level collision verification
+// must upgrade.
+func (blobStoreConfig TomlLocalHashBucketedV2) GetVerifyOnCollision() bool {
+	return false
+}
+
 func (blobStoreConfig TomlLocalHashBucketedV2) SupportsMultiHash() bool {
 	return true
 }

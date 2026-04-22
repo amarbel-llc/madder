@@ -17,6 +17,12 @@ type MoveOptions struct {
 	TemporaryFS
 	FinalPathOrDir              string
 	GenerateFinalPathFromDigest bool
+	// VerifyOnCollision, when true, invokes checkCollision on the
+	// link(2) EEXIST branch — opening both the temp file and the
+	// existing blob as BlobReaders and byte-comparing their decoded
+	// streams. On mismatch, returns ErrCollisionContentMismatch.
+	// See ADR 0003 and issue #31.
+	VerifyOnCollision bool
 }
 
 type localFileMover struct {
@@ -24,8 +30,14 @@ type localFileMover struct {
 	file     *os.File
 	domain_interfaces.BlobWriter
 
-	basePath string
-	blobPath string
+	basePath          string
+	blobPath          string
+	verifyOnCollision bool
+
+	// envDirConfig is retained from construction so the EEXIST branch
+	// can build a BlobReader over the existing blob with the same
+	// decoding config (compression/encryption) the writer used.
+	envDirConfig Config
 }
 
 func NewMover(
@@ -44,7 +56,9 @@ func newMover(
 	moveOptions MoveOptions,
 ) (mover *localFileMover, err error) {
 	mover = &localFileMover{
-		funcJoin: config.funcJoin,
+		funcJoin:          config.funcJoin,
+		verifyOnCollision: moveOptions.VerifyOnCollision,
+		envDirConfig:      config,
 	}
 
 	if moveOptions.GenerateFinalPathFromDigest {
@@ -149,6 +163,24 @@ func (mover *localFileMover) Close() (err error) {
 	case linkErr == nil:
 		// happy path — fall through to unlink the temp and fsync the dir.
 	case errors.Is(linkErr, fs.ErrExist):
+		// A same-digest writer published first. By ADR 0002 the bytes
+		// are equivalent and this is benign — unless the store opted
+		// into byte-level verification (issue #31), in which case we
+		// open both paths as BlobReaders and confirm the decoded
+		// streams match.
+		if mover.verifyOnCollision {
+			if err = verifyExistingBlobMatches(
+				mover.envDirConfig,
+				tempPath,
+				mover.blobPath,
+			); err != nil {
+				// Leave the temp file on disk for forensics; caller
+				// who opted into verification wants evidence of the
+				// collision, not silent cleanup.
+				err = errors.Wrap(err)
+				return err
+			}
+		}
 		if err = os.Remove(tempPath); err != nil {
 			err = errors.Wrap(err)
 			return err
