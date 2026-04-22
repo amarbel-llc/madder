@@ -200,17 +200,40 @@ tag version message:
   gum log --level info "Pushed $tag"
   git tag -v "$tag"
 
-# Cut a release: assemble a changelog-style message from commits
-# since the last go/v* tag, then call `tag` to sign, push, and
-# verify. The "go/v" prefix is added for you, so pass the semver
-# without it. Usage: just release 0.0.2
+# Sed-rewrite madderVersion in flake.nix to the given semver. The
+# version string is burnt into the binary at build time via -ldflags
+# (see go/internal/0/buildinfo), so flake.nix is the single source of
+# truth. No-op if already at the target version. Usage: just
+# bump-version 0.0.2
+[group("maint")]
+bump-version new_version:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  current=$(grep 'madderVersion = ' flake.nix | sed 's/.*"\(.*\)".*/\1/')
+  if [[ "$current" == "{{new_version}}" ]]; then
+    gum log --level info "already at {{new_version}}"
+    exit 0
+  fi
+  sed -i.bak 's/madderVersion = "'"$current"'"/madderVersion = "{{new_version}}"/' flake.nix && rm flake.nix.bak
+  gum log --level info "bumped madderVersion: $current → {{new_version}}"
+
+# Cut a release: must be run on master. Bumps madderVersion in
+# flake.nix, commits the bump with a changelog-style message built
+# from commits since the last go/v* tag, pushes master, then signs
+# and pushes the go/v{{version}} tag. The "go/v" prefix is added for
+# you, so pass the semver without it. Usage: just release 0.0.2
 #
 # Use `just tag <version> <message>` directly if you want to
-# control the commit message yourself.
+# control the commit message yourself without bumping.
 [group("maint")]
 release version:
   #!/usr/bin/env bash
   set -euo pipefail
+  current_branch=$(git rev-parse --abbrev-ref HEAD)
+  if [[ "$current_branch" != "master" ]]; then
+    gum log --level error "just release must be run on master (currently on $current_branch)"
+    exit 1
+  fi
   prev=$(git tag --sort=-v:refname -l "go/v*" | head -1)
   header="release v{{version}}"
   if [[ -n "$prev" ]]; then
@@ -222,6 +245,13 @@ release version:
     fi
   else
     msg="$header"
+  fi
+  just bump-version "{{version}}"
+  if ! git diff --quiet flake.nix; then
+    git add flake.nix
+    git commit -m "chore: release go/v{{version}}"
+    git push origin master
+    gum log --level info "pushed flake.nix bump to master"
   fi
   just tag "{{version}}" "$msg"
 

@@ -41,6 +41,15 @@
       purse-first,
       ...
     }:
+    let
+      # Burnt into the binary via -ldflags. Single source of truth for
+      # the release version; `just bump-version` sed-rewrites this line.
+      madderVersion = "0.0.1";
+      # shortRev for clean builds, dirtyShortRev for dirty working trees
+      # (so devshell builds show `dirty-abcdef` rather than masquerading
+      # as a clean release), "unknown" as a last-resort fallback.
+      madderCommit = self.shortRev or self.dirtyShortRev or "unknown";
+    in
     (utils.lib.eachDefaultSystem (
       system:
       let
@@ -55,6 +64,8 @@
             system
             ;
           man7Src = ./docs/man.7;
+          version = madderVersion;
+          commit = madderCommit;
         };
       in
       {

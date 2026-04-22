@@ -7,6 +7,11 @@
   purse-first,
   system,
   man7Src ? null,
+  # Burnt into every binary via -ldflags. Defaulted so that
+  # non-flake consumers (e.g. direct `import ./go/default.nix`) still
+  # work, but release builds always override via flake.nix.
+  version ? "dev",
+  commit ? "unknown",
 }:
 let
   pkgs = import nixpkgs {
@@ -20,9 +25,11 @@ let
     inherit system;
   };
 
+  buildinfoPkg = "github.com/amarbel-llc/madder/go/internal/0/buildinfo";
+
   madder = pkgs.buildGoApplication {
     pname = "madder";
-    version = "0.0.1";
+    inherit version;
     src = ./.;
     pwd = ./.;
     subPackages = [
@@ -33,6 +40,13 @@ let
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
+
+    ldflags = [
+      "-X"
+      "${buildinfoPkg}.Version=${version}"
+      "-X"
+      "${buildinfoPkg}.Commit=${commit}"
+    ];
 
     nativeBuildInputs = [
       purse-first.packages.${system}.dagnabit
