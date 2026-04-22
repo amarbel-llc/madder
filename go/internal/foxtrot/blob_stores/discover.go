@@ -171,10 +171,9 @@ func WriteRemoteConfig(
 	uiPrinter.Printf("writing remote blob store config to %q...", configPath)
 
 	config := &blob_store_configs.DefaultType{
-		HashTypeId:        blob_store_configs.HashType(discovered.HashTypeId),
-		HashBuckets:       discovered.Buckets,
-		CompressionType:   compression_type.CompressionTypeDefault,
-		LockInternalFiles: true,
+		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
+		HashBuckets:     discovered.Buckets,
+		CompressionType: compression_type.CompressionTypeDefault,
 	}
 
 	typedConfig := &hyphence.TypedBlob[blob_store_configs.Config]{

@@ -496,29 +496,29 @@ func TestRunCLIFlagsBeforeArgExactReproduction(t *testing.T) {
 	// Exact reproduction from #39: two flags (string + bool=value) before positional.
 	app := NewUtility("test", "test app")
 
-	var gotArg, gotEncryption, gotLock string
+	var gotArg, gotEncryption, gotVerbose string
 	app.AddCmd("init", &captureParamCmd{
 		params: []Param{
 			StringFlag{Name: "encryption", Description: "Encryption type"},
-			BoolFlag{Name: "lock-internal-files", Description: "Lock internal files"},
+			BoolFlag{Name: "verbose", Description: "Verbose output"},
 			StringArg{Name: "store-id", Description: "Store ID", Required: true},
 		},
 		onRun: func(req Request) {
 			gotEncryption = req.PopArg("encryption")
-			gotLock = req.PopArg("lock-internal-files")
+			gotVerbose = req.PopArg("verbose")
 			gotArg = req.PopArg("store-id")
 		},
 	})
 
-	err := app.RunCLI(t.Context(), []string{"init", "-encryption", "none", "-lock-internal-files=false", ".default"}, StubPrompter{})
+	err := app.RunCLI(t.Context(), []string{"init", "-encryption", "none", "-verbose=false", ".default"}, StubPrompter{})
 	if err != nil {
 		t.Fatalf("RunCLI error: %v", err)
 	}
 	if gotEncryption != "none" {
 		t.Errorf("encryption = %q, want %q", gotEncryption, "none")
 	}
-	if gotLock != "false" {
-		t.Errorf("lock-internal-files = %q, want %q", gotLock, "false")
+	if gotVerbose != "false" {
+		t.Errorf("verbose = %q, want %q", gotVerbose, "false")
 	}
 	if gotArg != ".default" {
 		t.Errorf("store-id = %q, want %q", gotArg, ".default")

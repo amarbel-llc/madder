@@ -21,8 +21,7 @@ type TomlLocalHashBucketedV2 struct {
 	// value due to unexported fields
 	Encryption markl.Id `toml:"encryption"`
 
-	CompressionType   compression_type.CompressionType `toml:"compression-type"`
-	LockInternalFiles bool                             `toml:"lock-internal-files"`
+	CompressionType compression_type.CompressionType `toml:"compression-type"`
 }
 
 func (TomlLocalHashBucketedV2) GetBlobStoreType() string {
@@ -51,13 +50,6 @@ func (blobStoreConfig *TomlLocalHashBucketedV2) SetFlagDefinitions(
 	)
 
 	setEncryptionFlagDefinition(flagSet, &blobStoreConfig.Encryption)
-
-	flagSet.BoolVar(
-		&blobStoreConfig.LockInternalFiles,
-		"lock-internal-files",
-		blobStoreConfig.LockInternalFiles,
-		"",
-	)
 }
 
 func (blobStoreConfig TomlLocalHashBucketedV2) getBasePath() string {
@@ -76,10 +68,6 @@ func (blobStoreConfig TomlLocalHashBucketedV2) GetBlobEncryption() domain_interf
 	return blobStoreConfig.Encryption
 }
 
-func (blobStoreConfig TomlLocalHashBucketedV2) GetLockInternalFiles() bool {
-	return blobStoreConfig.LockInternalFiles
-}
-
 func (blobStoreConfig TomlLocalHashBucketedV2) SupportsMultiHash() bool {
 	return true
 }
@@ -94,11 +82,10 @@ func (blobStoreConfig *TomlLocalHashBucketedV2) setBasePath(value string) {
 
 func (blobStoreConfig TomlLocalHashBucketedV2) Upgrade() (Config, ids.TypeStruct) {
 	upgraded := &TomlV3{
-		HashBuckets:       blobStoreConfig.HashBuckets,
-		BasePath:          blobStoreConfig.BasePath,
-		HashTypeId:        blobStoreConfig.HashTypeId,
-		CompressionType:   blobStoreConfig.CompressionType,
-		LockInternalFiles: blobStoreConfig.LockInternalFiles,
+		HashBuckets:     blobStoreConfig.HashBuckets,
+		BasePath:        blobStoreConfig.BasePath,
+		HashTypeId:      blobStoreConfig.HashTypeId,
+		CompressionType: blobStoreConfig.CompressionType,
 	}
 
 	if !blobStoreConfig.Encryption.IsNull() {

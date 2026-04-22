@@ -113,15 +113,17 @@ and writes to the target store.
 For the **local hash-bucketed** store, concurrent writers on the same host
 may write the same or different blobs simultaneously without coordination.
 Two writers producing the same bytes produce the same digest and therefore
-the same final path; the publishing rename is atomic, and either outcome
-is semantically correct. Writers producing different bytes produce
-different paths and do not interact.
+the same final path; the publish step uses **link**(2) against a temp
+file that was chmod'd read-only before linking, so the second writer gets
+**EEXIST** and never touches the first writer's inode. Writers producing
+different bytes produce different paths and do not interact.
 
 This guarantee depends on the configured hash being collision-resistant —
 **sha256** and **blake2b256**, the only hashes madder supports, satisfy
 this — and on the digest being computed from the bytes being written
 rather than supplied by the caller. The full rationale and audit live in
-**docs/decisions/0002-content-addressed-overwrite-is-fine.md**.
+**docs/decisions/0002-content-addressed-overwrite-is-fine.md** and
+**docs/decisions/0003-blob-store-hardlink-writes.md**.
 
 The **SFTP** store serialises blob-cache updates through an internal
 mutex; safety at the remote end depends on the remote filesystem's own
@@ -131,21 +133,31 @@ loose blob store it delegates to (typically local hash-bucketed).
 
 ## Durability
 
-Writes use a temp-file + rename pattern with **fsync**(2) at both the
-data and the containing-directory level. After a crash, any blob at a
-digest's final path has digest-matching bytes; partial or zero-byte
-blobs are never observable. Writers require the temp directory and the
-store's base path to be on the same filesystem (both default to XDG
-locations under the user's home; custom configurations should preserve
-this).
+Writes use a temp-file + **link**(2) pattern with **fsync**(2) at both
+the data and the containing-directory level. After a crash, any blob at
+a digest's final path has digest-matching bytes; partial or zero-byte
+blobs are never observable.
 
-## Known limitations
+Temp files live under **$XDG_CACHE_HOME/dodder/tmp-{pid}/** (or its
+CWD-scoped override for **.**-prefixed blob-store-ids). **link**(2)
+cannot cross filesystems, so **$XDG_CACHE_HOME** and the blob store's
+base path **must be on the same mount**. The default Linux layout
+satisfies this (both resolve under **~/**). If the invariant is
+violated — container layouts that mount **$XDG_CACHE_HOME** as tmpfs
+while **$XDG_DATA_HOME** persists to disk, NAS splits — the first blob
+write returns an error explicitly referencing this man page and ADR
+0003, and no blob is published. Remediation is to colocate cache and
+data on the same filesystem, or to report the layout so it can be
+evaluated against ADR 0003's reevaluation criteria.
 
-Stores configured with **lock-internal-files = true** have a brief
-window between the rename and the chmod-to-read-only step in which the
-published blob is writable to the invoking user (issue #29). Content is
-never corrupted; only the transient mode is unusual. The planned
-hardlink-based finalize (issue #30) would eliminate the window.
+## File permissions
+
+Published blobs are mode **0444** (read-only, world-readable) from the
+moment they exist. The inode is chmod'd before it is linked into the
+content-addressed tree, so there is no transient writable window — even
+under concurrent same-digest writes. Blob deletion is unaffected because
+**unlink**(2) requires write permission on the parent directory, not on
+the file itself.
 
 # INLINE STORE SWITCHING
 
@@ -180,3 +192,6 @@ init-from** to initialize a store from an existing configuration file.
 
 ADR 0002: Content-addressed overwrite-is-fine semantics
 (docs/decisions/0002-content-addressed-overwrite-is-fine.md)
+
+ADR 0003: Blob-store writes use link(2) + unlink(2) against a per-store
+temp directory (docs/decisions/0003-blob-store-hardlink-writes.md)

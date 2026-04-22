@@ -54,7 +54,6 @@ type (
 		ConfigHashType
 		domain_interfaces.BlobIOWrapper
 		GetHashBuckets() []int
-		GetLockInternalFiles() bool
 	}
 
 	ConfigInventoryArchive interface {

@@ -107,7 +107,7 @@ function has_scopes_to_explicit_blob_store_id { # @test
   # is only in another store, it should report "not found" in this
   # scope, not fall back to the all-stores search.
   init_store
-  run_madder init -encryption none -lock-internal-files=false .elsewhere
+  run_madder init -encryption none .elsewhere
   assert_success
 
   # Write to .elsewhere only.

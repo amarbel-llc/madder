@@ -20,10 +20,9 @@ func init() {
 	utility.AddCmd("init", &Init{
 		tipe: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		blobStoreConfig: &blob_store_configs.DefaultType{
-			HashTypeId:        blob_store_configs.HashTypeDefault,
-			HashBuckets:       blob_store_configs.DefaultHashBuckets,
-			CompressionType:   compression_type.CompressionTypeDefault,
-			LockInternalFiles: true,
+			HashTypeId:      blob_store_configs.HashTypeDefault,
+			HashBuckets:     blob_store_configs.DefaultHashBuckets,
+			CompressionType: compression_type.CompressionTypeDefault,
 		},
 	})
 }
@@ -38,7 +37,7 @@ type Init struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Init)(nil)
-	_ futility.CommandWithParams         = (*Init)(nil)
+	_ futility.CommandWithParams        = (*Init)(nil)
 )
 
 func (cmd *Init) GetParams() []futility.Param {

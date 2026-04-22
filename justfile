@@ -57,9 +57,11 @@ generate-tommy:
 #    |_|\___||___/\__|
 #
 
-# Run all tests (unit + integration).
+# Run all tests (unit + integration) with the race detector enabled.
+# Concurrent-write paths (pack_parallel, blob_mover link publish) are
+# load-bearing, so default verification runs them under -race.
 [group("test")]
-test: test-go test-bats
+test: test-go-race test-bats
 
 # Run Go unit tests only.
 [group("test")]
@@ -83,8 +85,8 @@ verify-internal-pkg subpath:
   cd go && go vet -tags test ./internal/{{subpath}}/...
   cd go && go test -tags test ./internal/{{subpath}}/...
 
-# Run Go unit tests under the race detector. Not included in the
-# default `test` target because race builds are substantially slower.
+# Run Go unit tests under the race detector. Invoked by the default
+# `test` target; kept as a standalone recipe for flag-passing use cases.
 [group("test")]
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
@@ -362,7 +364,7 @@ debug-init-repro storeid="default":
 
   # Variant C: XDG_* unset + the bats workaround flags.
   run_case "C: XDG_* unset + ceiling, workaround flags" "{{storeid}}C" \
-    -encryption none -lock-internal-files=false
+    -encryption none
 
   echo "(tmp workdir: $workdir)"
   echo "(tmp home:    $home)"

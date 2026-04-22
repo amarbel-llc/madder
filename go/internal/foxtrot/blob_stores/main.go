@@ -251,10 +251,9 @@ func MakeBlobStore(
 			loosePath := filepath.Join(configNamed.Path.GetBase(), "blobs")
 
 			embeddedConfig := &blob_store_configs.DefaultType{
-				HashTypeId:        blob_store_configs.HashType(config.GetDefaultHashTypeId()),
-				HashBuckets:       blob_store_configs.DefaultHashBuckets,
-				CompressionType:   config.GetCompressionType(),
-				LockInternalFiles: true,
+				HashTypeId:      blob_store_configs.HashType(config.GetDefaultHashTypeId()),
+				HashBuckets:     blob_store_configs.DefaultHashBuckets,
+				CompressionType: config.GetCompressionType(),
 			}
 
 			if looseBlobStore, err = makeLocalHashBucketed(

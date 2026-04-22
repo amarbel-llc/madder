@@ -16,8 +16,7 @@ type TomlV3 struct {
 
 	Encryption []markl.Id `toml:"encryption"`
 
-	CompressionType   compression_type.CompressionType `toml:"compression-type"`
-	LockInternalFiles bool                             `toml:"lock-internal-files"`
+	CompressionType compression_type.CompressionType `toml:"compression-type"`
 }
 
 func (TomlV3) GetBlobStoreType() string {
@@ -46,13 +45,6 @@ func (blobStoreConfig *TomlV3) SetFlagDefinitions(
 	)
 
 	setMultiEncryptionFlagDefinition(flagSet, &blobStoreConfig.Encryption)
-
-	flagSet.BoolVar(
-		&blobStoreConfig.LockInternalFiles,
-		"lock-internal-files",
-		blobStoreConfig.LockInternalFiles,
-		"",
-	)
 }
 
 func (blobStoreConfig TomlV3) getBasePath() string {
@@ -69,10 +61,6 @@ func (blobStoreConfig TomlV3) GetBlobCompression() interfaces.IOWrapper {
 
 func (blobStoreConfig TomlV3) GetBlobEncryption() domain_interfaces.MarklId {
 	return EncryptionKeys(blobStoreConfig.Encryption)
-}
-
-func (blobStoreConfig TomlV3) GetLockInternalFiles() bool {
-	return blobStoreConfig.LockInternalFiles
 }
 
 func (blobStoreConfig TomlV3) SupportsMultiHash() bool {

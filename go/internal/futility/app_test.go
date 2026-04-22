@@ -442,8 +442,8 @@ func TestAddCmdRecoversCancelPanicInRunResult(t *testing.T) {
 // flagDefCmd uses GetParams() for a positional arg and SetFlagDefinitions for flags.
 // This reproduces the pattern from madder's Init command.
 type flagDefCmd struct {
-	encryption        string
-	lockInternalFiles bool
+	encryption string
+	verbose    bool
 }
 
 func (c *flagDefCmd) Run(req Request) {}
@@ -460,7 +460,7 @@ func (c *flagDefCmd) GetParams() []Param {
 
 func (c *flagDefCmd) SetFlagDefinitions(fs interfaces.CLIFlagDefinitions) {
 	fs.StringVar(&c.encryption, "encryption", "age", "Encryption type")
-	fs.BoolVar(&c.lockInternalFiles, "lock-internal-files", true, "Lock internal files")
+	fs.BoolVar(&c.verbose, "verbose", true, "Verbose output")
 }
 
 func TestAddCmdSetFlagDefinitionsFlagsBeforeArg(t *testing.T) {
@@ -471,7 +471,7 @@ func TestAddCmdSetFlagDefinitionsFlagsBeforeArg(t *testing.T) {
 
 	// Flags before positional arg — this is the exact reproduction from #42.
 	err := app.RunCLI(t.Context(), []string{
-		"init", "-encryption", "none", "-lock-internal-files=false", ".default",
+		"init", "-encryption", "none", "-verbose=false", ".default",
 	}, StubPrompter{})
 	if err != nil {
 		t.Fatalf("RunCLI error: %v", err)
@@ -479,8 +479,8 @@ func TestAddCmdSetFlagDefinitionsFlagsBeforeArg(t *testing.T) {
 	if cmd.encryption != "none" {
 		t.Errorf("encryption = %q, want %q", cmd.encryption, "none")
 	}
-	if cmd.lockInternalFiles {
-		t.Errorf("lock-internal-files = true, want false")
+	if cmd.verbose {
+		t.Errorf("verbose = true, want false")
 	}
 }
 

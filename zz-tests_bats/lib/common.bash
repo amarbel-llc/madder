@@ -36,6 +36,6 @@ run_madder() {
 }
 
 init_store() {
-  run_madder init -encryption none -lock-internal-files=false "${1:-.default}"
+  run_madder init -encryption none "${1:-.default}"
   assert_success
 }

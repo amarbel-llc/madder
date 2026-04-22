@@ -15,7 +15,7 @@ function cross_hash_sync { # @test
   assert_success
   blake_sha="$(echo "$output" | grep -oP 'blake2b256-\S+' | head -1)"
 
-  run_madder init -hash_type-id sha256 -encryption none -lock-internal-files=false .sha256
+  run_madder init -hash_type-id sha256 -encryption none .sha256
   assert_success
 
   run_madder sync .default .sha256
@@ -39,7 +39,7 @@ function sync_idempotent { # @test
   run_madder write "$blob"
   assert_success
 
-  run_madder init -hash_type-id sha256 -encryption none -lock-internal-files=false .sha256
+  run_madder init -hash_type-id sha256 -encryption none .sha256
   assert_success
 
   run_madder sync .default .sha256
@@ -59,7 +59,7 @@ function sync_json_auto_detects { # @test
   run_madder write -format tap "$blob"
   assert_success
 
-  run_madder init -hash_type-id sha256 -encryption none -lock-internal-files=false .sha256
+  run_madder init -hash_type-id sha256 -encryption none .sha256
   assert_success
 
   run_madder sync .default .sha256

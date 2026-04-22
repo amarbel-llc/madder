@@ -151,7 +151,7 @@ A blob store configuration:
 
     [blob-store]
     compression-type = "zstd"
-    lock-internal-files = true
+    hash_type-id = "blake2b256"
 
 A type definition with a lock:
 

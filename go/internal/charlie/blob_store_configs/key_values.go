@@ -34,9 +34,6 @@ func ConfigKeyValues(config Config) map[string]string {
 		keyValues["hash_buckets"] = fmt.Sprint(
 			configLocal.GetHashBuckets(),
 		)
-		keyValues["lock-internal-files"] = fmt.Sprint(
-			configLocal.GetLockInternalFiles(),
-		)
 	}
 
 	if configArchive, ok := config.(ConfigInventoryArchive); ok {

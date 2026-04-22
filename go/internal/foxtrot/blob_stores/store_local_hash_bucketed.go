@@ -50,6 +50,11 @@ func makeLocalHashBucketed(
 	store.buckets = config.GetHashBuckets()
 
 	store.basePath = basePath
+	// Per ADR 0003: the tempFS is XDG_CACHE_HOME-rooted (or its CWD-scoped
+	// override). Cache and data are assumed to live on the same filesystem;
+	// if that invariant is violated, link(2) in blob_mover returns EXDEV
+	// and the caller gets a clear error pointing at ADR 0003 and
+	// blob-store(7).
 	store.tempFS = envDir.GetTempLocal()
 
 	return store, err

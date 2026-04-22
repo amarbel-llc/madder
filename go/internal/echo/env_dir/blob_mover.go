@@ -1,13 +1,14 @@
 package env_dir
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 )
 
 // TODO move into own package
@@ -25,7 +26,6 @@ type localFileMover struct {
 
 	basePath string
 	blobPath string
-	lockFile bool
 }
 
 func NewMover(
@@ -37,7 +37,6 @@ func NewMover(
 	return newMover(config, moveOptions)
 }
 
-// TODO add back support for locking internal files
 // TODO split mover into sha-based mover and final-path based mover
 // TODO extract writer portion in injected depenency
 func newMover(
@@ -75,6 +74,12 @@ func newMover(
 	return mover, err
 }
 
+// blobFileMode is the mode applied to the temp file immediately before it is
+// linked into the content-addressed tree. 0o444 means the final inode is
+// read-only to everyone from birth — there is no mutable window between
+// publish and lock. See ADR 0003.
+const blobFileMode os.FileMode = 0o444
+
 func (mover *localFileMover) Close() (err error) {
 	if mover.file == nil {
 		err = errors.ErrorWithStackf("nil file")
@@ -91,8 +96,8 @@ func (mover *localFileMover) Close() (err error) {
 		return err
 	}
 
-	// fsync file data to disk before rename so a crash between rename and
-	// the next fsync cannot leave a zero-byte file at blobPath.
+	// fsync file data to disk before link so a crash between link and the
+	// next fsync cannot leave a zero-byte file at blobPath.
 	if err = mover.file.Sync(); err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -114,18 +119,6 @@ func (mover *localFileMover) Close() (err error) {
 		return err
 	}
 
-	// if err = merkle.MakeErrIsNull(digest, ""); err != nil {
-	// 	err = errors.Wrap(err)
-	// 	return
-	// }
-
-	// log.Log().Printf(
-	// 	"wrote %d bytes to %s, sha %s",
-	// 	fi.Size(),
-	// 	m.file.Name(),
-	// 	sh,
-	// )
-
 	if mover.blobPath == "" {
 		// TODO-P3 move this validation to options
 		if mover.blobPath, err = MakeDirIfNecessary(
@@ -138,31 +131,57 @@ func (mover *localFileMover) Close() (err error) {
 		}
 	}
 
-	path := mover.file.Name()
+	tempPath := mover.file.Name()
 
-	// Per ADR 0002 (content-addressed overwrite-is-fine): os.Rename silently
-	// replaces any existing file at mover.blobPath, which is the desired
-	// behaviour for a strong-hash content-addressed store. A racing writer
-	// that produced the same digest produced the same bytes, so the
-	// replacement is semantically a no-op.
-	if err = os.Rename(path, mover.blobPath); err != nil {
+	// Per ADR 0003: chmod the temp file read-only *before* link so the
+	// inode published at blobPath is immutable from birth. No transient
+	// writable window exists.
+	if err = os.Chmod(tempPath, blobFileMode); err != nil {
 		err = errors.Wrap(err)
 		return err
 	}
 
-	// fsync the parent directory so the rename's directory-entry update is
-	// durable across crashes. POSIX does not persist rename metadata until
+	// Per ADR 0003: link(2) is the publish primitive. On EEXIST a same-digest
+	// writer already published; by ADR 0002 the bytes are equivalent so the
+	// race is benign. Unlink the temp and return cleanly.
+	linkErr := os.Link(tempPath, mover.blobPath)
+	switch {
+	case linkErr == nil:
+		// happy path — fall through to unlink the temp and fsync the dir.
+	case errors.Is(linkErr, fs.ErrExist):
+		if err = os.Remove(tempPath); err != nil {
+			err = errors.Wrap(err)
+			return err
+		}
+		return err
+	case errors.Is(linkErr, syscall.EXDEV):
+		err = errors.Wrapf(
+			linkErr,
+			"blob temp dir and blob store base path are on different "+
+				"filesystems; link(2) cannot cross mount boundaries. "+
+				"See docs/decisions/0003-blob-store-hardlink-writes.md "+
+				"and blob-store(7) for the same-filesystem invariant. "+
+				"tempPath=%q blobPath=%q",
+			tempPath,
+			mover.blobPath,
+		)
+		return err
+	default:
+		err = errors.Wrap(linkErr)
+		return err
+	}
+
+	if err = os.Remove(tempPath); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	// fsync the parent directory so the link's directory-entry update is
+	// durable across crashes. POSIX does not persist link metadata until
 	// the containing directory is fsynced.
 	if err = fsyncDir(filepath.Dir(mover.blobPath)); err != nil {
 		err = errors.Wrap(err)
 		return err
-	}
-
-	if mover.lockFile {
-		if err = files.SetDisallowUserChanges(mover.blobPath); err != nil {
-			err = errors.Wrap(err)
-			return err
-		}
 	}
 
 	return err

@@ -113,10 +113,9 @@ func Default() *TypedMutableConfig {
 	return &TypedMutableConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		Blob: &DefaultType{
-			HashBuckets:       DefaultHashBuckets,
-			HashTypeId:        HashTypeDefault,
-			CompressionType:   compression_type.CompressionTypeDefault,
-			LockInternalFiles: true,
+			HashBuckets:     DefaultHashBuckets,
+			HashTypeId:      HashTypeDefault,
+			CompressionType: compression_type.CompressionTypeDefault,
 		},
 	}
 }

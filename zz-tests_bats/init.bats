@@ -12,7 +12,7 @@ function init_default { # @test
 function init_idempotent_fails { # @test
 
   init_store
-  run_madder init -encryption none -lock-internal-files=false .default
+  run_madder init -encryption none .default
   assert_failure
 }
 
@@ -78,11 +78,10 @@ HEADER
 	hash_type-id = ""
 	compression-type = "zstd"
 	encryption = ""
-	lock-internal-files = false
 	hash-buckets = [2]
 EOM
 
-  run_madder init -encryption none -lock-internal-files=false .default
+  run_madder init -encryption none .default
   assert_failure
   assert_output --partial '".broken"'
   assert_output --partial "$store_dir/blob_store-config"

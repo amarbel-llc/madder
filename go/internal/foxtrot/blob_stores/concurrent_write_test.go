@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -18,9 +19,11 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
-// makeTestStore constructs a localHashBucketed backed entirely by t.TempDir()
-// paths, with LockInternalFiles disabled so the test does not interact with
-// the chmod race tracked in https://github.com/amarbel-llc/madder/issues/29.
+// makeTestStore constructs a localHashBucketed backed by t.TempDir() paths.
+// Both basePath and tempPath come from t.TempDir(), which places them under
+// the test runner's tmpdir — same filesystem, so link(2) (ADR 0003) works
+// in tests mirroring the production expectation that XDG_CACHE_HOME and
+// the blob store's base path share a mount.
 func makeTestStore(t *testing.T) localHashBucketed {
 	t.Helper()
 
@@ -28,10 +31,9 @@ func makeTestStore(t *testing.T) localHashBucketed {
 	tempPath := t.TempDir()
 
 	config := &blob_store_configs.DefaultType{
-		HashBuckets:       blob_store_configs.DefaultHashBuckets,
-		HashTypeId:        charlie_bsc.HashTypeSha256,
-		CompressionType:   compression_type.CompressionTypeNone,
-		LockInternalFiles: false,
+		HashBuckets:     blob_store_configs.DefaultHashBuckets,
+		HashTypeId:      charlie_bsc.HashTypeSha256,
+		CompressionType: compression_type.CompressionTypeNone,
 	}
 
 	return localHashBucketed{
@@ -156,6 +158,40 @@ func TestConcurrentBlobWritesSameContent(t *testing.T) {
 	got := readBlob(t, store, digests[0])
 	if !bytes.Equal(got, payload) {
 		t.Fatalf("read-back mismatch: got %q, want %q", got, payload)
+	}
+
+	// ADR 0003: published blobs are chmod 0o444 before link, so the inode
+	// is read-only from birth regardless of which writer won the race.
+	blobPath := env_dir.MakeHashBucketPathFromMerkleId(
+		digests[0],
+		store.buckets,
+		store.multiHash,
+		store.basePath,
+	)
+
+	info, err := os.Stat(blobPath)
+	if err != nil {
+		t.Fatalf("Stat(%s): %v", blobPath, err)
+	}
+
+	if mode := info.Mode().Perm(); mode != 0o444 {
+		t.Errorf("blob mode = %o, want 0o444", mode)
+	}
+
+	// ADR 0003: every write unlinks its temp file on both the happy path and
+	// the EEXIST (duplicate-write) path. After 32 same-content writers, the
+	// per-store tmp dir must be empty.
+	entries, err := os.ReadDir(store.tempFS.BasePath)
+	if err != nil {
+		t.Fatalf("ReadDir(%s): %v", store.tempFS.BasePath, err)
+	}
+
+	if len(entries) != 0 {
+		names := make([]string, len(entries))
+		for i, e := range entries {
+			names[i] = e.Name()
+		}
+		t.Errorf("temp dir %s has %d leftover entries: %v", store.tempFS.BasePath, len(entries), names)
 	}
 }
 

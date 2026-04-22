@@ -55,7 +55,7 @@ function write_warns_when_file_shadows_store { # @test
   # the CWD. A bare `write shadowed` should resolve to the file but emit
   # a warning comment pointing at the blob-store-id collision.
   init_store
-  run_madder init -encryption none -lock-internal-files=false shadowed
+  run_madder init -encryption none shadowed
   assert_success
 
   echo "file content" >shadowed
@@ -73,7 +73,7 @@ function pack_blobs_warns_when_file_shadows_store { # @test
   # write; pack-blobs had the same ambiguity class but no warning. The
   # shared arg_resolver fixes that.
   init_store
-  run_madder init -encryption none -lock-internal-files=false shadowed
+  run_madder init -encryption none shadowed
   assert_success
 
   echo "file content" >shadowed
@@ -187,7 +187,7 @@ function write_json_warning_goes_to_stderr { # @test
   # stderr into $output, so we can't separate streams here — but we can
   # at least assert the warning does NOT appear mid-NDJSON line.
   init_store
-  run_madder init -encryption none -lock-internal-files=false shadowed
+  run_madder init -encryption none shadowed
   assert_success
 
   echo "file content" >shadowed

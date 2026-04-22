@@ -74,11 +74,6 @@ func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
 				}
 				d.consumed["compression-type"] = true
 			}
-		case "lock-internal-files":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.LockInternalFiles = v
-				d.consumed["lock-internal-files"] = true
-			}
 		}
 	}
 	return d, nil
@@ -127,11 +122,6 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 			return nil, fmt.Errorf("compression-type: %w", err)
 		}
 		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", string(v)); err != nil {
-			return nil, fmt.Errorf("%w", err)
-		}
-	}
-	if d.data.LockInternalFiles != false || cst.HasValue(d.cstDoc.Root(), "lock-internal-files") {
-		if err := cst.SetAny(d.cstDoc.Root(), "lock-internal-files", d.data.LockInternalFiles); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
@@ -192,11 +182,6 @@ func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node,
 				}
 				consumed[keyPrefix+"compression-type"] = true
 			}
-		case "lock-internal-files":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.LockInternalFiles = v
-				consumed[keyPrefix+"lock-internal-files"] = true
-			}
 		}
 	}
 	return nil
@@ -242,11 +227,6 @@ func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node)
 			return fmt.Errorf("compression-type: %w", err)
 		}
 		if err := cst.SetAny(container, "compression-type", string(v)); err != nil {
-			return fmt.Errorf("%w", err)
-		}
-	}
-	if data.LockInternalFiles != false || cst.HasValue(container, "lock-internal-files") {
-		if err := cst.SetAny(container, "lock-internal-files", data.LockInternalFiles); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 	}
