@@ -4,10 +4,18 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
 )
+
+var version = "dev"
+var commit  = "unknown"
+
+func init() {
+	buildinfo.Set(version, commit)
+}
 
 func main() {
 	if len(os.Args) < 2 {
