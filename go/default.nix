@@ -20,7 +20,7 @@ let
     pname = "madder";
     inherit version;
     commit = self.shortRev or self.dirtyShortRev or "unknown";
-    src = self;
+    src = ./go;
     pwd = ./.;
     subPackages = [
       "cmd/madder"
