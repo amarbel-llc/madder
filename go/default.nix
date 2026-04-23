@@ -1,36 +1,26 @@
 {
+  self,
   nixpkgs,
   nixpkgs-master,
   tommy,
-  gomod2nix,
   bob,
   purse-first,
   system,
   man7Src ? null,
-  # Burnt into every binary via -ldflags. Defaulted so that
-  # non-flake consumers (e.g. direct `import ./go/default.nix`) still
-  # work, but release builds always override via flake.nix.
   version ? "dev",
-  commit ? "unknown",
 }:
 let
-  pkgs = import nixpkgs {
-    inherit system;
-    overlays = [
-      gomod2nix.overlays.default
-    ];
-  };
+  pkgs = import nixpkgs { inherit system; };
 
   pkgs-master = import nixpkgs-master {
     inherit system;
   };
 
-  buildinfoPkg = "github.com/amarbel-llc/madder/go/internal/0/buildinfo";
-
   madder = pkgs.buildGoApplication {
     pname = "madder";
     inherit version;
-    src = ./.;
+    commit = self.shortRev or self.dirtyShortRev or "unknown";
+    src = self;
     pwd = ./.;
     subPackages = [
       "cmd/madder"
@@ -40,13 +30,6 @@ let
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
-
-    ldflags = [
-      "-X"
-      "${buildinfoPkg}.Version=${version}"
-      "-X"
-      "${buildinfoPkg}.Commit=${commit}"
-    ];
 
     nativeBuildInputs = [
       purse-first.packages.${system}.dagnabit
@@ -58,7 +41,6 @@ let
       dagnabit export
     '';
 
-    # madder-gen_man takes a *prefix* and writes to {prefix}/share/man/man1/
     postInstall = ''
       $out/bin/madder-gen_man $out
       rm $out/bin/madder-gen_man
@@ -81,14 +63,13 @@ in
 
   devShells.default = pkgs-master.mkShell {
     packages = [
-      gomod2nix.packages.${system}.default
+      (pkgs.mkGoEnv { pwd = ./.; go = pkgs-master.go_1_26; })
       tommy.packages.${system}.default
       bob.packages.${system}.batman
       purse-first.packages.${system}.dagnabit
     ]
     ++ (with pkgs-master; [
       delve
-      go_1_26
       gofumpt
       gopls
       gotools
