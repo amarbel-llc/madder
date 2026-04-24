@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -19,6 +20,8 @@ import (
 type localHashBucketed struct {
 	config blob_store_configs.ConfigLocalHashBucketed
 
+	id blob_store_id.Id
+
 	multiHash         bool
 	defaultHashFormat markl.FormatHash
 	buckets           []int
@@ -30,6 +33,11 @@ type localHashBucketed struct {
 	// MADDER_VERIFY_ON_COLLISION env-var override, resolved at store
 	// construction. See ADR 0003 and issue #31.
 	verifyOnCollision bool
+
+	// observer is captured from the ambient env at store construction
+	// and forwarded into env_dir.MoveOptions on every MakeBlobWriter.
+	// Nil means no audit logging for this store's writes. See ADR 0004.
+	observer domain_interfaces.BlobWriteObserver
 }
 
 var (
@@ -40,10 +48,12 @@ var (
 
 func makeLocalHashBucketed(
 	envDir env_dir.Env,
+	id blob_store_id.Id,
 	basePath string,
 	config blob_store_configs.ConfigLocalHashBucketed,
 ) (store localHashBucketed, err error) {
 	store.config = config
+	store.id = id
 
 	store.multiHash = config.SupportsMultiHash()
 	if store.defaultHashFormat, err = markl.GetFormatHashOrError(
@@ -66,6 +76,10 @@ func makeLocalHashBucketed(
 	// override enables byte-level collision verification on EEXIST.
 	store.verifyOnCollision = config.GetVerifyOnCollision() ||
 		envDir.GetVerifyOnCollisionOverride()
+
+	// Per ADR 0004: pull the audit-log observer off the ambient env and
+	// forward it to every MoveOptions built from this store.
+	store.observer = envDir.GetBlobWriteObserver()
 
 	return store, err
 }
@@ -191,6 +205,8 @@ func (blobStore localHashBucketed) blobWriterTo(
 			GenerateFinalPathFromDigest: true,
 			TemporaryFS:                 blobStore.tempFS,
 			VerifyOnCollision:           blobStore.verifyOnCollision,
+			Observer:                    blobStore.observer,
+			StoreId:                     blobStore.id.String(),
 		},
 	); err != nil {
 		err = errors.Wrap(err)

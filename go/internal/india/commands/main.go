@@ -2,11 +2,36 @@ package commands
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
 )
 
 var utility = futility.NewUtility("madder", "content-addressable blob store operations")
 
+// globalFlags is the singleton Globals struct whose fields hold the
+// parsed values of every --flag declared on the utility (not on a
+// specific subcommand). Owned here, pointer published as
+// utility.GlobalFlags for downstream type-asserting consumers.
+var globalFlags = &Globals{}
+
 func init() {
+	utility.GlobalFlags = globalFlags
+	utility.GlobalParams = []futility.Param{
+		futility.BoolFlag{
+			Name: "no-write-log",
+			Description: "Suppress the per-blob audit write-log under " +
+				"$XDG_LOG_HOME/madder/. See ADR 0004.",
+		},
+	}
+	utility.GlobalFlagDefiner = func(fs *flags.FlagSet) {
+		fs.BoolVar(
+			&globalFlags.NoWriteLog,
+			"no-write-log",
+			false,
+			"Suppress the per-blob audit write-log under "+
+				"$XDG_LOG_HOME/madder/. See ADR 0004.",
+		)
+	}
+
 	utility.Examples = append(utility.Examples,
 		futility.Example{
 			Description: "Initialize a default (XDG user) blob store.",
@@ -90,6 +115,29 @@ func init() {
 			Name: "XDG_STATE_HOME",
 			Description: "Base directory for per-user state honored by the " +
 				"underlying framework. Defaults to $HOME/.local/state.",
+		},
+		futility.EnvVar{
+			Name: "XDG_LOG_HOME",
+			Description: "Base directory for the per-blob audit write-log. " +
+				"Defaults to $HOME/.local/log. Logs live under " +
+				"$XDG_LOG_HOME/madder/blob-writes-YYYY-MM-DD.ndjson. See " +
+				"ADR 0004 and xdg_log_home(7).",
+		},
+		futility.EnvVar{
+			Name: "MADDER_WRITE_LOG",
+			Description: "Set to \"0\" to suppress the per-blob audit " +
+				"write-log. Equivalent to the --no-write-log global flag. " +
+				"Any other value (including unset) leaves logging enabled.",
+		},
+	)
+
+	utility.Files = append(utility.Files,
+		futility.FilePath{
+			Path: "$XDG_LOG_HOME/madder/blob-writes-YYYY-MM-DD.ndjson",
+			Description: "Append-only NDJSON record of every blob publish, " +
+				"one file per calendar day. Deletion is safe and must not " +
+				"affect application correctness (per xdg_log_home(7)). " +
+				"Suppress with --no-write-log or MADDER_WRITE_LOG=0.",
 		},
 	)
 }

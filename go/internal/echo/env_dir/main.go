@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -48,6 +49,19 @@ type Env interface {
 	// migration from env var to CLI global flag.
 	GetVerifyOnCollisionOverride() bool
 
+	// GetBlobWriteObserver returns the observer wired at env-construction
+	// time by the command layer (based on the --no-write-log global flag
+	// and the MADDER_WRITE_LOG env var). Concrete blob stores fetch it
+	// from here and plumb it into env_dir.MoveOptions. Nil means no
+	// observer is attached — the mover then skips its call sites. See
+	// ADR 0004.
+	//
+	// The corresponding setter lives on the concrete env type (not on
+	// this interface) because it needs a pointer receiver to mutate
+	// after construction; callers with the concrete value use
+	// (&dir).SetBlobWriteObserver(...).
+	GetBlobWriteObserver() domain_interfaces.BlobWriteObserver
+
 	Delete(paths ...string) (err error)
 }
 
@@ -58,6 +72,8 @@ type env struct {
 	TempLocal, TempOS TemporaryFS
 
 	verifyOnCollisionOverride bool
+
+	blobWriteObserver domain_interfaces.BlobWriteObserver
 
 	xdg.XDG
 }
@@ -97,6 +113,14 @@ func parseBoolEnv(v string) bool {
 
 func (env env) GetVerifyOnCollisionOverride() bool {
 	return env.verifyOnCollisionOverride
+}
+
+func (env env) GetBlobWriteObserver() domain_interfaces.BlobWriteObserver {
+	return env.blobWriteObserver
+}
+
+func (env *env) SetBlobWriteObserver(observer domain_interfaces.BlobWriteObserver) {
+	env.blobWriteObserver = observer
 }
 
 func (env env) GetActiveContext() interfaces.ActiveContext {

@@ -23,6 +23,15 @@ type MoveOptions struct {
 	// streams. On mismatch, returns ErrCollisionContentMismatch.
 	// See ADR 0003 and issue #31.
 	VerifyOnCollision bool
+	// Observer, when non-nil, receives one BlobWriteEvent per publish
+	// attempt after the link(2) disposition is determined. Nil means
+	// the publish path never calls it — the default behavior for
+	// callers who don't care about audit logging. See ADR 0004.
+	Observer domain_interfaces.BlobWriteObserver
+	// StoreId is stamped into the observer event so audit logs can be
+	// attributed to the store that produced them. Opaque string form
+	// of blob_store_id.Id, populated at the call site.
+	StoreId string
 }
 
 type localFileMover struct {
@@ -38,6 +47,9 @@ type localFileMover struct {
 	// can build a BlobReader over the existing blob with the same
 	// decoding config (compression/encryption) the writer used.
 	envDirConfig Config
+
+	observer domain_interfaces.BlobWriteObserver
+	storeId  string
 }
 
 func NewMover(
@@ -59,6 +71,8 @@ func newMover(
 		funcJoin:          config.funcJoin,
 		verifyOnCollision: moveOptions.VerifyOnCollision,
 		envDirConfig:      config,
+		observer:          moveOptions.Observer,
+		storeId:           moveOptions.StoreId,
 	}
 
 	if moveOptions.GenerateFinalPathFromDigest {
@@ -117,6 +131,15 @@ func (mover *localFileMover) Close() (err error) {
 		return err
 	}
 
+	// Capture the blob's on-disk size before closing the temp fd so the
+	// observer event below can report it. Stat'ing via the open fd is
+	// cheaper than stat'ing the path after the link, and it is the same
+	// byte count all four disposition branches would see.
+	var blobSize int64
+	if stat, statErr := mover.file.Stat(); statErr == nil {
+		blobSize = stat.Size()
+	}
+
 	if err = mover.file.Close(); err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -155,13 +178,32 @@ func (mover *localFileMover) Close() (err error) {
 		return err
 	}
 
+	// notifyObserver emits one BlobWriteEvent per publish attempt iff
+	// the caller wired a non-nil Observer. Per ADR 0004, errors are
+	// swallowed by the observer — this function never returns one.
+	notifyObserver := func(op domain_interfaces.BlobWriteOp) {
+		if mover.observer == nil {
+			return
+		}
+		mover.observer.OnBlobPublished(domain_interfaces.BlobWriteEvent{
+			StoreId: mover.storeId,
+			MarklId: digest,
+			Size:    blobSize,
+			Op:      op,
+		})
+	}
+
 	// Per ADR 0003: link(2) is the publish primitive. On EEXIST a same-digest
 	// writer already published; by ADR 0002 the bytes are equivalent so the
 	// race is benign. Unlink the temp and return cleanly.
 	linkErr := os.Link(tempPath, mover.blobPath)
 	switch {
 	case linkErr == nil:
-		// happy path — fall through to unlink the temp and fsync the dir.
+		// Per ADR 0004: emit "written" at the moment link(2) succeeds.
+		// If the subsequent unlink/fsync fails, the blob is still
+		// published from a correctness standpoint, so the record stands.
+		notifyObserver(domain_interfaces.BlobWriteOpWritten)
+		// fall through to unlink the temp and fsync the dir.
 	case errors.Is(linkErr, fs.ErrExist):
 		// A same-digest writer published first. By ADR 0002 the bytes
 		// are equivalent and this is benign — unless the store opted
@@ -169,17 +211,23 @@ func (mover *localFileMover) Close() (err error) {
 		// open both paths as BlobReaders and confirm the decoded
 		// streams match.
 		if mover.verifyOnCollision {
-			if err = verifyExistingBlobMatches(
+			if verifyErr := verifyExistingBlobMatches(
 				mover.envDirConfig,
 				tempPath,
 				mover.blobPath,
-			); err != nil {
+			); verifyErr != nil {
+				// Report the mismatch event before propagating so the
+				// audit log has a record even when the caller bails.
+				notifyObserver(domain_interfaces.BlobWriteOpVerifyMismatch)
 				// Leave the temp file on disk for forensics; caller
 				// who opted into verification wants evidence of the
 				// collision, not silent cleanup.
-				err = errors.Wrap(err)
+				err = errors.Wrap(verifyErr)
 				return err
 			}
+			notifyObserver(domain_interfaces.BlobWriteOpVerifyMatch)
+		} else {
+			notifyObserver(domain_interfaces.BlobWriteOpExists)
 		}
 		if err = os.Remove(tempPath); err != nil {
 			err = errors.Wrap(err)

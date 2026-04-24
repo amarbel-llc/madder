@@ -240,6 +240,7 @@ func MakeBlobStore(
 	case blob_store_configs.ConfigLocalHashBucketed:
 		return makeLocalHashBucketed(
 			envDir,
+			configNamed.GetId(),
 			configNamed.Path.GetBase(),
 			config,
 		)
@@ -258,6 +259,7 @@ func MakeBlobStore(
 
 			if looseBlobStore, err = makeLocalHashBucketed(
 				envDir,
+				configNamed.GetId(),
 				loosePath,
 				embeddedConfig,
 			); err != nil {
