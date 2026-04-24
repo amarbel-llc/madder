@@ -16,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
@@ -33,6 +34,8 @@ type remoteSftp struct {
 	uiPrinter ui.Printer
 	once      sync.Once
 
+	id blob_store_id.Id
+
 	buckets []int
 
 	config blob_store_configs.ConfigSFTPRemotePath
@@ -47,6 +50,14 @@ type remoteSftp struct {
 	sshClient            *ssh.Client
 	sftpClient           *sftp.Client
 
+	// observer receives one BlobWriteEvent per successful upload. Set
+	// at store-construction time from envDir.GetBlobWriteObserver().
+	// Nil means no audit logging; the mover's emitWriteEvent handles
+	// that case cleanly. Per ADR 0004 and issue #50 this currently
+	// only reports op=written — existing-target and error dispositions
+	// are tracked as a follow-up.
+	observer domain_interfaces.BlobWriteObserver
+
 	// TODO extract below into separate struct
 	blobCacheLock sync.RWMutex
 	blobCache     map[string]struct{}
@@ -57,8 +68,10 @@ var _ domain_interfaces.BlobStore = &remoteSftp{}
 func makeSftpStore(
 	ctx interfaces.ActiveContext,
 	uiPrinter ui.Printer,
+	id blob_store_id.Id,
 	config blob_store_configs.ConfigSFTPRemotePath,
 	sshClientInitializer func() (*ssh.Client, error),
+	observer domain_interfaces.BlobWriteObserver,
 ) (blobStore *remoteSftp, err error) {
 	var defaultHashType markl.FormatHash
 
@@ -71,12 +84,14 @@ func makeSftpStore(
 
 	blobStore = &remoteSftp{
 		ctx:                  ctx,
+		id:                   id,
 		defaultHashType:      defaultHashType,
 		uiPrinter:            uiPrinter,
 		buckets:              defaultBuckets,
 		config:               config,
 		blobCache:            make(map[string]struct{}),
 		sshClientInitializer: sshClientInitializer,
+		observer:             observer,
 	}
 
 	return blobStore, err
@@ -464,6 +479,44 @@ type sftpMover struct {
 	tempPath string
 	writer   *sftpWriter
 	closed   bool
+
+	// bytesWritten counts the pre-compression/encryption bytes the
+	// caller handed to Write/ReadFrom. Reported as the observer
+	// event's Size field on successful upload. Pre-compression is
+	// deliberately inconsistent with localFileMover (which stats the
+	// on-disk file and thus reports the compressed size) — the
+	// follow-up bats SFTP test rig can tighten this up by stat'ing
+	// the remote blob instead.
+	bytesWritten int64
+}
+
+// emitWriteEvent surfaces a BlobWriteEvent to the store's observer
+// when one is wired. Nil observer (write-log disabled, or store
+// constructed before the observer was attached) is a clean no-op.
+// MarklId is pulled from the mover's current digest state; callers
+// are responsible for only invoking this after the writer has been
+// closed so the digest is stable.
+func (mover *sftpMover) emitWriteEvent(
+	op domain_interfaces.BlobWriteOp,
+	size int64,
+) {
+	if mover.store == nil || mover.store.observer == nil {
+		return
+	}
+
+	var markl domain_interfaces.MarklId
+	if mover.writer != nil {
+		markl = mover.writer.GetDigest()
+	}
+
+	mover.store.observer.OnBlobPublished(
+		domain_interfaces.BlobWriteEvent{
+			StoreId: mover.store.id.String(),
+			MarklId: markl,
+			Size:    size,
+			Op:      op,
+		},
+	)
 }
 
 func (mover *sftpMover) initialize(hash domain_interfaces.Hash) (err error) {
@@ -510,7 +563,9 @@ func (mover *sftpMover) Write(p []byte) (n int, err error) {
 		return n, err
 	}
 
-	return mover.writer.Write(p)
+	n, err = mover.writer.Write(p)
+	mover.bytesWritten += int64(n)
+	return n, err
 }
 
 func (mover *sftpMover) ReadFrom(r io.Reader) (n int64, err error) {
@@ -519,7 +574,9 @@ func (mover *sftpMover) ReadFrom(r io.Reader) (n int64, err error) {
 		return n, err
 	}
 
-	return mover.writer.ReadFrom(r)
+	n, err = mover.writer.ReadFrom(r)
+	mover.bytesWritten += n
+	return n, err
 }
 
 func (mover *sftpMover) Close() (err error) {
@@ -593,6 +650,15 @@ func (mover *sftpMover) Close() (err error) {
 		// Rename succeeded: the temp file is already gone, don't let
 		// the deferred cleanup try to remove it.
 		mover.tempPath = ""
+
+		// Per ADR 0004 / issue #50: emit the audit event only for the
+		// cleanly-written case. The already-exists branch above reaches
+		// the same cache update but its disposition is tracked as a
+		// follow-up (see commit body).
+		mover.emitWriteEvent(
+			domain_interfaces.BlobWriteOpWritten,
+			mover.bytesWritten,
+		)
 	}
 
 	mover.store.blobCacheLock.Lock()

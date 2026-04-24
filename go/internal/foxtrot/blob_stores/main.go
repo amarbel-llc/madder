@@ -213,6 +213,7 @@ func MakeBlobStore(
 		return makeSftpStore(
 			envDir.GetActiveContext(),
 			printer,
+			configNamed.GetId(),
 			config,
 			func() (*ssh.Client, error) {
 				return MakeSSHClientFromSSHConfig(
@@ -221,12 +222,14 @@ func MakeBlobStore(
 					config,
 				)
 			},
+			envDir.GetBlobWriteObserver(),
 		)
 
 	case blob_store_configs.ConfigSFTPConfigExplicit:
 		return makeSftpStore(
 			envDir.GetActiveContext(),
 			printer,
+			configNamed.GetId(),
 			config,
 			func() (*ssh.Client, error) {
 				return MakeSSHClientForExplicitConfig(
@@ -235,6 +238,7 @@ func MakeBlobStore(
 					config,
 				)
 			},
+			envDir.GetBlobWriteObserver(),
 		)
 
 	case blob_store_configs.ConfigLocalHashBucketed:
