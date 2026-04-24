@@ -15,7 +15,10 @@
   commit ? "unknown",
 }:
 let
-  pkgs = import nixpkgs { inherit system; };
+  pkgs = import nixpkgs {
+    inherit system;
+    overlays = [ nixpkgs.overlays.default ];
+  };
   pkgs-master = import nixpkgs-master { inherit system; };
 
   madder = pkgs.buildGoApplication {
