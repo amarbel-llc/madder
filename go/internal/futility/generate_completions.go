@@ -95,6 +95,20 @@ func (u *Utility) generateBashCompletion(dir string) error {
 				}
 			}
 		}
+		// Utility-level GlobalParams show up in every subcommand's flag
+		// completion list. They are never positional, so positional
+		// completion state is untouched.
+		for _, p := range u.GlobalParams {
+			if !p.isPositional() {
+				flagForms = append(flagForms, "--"+p.paramName())
+				if p.paramShort() != 0 {
+					flagForms = append(flagForms, fmt.Sprintf("-%c", p.paramShort()))
+				}
+			}
+			if paramHasCompleter(p) {
+				completableParams = append(completableParams, p)
+			}
+		}
 		if len(flagForms) > 0 {
 			fmt.Fprintf(&b, "        %s)\n", c.name)
 			if len(completableParams) > 0 {

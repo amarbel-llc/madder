@@ -5,6 +5,7 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
 )
 
 // Utility holds the command registry and top-level metadata for a CLI/MCP application.
@@ -30,6 +31,33 @@ type Utility struct {
 	// from scdoc/ronn/asciidoctor).
 	ExtraManpages []ManpageFile
 
+	// GlobalParams declare flags that apply to every subcommand. They render
+	// into each subcommand's manpage, help output, completion scripts, and
+	// JSON schema alongside that command's own Params, and are parsed by
+	// RunCLI both before and after the subcommand name — `tool --verbose
+	// subcmd` and `tool subcmd --verbose` are equivalent. Collisions between
+	// a GlobalParam short rune and any registered command's short rune
+	// panic at AddCommand time.
+	GlobalParams []Param
+
+	// GlobalFlags is the pointer to a utility-defined struct that holds the
+	// parsed values of GlobalParams. GlobalFlagDefiner is expected to bind
+	// the struct's fields into the FlagSet it receives. Cmd.Run reaches the
+	// parsed values through a utility-defined helper that type-asserts on
+	// this field.
+	//
+	// The untyped any here is a known ergonomic tax intended to be collapsed
+	// into a type parameter once at least one concrete consumer exists —
+	// see the post-merge note in plans/warm-sleeping-flamingo.md.
+	GlobalFlags any
+
+	// GlobalFlagDefiner is an optional hook that binds GlobalFlags' fields
+	// into the given FlagSet. RunCLI calls it twice: once on the pre-
+	// subcommand global FlagSet and once on the per-command FlagSet, both
+	// pointing at the same underlying storage so post-subcommand writes
+	// land in the same memory as pre-subcommand ones.
+	GlobalFlagDefiner func(fs *flags.FlagSet)
+
 	commands       map[string]*Command
 	canonicalNames map[*Command]string
 }
@@ -48,14 +76,19 @@ func NewUtility(name, short string) *Utility {
 	return u
 }
 
-// AddCommand registers a command and its aliases. Panics on duplicate names
-// or if any two command params share the same non-zero Short rune.
+// AddCommand registers a command and its aliases. Panics on duplicate names,
+// on duplicate short runes within the command's own Params, or on a short
+// rune collision between a command Param and any Utility.GlobalParams.
 func (u *Utility) AddCommand(cmd *Command) {
-	// TODO: reintroduce global-flag vs command-flag short-flag collision
-	// detection if/when global Params return.
-
-	// Check for duplicate short flags within the command's own params.
 	shortSeen := make(map[rune]string)
+	for _, gp := range u.GlobalParams {
+		short := gp.paramShort()
+		if short == 0 {
+			continue
+		}
+		shortSeen[short] = "global:" + gp.paramName()
+	}
+
 	for _, cp := range cmd.Params {
 		short := cp.paramShort()
 		if short == 0 {

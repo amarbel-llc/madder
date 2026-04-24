@@ -119,6 +119,17 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 			fmt.Fprintf(&b, ".RI [ %s = %s ]\n", flagStr, typeStr)
 		}
 	}
+	for _, p := range u.GlobalParams {
+		if p.isPositional() {
+			continue
+		}
+		flagStr := fmt.Sprintf("--%s", p.paramName())
+		if p.paramShort() != 0 {
+			flagStr = fmt.Sprintf("-%c | --%s", p.paramShort(), p.paramName())
+		}
+		typeStr := strings.ToUpper(p.jsonSchemaType())
+		fmt.Fprintf(&b, ".RI [ %s = %s ]\n", flagStr, typeStr)
+	}
 
 	desc := cmd.Description.Long
 	if desc == "" {
@@ -140,6 +151,25 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 			}
 			if p.paramRequired() {
 				label += " (required)"
+			}
+			fmt.Fprintf(&b, ".B %s\n", label)
+			fmt.Fprintf(&b, "%s\n", p.paramDescription())
+			if d := p.paramDefault(); d != nil {
+				fmt.Fprintf(&b, "Default: %v\n", d)
+			}
+		}
+	}
+
+	if hasNonPositionalParam(u.GlobalParams) {
+		fmt.Fprintf(&b, ".SH GLOBAL OPTIONS\n")
+		for _, p := range u.GlobalParams {
+			if p.isPositional() {
+				continue
+			}
+			fmt.Fprintf(&b, ".TP\n")
+			label := fmt.Sprintf("--%s", p.paramName())
+			if p.paramShort() != 0 {
+				label = fmt.Sprintf("-%c, --%s", p.paramShort(), p.paramName())
 			}
 			fmt.Fprintf(&b, ".B %s\n", label)
 			fmt.Fprintf(&b, "%s\n", p.paramDescription())

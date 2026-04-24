@@ -32,15 +32,48 @@ func registerComponentWriter(cmd *Command, ccw interfaces.CommandComponentWriter
 // Prefix subcommands joined by hyphens are resolved from space-separated args
 // (e.g. "perms check" → "perms-check").
 func (u *Utility) RunCLI(ctx context.Context, args []string, p Prompter) error {
-	// No global flags at present — walk args directly for the subcommand name.
-	remaining := args
-
-	if len(remaining) == 0 {
+	if len(args) == 0 {
 		u.printUsage()
 		return nil
 	}
 
-	if isHelpArg(remaining[0]) {
+	// The bare `help` / `-h` / `--help` words short-circuit to utility
+	// usage before any flag parsing so `tool -h` works even when `-h` is
+	// not a registered global flag (which it usually isn't, since the
+	// flags package handles --help internally and would reject it from a
+	// custom FlagSet).
+	if isHelpArg(args[0]) {
+		u.printUsage()
+		return nil
+	}
+
+	// Parse any global flags that precede the subcommand name. flags.Parse
+	// stops at the first non-flag arg (the subcommand), so walking args
+	// through globalFS.Parse drains leading --foo tokens and leaves
+	// remaining pointing at the subcommand onwards. The GlobalFlagDefiner
+	// is the sole binding path — GlobalParams is declarative metadata for
+	// rendering only, never a registration path, because the two would
+	// redefine the same flag name on the FlagSet otherwise.
+	globalFS := flags.NewFlagSet(u.Name, flags.ContinueOnError)
+	if u.GlobalFlagDefiner != nil {
+		u.GlobalFlagDefiner(globalFS)
+	}
+	if err := globalFS.Parse(args); err != nil {
+		return fmt.Errorf("parsing global flags: %w", err)
+	}
+	remaining := globalFS.Args()
+
+	// Snapshot the globals the user explicitly set before the subcommand.
+	// Rebinding GlobalFlagDefiner on the per-command FlagSet below rewrites
+	// the struct fields back to their defaults (BoolVar et al. init the
+	// pointer on each bind), so we restore these after cmd parse for any
+	// flag not also re-specified post-subcommand.
+	globalsSetPreSubcommand := make(map[string]string)
+	globalFS.Visit(func(f *flags.Flag) {
+		globalsSetPreSubcommand[f.Name] = f.Value.String()
+	})
+
+	if len(remaining) == 0 {
 		u.printUsage()
 		return nil
 	}
@@ -106,9 +139,35 @@ func (u *Utility) RunCLI(ctx context.Context, args []string, p Prompter) error {
 		ccw.SetFlagDefinitions(fs)
 	}
 
+	// Call the GlobalFlagDefiner against the per-command FlagSet so its
+	// struct-pointer bindings land on the same storage as the pre-subcommand
+	// parse. This is what makes `tool sub --no-write-log` and
+	// `tool --no-write-log sub` equivalent at the value level.
+	if u.GlobalFlagDefiner != nil {
+		u.GlobalFlagDefiner(fs)
+	}
+
 	if err := fs.Parse(cmdArgs); err != nil {
 		return fmt.Errorf("parsing flags for %s: %w", name, err)
 	}
+
+	// Restore any global flag values the user set pre-subcommand that
+	// were reset by the GlobalFlagDefiner rebind above and not re-set by
+	// cmdArgs post-subcommand. This preserves `tool --verbose sub` while
+	// leaving `tool sub --verbose` and `tool sub` (no flag) untouched.
+	cmdFSVisited := make(map[string]bool)
+	fs.Visit(func(f *flags.Flag) {
+		cmdFSVisited[f.Name] = true
+	})
+	for globalName, val := range globalsSetPreSubcommand {
+		if cmdFSVisited[globalName] {
+			continue
+		}
+		if f := fs.Lookup(globalName); f != nil {
+			_ = f.Value.Set(val)
+		}
+	}
+
 	positional := fs.Args()
 
 	// Build CommandLineInput.Args from params in declaration order:
