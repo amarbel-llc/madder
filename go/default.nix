@@ -2,32 +2,25 @@
   nixpkgs,
   nixpkgs-master,
   tommy,
-  gomod2nix,
   bob,
   purse-first,
   system,
   man7Src ? null,
-  # Burnt into every binary via -ldflags. Defaulted so that
+  # Passed to buildGoApplication's `version` and `commit` attrs; the
+  # fork's nixpkgs auto-injects them as `-X main.version` and
+  # `-X main.commit` ldflags on every subPackage. Defaulted so that
   # non-flake consumers (e.g. direct `import ./go/default.nix`) still
   # work, but release builds always override via flake.nix.
   version ? "dev",
   commit ? "unknown",
 }:
 let
-  pkgs = import nixpkgs {
-    inherit system;
-    overlays = [
-      gomod2nix.overlays.default
-    ];
-  };
-
-  pkgs-master = import nixpkgs-master {
-    inherit system;
-  };
+  pkgs = import nixpkgs { inherit system; };
+  pkgs-master = import nixpkgs-master { inherit system; };
 
   madder = pkgs.buildGoApplication {
     pname = "madder";
-    inherit version;
+    inherit version commit;
     src = ./.;
     pwd = ./.;
     subPackages = [
@@ -38,13 +31,6 @@ let
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
-
-    ldflags = [
-      "-X"
-      "main.version=${version}"
-      "-X"
-      "main.commit=${commit}"
-    ];
 
     nativeBuildInputs = [
       purse-first.packages.${system}.dagnabit
@@ -79,14 +65,13 @@ in
 
   devShells.default = pkgs-master.mkShell {
     packages = [
-      gomod2nix.packages.${system}.default
+      (pkgs.mkGoEnv { pwd = ./.; })
       tommy.packages.${system}.default
       bob.packages.${system}.batman
       purse-first.packages.${system}.dagnabit
     ]
     ++ (with pkgs-master; [
       delve
-      go_1_26
       gofumpt
       gopls
       gotools
