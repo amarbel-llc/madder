@@ -31,7 +31,7 @@ type Pack struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Pack)(nil)
-	_ futility.CommandWithParams         = (*Pack)(nil)
+	_ futility.CommandWithParams        = (*Pack)(nil)
 )
 
 func (cmd *Pack) GetParams() []futility.Param {

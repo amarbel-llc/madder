@@ -16,7 +16,7 @@ type List struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*List)(nil)
-	_ futility.CommandWithParams         = (*List)(nil)
+	_ futility.CommandWithParams        = (*List)(nil)
 )
 
 func (cmd *List) GetParams() []futility.Param { return nil }

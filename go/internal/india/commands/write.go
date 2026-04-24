@@ -38,7 +38,7 @@ type Write struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Write)(nil)
-	_ futility.CommandWithParams         = (*Write)(nil)
+	_ futility.CommandWithParams        = (*Write)(nil)
 )
 
 func (cmd *Write) GetParams() []futility.Param {

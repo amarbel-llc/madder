@@ -28,7 +28,7 @@ type InitFrom struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*InitFrom)(nil)
-	_ futility.CommandWithParams         = (*InitFrom)(nil)
+	_ futility.CommandWithParams        = (*InitFrom)(nil)
 )
 
 func (cmd *InitFrom) GetParams() []futility.Param {

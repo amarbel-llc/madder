@@ -40,7 +40,7 @@ type PackBlobs struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*PackBlobs)(nil)
-	_ futility.CommandWithParams         = (*PackBlobs)(nil)
+	_ futility.CommandWithParams        = (*PackBlobs)(nil)
 )
 
 func (cmd *PackBlobs) GetParams() []futility.Param {

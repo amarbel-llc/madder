@@ -9,7 +9,19 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
 )
 
+// Declared so the shared -X main.version / -X main.commit ldflags have
+// matching symbols in this binary. madder-gen_man is a build-time tool
+// and doesn't surface either value, but the ldflags list is shared
+// across all subPackages.
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 func main() {
+	_ = version
+	_ = commit
+
 	if len(os.Args) < 2 {
 		fmt.Fprintf(os.Stderr, "usage: madder-gen_man <output-dir>\n")
 		os.Exit(1)

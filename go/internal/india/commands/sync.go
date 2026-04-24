@@ -40,7 +40,7 @@ type Sync struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Sync)(nil)
-	_ futility.CommandWithParams         = (*Sync)(nil)
+	_ futility.CommandWithParams        = (*Sync)(nil)
 )
 
 func (cmd *Sync) GetParams() []futility.Param {

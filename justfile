@@ -259,6 +259,16 @@ release version:
 gomod2nix:
   cd go && gomod2nix
 
+# Print the version subcommand output from the nix-built binaries.
+# Used to verify -ldflags injection (see go/internal/0/buildinfo).
+[group("debug")]
+debug-version:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  just build >/dev/null
+  echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
+  echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
+
 # Copy a subpackage from the cached dewey module into go/internal/<dest>/
 # so we can iterate on it in-tree without a purse-first release cycle.
 # Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,

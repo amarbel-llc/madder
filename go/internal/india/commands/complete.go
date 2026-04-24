@@ -31,7 +31,7 @@ type Complete struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Complete)(nil)
-	_ futility.CommandWithParams         = (*Complete)(nil)
+	_ futility.CommandWithParams        = (*Complete)(nil)
 )
 
 func (cmd *Complete) GetParams() []futility.Param { return nil }

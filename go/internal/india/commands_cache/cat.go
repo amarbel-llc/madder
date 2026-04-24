@@ -32,7 +32,7 @@ type Cat struct {
 
 var (
 	_ interfaces.CommandComponentWriter = (*Cat)(nil)
-	_ futility.CommandWithParams         = (*Cat)(nil)
+	_ futility.CommandWithParams        = (*Cat)(nil)
 )
 
 func (cmd *Cat) GetParams() []futility.Param {

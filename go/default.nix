@@ -25,8 +25,6 @@ let
     inherit system;
   };
 
-  buildinfoPkg = "github.com/amarbel-llc/madder/go/internal/0/buildinfo";
-
   madder = pkgs.buildGoApplication {
     pname = "madder";
     inherit version;
@@ -43,9 +41,9 @@ let
 
     ldflags = [
       "-X"
-      "${buildinfoPkg}.Version=${version}"
+      "main.version=${version}"
       "-X"
-      "${buildinfoPkg}.Commit=${commit}"
+      "main.commit=${commit}"
     ];
 
     nativeBuildInputs = [
