@@ -30,9 +30,37 @@ type FileObserver struct {
 	mu          sync.Mutex
 	currentDate string
 	currentFile *os.File
+
+	// description is stamped into every emitted event's Description
+	// field when non-empty, overriding whatever the event carried.
+	// Set by the caller (e.g. Write.Run) via SetDescription. See
+	// ADR 0004 and issue #51.
+	description string
 }
 
-var _ domain_interfaces.BlobWriteObserver = (*FileObserver)(nil)
+// DescriptionSetter is the narrow capability interface callers use to
+// attach per-invocation intent to every record the observer produces.
+// FileObserver implements it; NopObserver does not — type assertions
+// at the call site naturally no-op when logging is disabled.
+type DescriptionSetter interface {
+	SetDescription(s string)
+}
+
+var (
+	_ domain_interfaces.BlobWriteObserver = (*FileObserver)(nil)
+	_ DescriptionSetter                   = (*FileObserver)(nil)
+)
+
+// SetDescription records a caller-supplied string to stamp into every
+// subsequent event's Description field. Safe to call before any
+// OnBlobPublished has fired; called mid-stream, the new value takes
+// effect for subsequent events only (already-written records are
+// immutable by construction).
+func (o *FileObserver) SetDescription(s string) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.description = s
+}
 
 // NewFileObserver returns a FileObserver rooted at dir. The directory is
 // created on first write (not now) so that the constructor has no side
@@ -48,6 +76,13 @@ func NewFileObserver(dir string) *FileObserver {
 // day's log file. Failures never propagate.
 func (o *FileObserver) OnBlobPublished(ev domain_interfaces.BlobWriteEvent) {
 	now := o.now()
+
+	o.mu.Lock()
+	if o.description != "" {
+		ev.Description = o.description
+	}
+	o.mu.Unlock()
+
 	rec := recordFromEvent(
 		ev,
 		now.UTC().Format(time.RFC3339Nano),

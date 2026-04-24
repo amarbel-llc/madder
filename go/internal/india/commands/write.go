@@ -15,6 +15,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/madder/go/internal/juliett/write_log"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -30,10 +31,11 @@ func init() {
 type Write struct {
 	command_components.EnvBlobStore
 
-	Check         bool
-	Format        output_format.Format
-	UtilityBefore script_value.Utility
-	UtilityAfter  script_value.Utility
+	Check          bool
+	Format         output_format.Format
+	LogDescription string
+	UtilityBefore  script_value.Utility
+	UtilityAfter   script_value.Utility
 }
 
 var (
@@ -106,12 +108,34 @@ func (cmd *Write) SetFlagDefinitions(
 
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 
+	flagSet.StringVar(
+		&cmd.LogDescription,
+		"log-description",
+		"",
+		"Caller-supplied intent stamped into every write-log record "+
+			"emitted by this invocation (e.g. 'imported Q3 backup "+
+			"tapes'). Empty string omits the field. See ADR 0004.",
+	)
+
 	flagSet.Var(&cmd.UtilityBefore, "utility-before", "")
 	flagSet.Var(&cmd.UtilityAfter, "utility-after", "")
 }
 
 func (cmd Write) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	// If the user passed --log-description, stamp it onto every
+	// write-log record this invocation produces. The observer type-
+	// asserts to the DescriptionSetter capability interface; when
+	// logging is disabled the underlying NopObserver doesn't implement
+	// it and the call is skipped cleanly. Skipping on empty keeps
+	// `--log-description ''` behaving as omitempty.
+	if cmd.LogDescription != "" {
+		if setter, ok := envBlobStore.GetBlobWriteObserver().(write_log.DescriptionSetter); ok {
+			setter.SetDescription(cmd.LogDescription)
+		}
+	}
+
 	blobStore := envBlobStore.GetDefaultBlobStore()
 
 	var sink blob_write_sink.Sink
