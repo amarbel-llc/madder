@@ -81,15 +81,12 @@ func (cmd Complete) Run(req futility.Request) {
 	utility := req.Utility
 	envLocal := cmd.makeEnv(req)
 
-	// TODO extract into constructor
-	// TODO find double-hyphen
-	// TODO keep track of all args
 	commandLine := futility.CommandLineInput{
 		FlagsOrArgs: req.PeekArgs(),
 		InProgress:  cmd.inProgress,
 	}
 
-	// TODO determine state:
+	// Dispatch by shell-completion state:
 	// bare: `madder`
 	// subcommand or arg or flag:
 	//  - `madder subcommand`
@@ -115,7 +112,7 @@ func (cmd Complete) Run(req futility.Request) {
 	flagSet.SetOutput(io.Discard)
 	(&config_cli.Config{}).SetFlagDefinitions(flagSet)
 
-	// TODO: migrate flag completion to use subcmd.Params instead of
+	// TODO(#47): migrate flag completion to use subcmd.Params instead of
 	// SetFlagDefinitions interface (subcmd is *Command, not an interface)
 
 	var containsDoubleHyphen bool
@@ -173,8 +170,8 @@ func (cmd Complete) completeSubcommandArgs(
 		return
 	}
 
-	// TODO: migrate arg completion to use subcmd.Params enum values
-	// instead of Completer interface (subcmd is *Command, not an interface)
+	// TODO(#48): restore arg completion using subcmd.Params enum values
+	// (Completer interface path no longer fits; subcmd is *Command, not an interface)
 	_ = req
 	_ = envLocal
 	_ = commandLine
