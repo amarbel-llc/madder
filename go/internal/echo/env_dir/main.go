@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	EnvDir               = "DIR_DODDER" // TODO chang to dodder-prefixed
-	EnvBin               = "BIN_DODDER" // TODO change to dodder-prefixed
-	XDGUtilityNameDodder = "dodder"
+	// EnvBin is the env var name madder exports to subprocesses so they
+	// can find the madder binary that spawned them. Set in
+	// beforeXDG.initialize and surfaced via MakeCommonEnv / AddToEnvVars.
+	EnvBin = "BIN_MADDER"
 )
 
 type Env interface {
@@ -197,8 +198,6 @@ func (env env) Rel(
 func (env env) MakeCommonEnv() map[string]string {
 	return map[string]string{
 		EnvBin: env.GetExecPath(),
-		// TODO determine if EnvDir is kept
-		// EnvDir: h.Dir(),
 	}
 }
 

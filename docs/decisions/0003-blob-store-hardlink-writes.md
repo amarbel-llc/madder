@@ -18,7 +18,7 @@ decision-makers: Sasha F
 
 * All three issues disappear if the publish primitive is `link(2)` instead of `rename(2)`: the second writer gets `EEXIST` and never touches the first writer's inode.
 * `link(2)` is portable across Linux and darwin. No syscall fallback logic needed.
-* `link(2)` cannot cross filesystems (`EXDEV`). The global temp dir lives at `$XDG_CACHE_HOME/dodder/tmp-{pid}/` (or its CWD-scoped equivalent for `.`-prefixed blob-store-ids) while blob stores live under `$XDG_DATA_HOME/madder/blob_stores/{id}/`. In the default user layout both resolve under `~/` and share a mount; most deployments satisfy this invariant.
+* `link(2)` cannot cross filesystems (`EXDEV`). The global temp dir lives at `$XDG_CACHE_HOME/madder/tmp-{pid}/` (or its CWD-scoped equivalent for `.`-prefixed blob-store-ids) while blob stores live under `$XDG_DATA_HOME/madder/blob_stores/{id}/`. In the default user layout both resolve under `~/` and share a mount; most deployments satisfy this invariant.
 * Content-addressed stores should not have mutable blobs. Per ADR 0002 the bytes never change, so the mode bits never need to either. Write-once, read-many is the shape of the data.
 
 ## Considered Options
@@ -39,7 +39,7 @@ decision-makers: Sasha F
 5. On success: `os.Remove(tempPath)` to release the temp path (blob keeps its own link).
 6. `fsyncDir(filepath.Dir(blobPath))` for directory-entry durability.
 
-The `tempFS` for `localHashBucketed` stores remains the existing `envDir.GetTempLocal()` — rooted at `$XDG_CACHE_HOME/dodder/tmp-{pid}/` or, for `.`-prefixed blob-store-ids, its CWD-scoped override. Cleanup is already handled by `envDir.resetTempOnExit`. No new directory appears inside the blob store, and the `AllBlobs` walkers do not need special-case filtering.
+The `tempFS` for `localHashBucketed` stores remains the existing `envDir.GetTempLocal()` — rooted at `$XDG_CACHE_HOME/madder/tmp-{pid}/` or, for `.`-prefixed blob-store-ids, its CWD-scoped override. Cleanup is already handled by `envDir.resetTempOnExit`. No new directory appears inside the blob store, and the `AllBlobs` walkers do not need special-case filtering.
 
 ### Why not option 3 (per-store colocated temp dir)
 

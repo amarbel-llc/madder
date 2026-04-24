@@ -138,7 +138,7 @@ the data and the containing-directory level. After a crash, any blob at
 a digest's final path has digest-matching bytes; partial or zero-byte
 blobs are never observable.
 
-Temp files live under **$XDG_CACHE_HOME/dodder/tmp-{pid}/** (or its
+Temp files live under **$XDG_CACHE_HOME/madder/tmp-{pid}/** (or its
 CWD-scoped override for **.**-prefixed blob-store-ids). **link**(2)
 cannot cross filesystems, so **$XDG_CACHE_HOME** and the blob store's
 base path **must be on the same mount**. The default Linux layout

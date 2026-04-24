@@ -88,7 +88,7 @@ The takeaway: every production content-addressed store the author surveyed treat
 
 * Good, because `link(2)` gives `EEXIST` on collision portably across Linux and darwin, recovering first-writer semantics without extra machinery.
 * Good, because it also eliminates the chmod-race in [#29](https://github.com/amarbel-llc/madder/issues/29).
-* Bad, because `link(2)` cannot cross filesystems and madder's `tempFS` (`XDG_CACHE_HOME/dodder/tmp-{pid}`) is not co-located with the blob store (typically under `XDG_DATA_HOME`), so a naive switch breaks on systems with separate cache and data mounts.
+* Bad, because `link(2)` cannot cross filesystems and madder's `tempFS` (`XDG_CACHE_HOME/madder/tmp-{pid}`) is not co-located with the blob store (typically under `XDG_DATA_HOME`), so a naive switch breaks on systems with separate cache and data mounts.
 * Bad, because correctly landing this requires per-store temp directories and migration of existing `GetTempLocal` callers — larger than the concurrent-write hardening this ADR is scoped with. Tracked as [#30](https://github.com/amarbel-llc/madder/issues/30).
 
 ## More Information

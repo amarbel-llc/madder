@@ -8,6 +8,11 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
 )
 
+// OverrideEnvVarName is the env var a user sets to override the XDG
+// utility name dewey resolves at startup. When set, its value wins over
+// whatever utilityName the call site passes into env_dir.MakeDefault.
+const OverrideEnvVarName = "MADDER_XDG_UTILITY_OVERRIDE"
+
 type beforeXDG struct {
 	xdgInitArgs xdg.InitArgs
 
@@ -20,7 +25,7 @@ func (env *beforeXDG) initialize(
 	utilityName string,
 ) (err error) {
 	env.debugOptions = debugOptions
-	env.xdgInitArgs.OverrideEnvVarName = "DODDER_XDG_UTILITY_OVERRIDE"
+	env.xdgInitArgs.OverrideEnvVarName = OverrideEnvVarName
 
 	if err = env.xdgInitArgs.Initialize(utilityName); err != nil {
 		err = errors.Wrap(err)
