@@ -59,6 +59,20 @@ let
       done
     '';
   };
+
+  # Devshell-only test harness for SFTP integration tests (RFC 0001).
+  # Intentionally NOT included in the `packages` output — release
+  # artifacts must not ship a server that accepts any password.
+  madder-test-sftp-server = pkgs.buildGoApplication {
+    pname = "madder-test-sftp-server";
+    version = "0.0.0";
+    src = ./.;
+    pwd = ./.;
+    subPackages = [ "cmd/madder-test-sftp-server" ];
+    modules = ./gomod2nix.toml;
+    go = pkgs-master.go_1_26;
+    GOTOOLCHAIN = "local";
+  };
 in
 {
   packages = {
@@ -72,6 +86,7 @@ in
       tommy.packages.${system}.default
       bob.packages.${system}.batman
       purse-first.packages.${system}.dagnabit
+      madder-test-sftp-server
     ]
     ++ (with pkgs-master; [
       delve
