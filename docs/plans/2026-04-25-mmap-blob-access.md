@@ -1034,64 +1034,61 @@ null.
 
 ---
 
-## Task 9: Bats integration test
+## Task 9: Go integration test (revised)
 
 **Promotion criteria:** 14 days of green CI without callers reporting unexpected `ErrMmapUnsupported` or `ErrDigestMismatch`.
 
 **Files:**
-- Create: `zz-tests_bats/mmap_blob.bats`
-- Possibly: `go/cmd/madder-test-mmap/` (small Go test binary that promotes a blob and prints the bytes)
+- Create: `go/internal/foxtrot/blob_stores/store_local_hash_bucketed_mmap_test.go`
 
-**Step 1: Decide on the test driver**
+**Why a Go test, not bats**
 
-Two options:
-- **A:** Add a Go test helper binary at `go/cmd/madder-test-mmap/` that takes `--store-path` and `--digest`, opens the store, makes a BlobReader, promotes to MmapBlob, prints `Bytes()` to stdout. Bats compares against expected bytes.
-- **B:** Add a flag to the main `madder` CLI (e.g. `madder cat --mmap`). Heavier — affects the public CLI surface.
+The original plan called for a `madder-test-mmap` binary plus a bats
+scenario that wrote a blob through the CLI and printed the mmap'd
+bytes through a synthetic helper. Dropped: the CLI is the wrong
+harness for an embedding-driven feature. `MakeMmapBlobFromBlobReader`
+is consumed in-process by Go callers (llama.cpp embedders, parsers);
+shelling through the CLI would invent a helper binary just to surface
+an API that already has Go-native callers. The integration value is
+exercising the public store API end-to-end through to `MmapBlob`,
+which a same-package Go test does directly and idiomatically.
 
-Default to **A** — it mirrors `madder-test-sftp-server`'s pattern from the SFTP test harness.
+**Step 1: Write the test**
 
-**Step 2: Write the bats scenario**
+Same package as `store_inventory_archive_test.go` and
+`concurrent_write_test.go`, so `makeTestStore` and `writeBlob` are
+already in scope. Build tag `//go:build test && unix` matches
+`mmap_blob/promote_test.go`. The test:
 
-```bash
-#!/usr/bin/env bats
+1. `store := makeTestStore(t)`.
+2. `digest, err := writeBlob(store, payload)`.
+3. `reader, err := store.MakeBlobReader(digest)`.
+4. `mb, err := mmap_blob.MakeMmapBlobFromBlobReader(reader)`.
+5. `reader.Close()` — must not double-close; ownership transferred.
+6. `bytes.Equal(mb.Bytes(), payload)`.
 
-# bats file_tags=
+The negative cases (non-identity wrappers, non-file backing) are
+already covered at the env_dir layer in `blob_reader_mmap_test.go`
+and at the mmap_blob package layer in `promote_test.go`. This task
+only adds the missing happy path that runs through the real store.
 
-setup() {
-    load 'lib/common'
-    setup_madder_repo
-}
-
-@test "mmap promotion: local hash-bucketed blob round-trips through MmapBlob" {
-    payload="$(printf 'mmap-integration-payload-%s' "$RANDOM")"
-    digest="$(printf '%s' "$payload" | "$MADDER_BIN" write -)"
-    [ -n "$digest" ]
-
-    got="$("$MADDER_TEST_MMAP_BIN" --repo "$MADDER_REPO" --digest "$digest")"
-    [ "$got" = "$payload" ]
-}
-```
-
-**Step 3: Wire `madder-test-mmap` into the devshell**
-
-Mirror the pattern from `madder-test-sftp-server`: add to `go/default.nix`, surface in `flake.nix` `devShells.default.buildInputs`, never expose in `flake.packages` / `flake.apps`.
-
-**Step 4: Run bats**
+**Step 2: Run**
 
 ```bash
-just test-bats
+just verify-internal-pkg foxtrot/blob_stores
 ```
-Expected: the new scenario passes alongside existing tests.
+Expected: PASS — the implementation is already in place from tasks
+1–8; the test exercises behavior that should already hold.
 
-**Step 5: Commit**
+**Step 3: Commit**
 
 ```
-test(mmap_blob): bats integration exercising MakeMmapBlobFromBlobReader
+test(blob_stores): integration test for store→MmapBlob round-trip
 
-CLI writes a blob, the test helper opens the store and promotes via
-MakeMmapBlobFromBlobReader, prints Bytes(); bats compares against the
-written payload byte-for-byte. End-to-end coverage that the design
-doc's reference path works.
+Writes a blob through the localHashBucketed store, reads it back via
+store.MakeBlobReader, promotes via mmap_blob.MakeMmapBlobFromBlobReader,
+and asserts the bytes match. Exercises the same public path that
+library/embedding consumers will use.
 ```
 
 ---

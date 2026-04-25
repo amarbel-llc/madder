@@ -80,8 +80,19 @@ func (config Config) HasIdentityWrappers() bool {
 		*compType != compression_type.CompressionTypeEmpty {
 		return false
 	}
-	if _, ok := config.GetBlobEncryption().(*ohio.NopeIOWrapper); !ok {
+	// NopeIOWrapper has value-receiver methods, so both ohio.NopeIOWrapper
+	// and *ohio.NopeIOWrapper satisfy interfaces.IOWrapper. DefaultConfig
+	// stores the pointer form, but Config values built via MakeConfig
+	// with an empty EncryptionKeys land on the value form (because
+	// MakeConfig overwrites the default pointer when its encryption arg
+	// is a typed-nil MarklId whose GetIOWrapper returns nil, and
+	// GetBlobEncryption then falls back to the value-form
+	// defaultEncryptionIOWrapper). Accept both forms here — the
+	// byte-identity property is the same.
+	switch config.GetBlobEncryption().(type) {
+	case *ohio.NopeIOWrapper, ohio.NopeIOWrapper:
+		return true
+	default:
 		return false
 	}
-	return true
 }

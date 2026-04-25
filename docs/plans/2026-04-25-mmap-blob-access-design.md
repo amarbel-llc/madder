@@ -203,10 +203,19 @@ broader Unix-only posture — the existing tree uses
 - **`Verify()`:** positive for an untouched blob; manually corrupt the
   on-disk file and assert `ErrDigestMismatch`.
 
-**Bats integration test** in `zz-tests_bats/`:
-- One scenario writing a blob via the CLI then reading it back via a
-  small Go test binary that calls `MakeMmapBlobFromBlobReader`. Asserts
-  the `[]byte` view matches the written bytes.
+**Go integration test** in `foxtrot/blob_stores/`:
+- One scenario that opens a `localHashBucketed` store (constructed
+  in-package with `makeTestStore`), writes a payload via
+  `store.MakeBlobWriter`, reads it back via `store.MakeBlobReader`,
+  promotes the resulting `BlobReader` via
+  `mmap_blob.MakeMmapBlobFromBlobReader`, and asserts `Bytes()` matches
+  the written payload byte-for-byte. The CLI is the wrong harness for
+  an embedding-driven feature whose value is `[]byte` access from
+  library callers — a bats-driven CLI test would have to invent a
+  synthetic helper binary just to surface a public API that already
+  has Go callers in tree. The integration value here is exercising
+  the public store API end-to-end through to `MmapBlob`, in the same
+  package and language as the consumers.
 
 ## Rollback
 
