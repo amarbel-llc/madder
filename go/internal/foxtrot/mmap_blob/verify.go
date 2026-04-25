@@ -20,10 +20,8 @@ func (m *mmapBlob) Verify() error {
 	}
 
 	// MarklId.GetMarklFormat() returns the lightweight MarklFormat
-	// interface, which lacks GetHash(). Resolve it to a full
-	// markl.FormatHash via its format ID — the same path
-	// store_local_hash_bucketed.go takes when materializing a hash from a
-	// recorded blob digest.
+	// interface; GetHash() lives on the FormatHash side, resolved by
+	// format-id.
 	formatHash, err := markl.GetFormatHashOrError(
 		m.marklId.GetMarklFormat().GetMarklFormatId(),
 	)
