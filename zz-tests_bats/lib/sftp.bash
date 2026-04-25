@@ -53,6 +53,41 @@ start_sftp_server() {
   export SFTP_KNOWN_HOSTS="${fields[4]#known_hosts=}"
 }
 
+# init_sftp_test_store spins up a minimal SFTP-backed blob store
+# under the running test SFTP server. Caller can override the remote
+# directory and the local store id; both default to values that work
+# for a single-store test scenario.
+init_sftp_test_store() {
+  local remote_root="${1:-$BATS_TEST_TMPDIR/sftp-remote}"
+  local store_id="${2:-.sftp-test}"
+
+  # The remote layout is just a regular filesystem path (the test
+  # SFTP server has no notion of a chroot). Seed it with a valid
+  # blob_store-config so the first write doesn't bail trying to
+  # discover one.
+  mkdir -p "$remote_root"
+  cat >"$remote_root/blob_store-config" <<'EOF'
+---
+! toml-blob_store_config-v3
+---
+
+hash_buckets = [2]
+hash_type-id = "blake2b256"
+encryption = []
+compression-type = "zstd"
+EOF
+
+  run_madder init-sftp-explicit \
+    -host 127.0.0.1 \
+    -port "$SFTP_PORT" \
+    -user testuser \
+    -password anything \
+    -remote-path "$remote_root" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    "$store_id"
+  assert_success
+}
+
 # stop_sftp_server closes the child's stdin (RFC 0001 graceful
 # shutdown signal), then reaps the child. Safe to call when start
 # failed or when a previous teardown already ran.

@@ -17,35 +17,15 @@ function sftp_handshake_exports_port_and_known_hosts { # @test
   [[ -f $SFTP_KNOWN_HOSTS ]] || fail "known_hosts file missing at $SFTP_KNOWN_HOSTS"
 }
 
+today_sftp_log() {
+  local date
+  date="$(date -u +%Y-%m-%d)"
+  echo "$XDG_LOG_HOME/madder/blob-writes-$date.ndjson"
+}
+
 function sftp_write_emits_written_record { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
-
-  # The remote layout is just a regular filesystem path (the test
-  # SFTP server has no notion of a chroot). Seed it with a valid
-  # blob_store-config so madder's first write doesn't bail trying
-  # to discover one.
-  local remote_root="$BATS_TEST_TMPDIR/sftp-remote"
-  mkdir -p "$remote_root"
-  cat >"$remote_root/blob_store-config" <<'EOF'
----
-! toml-blob_store_config-v3
----
-
-hash_buckets = [2]
-hash_type-id = "blake2b256"
-encryption = []
-compression-type = "zstd"
-EOF
-
-  run_madder init-sftp-explicit \
-    -host 127.0.0.1 \
-    -port "$SFTP_PORT" \
-    -user testuser \
-    -password anything \
-    -remote-path "$remote_root" \
-    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
-    .sftp-test
-  assert_success
+  init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "hello sftp" >"$blob"
@@ -55,13 +35,44 @@ EOF
   run_madder write .sftp-test "$blob"
   assert_success
 
-  local date
-  date="$(date -u +%Y-%m-%d)"
-  local log="$XDG_LOG_HOME/madder/blob-writes-$date.ndjson"
+  local log
+  log="$(today_sftp_log)"
   [[ -s $log ]] || fail "expected write-log at $log, got none"
 
   local n
   n="$(grep -c '"op":"written"' "$log" || true)"
   [[ $n -eq 1 ]] || fail "expected 1 written record, got $n. log:
 $(cat "$log")"
+}
+
+function sftp_write_disabled_by_no_write_log_flag { # @test
+  export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "hello sftp" >"$blob"
+
+  # --no-write-log is a global flag; place it before the subcommand.
+  local bin="${MADDER_BIN:-madder}"
+  run timeout --preserve-status 5s "$bin" --no-write-log write .sftp-test "$blob"
+  assert_success
+
+  local log
+  log="$(today_sftp_log)"
+  [[ ! -e $log ]] || fail "--no-write-log should prevent log file creation at $log"
+}
+
+function sftp_write_disabled_by_env_var { # @test
+  export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "hello sftp" >"$blob"
+
+  MADDER_WRITE_LOG=0 run_madder write .sftp-test "$blob"
+  assert_success
+
+  local log
+  log="$(today_sftp_log)"
+  [[ ! -e $log ]] || fail "MADDER_WRITE_LOG=0 should prevent log file creation at $log"
 }
