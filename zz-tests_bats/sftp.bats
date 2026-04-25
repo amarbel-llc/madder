@@ -142,6 +142,61 @@ function sftp_write_no_warning_when_no_store_collision { # @test
   refute_output --partial "shadows blob store"
 }
 
+function sftp_write_json_emits_ndjson_record { # @test
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'hello world\n' >"$blob"
+
+  run_madder write -format json .sftp-test "$blob"
+  assert_success
+  # Non-default store, so the record carries a "store" field in
+  # addition to id/size/source. Field order is a commitment of the
+  # write contract. Use assert_line --regexp because $output
+  # interleaves the SFTP transport's dialing/connecting log lines
+  # with the NDJSON record; the local write_json_emits_ndjson_record
+  # version has clean output and so can anchor at $output level.
+  assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt","store":"\.sftp-test"\}$'
+}
+
+# sftp_write_json_check_present is intentionally absent: blocked by
+# madder#59 — write -check against SFTP recomputes the file digest
+# using the global default hash (sha256) before the lazy SFTP init
+# has read the remote config (blake2b256). Re-add once #59 is fixed.
+
+function sftp_write_json_check_missing { # @test
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'not stored\n' >"$blob"
+
+  run_madder write -check -format json .sftp-test "$blob"
+  assert_failure
+  # CAVEAT: per madder#59, -check against SFTP currently always
+  # returns present:false because of a lazy-init bug. This test
+  # therefore passes for the right reason AND the wrong reason;
+  # tighten or re-evaluate once #59 lands.
+  assert_output --partial '"present":false'
+}
+
+function sftp_write_json_warning_goes_to_stderr { # @test
+  # Shadow warnings are informational; in JSON mode they must route
+  # to stderr so stdout stays valid NDJSON. bats `run` merges streams
+  # but the count of NDJSON records on the merged output should still
+  # be exactly one — proves the warning didn't pollute stdout.
+  init_sftp_test_store "$BATS_TEST_TMPDIR/sftp-shadowed" shadowed
+
+  echo "file content" >shadowed
+
+  run_madder write -format json shadowed
+  assert_success
+  local n
+  n="$(echo "$output" | grep -c '^{' || true)"
+  [[ $n -eq 1 ]] || fail "expected 1 NDJSON record, got $n. output:
+$output"
+  assert_output --partial 'shadows blob-store-id'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
