@@ -20,6 +20,12 @@ type mmapBlob struct {
 	closeErr  error
 }
 
+var _ MmapBlob = (*mmapBlob)(nil)
+
+// mmapFile wraps unix.Mmap for a contiguous read-only mapping over
+// the file region [offset, offset+length). On success the returned
+// MmapBlob takes ownership of file and closes it via Close(). On
+// error the caller retains ownership of file and must close it.
 func mmapFile(
 	file *os.File,
 	offset, length int64,
@@ -27,8 +33,9 @@ func mmapFile(
 ) (MmapBlob, error) {
 	if length == 0 {
 		// unix.Mmap rejects length=0 with EINVAL; treat empty blobs as
-		// a valid no-op mapping.
-		return &mmapBlob{file: file, marklId: marklId}, nil
+		// a valid no-op mapping. Use []byte{} (not nil) so callers
+		// observe a non-nil, zero-length slice in both code paths.
+		return &mmapBlob{bytes: []byte{}, file: file, marklId: marklId}, nil
 	}
 	data, err := unix.Mmap(
 		int(file.Fd()),
@@ -50,14 +57,17 @@ func mmapFile(
 func (m *mmapBlob) Bytes() []byte                         { return m.bytes }
 func (m *mmapBlob) GetMarklId() domain_interfaces.MarklId { return m.marklId }
 
+// Close unmaps the bytes and closes the file, idempotently. If both
+// fail, the Munmap error wins (file-close error is recorded only when
+// closeErr is still nil).
 func (m *mmapBlob) Close() error {
 	m.closeOnce.Do(func() {
-		if m.bytes != nil {
+		if len(m.bytes) > 0 {
 			if err := unix.Munmap(m.bytes); err != nil {
 				m.closeErr = errors.Wrap(err)
 			}
-			m.bytes = nil
 		}
+		m.bytes = nil
 		if m.file != nil {
 			if err := m.file.Close(); err != nil && m.closeErr == nil {
 				m.closeErr = errors.Wrap(err)
