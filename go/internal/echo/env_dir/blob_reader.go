@@ -202,3 +202,31 @@ func (reader *blobReader) Close() (err error) {
 func (reader *blobReader) GetMarklId() domain_interfaces.MarklId {
 	return reader.digester.GetMarklId()
 }
+
+// Compile-time assertion.
+var _ domain_interfaces.MmapSource = (*blobReader)(nil)
+
+// MmapSource implements domain_interfaces.MmapSource. Returns ok=true
+// only when readSeeker is *os.File and the wrapper chain is identity
+// (no compression, no encryption). On ok=true the caller owns the
+// returned *os.File.
+func (reader *blobReader) MmapSource() (
+	file *os.File,
+	offset int64,
+	length int64,
+	ok bool,
+	err error,
+) {
+	f, isFile := reader.readSeeker.(*os.File)
+	if !isFile {
+		return nil, 0, 0, false, nil
+	}
+	if !reader.config.HasIdentityWrappers() {
+		return nil, 0, 0, false, nil
+	}
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, 0, 0, false, errors.Wrap(err)
+	}
+	return f, 0, stat.Size(), true, nil
+}
