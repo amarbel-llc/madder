@@ -76,3 +76,34 @@ function sftp_write_disabled_by_env_var { # @test
   log="$(today_sftp_log)"
   [[ ! -e $log ]] || fail "MADDER_WRITE_LOG=0 should prevent log file creation at $log"
 }
+
+function sftp_write_record_has_contracted_fields { # @test
+  export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "schema check" >"$blob"
+
+  run_madder write .sftp-test "$blob"
+  assert_success
+
+  local log
+  log="$(today_sftp_log)"
+  local line
+  line="$(head -n 1 "$log")"
+
+  # Every field the ADR contracts is present. The description field
+  # is optional (omitempty) and expected to be absent here since
+  # --log-description is not passed.
+  echo "$line" | grep -q '"ts":' || fail "record missing ts field: $line"
+  echo "$line" | grep -q '"utility":"madder"' || fail "record utility != madder: $line"
+  echo "$line" | grep -q '"pid":' || fail "record missing pid field: $line"
+  echo "$line" | grep -q '"store_id":' || fail "record missing store_id: $line"
+  echo "$line" | grep -q '"markl_id":' || fail "record missing markl_id: $line"
+  echo "$line" | grep -q '"size":' || fail "record missing size field: $line"
+  echo "$line" | grep -q '"op":"written"' || fail "record op != written: $line"
+
+  echo "$line" | grep -q '"description"' &&
+    fail "description field should be absent when --log-description not passed: $line" ||
+    true
+}
