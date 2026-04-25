@@ -71,6 +71,44 @@ function sftp_write_disabled_by_env_var { # @test
   [[ ! -e $log ]] || fail "MADDER_WRITE_LOG=0 should prevent log file creation at $log"
 }
 
+function sftp_write_and_cat { # @test
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "hello world" >"$blob"
+
+  run_madder write -format tap .sftp-test "$blob"
+  assert_success
+  local hash
+  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+  [[ -n $hash ]] || fail "write returned empty hash. output: $output"
+
+  run_madder cat .sftp-test "$hash"
+  assert_success
+  assert_output --partial "hello world"
+}
+
+function sftp_write_from_stdin { # @test
+  init_sftp_test_store
+
+  run_madder write -format tap .sftp-test -
+  assert_success
+}
+
+function sftp_list_after_write { # @test
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "list test" >"$blob"
+
+  run_madder write -format tap .sftp-test "$blob"
+  assert_success
+
+  run_madder list
+  assert_success
+  assert_output
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
