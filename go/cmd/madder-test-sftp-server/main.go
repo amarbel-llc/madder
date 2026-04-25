@@ -38,16 +38,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	knownHostsPath, err := writeKnownHosts(hostSigner.PublicKey())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "[%s] known_hosts: %v\n", programName, err)
-		os.Exit(1)
-	}
-
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] listen: %v\n", programName, err)
-		_ = os.Remove(knownHostsPath)
+		os.Exit(1)
+	}
+
+	// OpenSSH known_hosts does not support port wildcards on
+	// `[host]:port` patterns, so the file is written after the
+	// listener binds and we know the ephemeral port the client must
+	// connect to.
+	addr := listener.Addr().(*net.TCPAddr)
+	knownHostsPath, err := writeKnownHosts(hostSigner.PublicKey(), addr.Port)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[%s] known_hosts: %v\n", programName, err)
+		_ = listener.Close()
 		os.Exit(1)
 	}
 
@@ -97,10 +102,9 @@ func generateECDSAHostKey() (ssh.Signer, error) {
 }
 
 // writeKnownHosts writes the host public key into a temp file in
-// OpenSSH known_hosts format scoped to 127.0.0.1 (any port). The
-// `[127.0.0.1]:*` host pattern means OpenSSH clients accept the key
-// regardless of which ephemeral port we bound.
-func writeKnownHosts(publicKey ssh.PublicKey) (string, error) {
+// OpenSSH known_hosts format scoped to [127.0.0.1]:port — the exact
+// host:port pattern the client will connect to.
+func writeKnownHosts(publicKey ssh.PublicKey, port int) (string, error) {
 	f, err := os.CreateTemp("", "madder-test-sftp-server-known_hosts-*")
 	if err != nil {
 		return "", err
@@ -108,7 +112,8 @@ func writeKnownHosts(publicKey ssh.PublicKey) (string, error) {
 	defer f.Close() //nolint:errcheck
 
 	line := fmt.Sprintf(
-		"[127.0.0.1]:* %s %s\n",
+		"[127.0.0.1]:%d %s %s\n",
+		port,
 		publicKey.Type(),
 		base64.StdEncoding.EncodeToString(publicKey.Marshal()),
 	)
