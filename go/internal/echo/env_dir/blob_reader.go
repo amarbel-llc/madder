@@ -16,6 +16,7 @@ import (
 // TODO move into own package
 
 type blobReader struct {
+	config     Config
 	readSeeker io.ReadSeeker
 	digester   domain_interfaces.BlobWriter
 	decrypter  io.Reader
@@ -28,6 +29,7 @@ func NewReader(
 	readSeeker io.ReadSeeker,
 ) (reader *blobReader, err error) {
 	reader = &blobReader{
+		config:     config,
 		readSeeker: readSeeker,
 	}
 
