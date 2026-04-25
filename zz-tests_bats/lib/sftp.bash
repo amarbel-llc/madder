@@ -62,21 +62,9 @@ init_sftp_test_store() {
   local store_id="${2:-.sftp-test}"
 
   # The remote layout is just a regular filesystem path (the test
-  # SFTP server has no notion of a chroot). Seed it with a valid
-  # blob_store-config so the first write doesn't bail trying to
-  # discover one.
-  mkdir -p "$remote_root"
-  cat >"$remote_root/blob_store-config" <<'EOF'
----
-! toml-blob_store_config-v3
----
-
-hash_buckets = [2]
-hash_type-id = "blake2b256"
-encryption = []
-compression-type = "zstd"
-EOF
-
+  # SFTP server has no notion of a chroot). init-sftp-explicit will
+  # mkdir the remote_root and write a default blob_store-config
+  # there if one doesn't already exist (madder#58).
   run_madder init-sftp-explicit \
     -host 127.0.0.1 \
     -port "$SFTP_PORT" \

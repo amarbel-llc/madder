@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -199,6 +201,17 @@ func (cmd *Init) Run(req futility.Request) {
 		return
 	}
 
+	// SFTP-backed stores need a blob_store-config at the remote root
+	// before the first write — otherwise reads/writes fail with
+	// "remote blob store config missing". Bootstrap one (default-shaped,
+	// matching `init -encryption none` for local stores) when the
+	// remote doesn't already have one.
+	if sftpConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); ok {
+		if !cmd.ensureRemoteConfigExists(req, blobStoreId, sftpConfig) {
+			return
+		}
+	}
+
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	pathConfig := cmd.InitBlobStore(
@@ -234,39 +247,11 @@ func (cmd *Init) runDiscover(
 		fmt.Sprintf("(blob_store: %s) ", blobStoreId),
 	)
 
-	// Connect to remote via SSH/SFTP
-	var sshClient *ssh.Client
-	var err error
-
-	switch config := cmd.blobStoreConfig.(type) {
-	case blob_store_configs.ConfigSFTPUri:
-		if sshClient, err = blob_stores.MakeSSHClientFromSSHConfig(
-			req,
-			printer,
-			config,
-		); err != nil {
-			errors.ContextCancelWithBadRequestError(req, err)
-			return
-		}
-
-	case blob_store_configs.ConfigSFTPConfigExplicit:
-		if sshClient, err = blob_stores.MakeSSHClientForExplicitConfig(
-			req,
-			printer,
-			config,
-		); err != nil {
-			errors.ContextCancelWithBadRequestError(req, err)
-			return
-		}
-
-	default:
-		errors.ContextCancelWithBadRequestError(
-			req,
-			errors.Errorf("unsupported SFTP config type %T for --discover", config),
-		)
+	sshClient, err := makeSSHClientForSFTPConfig(req, printer, cmd.blobStoreConfig)
+	if err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
 		return
 	}
-
 	defer sshClient.Close() //defer:err-checked
 
 	sftpClient, err := sftp.NewClient(sshClient)
@@ -363,4 +348,100 @@ func (cmd *Init) runDiscover(
 
 	tw.Comment(fmt.Sprintf("verified %d blobs", verifiedCount))
 	tw.Plan()
+}
+
+// makeSSHClientForSFTPConfig dispatches to the right SSH-client
+// constructor based on the concrete SFTP config type. Used by both
+// the -discover path and ensureRemoteConfigExists.
+func makeSSHClientForSFTPConfig(
+	req futility.Request,
+	printer ui.Printer,
+	blobStoreConfig blob_store_configs.ConfigMutable,
+) (sshClient *ssh.Client, err error) {
+	switch config := blobStoreConfig.(type) {
+	case blob_store_configs.ConfigSFTPUri:
+		return blob_stores.MakeSSHClientFromSSHConfig(req, printer, config)
+
+	case blob_store_configs.ConfigSFTPConfigExplicit:
+		return blob_stores.MakeSSHClientForExplicitConfig(req, printer, config)
+
+	default:
+		return nil, errors.Errorf("unsupported SFTP config type %T", config)
+	}
+}
+
+// ensureRemoteConfigExists makes sure the SFTP remote has a
+// blob_store-config at its root. If one is already there it is left
+// alone (someone — a prior init or an external tool — has already
+// populated it). If absent, a default TomlV3 config is written
+// matching what `madder init -encryption none` produces locally
+// (HashTypeDefault, DefaultHashBuckets, CompressionTypeDefault).
+//
+// The remote directory itself is mkdir'd if missing.
+//
+// Returns false when the request was cancelled with an error so the
+// caller can stop short of writing the local pointer config.
+func (cmd *Init) ensureRemoteConfigExists(
+	req futility.Request,
+	blobStoreId blob_store_id.Id,
+	sftpConfig blob_store_configs.ConfigSFTPRemotePath,
+) bool {
+	printer := ui.MakePrefixPrinter(
+		ui.Err(),
+		fmt.Sprintf("(blob_store: %s) ", blobStoreId),
+	)
+
+	sshClient, err := makeSSHClientForSFTPConfig(req, printer, cmd.blobStoreConfig)
+	if err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
+		return false
+	}
+	defer sshClient.Close() //defer:err-checked
+
+	sftpClient, err := sftp.NewClient(sshClient)
+	if err != nil {
+		errors.ContextCancelWithBadRequestError(
+			req,
+			errors.Wrapf(err, "failed to create SFTP client"),
+		)
+		return false
+	}
+	defer sftpClient.Close() //defer:err-checked
+
+	remotePath := sftpConfig.GetRemotePath()
+	configPath := path.Join(remotePath, directory_layout.FileNameBlobStoreConfig)
+
+	if _, statErr := sftpClient.Stat(configPath); statErr == nil {
+		printer.Printf("remote blob store config already present at %q", configPath)
+		return true
+	} else if !os.IsNotExist(statErr) {
+		errors.ContextCancelWithBadRequestError(
+			req,
+			errors.Wrapf(statErr, "failed to stat remote config %q", configPath),
+		)
+		return false
+	}
+
+	if err := sftpClient.MkdirAll(remotePath); err != nil {
+		errors.ContextCancelWithBadRequestError(
+			req,
+			errors.Wrapf(err, "failed to create remote dir %q", remotePath),
+		)
+		return false
+	}
+
+	if err := blob_stores.WriteRemoteConfig(
+		sftpClient,
+		remotePath,
+		blob_stores.DiscoveredConfig{
+			HashTypeId: string(blob_store_configs.HashTypeDefault),
+			Buckets:    blob_store_configs.DefaultHashBuckets,
+		},
+		printer,
+	); err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
+		return false
+	}
+
+	return true
 }
