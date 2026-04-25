@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -60,7 +61,27 @@ func main() {
 	)
 	_ = os.Stdout.Sync()
 
-	serve(listener, hostSigner)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	go func() {
+		// Per RFC 0001 Lifecycle: a closed stdin (EOF) is the sole
+		// normative shutdown signal. Drain any input the parent
+		// happens to send and treat EOF as graceful shutdown.
+		_, _ = io.Copy(io.Discard, os.Stdin)
+		cancel()
+	}()
+
+	served := make(chan struct{})
+	go func() {
+		serve(listener, hostSigner)
+		close(served)
+	}()
+
+	<-ctx.Done()
+	_ = listener.Close()
+	<-served
+	_ = os.Remove(knownHostsPath)
 }
 
 func generateECDSAHostKey() (ssh.Signer, error) {

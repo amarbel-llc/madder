@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // binaryPath is the path to a freshly-built madder-test-sftp-server
@@ -110,6 +111,54 @@ func TestHandshakeLineFormat(t *testing.T) {
 	}
 	if fields[5] != "ssh" {
 		t.Errorf("field[5] (subprotocol) = %q, want ssh", fields[5])
+	}
+}
+
+// TestStdinCloseTriggersCleanExit asserts RFC 0001 Lifecycle:
+// closing the child's stdin MUST trigger graceful shutdown with
+// exit 0 within a short grace window.
+func TestStdinCloseTriggersCleanExit(t *testing.T) {
+	const cookie = "0123456789abcdef0123456789abcdef"
+	cmd := exec.Command(binaryPath)
+	cmd.Env = append(envWithoutCookie(), "MADDER_PLUGIN_COOKIE="+cookie)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for handshake so we know the server is running.
+	buf := make([]byte, 1024)
+	if _, err := stdout.Read(buf); err != nil {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+		t.Fatalf("read handshake: %v\nstderr: %s", err, stderr.String())
+	}
+
+	// Close stdin — the documented shutdown signal.
+	if err := stdin.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("child exited with error: %v\nstderr: %s", err, stderr.String())
+		}
+	case <-time.After(10 * time.Second):
+		_ = cmd.Process.Kill()
+		t.Fatal("child did not exit within 10s of stdin close")
 	}
 }
 
