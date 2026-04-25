@@ -14,5 +14,17 @@ test-tags *tags:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} --filter-tags {{tags}} *.bats
 
+# Run the default integration test suite. Excludes net_cap-tagged
+# tests (loopback-binding scenarios) — those run under `test-net-cap`
+# with sandcastle's --allow-local-binding granted.
 [group("test")]
-test: (test-targets "*.bats")
+test:
+  BATS_TEST_TIMEOUT="{{bats_timeout}}" \
+    bats --jobs {{num_cpus()}} --filter-tags '!net_cap' *.bats
+
+# Run net_cap-tagged tests with --allow-local-binding so sandcastle
+# permits 127.0.0.1 binds. Used for SFTP harness tests today.
+[group("test")]
+test-net-cap:
+  BATS_TEST_TIMEOUT="{{bats_timeout}}" \
+    bats --allow-local-binding --jobs {{num_cpus()}} --filter-tags net_cap *.bats

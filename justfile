@@ -61,7 +61,7 @@ generate-tommy:
 # Concurrent-write paths (pack_parallel, blob_mover link publish) are
 # load-bearing, so default verification runs them under -race.
 [group("test")]
-test: test-go-race test-bats
+test: test-go-race test-bats test-bats-net-cap
 
 # Run Go unit tests only.
 [group("test")]
@@ -105,10 +105,18 @@ test-go-cover *flags:
   echo "==> Coverage written to $out"
   go tool cover -func="$out" | tail -n 1
 
-# Run bats integration tests.
+# Run bats integration tests. Excludes net_cap-tagged tests (loopback-
+# binding scenarios) — those run under `test-bats-net-cap`.
 [group("test")]
 test-bats: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test
+
+# Run net_cap-tagged bats tests under sandcastle's --allow-local-binding.
+# Currently covers the SFTP harness; future loopback-binding harnesses
+# (HTTP, CalDAV, etc.) get the same treatment.
+[group("test")]
+test-bats-net-cap: build
+  MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-net-cap
 
 # Run bats integration tests against race-instrumented binaries built
 # by build-go-race. Catches data races that the unit-test -race pass
