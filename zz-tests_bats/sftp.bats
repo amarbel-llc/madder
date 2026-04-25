@@ -197,6 +197,40 @@ $output"
   assert_output --partial 'shadows blob-store-id'
 }
 
+function sftp_init_idempotent_fails { # @test
+  init_sftp_test_store
+
+  # A second init for the same id should fail because the local
+  # config file already exists; this matches the local-store
+  # init_idempotent_fails contract.
+  run_madder init-sftp-explicit \
+    -host 127.0.0.1 \
+    -port "$SFTP_PORT" \
+    -user testuser \
+    -password anything \
+    -remote-path "$BATS_TEST_TMPDIR/sftp-remote" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    .sftp-test
+  assert_failure
+}
+
+function sftp_init_probe_compression_default { # @test
+  # Diagnostic: the local init_compression_default asserts that
+  # `info-repo compression-type` returns "zstd". For SFTP, info-repo
+  # reads the LOCAL config (TomlSFTPV0) which carries only transport
+  # fields — compression-type lives in the remote blob_store-config
+  # and is invisible to info-repo today. Tracked as madder#60.
+  #
+  # When #60 lands, flip the assertions to mirror the local
+  # init_compression_default (assert_success + assert_output 'zstd')
+  # and rename to sftp_init_compression_default.
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test compression-type
+  assert_failure
+  assert_output --partial 'unsupported info key'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
