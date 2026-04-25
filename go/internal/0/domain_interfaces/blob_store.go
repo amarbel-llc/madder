@@ -4,6 +4,7 @@ package domain_interfaces
 
 import (
 	"io"
+	"os"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
@@ -39,6 +40,18 @@ type (
 
 	BlobReaderFactory interface {
 		MakeBlobReader(MarklId) (BlobReader, error)
+	}
+
+	// MmapSource is implemented by a BlobReader whose bytes equal a
+	// contiguous file region. Only the local hash-bucketed store's
+	// reader implements this in v1; non-local stores (SFTP, in-memory)
+	// and stores wrapping the file with non-identity encoding return
+	// ok=false from MmapSource().
+	//
+	// On ok=true, ownership of file transfers to the caller; the caller
+	// is responsible for closing it (typically the MmapBlob does this).
+	MmapSource interface {
+		MmapSource() (file *os.File, offset int64, length int64, ok bool, err error)
 	}
 
 	BlobWriterFactory interface {
