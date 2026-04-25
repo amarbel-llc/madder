@@ -66,3 +66,22 @@ func (config Config) GetBlobEncryption() interfaces.IOWrapper {
 		return config.encryption
 	}
 }
+
+// HasIdentityWrappers returns true when both blob wrappers are
+// byte-identity (none compression, no-op encryption). When true, the
+// on-disk file bytes equal the logical blob bytes — a precondition
+// for direct file mmap.
+func (config Config) HasIdentityWrappers() bool {
+	compType, ok := config.GetBlobCompression().(*compression_type.CompressionType)
+	if !ok {
+		return false
+	}
+	if *compType != compression_type.CompressionTypeNone &&
+		*compType != compression_type.CompressionTypeEmpty {
+		return false
+	}
+	if _, ok := config.GetBlobEncryption().(*ohio.NopeIOWrapper); !ok {
+		return false
+	}
+	return true
+}
