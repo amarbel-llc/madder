@@ -26,6 +26,9 @@ func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {
 	}
 	defer br.Close()
 
+	// NewFileReaderOrErrNotExist returns the BlobReader interface, so
+	// the MmapSource capability has to be discovered via type-assert.
+	// (Tests that go through NewReader directly skip this dance.)
 	src, ok := br.(domain_interfaces.MmapSource)
 	if !ok {
 		t.Fatal("blobReader should implement MmapSource")
@@ -81,9 +84,12 @@ func TestMmapSource_ZstdCompression(t *testing.T) {
 
 	br, err := NewReader(cfg, f)
 	if err != nil {
-		t.Skipf("NewReader rejected zstd config on raw bytes: %v", err)
+		t.Fatal(err)
 	}
-	_, _, _, mmapOk, _ := br.MmapSource()
+	_, _, _, mmapOk, err := br.MmapSource()
+	if err != nil {
+		t.Fatal(err)
+	}
 	if mmapOk {
 		t.Fatal("expected ok=false for zstd-configured reader")
 	}

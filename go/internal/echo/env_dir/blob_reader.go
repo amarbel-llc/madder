@@ -206,10 +206,9 @@ func (reader *blobReader) GetMarklId() domain_interfaces.MarklId {
 // Compile-time assertion.
 var _ domain_interfaces.MmapSource = (*blobReader)(nil)
 
-// MmapSource implements domain_interfaces.MmapSource. Returns ok=true
-// only when readSeeker is *os.File and the wrapper chain is identity
-// (no compression, no encryption). On ok=true the caller owns the
-// returned *os.File.
+// MmapSource returns ok=true only when readSeeker is *os.File and
+// wrappers are identity. On ok=true the caller takes ownership of
+// the returned *os.File.
 func (reader *blobReader) MmapSource() (
 	file *os.File,
 	offset int64,
