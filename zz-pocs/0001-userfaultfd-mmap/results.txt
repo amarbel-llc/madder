@@ -1,0 +1,9 @@
+kernel page size: 4096 bytes
+fixture dir:      /home/sasha/eng/repos/madder/.worktrees/snug-cypress/.tmp/nix-shell.29gF2a/uffdpoc-647907476
+fixture: 64 MiB plaintext, 64 chunks, compressed=67111232 bytes (gen 214ms)
+uffd registered: base=0x7fffad000000 len=67108864
+handler ready
+verify: 4096 random reads in 29.793ms
+faults handled: 64
+decompressions: 64 (64 / 64 chunks touched)
+POC OK

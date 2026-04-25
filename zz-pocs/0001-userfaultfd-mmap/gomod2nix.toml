@@ -1,0 +1,12 @@
+schema = 3
+
+[mod]
+  [mod.'github.com/klauspost/compress']
+    version = 'v1.18.5'
+    hash = 'sha256-H9b5iFJf4XbEnkGQCjGQAJ3aYhVDiolKrDewTbhuzQo='
+    goVersion = '1.24'
+
+  [mod.'golang.org/x/sys']
+    version = 'v0.43.0'
+    hash = 'sha256-aDQXqSTZES2l/132PBxhZN4ywldpPyfm7LByYCHzzwM='
+    goVersion = '1.25.0'

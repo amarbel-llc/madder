@@ -1,0 +1,24 @@
+# POC 0001 — userfaultfd-driven lazy mmap
+
+# default: build + run, verifying exit 0
+default: run
+
+# Run the POC. Requires Linux kernel >= 5.11 for UFFD_USER_MODE_ONLY.
+run:
+    go run .
+
+# Build the binary without running.
+build:
+    go build -o poc .
+
+# Run with -race to confirm no data races between the fault handler and verifier.
+race:
+    go run -race .
+
+# Tidy module deps.
+tidy:
+    go mod tidy
+
+# Capture a fresh run of the POC into results.txt.
+record:
+    go run . | tee results.txt
