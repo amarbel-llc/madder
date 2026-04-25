@@ -109,6 +109,39 @@ function sftp_list_after_write { # @test
   assert_output
 }
 
+function sftp_write_warns_when_file_shadows_store { # @test
+  # Init an SFTP store named `shadowed`, then create a file with the
+  # same bare name in CWD. Bare `write shadowed` should resolve to the
+  # file but warn about the blob-store-id collision — same semantics
+  # as the local-store version, since shadow detection is name-based
+  # and backend-agnostic.
+  init_sftp_test_store "$BATS_TEST_TMPDIR/sftp-shadowed" shadowed
+
+  echo "file content" >shadowed
+
+  run_madder write -format tap shadowed
+  assert_success
+  assert_output --partial "shadows blob-store-id"
+  assert_output --partial "'./shadowed'"
+  # Unlike `init -encryption none shadowed`, which yields a CWD-scoped
+  # `.shadowed` store id in the warning, init-sftp-explicit registers
+  # the id at user (XDG) scope where the bare name is the canonical
+  # form — the warning quotes it as "shadowed".
+  assert_output --partial '"shadowed"'
+}
+
+function sftp_write_no_warning_when_no_store_collision { # @test
+  # Control: SFTP store id does not collide with any file in CWD;
+  # write of an unrelated file must not surface a shadow warning.
+  init_sftp_test_store
+
+  echo "file content" >unique_filename
+
+  run_madder write -format tap unique_filename
+  assert_success
+  refute_output --partial "shadows blob store"
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
