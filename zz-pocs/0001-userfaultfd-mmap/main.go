@@ -27,13 +27,13 @@ const (
 
 	verifyReads = 4096
 
-	uffdAPIMagic            = 0xAA
-	uffdUserModeOnly        = 1
-	uffdioAPI               = 0xC018AA3F
-	uffdioRegister          = 0xC020AA00
-	uffdioCopy              = 0xC028AA03
-	uffdioRegModeMissing    = 1
-	uffdEventPagefault uint8 = 0x12
+	uffdAPIMagic               = 0xAA
+	uffdUserModeOnly           = 1
+	uffdioAPI                  = 0xC018AA3F
+	uffdioRegister             = 0xC020AA00
+	uffdioCopy                 = 0xC028AA03
+	uffdioRegModeMissing       = 1
+	uffdEventPagefault   uint8 = 0x12
 )
 
 type uffdioAPIArg struct {
