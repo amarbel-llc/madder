@@ -29,12 +29,17 @@ func TestMakeMmapBlob_LocalFileIdentity(t *testing.T) {
 	}
 	defer mb.Close()
 	if !bytes.Equal(mb.Bytes(), payload) {
-		t.Fatalf("Bytes(): got %q want %q", mb.Bytes(), payload)
+		t.Fatalf("Bytes() pre-Close: got %q want %q", mb.Bytes(), payload)
 	}
 	// After successful promotion, br.Close() must not double-close
 	// the underlying file (mb owns it now).
 	if err := br.Close(); err != nil {
 		t.Fatalf("br.Close after promotion: %v", err)
+	}
+	// And the mmap'd view must survive the source-reader Close —
+	// that's the practical contract callers depend on.
+	if !bytes.Equal(mb.Bytes(), payload) {
+		t.Fatalf("Bytes() post-Close: got %q want %q", mb.Bytes(), payload)
 	}
 }
 

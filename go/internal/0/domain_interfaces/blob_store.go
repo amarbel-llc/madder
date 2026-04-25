@@ -50,6 +50,8 @@ type (
 	//
 	// On ok=true, ownership of file transfers to the caller; the caller
 	// is responsible for closing it (typically the MmapBlob does this).
+	// MmapSource is a one-shot transfer: subsequent calls return
+	// ok=false because the source no longer holds the file.
 	MmapSource interface {
 		MmapSource() (file *os.File, offset int64, length int64, ok bool, err error)
 	}

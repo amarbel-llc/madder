@@ -6,7 +6,11 @@ import (
 
 // MakeMmapBlobFromBlobReader inspects reader. If it implements
 // MmapSource and reports ok=true, returns an MmapBlob mapping the
-// reported file region. Otherwise returns ErrMmapUnsupported.
+// reported file region. Otherwise returns ErrMmapUnsupported —
+// reserved for capability mismatch (wrong store, non-file backing,
+// non-identity wrappers). OS errors from inspecting the file (e.g.
+// stat or mmap failure) bubble up unwrapped, not as
+// ErrMmapUnsupported.
 //
 // On success, ownership of the underlying file transfers to the
 // returned MmapBlob. Caller MUST NOT also Close reader for the file
