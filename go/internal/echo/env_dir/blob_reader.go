@@ -189,10 +189,15 @@ func (reader *blobReader) Close() (err error) {
 		return err
 	}
 
-	if closer, ok := reader.readSeeker.(io.Closer); ok {
-		if err = closer.Close(); err != nil {
-			err = errors.Wrap(err)
-			return err
+	// readSeeker is nil after a successful MmapSource() handoff.
+	// Type-asserting a nil interface yields ok=false, but guard
+	// explicitly to match the project's defensive coding style.
+	if reader.readSeeker != nil {
+		if closer, ok := reader.readSeeker.(io.Closer); ok {
+			if err = closer.Close(); err != nil {
+				err = errors.Wrap(err)
+				return err
+			}
 		}
 	}
 
@@ -227,5 +232,8 @@ func (reader *blobReader) MmapSource() (
 	if err != nil {
 		return nil, 0, 0, false, errors.Wrap(err)
 	}
+	// Ownership of the file transfers to the caller. Drop our
+	// reference so Close() does not double-close it.
+	reader.readSeeker = nil
 	return f, 0, stat.Size(), true, nil
 }
