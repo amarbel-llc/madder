@@ -16,6 +16,9 @@ type (
 	BlobReader                                                          = internal.BlobReader
 	BlobReaderFactory                                                   = internal.BlobReaderFactory
 	BlobStore                                                           = internal.BlobStore
+	BlobWriteEvent                                                      = internal.BlobWriteEvent
+	BlobWriteObserver                                                   = internal.BlobWriteObserver
+	BlobWriteOp                                                         = internal.BlobWriteOp
 	BlobWriter                                                          = internal.BlobWriter
 	BlobWriterFactory                                                   = internal.BlobWriterFactory
 	CLIConfigProvider                                                   = internal.CLIConfigProvider
@@ -33,6 +36,7 @@ type (
 	MarklId                                                             = internal.MarklId
 	MarklIdGetter                                                       = internal.MarklIdGetter
 	MarklIdMutable                                                      = internal.MarklIdMutable
+	MmapSource                                                          = internal.MmapSource
 	MutableConfig                                                       = internal.MutableConfig
 	MutableConfigDryRun                                                 = internal.MutableConfigDryRun
 	NamedBlobAccess                                                     = internal.NamedBlobAccess
@@ -40,4 +44,11 @@ type (
 	RepoCLIConfigProvider                                               = internal.RepoCLIConfigProvider
 	SavedBlobFormatter                                                  = internal.SavedBlobFormatter
 	TypedStore[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]]                 = internal.TypedStore[BLOB, BLOB_PTR]
+)
+
+const (
+	BlobWriteOpExists         = internal.BlobWriteOpExists
+	BlobWriteOpVerifyMatch    = internal.BlobWriteOpVerifyMatch
+	BlobWriteOpVerifyMismatch = internal.BlobWriteOpVerifyMismatch
+	BlobWriteOpWritten        = internal.BlobWriteOpWritten
 )

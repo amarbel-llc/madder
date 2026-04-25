@@ -2,6 +2,8 @@
 // backed by file mmap, when the underlying storage permits.
 package mmap_blob
 
+//go:generate dagnabit export
+
 import (
 	"errors"
 	"io"
