@@ -78,6 +78,4 @@ func (m *mmapBlob) Close() error {
 	return m.closeErr
 }
 
-// Verify is a stub here. Real implementation lands in task 8 of the
-// mmap blob access plan.
-func (m *mmapBlob) Verify() error { return nil }
+// Verify is implemented in verify.go.
