@@ -159,10 +159,18 @@ function sftp_write_json_emits_ndjson_record { # @test
   assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt","store":"\.sftp-test"\}$'
 }
 
-# sftp_write_json_check_present is intentionally absent: blocked by
-# madder#59 — write -check against SFTP recomputes the file digest
-# using the global default hash (sha256) before the lazy SFTP init
-# has read the remote config (blake2b256). Re-add once #59 is fixed.
+function sftp_write_json_check_present { # @test
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'already here\n' >"$blob"
+  run_madder write -format json .sftp-test "$blob"
+  assert_success
+
+  run_madder write -check -format json .sftp-test "$blob"
+  assert_success
+  assert_output --partial '"present":true'
+}
 
 function sftp_write_json_check_missing { # @test
   init_sftp_test_store
@@ -172,10 +180,6 @@ function sftp_write_json_check_missing { # @test
 
   run_madder write -check -format json .sftp-test "$blob"
   assert_failure
-  # CAVEAT: per madder#59, -check against SFTP currently always
-  # returns present:false because of a lazy-init bug. This test
-  # therefore passes for the right reason AND the wrong reason;
-  # tighten or re-evaluate once #59 lands.
   assert_output --partial '"present":false'
 }
 

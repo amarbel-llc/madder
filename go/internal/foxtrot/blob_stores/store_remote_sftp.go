@@ -102,6 +102,13 @@ func (blobStore *remoteSftp) GetBlobStoreConfig() blob_store_configs.Config {
 }
 
 func (blobStore *remoteSftp) GetDefaultHashType() domain_interfaces.FormatHash {
+	// defaultHashType is overwritten by readRemoteConfig during lazy
+	// init; without this call the constructor default (sha256 from
+	// blob_store_configs.DefaultHashTypeId) is returned and callers
+	// like Write.doOne -check compute the file digest with the wrong
+	// hash. Matches the convention used by HasBlob, AllBlobs,
+	// MakeBlobWriter, MakeBlobReader, and GetBlobIOWrapper.
+	blobStore.initializeOnce()
 	return blobStore.defaultHashType
 }
 
