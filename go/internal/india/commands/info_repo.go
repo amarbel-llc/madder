@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -79,17 +81,43 @@ func (cmd InfoRepo) Run(req futility.Request) {
 	blobStoreConfig := blobStore.Config
 	configKVs := blob_store_configs.ConfigKeyValues(blobStoreConfig.Blob)
 
+	// storeConfig + storeConfigKVs are populated lazily by getStoreConfig
+	// below. Per ADR 0005 / issue #60 the authoritative
+	// blob-store-properties config lives on GetBlobStoreConfig(), which
+	// for SFTP forces a remote read; deferring keeps `info-repo
+	// config-path` and other non-store-property keys from triggering an
+	// SSH dial when the user asked for nothing that needs it.
+	var (
+		storeConfig    blob_store_configs.Config
+		storeConfigKVs map[string]string
+	)
+
+	getStoreConfig := func() (blob_store_configs.Config, map[string]string) {
+		if storeConfig == nil {
+			storeConfig = blobStore.BlobStore.GetBlobStoreConfig()
+			storeConfigKVs = blob_store_configs.ConfigKeyValues(storeConfig)
+		}
+
+		return storeConfig, storeConfigKVs
+	}
+
 	for _, key := range keys {
 		switch strings.ToLower(key) {
 		case "config-immutable":
-			// Per ADR 0005 §"info-repo … config-immutable wire shape" (#78),
-			// this pseudo-key encodes BlobStore.GetBlobStoreConfig() only.
-			// Today's encoding via blobStoreConfig (the on-disk TypedBlob)
-			// matches that contract for every store type; #60 ships the
-			// SFTP semantic flip that lets the encoder source the remote
-			// blob-store config rather than the local transport.
+			// Per ADR 0005 §"info-repo … config-immutable wire shape"
+			// (#78), this pseudo-key encodes BlobStore.GetBlobStoreConfig()
+			// only. Wrap the freestanding Config back into a TypedBlob
+			// with the matching wire type-id so the hyphence Coder can
+			// route it to the right per-type encoder.
+			cfg, _ := getStoreConfig()
+
+			immutableTyped := &hyphence.TypedBlob[blob_store_configs.Config]{
+				Type: blob_store_configs.TypeStructForConfig(cfg),
+				Blob: cfg,
+			}
+
 			if _, err := blob_store_configs.Coder.EncodeTo(
-				&blobStoreConfig,
+				immutableTyped,
 				env.GetUIFile(),
 			); err != nil {
 				env.Cancel(err)
@@ -115,10 +143,22 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			}
 
 		default:
-			value, ok := configKVs[key]
+			// Authoritative blob-store-properties first (ADR 0005 / #60),
+			// then transport-only keys from the local typed config (host,
+			// port, user, …). The local typed config is consulted second
+			// so its stub values for hash_type-id / supports-multi-hash
+			// don't shadow the truth that lives on the remote.
+			cfg, kvs := getStoreConfig()
+
+			value, ok := kvs[key]
 			if !ok {
-				availableKeys := blob_store_configs.ConfigKeyNames(
-					blobStoreConfig.Blob,
+				value, ok = configKVs[key]
+			}
+
+			if !ok {
+				availableKeys := mergeKeyNames(
+					blob_store_configs.ConfigKeyNames(blobStoreConfig.Blob),
+					blob_store_configs.ConfigKeyNames(cfg),
 				)
 
 				errors.ContextCancelWithBadRequestf(
@@ -134,4 +174,30 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			env.GetUI().Print(value)
 		}
 	}
+}
+
+// mergeKeyNames returns the deduplicated, sorted union of two
+// already-sorted key-name lists. Used to surface every key the user
+// could have asked for when info-repo rejects an unknown key — the
+// local-typed config and the blob-store-properties config can each
+// contribute different keys (transport vs. backend properties for
+// SFTP per ADR 0005).
+func mergeKeyNames(a, b []string) []string {
+	seen := make(map[string]struct{}, len(a)+len(b))
+	merged := make([]string, 0, len(a)+len(b))
+
+	for _, list := range [][]string{a, b} {
+		for _, name := range list {
+			if _, ok := seen[name]; ok {
+				continue
+			}
+
+			seen[name] = struct{}{}
+			merged = append(merged, name)
+		}
+	}
+
+	sort.Strings(merged)
+
+	return merged
 }
