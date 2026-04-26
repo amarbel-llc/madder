@@ -254,3 +254,64 @@ function capture_tree_file_arg_is_failure { # @test
   run_madder capture-tree -format json loose.txt
   assert_failure
 }
+
+function capture_tree_warns_when_dir_shadows_store { # @test
+
+  # A bare arg "shadowed" matches both a directory in CWD and a
+  # configured blob-store-id. The dir wins (matching `write`'s
+  # precedent) and a shadow warning routes to stderr. Capture still
+  # succeeds.
+  init_store
+  run_madder init -encryption none shadowed
+  assert_success
+
+  mkdir shadowed
+  echo "x" >shadowed/x.txt
+
+  run_madder capture-tree -format json shadowed
+  assert_success
+
+  # Receipt is for the default store (the dir won; no store switch).
+  local rid store
+  rid="$(receipt_id_of_group "$output")"
+  store="$(receipt_store_of_group "$output")"
+
+  [[ -n $rid ]] || fail "no receipt id: $output"
+  [[ -z $store ]] || fail "expected default store (empty), got '$store'"
+
+  # Shadow warning surfaces somewhere in the run output. NDJSON sink
+  # routes notices to stderr; bats merges stdout+stderr into $output.
+  echo "$output" | grep -qF 'shadows blob-store-id' ||
+    fail "expected shadow warning in output: $output"
+}
+
+function capture_tree_per_entry_failure_continues_walk { # @test
+
+  # If one file in the tree is unreadable, the run reports that as a
+  # per-entry failure but still captures siblings and exits non-zero.
+  # Skip if running as root (chmod 000 doesn't deny root reads).
+  if [[ $(id -u) -eq 0 ]]; then
+    skip "running as root; chmod 000 has no effect"
+  fi
+
+  init_store
+
+  mkdir -p tree
+  echo "good"   >tree/good.txt
+  echo "secret" >tree/secret.txt
+  chmod 000 tree/secret.txt
+
+  run_madder capture-tree -format json tree
+  # Restore perms before any assert_* might exit, so bats can clean up.
+  chmod 644 tree/secret.txt
+
+  assert_failure
+
+  # The good file is captured.
+  echo "$output" | grep -q '"path":"good.txt".*"type":"file"' ||
+    fail "good.txt should have been captured: $output"
+
+  # An error record names secret.txt.
+  echo "$output" | grep -q '"source":"tree/secret.txt".*"error"' ||
+    fail "expected error record for secret.txt: $output"
+}
