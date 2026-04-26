@@ -3,6 +3,8 @@ package blob_store_configs
 //go:generate dagnabit export
 
 import (
+	"fmt"
+
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
@@ -118,4 +120,45 @@ func Default() *TypedMutableConfig {
 			CompressionType: compression_type.CompressionTypeDefault,
 		},
 	}
+}
+
+// TypeStructForConfig returns the wire type-id (TypeStruct) that the
+// hyphence Coder uses to decode/encode the given Config. Inverts the
+// type-id → coder map in coding.go. Panics if the concrete Config
+// type is not one of the registered variants — keep this in sync with
+// the Coder map when adding a new on-disk config type.
+//
+// Used by callers that need to wrap a freestanding Config back into a
+// TypedBlob for encoding (e.g. info-repo's config-immutable encoder
+// per ADR 0005).
+func TypeStructForConfig(config Config) ids.TypeStruct {
+	var typeId string
+
+	switch config.(type) {
+	case *TomlLocalHashBucketedV1, TomlLocalHashBucketedV1:
+		typeId = ids.TypeTomlBlobStoreConfigV1
+	case *TomlLocalHashBucketedV2, TomlLocalHashBucketedV2:
+		typeId = ids.TypeTomlBlobStoreConfigV2
+	case *TomlV3, TomlV3:
+		typeId = ids.TypeTomlBlobStoreConfigV3
+	case *TomlSFTPV0:
+		typeId = ids.TypeTomlBlobStoreConfigSftpExplicitV0
+	case *TomlSFTPViaSSHConfigV0, TomlSFTPViaSSHConfigV0:
+		typeId = ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0
+	case *TomlPointerV0, TomlPointerV0:
+		typeId = ids.TypeTomlBlobStoreConfigPointerV0
+	case *TomlInventoryArchiveV0, TomlInventoryArchiveV0:
+		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV0
+	case *TomlInventoryArchiveV1, TomlInventoryArchiveV1:
+		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV1
+	case *TomlInventoryArchiveV2, TomlInventoryArchiveV2:
+		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV2
+	default:
+		panic(fmt.Sprintf(
+			"no wire type-id known for blob store config of type %T",
+			config,
+		))
+	}
+
+	return ids.GetOrPanic(typeId).TypeStruct
 }
