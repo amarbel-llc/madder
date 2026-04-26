@@ -241,21 +241,41 @@ function sftp_init_idempotent_fails { # @test
   assert_failure
 }
 
-function sftp_init_probe_compression_default { # @test
-  # Diagnostic: the local init_compression_default asserts that
-  # `info-repo compression-type` returns "zstd". For SFTP, info-repo
-  # reads the LOCAL config (TomlSFTPV0) which carries only transport
-  # fields — compression-type lives in the remote blob_store-config
-  # and is invisible to info-repo today. Tracked as madder#60.
-  #
-  # When #60 lands, flip the assertions to mirror the local
-  # init_compression_default (assert_success + assert_output 'zstd')
-  # and rename to sftp_init_compression_default.
+function sftp_init_compression_default { # @test
+  # Mirrors init_compression_default for SFTP. The local test uses
+  # assert_output (full-output equality) but the SFTP transport emits
+  # dialing/connecting log lines that bats' merged run output captures
+  # alongside the value, so anchor on assert_line for the printed
+  # info-repo value instead. Per ADR 0005 / #60: compression-type is a
+  # blob-store property and must come from the remote TomlV3.
   init_sftp_test_store
 
   run_madder info-repo .sftp-test compression-type
-  assert_failure
-  assert_output --partial 'unsupported info key'
+  assert_success
+  assert_line 'zstd'
+}
+
+function sftp_init_hash_type_id_default { # @test
+  # SFTP-init bootstrap writes a remote TomlV3 with HashTypeDefault
+  # (blake2b256). Per ADR 0005 / #60, info-repo must surface that
+  # (and not the stub sha256 the local TomlSFTPV0 returns).
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test hash_type-id
+  assert_success
+  assert_line 'blake2b256'
+}
+
+function sftp_init_hash_buckets_default { # @test
+  # hash_buckets is not in the local SFTP transport config at all —
+  # it's a blob-store property that lives only on the remote TomlV3.
+  # Without #60's GetBlobStoreConfig() fall-through this would fail
+  # with "unsupported info key".
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test hash_buckets
+  assert_success
+  assert_line '[2]'
 }
 
 function sftp_write_record_has_contracted_fields { # @test
