@@ -40,6 +40,13 @@ type remoteSftp struct {
 
 	config blob_store_configs.ConfigSFTPRemotePath
 
+	// remoteConfig is the authoritative blob-store-properties config
+	// decoded from the SFTP remote's blob_store-config file. Per ADR
+	// 0005, the local `config` (TomlSFTPV0) above is transport only;
+	// hash type, buckets, compression, and encryption all live here.
+	// Populated by readRemoteConfig; nil before initializeOnce runs.
+	remoteConfig blob_store_configs.Config
+
 	multiHash       bool
 	defaultHashType markl.FormatHash
 
@@ -98,7 +105,13 @@ func makeSftpStore(
 }
 
 func (blobStore *remoteSftp) GetBlobStoreConfig() blob_store_configs.Config {
-	return blobStore.config
+	// Per ADR 0005 / issue #60: the authoritative blob-store-properties
+	// config is the one decoded from the remote `blob_store-config`
+	// file, not the local SFTP transport config. Force initialization
+	// so remoteConfig is populated; the local transport remains
+	// reachable via BlobStoreInitialized.Config when callers need it.
+	blobStore.initializeOnce()
+	return blobStore.remoteConfig
 }
 
 func (blobStore *remoteSftp) GetDefaultHashType() domain_interfaces.FormatHash {
@@ -167,6 +180,13 @@ func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 	}
 
 	remoteConfig := typedConfig.Blob
+
+	// Persist the decoded remote config so GetBlobStoreConfig can
+	// return the authoritative blob-store-properties object per ADR
+	// 0005 / issue #60. The hash-type and bucket extractions below
+	// remain — they pre-cache fields the hot path uses without going
+	// through the interface assertions every call.
+	blobStore.remoteConfig = remoteConfig
 
 	if hashTypeConfig, ok := remoteConfig.(blob_store_configs.ConfigHashType); ok {
 		blobStore.multiHash = hashTypeConfig.SupportsMultiHash()
