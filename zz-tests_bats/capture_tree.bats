@@ -297,7 +297,7 @@ function capture_tree_per_entry_failure_continues_walk { # @test
   init_store
 
   mkdir -p tree
-  echo "good"   >tree/good.txt
+  echo "good" >tree/good.txt
   echo "secret" >tree/secret.txt
   chmod 000 tree/secret.txt
 
