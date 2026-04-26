@@ -278,6 +278,27 @@ function sftp_init_hash_buckets_default { # @test
   assert_line '[2]'
 }
 
+function sftp_info_repo_host_stays_local { # @test
+  # TDD seed for #83. Per ADR 0005 §"Negative consequences": "Reading
+  # host or port stays purely local; reading compression-type or
+  # hash_type-id opens the SSH/SFTP connection." After #60 landed,
+  # any default-case info-repo key dials because TomlSFTPV0 satisfies
+  # ConfigHashType with stub values that would shadow the remote
+  # config; #83 drops those stubs and flips the lookup order so host
+  # / port can be served from the local typed config without a dial.
+  # Skipping until #83 lands; the assertions are the contract the
+  # fix must satisfy.
+  skip "depends on #83 (drop ConfigHashType from TomlSFTPV0; flip lookup order)"
+
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test host
+  assert_success
+  assert_line '127.0.0.1'
+  refute_output --partial 'dialing'
+  refute_output --partial 'connected to'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
