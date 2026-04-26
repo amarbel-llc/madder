@@ -16,9 +16,7 @@ const DefaultHashTypeId = string(HashTypeSha256)
 var DefaultHashType markl.FormatHash = markl.FormatHashSha256
 
 type (
-	Config = interface {
-		GetBlobStoreType() string
-	}
+	Config = domain_interfaces.BlobStoreConfig
 
 	ConfigUpgradeable interface {
 		Config

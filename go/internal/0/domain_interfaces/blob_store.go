@@ -71,12 +71,22 @@ type (
 		MakeNamedBlobWriter(string) (BlobWriter, error)
 	}
 
+	// BlobStoreConfig is the layer-0 marker for blob-store configuration
+	// objects. Per ADR 0005, the config returned here describes blob-store
+	// properties (hash type, buckets, compression, encryption); transport
+	// configuration for remote stores lives elsewhere
+	// (BlobStoreInitialized.Config).
+	BlobStoreConfig interface {
+		GetBlobStoreType() string
+	}
+
 	BlobStore interface {
 		BlobAccess
 		BlobIOWrapperGetter
 
 		GetBlobStoreDescription() string
 		GetDefaultHashType() FormatHash
+		GetBlobStoreConfig() BlobStoreConfig
 		AllBlobs() interfaces.SeqError[MarklId]
 	}
 

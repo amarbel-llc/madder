@@ -270,6 +270,10 @@ func (store *inventoryArchiveV0) rebuildIndex() (err error) {
 	return nil
 }
 
+func (store inventoryArchiveV0) GetBlobStoreConfig() blob_store_configs.Config {
+	return store.config
+}
+
 func (store inventoryArchiveV0) GetBlobStoreDescription() string {
 	return "local inventory archive"
 }
