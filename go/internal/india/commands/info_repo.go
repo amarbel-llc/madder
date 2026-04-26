@@ -82,6 +82,12 @@ func (cmd InfoRepo) Run(req futility.Request) {
 	for _, key := range keys {
 		switch strings.ToLower(key) {
 		case "config-immutable":
+			// Per ADR 0005 §"info-repo … config-immutable wire shape" (#78),
+			// this pseudo-key encodes BlobStore.GetBlobStoreConfig() only.
+			// Today's encoding via blobStoreConfig (the on-disk TypedBlob)
+			// matches that contract for every store type; #60 ships the
+			// SFTP semantic flip that lets the encoder source the remote
+			// blob-store config rather than the local transport.
 			if _, err := blob_store_configs.Coder.EncodeTo(
 				&blobStoreConfig,
 				env.GetUIFile(),

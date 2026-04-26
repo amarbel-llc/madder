@@ -75,6 +75,14 @@ The `BlobStore.GetBlobStoreConfig()` method, by name, returns the *blob store's*
 
 This semantic correction is what `info-repo` will use to surface remote-side keys ([#60](https://github.com/amarbel-llc/madder/issues/60)).
 
+### `info-repo … config-immutable` wire shape
+
+The `madder info-repo <store> config-immutable` pseudo-key MUST encode `BlobStore.GetBlobStoreConfig()` only. Operators wanting transport details for an SFTP store read individual keys (`host`, `port`, `user`, `private-key-path`, `remote-path`, `known-hosts-file`) — those continue to read from `BlobStoreInitialized.Config` (the local transport).
+
+This mirrors the cleavage drawn above between blob-store properties (via the interface method) and transport configuration (via the struct field). Encoding both at this pseudo-key would deliberately re-merge what the rest of this ADR splits, and would promote the output from human-readable pretty-print to a wire-format contract requiring a separator definition. We do not need that contract today: nothing parses `config-immutable` programmatically — the surface is human and MCP, both consumers of the existing single-block hyphence form.
+
+Implementation lands as part of [#60](https://github.com/amarbel-llc/madder/issues/60), since the `info_repo.go` encoder pivot and the SFTP `GetBlobStoreConfig()` semantic flip share the wire-shape concern (`BlobStoreInitialized.Config.Type` no longer matches the bare `GetBlobStoreConfig()` for SFTP once the flip ships). [#78](https://github.com/amarbel-llc/madder/issues/78) records this decision; #60 carries the code change.
+
 ### Negative consequences
 
 * **`info-repo` on an SFTP store triggers lazy init for blob-store-shaped keys.** Reading `host` or `port` stays purely local; reading `compression-type` or `hash_type-id` opens the SSH/SFTP connection that lazy init has always required. Acceptable. Caching mitigates this if the cost ever bites in practice.
