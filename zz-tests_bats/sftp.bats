@@ -11,10 +11,22 @@ teardown() {
 
 # bats file_tags=net_cap
 
-today_sftp_log() {
+today_sftp_session_file() {
   local date
   date="$(date -u +%Y-%m-%d)"
-  echo "$XDG_LOG_HOME/madder/blob-writes-$date.ndjson"
+  local day_dir="$XDG_LOG_HOME/madder/inventory_log/$date"
+
+  if [[ ! -d $day_dir ]]; then
+    return 1
+  fi
+
+  ls -1 "$day_dir"/*.hyphence 2>/dev/null | head -n 1
+}
+
+# session_body strips the 4-line hyphence header (---, ! type, ---,
+# blank separator) from a session file, leaving just the NDJSON body.
+sftp_session_body() {
+  tail -n +5 "$1"
 }
 
 function sftp_write_emits_written_record { # @test
@@ -30,30 +42,37 @@ function sftp_write_emits_written_record { # @test
   assert_success
 
   local log
-  log="$(today_sftp_log)"
-  [[ -s $log ]] || fail "expected write-log at $log, got none"
+  log="$(today_sftp_session_file)" || fail "no session file under $XDG_LOG_HOME/madder/inventory_log/"
+  [[ -s $log ]] || fail "expected non-empty session file at $log"
+
+  local body
+  body="$(sftp_session_body "$log")"
 
   local n
-  n="$(grep -c '"op":"written"' "$log" || true)"
-  [[ $n -eq 1 ]] || fail "expected 1 written record, got $n. log:
-$(cat "$log")"
+  n="$(echo "$body" | grep -c '"op":"written"' || true)"
+  [[ $n -eq 1 ]] || fail "expected 1 written record, got $n. body:
+$body"
 }
 
-function sftp_write_disabled_by_no_write_log_flag { # @test
+function sftp_write_disabled_by_no_inventory_log_flag { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "hello sftp" >"$blob"
 
-  # --no-write-log is a global flag; place it before the subcommand.
+  # --no-inventory-log is a global flag; place it before the subcommand.
   local bin="${MADDER_BIN:-madder}"
-  run timeout --preserve-status 5s "$bin" --no-write-log write .sftp-test "$blob"
+  run timeout --preserve-status 5s "$bin" --no-inventory-log write .sftp-test "$blob"
   assert_success
 
-  local log
-  log="$(today_sftp_log)"
-  [[ ! -e $log ]] || fail "--no-write-log should prevent log file creation at $log"
+  local day_dir
+  day_dir="$XDG_LOG_HOME/madder/inventory_log/$(date -u +%Y-%m-%d)"
+  if [[ -d $day_dir ]]; then
+    local count
+    count="$(ls -1 "$day_dir"/*.hyphence 2>/dev/null | wc -l)"
+    [[ $count -eq 0 ]] || fail "--no-inventory-log should prevent session file creation; found $count file(s) in $day_dir"
+  fi
 }
 
 function sftp_write_disabled_by_env_var { # @test
@@ -63,12 +82,16 @@ function sftp_write_disabled_by_env_var { # @test
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "hello sftp" >"$blob"
 
-  MADDER_WRITE_LOG=0 run_madder write .sftp-test "$blob"
+  MADDER_INVENTORY_LOG=0 run_madder write .sftp-test "$blob"
   assert_success
 
-  local log
-  log="$(today_sftp_log)"
-  [[ ! -e $log ]] || fail "MADDER_WRITE_LOG=0 should prevent log file creation at $log"
+  local day_dir
+  day_dir="$XDG_LOG_HOME/madder/inventory_log/$(date -u +%Y-%m-%d)"
+  if [[ -d $day_dir ]]; then
+    local count
+    count="$(ls -1 "$day_dir"/*.hyphence 2>/dev/null | wc -l)"
+    [[ $count -eq 0 ]] || fail "MADDER_INVENTORY_LOG=0 should prevent session file creation; found $count file(s) in $day_dir"
+  fi
 }
 
 function sftp_write_and_cat { # @test
@@ -246,13 +269,14 @@ function sftp_write_record_has_contracted_fields { # @test
   assert_success
 
   local log
-  log="$(today_sftp_log)"
+  log="$(today_sftp_session_file)" || fail "no session file"
   local line
-  line="$(head -n 1 "$log")"
+  line="$(sftp_session_body "$log" | head -n 1)"
 
-  # Every field the ADR contracts is present. The description field
+  # Every field the design contracts is present. The description field
   # is optional (omitempty) and expected to be absent here since
   # --log-description is not passed.
+  echo "$line" | grep -q '"type":"blob-write-published-v1"' || fail "record missing type discriminator: $line"
   echo "$line" | grep -q '"ts":' || fail "record missing ts field: $line"
   echo "$line" | grep -q '"utility":"madder"' || fail "record utility != madder: $line"
   echo "$line" | grep -q '"pid":' || fail "record missing pid field: $line"
