@@ -50,6 +50,43 @@ generate-tommy:
   cd go && go generate ./internal/charlie/blob_store_configs/...
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
 
+#    ____ _
+#   / ___| | ___  __ _ _ __
+#  | |   | |/ _ \/ _` | '_ \
+#  | |___| |  __/ (_| | | | |
+#   \____|_|\___|\__,_|_| |_|
+#
+
+# Wipe Go's build cache. Useful when bisecting a stale-build mystery
+# or recovering from a corrupted cache entry.
+[group("clean")]
+clean-go-cache:
+  cd go && go clean -cache
+
+# Wipe Go's module cache (~/go/pkg/mod). Forces re-download of every
+# module on the next build. Heavier than clean-go-cache.
+[group("clean")]
+clean-go-modcache:
+  cd go && go clean -modcache
+
+# Both Go cleans together.
+[group("clean")]
+clean-go: clean-go-cache clean-go-modcache
+
+# Remove the nix-build symlink. Forces the next `nix build` to
+# refresh the symlink even if its store path is reachable from cache.
+[group("clean")]
+clean-nix-result:
+  rm -f {{justfile_directory()}}/result
+
+# Full sweep: Go caches + nix-build symlink. Recovers from most
+# stale-build states without touching git-tracked files or the nix
+# store (use `nix store gc` for the latter). Does NOT wipe .tmp/
+# — long-running clients (Clown, devshell tools) hold open files
+# there and rely on $TMPDIR pointing at it.
+[group("clean")]
+clean: clean-go clean-nix-result
+
 #   _____         _
 #  |_   _|__  ___| |_
 #    | |/ _ \/ __| __|
