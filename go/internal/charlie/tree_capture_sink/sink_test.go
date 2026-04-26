@@ -13,7 +13,8 @@ func TestNDJSON_FileEntry(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.Entry("storeA", tree_capture_receipt.Entry{
+	s.SetStore("storeA")
+	s.Entry(tree_capture_receipt.Entry{
 		Path:   "foo.go",
 		Root:   "./src",
 		Type:   tree_capture_receipt.TypeFile,
@@ -36,7 +37,8 @@ func TestNDJSON_DirEntry(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.Entry("storeA", tree_capture_receipt.Entry{
+	s.SetStore("storeA")
+	s.Entry(tree_capture_receipt.Entry{
 		Path: ".",
 		Root: "./src",
 		Type: tree_capture_receipt.TypeDir,
@@ -50,11 +52,11 @@ func TestNDJSON_DirEntry(t *testing.T) {
 	}
 }
 
-func TestNDJSON_SymlinkEntry(t *testing.T) {
+func TestNDJSON_SymlinkEntry_DefaultStoreOmitsField(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.Entry("", tree_capture_receipt.Entry{
+	s.Entry(tree_capture_receipt.Entry{
 		Path:   "link",
 		Root:   ".",
 		Type:   tree_capture_receipt.TypeSymlink,
@@ -73,7 +75,8 @@ func TestNDJSON_StoreGroupReceipt(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.StoreGroupReceipt("storeA", "blake3:receipt", 42)
+	s.SetStore("storeA")
+	s.StoreGroupReceipt("blake3:receipt", 42)
 	s.Finalize()
 
 	const want = `{"type":"store_group_receipt","store":"storeA","receipt_id":"blake3:receipt","count":42}` + "\n"
@@ -110,26 +113,35 @@ func TestNDJSON_FailureRecord(t *testing.T) {
 	}
 }
 
-func TestNDJSON_MultipleEvents(t *testing.T) {
+func TestNDJSON_StoreScopesSubsequentEntries(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.Entry("A", tree_capture_receipt.Entry{
-		Path: "f", Root: ".", Type: tree_capture_receipt.TypeFile,
+	s.SetStore("A")
+	s.Entry(tree_capture_receipt.Entry{
+		Path: "a", Root: ".", Type: tree_capture_receipt.TypeFile,
 		Mode: 0o644, Size: 1, BlobId: "x",
 	})
-	s.StoreGroupReceipt("A", "r1", 1)
+	s.SetStore("B")
+	s.Entry(tree_capture_receipt.Entry{
+		Path: "b", Root: ".", Type: tree_capture_receipt.TypeFile,
+		Mode: 0o644, Size: 1, BlobId: "y",
+	})
+	s.StoreGroupReceipt("r", 1)
 	s.Finalize()
 
 	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
-	if len(lines) != 2 {
-		t.Fatalf("expected 2 lines, got %d: %q", len(lines), lines)
+	if len(lines) != 3 {
+		t.Fatalf("expected 3 lines, got %d: %q", len(lines), lines)
 	}
-	if !strings.Contains(lines[0], `"type":"file"`) {
-		t.Fatalf("line 0 should be file entry; got %q", lines[0])
+	if !strings.Contains(lines[0], `"store":"A"`) {
+		t.Fatalf("line 0 store should be A: %q", lines[0])
 	}
-	if !strings.Contains(lines[1], `"type":"store_group_receipt"`) {
-		t.Fatalf("line 1 should be summary; got %q", lines[1])
+	if !strings.Contains(lines[1], `"store":"B"`) {
+		t.Fatalf("line 1 store should be B: %q", lines[1])
+	}
+	if !strings.Contains(lines[2], `"store":"B"`) {
+		t.Fatalf("summary store should be B: %q", lines[2])
 	}
 }
 
@@ -137,7 +149,8 @@ func TestTAP_EntryEmitsOk(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry("storeA", tree_capture_receipt.Entry{
+	s.SetStore("storeA")
+	s.Entry(tree_capture_receipt.Entry{
 		Path:   "foo.go",
 		Root:   "./src",
 		Type:   tree_capture_receipt.TypeFile,
@@ -160,7 +173,7 @@ func TestTAP_DirEntryNoFileFields(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry("", tree_capture_receipt.Entry{
+	s.Entry(tree_capture_receipt.Entry{
 		Path: ".",
 		Root: "./src",
 		Type: tree_capture_receipt.TypeDir,
@@ -182,7 +195,7 @@ func TestTAP_SymlinkEntry(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry("", tree_capture_receipt.Entry{
+	s.Entry(tree_capture_receipt.Entry{
 		Path:   "link",
 		Root:   "./src",
 		Type:   tree_capture_receipt.TypeSymlink,
@@ -198,7 +211,8 @@ func TestTAP_StoreGroupReceiptIsOkLine(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.StoreGroupReceipt("storeA", "blake3:receipt", 42)
+	s.SetStore("storeA")
+	s.StoreGroupReceipt("blake3:receipt", 42)
 	s.Finalize()
 
 	got := buf.String()
@@ -206,7 +220,6 @@ func TestTAP_StoreGroupReceiptIsOkLine(t *testing.T) {
 	mustContain(t, got, "id=blake3:receipt")
 	mustContain(t, got, "count=42")
 
-	// One ok per receipt; not_ok must not appear.
 	if strings.Contains(got, "not ok") {
 		t.Fatalf("receipt should be ok, got: %q", got)
 	}
@@ -239,12 +252,11 @@ func TestTAP_FinalizeEmitsPlan(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry("", tree_capture_receipt.Entry{
+	s.Entry(tree_capture_receipt.Entry{
 		Path: ".", Root: ".", Type: tree_capture_receipt.TypeDir, Mode: 0o755,
 	})
 	s.Finalize()
 
-	// TAP-14 plan line: 1..N
 	mustContain(t, buf.String(), "1..1")
 }
 

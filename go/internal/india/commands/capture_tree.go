@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sync/atomic"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
@@ -69,15 +68,16 @@ func (cmd CaptureTree) GetDescription() futility.Description {
 			"for system-wide, '%' for cache, '_' for custom-rooted, " +
 			"and no prefix for the user default — see " +
 			"blob-store(7). Symlinks are recorded by their target " +
-			"string; the target is not dereferenced. Hidden files " +
-			"are captured. With zero positional arguments the " +
-			"current working directory is captured into the default " +
-			"store; with exactly one positional argument that " +
-			"resolves to a blob-store-id the current working " +
-			"directory is captured into that store. Output format " +
-			"defaults to TAP on an interactive terminal and to " +
-			"NDJSON when stdout is piped; pass -format to force a " +
-			"specific encoding.",
+			"string; the target is not dereferenced, and a symlink " +
+			"passed as a capture-root is rejected (resolve it with " +
+			"realpath first). Hidden files are captured. With zero " +
+			"positional arguments the current working directory is " +
+			"captured into the default store; with exactly one " +
+			"positional argument that resolves to a blob-store-id " +
+			"the current working directory is captured into that " +
+			"store. Output format defaults to TAP on an interactive " +
+			"terminal and to NDJSON when stdout is piped; pass " +
+			"-format to force a specific encoding.",
 	}
 }
 
@@ -102,8 +102,7 @@ func (cmd CaptureTree) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	args := req.PopArgs()
-	allStores := envBlobStore.GetBlobStores()
-	shadowCandidates := command_components.BlobStoreIds(allStores)
+	shadowCandidates := command_components.BlobStoreIds(envBlobStore.GetBlobStores())
 
 	groups, classifyFails, planErr := planCapture(args, shadowCandidates)
 
@@ -115,11 +114,11 @@ func (cmd CaptureTree) Run(req futility.Request) {
 		sink = tree_capture_sink.NewTAP(os.Stdout)
 	}
 
-	var failCount atomic.Uint32
+	failCount := 0
 
 	for _, cf := range classifyFails {
 		sink.Failure(cf.arg, cf.err)
-		failCount.Add(1)
+		failCount++
 	}
 
 	if planErr != nil {
@@ -136,12 +135,14 @@ func (cmd CaptureTree) Run(req futility.Request) {
 
 		var blobStore blob_stores.BlobStoreInitialized
 		var storeName string
-		if group.useDefault {
+		if group.storeID.IsEmpty() {
 			blobStore = envBlobStore.GetDefaultBlobStore()
 		} else {
 			blobStore = envBlobStore.GetBlobStore(group.storeID)
 			storeName = group.storeID.String()
 		}
+
+		sink.SetStore(storeName)
 
 		var entries []tree_capture_receipt.Entry
 
@@ -149,8 +150,8 @@ func (cmd CaptureTree) Run(req futility.Request) {
 			if root.shadowNotice != "" {
 				sink.Notice(root.shadowNotice)
 			}
-			fails := walkRoot(blobStore, storeName, root.path, &entries, sink)
-			failCount.Add(uint32(fails))
+			fails := walkRoot(blobStore, root.path, &entries, sink)
+			failCount += fails
 		}
 
 		if len(entries) == 0 {
@@ -167,45 +168,41 @@ func (cmd CaptureTree) Run(req futility.Request) {
 				fmt.Sprintf("(receipt:%s)", quoteEmpty(storeName)),
 				err,
 			)
-			failCount.Add(1)
+			failCount++
 			continue
 		}
 
-		sink.StoreGroupReceipt(storeName, receiptID, len(entries))
+		sink.StoreGroupReceipt(receiptID, len(entries))
 	}
 
 	sink.Finalize()
 
-	if fc := failCount.Load(); fc > 0 {
+	if failCount > 0 {
 		errors.ContextCancelWithBadRequestf(
 			req,
 			"capture-tree failed entries: %d",
-			fc,
+			failCount,
 		)
 		return
 	}
 }
 
-// captureRoot is one directory the walk should descend, optionally
-// carrying a shadow-warning notice the caller should emit before walking.
 type captureRoot struct {
 	path         string
 	shadowNotice string
 }
 
 // captureGroup is the unit of one receipt: a target store plus the set
-// of directories captured into it. switchNotice is non-empty when this
-// group started with an explicit store-switch arg; the planner emits it
-// at the first dir of the group.
+// of directories captured into it. An empty storeID selects the default
+// store. switchNotice is non-empty when this group started with an
+// explicit store-switch arg; the planner emits it before the group's
+// first root is walked.
 type captureGroup struct {
-	useDefault   bool
 	storeID      blob_store_id.Id
 	switchNotice string
 	roots        []captureRoot
 }
 
-// classifyFailure carries one per-arg classification error for the
-// caller to surface on the sink.
 type classifyFailure struct {
 	arg string
 	err error
@@ -220,48 +217,35 @@ func planCapture(
 	args []string,
 	shadowCandidates []blob_store_id.Id,
 ) (groups []captureGroup, classifyFails []classifyFailure, err error) {
-	// Zero-arg fast path.
 	if len(args) == 0 {
 		return []captureGroup{{
-			useDefault: true,
-			roots:      []captureRoot{{path: "."}},
+			roots: []captureRoot{{path: "."}},
 		}}, nil, nil
 	}
 
-	// Single-arg fast path: if the lone arg classifies as a store-id
-	// (and not a directory in CWD), default the root to PWD.
 	if len(args) == 1 {
 		k := classifyArg(args[0])
 		switch k.kind {
 		case argKindStoreId:
 			return []captureGroup{{
-				storeID: k.storeID,
-				switchNotice: arg_resolver.FormatStoreSwitchNotice(
-					k.storeID,
-				),
-				roots: []captureRoot{{path: "."}},
+				storeID:      k.storeID,
+				switchNotice: arg_resolver.FormatStoreSwitchNotice(k.storeID),
+				roots:        []captureRoot{{path: "."}},
 			}}, nil, nil
 		case argKindDir:
-			notice := ""
-			if shadowed, ok := arg_resolver.DetectShadow(
-				args[0], shadowCandidates,
-			); ok {
-				notice = arg_resolver.FormatShadowWarning(args[0], shadowed)
-			}
 			return []captureGroup{{
-				useDefault: true,
 				roots: []captureRoot{{
 					path:         args[0],
-					shadowNotice: notice,
+					shadowNotice: shadowNoticeFor(args[0], shadowCandidates),
 				}},
 			}}, nil, nil
 		case argKindError:
-			return nil, []classifyFailure{{arg: args[0], err: k.err}}, errPlanNoUsableArgs
+			return nil, []classifyFailure{{arg: args[0], err: k.err}},
+				errors.ErrorWithStackf("no usable directories or store-ids in arguments")
 		}
 	}
 
-	// Multi-arg path: classify each, build groups, validate.
-	current := captureGroup{useDefault: true}
+	current := captureGroup{}
 	flush := func() {
 		groups = append(groups, current)
 	}
@@ -277,48 +261,33 @@ func planCapture(
 			})
 
 		case argKindStoreId:
-			if len(current.roots) == 0 && (current.useDefault || !current.storeID.IsEmpty()) {
-				// The current group never received a dir.
-				if !current.useDefault {
-					// Previous explicit store-switch had no dirs.
-					err = errors.ErrorWithStackf(
-						"blob-store-id %q has no following directories",
-						current.storeID,
-					)
-					return
-				}
-				// useDefault group with no roots and no explicit
-				// switch yet — drop it silently and start fresh.
-			} else {
+			if len(current.roots) == 0 && !current.storeID.IsEmpty() {
+				err = errors.ErrorWithStackf(
+					"blob-store-id %q has no following directories",
+					current.storeID,
+				)
+				return
+			}
+			if len(current.roots) > 0 {
 				flush()
 			}
 
 			current = captureGroup{
-				storeID: k.storeID,
-				switchNotice: arg_resolver.FormatStoreSwitchNotice(
-					k.storeID,
-				),
+				storeID:      k.storeID,
+				switchNotice: arg_resolver.FormatStoreSwitchNotice(k.storeID),
 			}
 
 		case argKindDir:
-			notice := ""
-			if shadowed, ok := arg_resolver.DetectShadow(
-				arg, shadowCandidates,
-			); ok {
-				notice = arg_resolver.FormatShadowWarning(arg, shadowed)
-			}
 			current.roots = append(current.roots, captureRoot{
 				path:         arg,
-				shadowNotice: notice,
+				shadowNotice: shadowNoticeFor(arg, shadowCandidates),
 			})
 		}
 	}
 
-	// Flush the trailing group (must have ≥1 root unless the only
-	// thing that ever happened was classifyError args).
 	if len(current.roots) > 0 {
 		flush()
-	} else if !current.useDefault {
+	} else if !current.storeID.IsEmpty() {
 		err = errors.ErrorWithStackf(
 			"blob-store-id %q has no following directories",
 			current.storeID,
@@ -327,16 +296,22 @@ func planCapture(
 	}
 
 	if len(groups) == 0 && len(classifyFails) == 0 {
-		// Defensive: shouldn't happen given the branches above, but
-		// guards against silent no-op.
-		err = errPlanNoUsableArgs
+		err = errors.ErrorWithStackf(
+			"no usable directories or store-ids in arguments",
+		)
 		return
 	}
 
 	return
 }
 
-var errPlanNoUsableArgs = errors.ErrorWithStackf("no usable directories or store-ids in arguments")
+func shadowNoticeFor(arg string, candidates []blob_store_id.Id) string {
+	shadowed, ok := arg_resolver.DetectShadow(arg, candidates)
+	if !ok {
+		return ""
+	}
+	return arg_resolver.FormatShadowWarning(arg, shadowed)
+}
 
 type argKind int
 
@@ -353,12 +328,13 @@ type classifiedArg struct {
 }
 
 // classifyArg decides whether arg names a directory in CWD or a
-// blob-store-id. Mirrors arg_resolver's file-first precedence: a bare
-// arg that exists as a directory is treated as a directory (with shadow
-// detection handled by the caller), and only falls through to
-// blob-store-id classification when no such directory exists.
+// blob-store-id. Uses Lstat (not Stat) so a symlink-to-directory does
+// not classify as a directory: filepath.WalkDir would refuse to descend
+// it anyway, and the resulting one-entry "type=symlink" receipt would
+// surprise a user who expected the linked tree's contents. Users who
+// want that should resolve the symlink before passing it in.
 func classifyArg(arg string) classifiedArg {
-	info, err := os.Stat(arg)
+	info, err := os.Lstat(arg)
 	switch {
 	case err == nil && info.IsDir():
 		return classifiedArg{kind: argKindDir}
@@ -366,12 +342,12 @@ func classifyArg(arg string) classifiedArg {
 		return classifiedArg{
 			kind: argKindError,
 			err: errors.ErrorWithStackf(
-				"%q exists but is not a directory; capture-tree only takes directories",
+				"%q exists but is not a directory; capture-tree only takes directories (resolve symlinks with realpath if needed)",
 				arg,
 			),
 		}
 	case errors.IsNotExist(err):
-		// Fall through to store-id parsing.
+		// fall through to store-id parsing
 	default:
 		return classifiedArg{kind: argKindError, err: errors.Wrap(err)}
 	}
@@ -397,7 +373,6 @@ func classifyArg(arg string) classifiedArg {
 // failures encountered during the walk.
 func walkRoot(
 	store blob_stores.BlobStoreInitialized,
-	storeName string,
 	rootArg string,
 	accum *[]tree_capture_receipt.Entry,
 	sink tree_capture_sink.Sink,
@@ -408,7 +383,6 @@ func walkRoot(
 		if walkErr != nil {
 			sink.Failure(p, walkErr)
 			failCount++
-			// Don't propagate; let WalkDir continue with siblings.
 			if d != nil && d.IsDir() {
 				return filepath.SkipDir
 			}
@@ -433,14 +407,15 @@ func walkRoot(
 		}
 		rel = filepath.ToSlash(rel)
 
+		mode := info.Mode()
 		entry := tree_capture_receipt.Entry{
 			Path: rel,
 			Root: rootArg,
-			Mode: info.Mode(),
+			Mode: mode,
 		}
 
 		switch {
-		case info.Mode()&fs.ModeSymlink != 0:
+		case mode&fs.ModeSymlink != 0:
 			target, err := os.Readlink(p)
 			if err != nil {
 				sink.Failure(p, errors.Wrap(err))
@@ -450,10 +425,10 @@ func walkRoot(
 			entry.Type = tree_capture_receipt.TypeSymlink
 			entry.Target = target
 
-		case info.Mode().IsDir():
+		case mode.IsDir():
 			entry.Type = tree_capture_receipt.TypeDir
 
-		case info.Mode().IsRegular():
+		case mode.IsRegular():
 			id, size, err := writeFileBlob(store, p)
 			if err != nil {
 				sink.Failure(p, errors.Wrap(err))
@@ -469,7 +444,7 @@ func walkRoot(
 		}
 
 		*accum = append(*accum, entry)
-		sink.Entry(storeName, entry)
+		sink.Entry(entry)
 		return nil
 	})
 
@@ -481,8 +456,6 @@ func walkRoot(
 	return failCount
 }
 
-// writeFileBlob streams srcPath into a new blob in blobStore. Returns
-// the blob's MarklId and the number of bytes copied.
 func writeFileBlob(
 	blobStore blob_stores.BlobStoreInitialized,
 	srcPath string,
@@ -511,9 +484,9 @@ func writeFileBlob(
 }
 
 // writeReceiptBlob serializes entries via tree_capture_receipt.Write
-// into a new blob in blobStore. Returns the receipt blob's stringified
-// MarklId. The output is deterministic — equivalent inputs yield
-// byte-identical receipts and identical blob IDs.
+// into a new blob in blobStore. The output is deterministic:
+// equivalent inputs yield byte-identical receipts and identical blob
+// IDs.
 func writeReceiptBlob(
 	blobStore blob_stores.BlobStoreInitialized,
 	entries []tree_capture_receipt.Entry,

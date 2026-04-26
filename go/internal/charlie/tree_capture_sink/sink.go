@@ -21,17 +21,28 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
 )
 
+// summaryRecordType is the wire `type` value the NDJSON sink writes on
+// the per-store-group summary record. Filesystem entry types ("file",
+// "dir", "symlink", "other") are deliberately distinct so a single
+// `type` field discriminates entries from summaries.
+const summaryRecordType = "store_group_receipt"
+
 // Sink streams capture-tree results in either TAP or NDJSON form. Each
 // concrete sink is single-threaded; capture-tree's walk is sequential.
 type Sink interface {
-	// Entry reports one filesystem entry that was successfully captured.
-	// `store` is the active store-id at capture time; empty when the
-	// default store is in use.
-	Entry(store string, e tree_capture_receipt.Entry)
+	// SetStore sets the store-id stamped onto subsequent Entry and
+	// StoreGroupReceipt records. Called once per store group before its
+	// entries are emitted. Empty string means the default store.
+	SetStore(store string)
 
-	// StoreGroupReceipt reports the receipt blob produced for one store
-	// group, after every entry under that group has been emitted.
-	StoreGroupReceipt(store, receiptID string, count int)
+	// Entry reports one filesystem entry that was successfully captured
+	// under the active store.
+	Entry(e tree_capture_receipt.Entry)
+
+	// StoreGroupReceipt reports the receipt blob produced for the
+	// active store group, after every entry under that group has been
+	// emitted.
+	StoreGroupReceipt(receiptID string, count int)
 
 	// Notice reports informational events (store switches, shadow
 	// warnings). TAP renders as a comment; NDJSON routes to stderr.
@@ -65,17 +76,20 @@ func NewNDJSON(out, errOut io.Writer) Sink {
 }
 
 type tapSink struct {
-	tw *tap.Writer
+	tw    *tap.Writer
+	store string
 }
 
-func (s *tapSink) Entry(_ string, e tree_capture_receipt.Entry) {
+func (s *tapSink) SetStore(store string) { s.store = store }
+
+func (s *tapSink) Entry(e tree_capture_receipt.Entry) {
 	s.tw.Ok(formatTAPEntry(e))
 }
 
-func (s *tapSink) StoreGroupReceipt(store, receiptID string, count int) {
+func (s *tapSink) StoreGroupReceipt(receiptID string, count int) {
 	s.tw.Ok(fmt.Sprintf(
 		"receipt store=%s id=%s count=%d",
-		quoteIfEmpty(store), receiptID, count,
+		quoteIfEmpty(s.store), receiptID, count,
 	))
 }
 
@@ -107,9 +121,8 @@ func formatTAPEntry(e tree_capture_receipt.Entry) string {
 	}
 }
 
-// joinRootPath formats Root+Path for human-readable output. The
-// receipt itself stores them separately for parser clarity, but a
-// single combined string is friendlier in TAP test point messages.
+// joinRootPath formats Root+Path for human-readable TAP output. The
+// receipt itself stores them separately for parser clarity.
 func joinRootPath(root, path string) string {
 	if path == "." || path == "" {
 		return root
@@ -128,13 +141,13 @@ type jsonSink struct {
 	buf    *bufio.Writer
 	enc    *json.Encoder
 	errOut io.Writer
+	store  string
 }
 
 // entryRecord is the wire shape of one captured entry on the NDJSON
 // stream. Mirrors tree_capture_receipt's recordV1 (so consumers can
-// share a parser) and adds `store`. Type carries the filesystem entry
-// kind for entries; the `store_group_receipt` summary uses
-// summaryRecord, which sets Type to "store_group_receipt".
+// share a parser) and adds `store`. Source/Error are populated only
+// for failure records, which omit the entry fields.
 type entryRecord struct {
 	Path   string `json:"path,omitempty"`
 	Root   string `json:"root,omitempty"`
@@ -155,13 +168,15 @@ type summaryRecord struct {
 	Count     int    `json:"count"`
 }
 
-func (s *jsonSink) Entry(store string, e tree_capture_receipt.Entry) {
+func (s *jsonSink) SetStore(store string) { s.store = store }
+
+func (s *jsonSink) Entry(e tree_capture_receipt.Entry) {
 	rec := entryRecord{
 		Path:  e.Path,
 		Root:  e.Root,
 		Type:  e.Type,
 		Mode:  fmt.Sprintf("%04o", e.Mode.Perm()),
-		Store: store,
+		Store: s.store,
 	}
 
 	switch e.Type {
@@ -175,10 +190,10 @@ func (s *jsonSink) Entry(store string, e tree_capture_receipt.Entry) {
 	_ = s.enc.Encode(rec)
 }
 
-func (s *jsonSink) StoreGroupReceipt(store, receiptID string, count int) {
+func (s *jsonSink) StoreGroupReceipt(receiptID string, count int) {
 	_ = s.enc.Encode(summaryRecord{
-		Type:      "store_group_receipt",
-		Store:     store,
+		Type:      summaryRecordType,
+		Store:     s.store,
 		ReceiptID: receiptID,
 		Count:     count,
 	})
