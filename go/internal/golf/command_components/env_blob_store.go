@@ -9,19 +9,20 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/juliett/write_log"
+	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
 )
 
-// writeLogFlagsReader is the minimal surface `command_components` needs
-// from the utility's globals struct to decide whether to enable the
-// audit write-log. Any utility whose `*Globals` satisfies this will
-// work — see india/commands/globals.go for the concrete implementation.
-// Declared here (structurally-typed) to avoid a cyclic import on
-// india/commands.
-type writeLogFlagsReader interface {
-	IsWriteLogDisabled() bool
+// inventoryLogFlagsReader is the minimal surface `command_components`
+// needs from the utility's globals struct to decide whether to enable
+// the audit inventory-log. Any utility whose `*Globals` satisfies this
+// will work — see india/commands/globals.go for the concrete
+// implementation. Declared here (structurally-typed) to avoid a cyclic
+// import on india/commands.
+type inventoryLogFlagsReader interface {
+	IsInventoryLogDisabled() bool
 }
 
 // DefaultConfig is the CLI config used by madder commands.
@@ -79,24 +80,34 @@ func (cmd EnvBlobStore) makeEnvLocal(
 }
 
 // makeBlobWriteObserver returns the observer to wire into env_dir for
-// this command invocation. Resolves the ADR 0004 disable contract:
+// this command invocation. Resolves the disable contract:
 //
-//  1. MADDER_WRITE_LOG=0 (exactly "0") → no-op observer.
-//  2. --no-write-log global flag, if the utility's GlobalFlags satisfies
-//     writeLogFlagsReader and reports true → no-op observer.
-//  3. Otherwise → FileObserver rooted at write_log.MadderLogDir().
+//  1. MADDER_INVENTORY_LOG=0 (exactly "0") → no-op observer.
+//  2. --no-inventory-log global flag, if the utility's GlobalFlags
+//     satisfies inventoryLogFlagsReader and reports true → no-op
+//     observer.
+//  3. Otherwise → FileObserver rooted at
+//     inventory_log.MadderInventoryLogDir(), with its Close registered
+//     as an After hook on req.Context. The hook fires when
+//     errCtx.Run() inside futility's wrapped.Run completes, flushing
+//     hyphence's bufio.Writer and the file before RunCLI returns.
+//     Without this, the body adapter goroutine would be killed mid-
+//     stream on process exit and the trailing buffer would be lost.
+//     See ADR 0004's superseded-by note and madder#75.
 func makeBlobWriteObserver(
 	req futility.Request,
 ) domain_interfaces.BlobWriteObserver {
-	if strings.TrimSpace(os.Getenv("MADDER_WRITE_LOG")) == "0" {
-		return write_log.NopObserver{}
+	if strings.TrimSpace(os.Getenv("MADDER_INVENTORY_LOG")) == "0" {
+		return inventory_log.NopObserver{}
 	}
 
-	if g, ok := req.Utility.GlobalFlags.(writeLogFlagsReader); ok {
-		if g.IsWriteLogDisabled() {
-			return write_log.NopObserver{}
+	if g, ok := req.Utility.GlobalFlags.(inventoryLogFlagsReader); ok {
+		if g.IsInventoryLogDisabled() {
+			return inventory_log.NopObserver{}
 		}
 	}
 
-	return write_log.NewFileObserver(write_log.MadderLogDir())
+	obs := inventory_log.NewFileObserver(inventory_log.MadderInventoryLogDir())
+	errors.ContextCloseAfter(req.Context, obs)
+	return obs
 }

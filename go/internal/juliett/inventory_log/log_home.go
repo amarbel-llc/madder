@@ -1,4 +1,4 @@
-package write_log
+package inventory_log
 
 import (
 	"os"
@@ -23,9 +23,15 @@ func ResolveLogHome() string {
 	return filepath.Join(home, ".local", "log")
 }
 
-// MadderLogDir returns the madder-scoped subdirectory of $XDG_LOG_HOME
-// where the blob-write log lives. Apps should namespace their logs per
-// xdg_log_home(7) NOTES.
+// MadderLogDir returns the madder-scoped subdirectory of $XDG_LOG_HOME.
+// Apps should namespace their logs per xdg_log_home(7) NOTES.
 func MadderLogDir() string {
 	return filepath.Join(ResolveLogHome(), "madder")
+}
+
+// MadderInventoryLogDir returns the inventory-log root directory:
+// $XDG_LOG_HOME/madder/inventory_log/. FileObserver creates per-day
+// subdirectories under this path.
+func MadderInventoryLogDir() string {
+	return filepath.Join(MadderLogDir(), "inventory_log")
 }

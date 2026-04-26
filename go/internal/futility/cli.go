@@ -141,8 +141,8 @@ func (u *Utility) RunCLI(ctx context.Context, args []string, p Prompter) error {
 
 	// Call the GlobalFlagDefiner against the per-command FlagSet so its
 	// struct-pointer bindings land on the same storage as the pre-subcommand
-	// parse. This is what makes `tool sub --no-write-log` and
-	// `tool --no-write-log sub` equivalent at the value level.
+	// parse. This is what makes `tool sub --no-inventory-log` and
+	// `tool --no-inventory-log sub` equivalent at the value level.
 	if u.GlobalFlagDefiner != nil {
 		u.GlobalFlagDefiner(fs)
 	}

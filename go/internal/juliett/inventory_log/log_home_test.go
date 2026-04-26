@@ -1,4 +1,4 @@
-package write_log
+package inventory_log
 
 import (
 	"path/filepath"

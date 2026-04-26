@@ -50,8 +50,8 @@ type Env interface {
 	GetVerifyOnCollisionOverride() bool
 
 	// GetBlobWriteObserver returns the observer wired at env-construction
-	// time by the command layer (based on the --no-write-log global flag
-	// and the MADDER_WRITE_LOG env var). Concrete blob stores fetch it
+	// time by the command layer (based on the --no-inventory-log global
+	// flag and the MADDER_INVENTORY_LOG env var). Concrete blob stores fetch it
 	// from here and plumb it into env_dir.MoveOptions. Nil means no
 	// observer is attached — the mover then skips its call sites. See
 	// ADR 0004.

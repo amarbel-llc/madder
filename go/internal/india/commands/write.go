@@ -15,7 +15,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/madder/go/internal/juliett/write_log"
+	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -131,7 +131,7 @@ func (cmd Write) Run(req futility.Request) {
 	// it and the call is skipped cleanly. Skipping on empty keeps
 	// `--log-description ''` behaving as omitempty.
 	if cmd.LogDescription != "" {
-		if setter, ok := envBlobStore.GetBlobWriteObserver().(write_log.DescriptionSetter); ok {
+		if setter, ok := envBlobStore.GetBlobWriteObserver().(inventory_log.DescriptionSetter); ok {
 			setter.SetDescription(cmd.LogDescription)
 		}
 	}

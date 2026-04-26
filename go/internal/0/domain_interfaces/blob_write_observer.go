@@ -18,6 +18,15 @@ const (
 	BlobWriteOpVerifyMismatch BlobWriteOp = "verify-mismatch"
 )
 
+// LogEvent is the discriminator interface for every event written to the
+// inventory log. The returned string identifies the event type both in
+// the on-disk JSON payload (the top-level `"type"` field) and in the
+// inventory_log codec registry. Stable, public — once shipped, a
+// `! type-string` cannot change without breaking on-disk readers.
+type LogEvent interface {
+	LogType() string
+}
+
 // BlobWriteEvent is emitted once per blob publish. StoreId is the
 // blob-store-id.Id stringified at the call site (interface lives at layer
 // 0 and cannot import alfa/blob_store_id). Size is the byte length of the
@@ -29,6 +38,14 @@ type BlobWriteEvent struct {
 	Op          BlobWriteOp
 	Description string
 }
+
+// LogType identifies BlobWriteEvent in the inventory log.
+//
+// Type-string is reserved by inventory_log; see the reserved-types map
+// in that package. Importer codecs cannot register against this type.
+func (BlobWriteEvent) LogType() string { return "blob-write-published-v1" }
+
+var _ LogEvent = BlobWriteEvent{}
 
 // BlobWriteObserver is called from concrete blob-store publish paths once
 // per attempt. Implementations must not fail the blob write — errors are

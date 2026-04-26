@@ -1,10 +1,25 @@
 ---
-status: accepted
+status: superseded
 date: 2026-04-24
 decision-makers: Sasha F
+superseded-by: ../plans/2026-04-26-typed-write-log-design.md
+superseded-date: 2026-04-26
 ---
 
 # Per-blob write-log at `$XDG_LOG_HOME/madder/` via a `BlobWriteObserver`
+
+> **Superseded by [docs/plans/2026-04-26-typed-write-log-design.md](../plans/2026-04-26-typed-write-log-design.md)** on 2026-04-26.
+> The new design retains the observer interface and four-disposition
+> semantics but: replaces the daily NDJSON file with one
+> hyphence-wrapped session file (`madder-inventory_log-ndjson-v1` body
+> type), introduces a typed codec registry so importers can extend the
+> log with new event types, switches timestamps from RFC3339Nano to
+> TAI sec.asec, renames the package and CLI surface
+> (`write_log` → `inventory_log`, `--no-write-log` → `--no-inventory-log`,
+> `MADDER_WRITE_LOG` → `MADDER_INVENTORY_LOG`), and shards files under
+> `$XDG_LOG_HOME/madder/inventory_log/YYYY-MM-DD/`. The reserved-types
+> policy formalizes that native codecs are immutable contracts —
+> see `feedback_codec_registration_stability.md`.
 
 ## Context and Problem Statement
 

@@ -69,10 +69,10 @@ func TestSftpMoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 }
 
 // TestSftpMoverEmitWriteEvent_NilObserverIsNoop guards the
-// write-log-disabled case: when the utility opts out (--no-write-log
-// or MADDER_WRITE_LOG=0), command_components hands the store a
-// NopObserver. remoteSftp.observer being nil must not panic; the
-// emitter is the right layer to absorb that.
+// inventory-log-disabled case: when the utility opts out
+// (--no-inventory-log or MADDER_INVENTORY_LOG=0), command_components
+// hands the store a NopObserver. remoteSftp.observer being nil must
+// not panic; the emitter is the right layer to absorb that.
 func TestSftpMoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
 	store := &remoteSftp{}
 	mover := &sftpMover{store: store}
