@@ -61,7 +61,7 @@ var (
 func NewFileObserver(rootDir string) *FileObserver {
 	return &FileObserver{
 		rootDir: rootDir,
-		now:     ids.NowTai,
+		now:     func() ids.Tai { return nowTai() },
 		randHex: defaultRandHex,
 	}
 }
