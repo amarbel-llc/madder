@@ -304,6 +304,54 @@ function tree_capture_refuses_collision_after_clean { # @test
     fail "expected exact RFC 0003 collision diagnostic: $output"
 }
 
+function tree_capture_emits_store_hint_when_known { # @test
+  # Per RFC 0003 §Producer Rules §Receipt Metadata: Store Hint, a
+  # tree-capture receipt SHOULD carry a `- store/<id> < <markl-id>`
+  # line naming the destination store and locking the lookup to that
+  # store's blob_store-config blob.
+  init_store
+  run_madder init -encryption none .work
+  assert_success
+
+  mkdir src
+  echo "x" >src/x.txt
+
+  run_madder tree-capture -format json .work src
+  assert_success
+
+  local rid
+  rid="$(receipt_id_of_group "$output")"
+  [[ -n $rid ]] || fail "no receipt id: $output"
+
+  run_madder cat .work "$rid"
+  assert_success
+  echo "$output" | grep -qE '^- store/\.work < blake2b256-' ||
+    fail "expected RFC 0003 store-hint line in receipt: $output"
+}
+
+function tree_capture_default_store_omits_hint { # @test
+  # Per #92 open call (a): the default-store case skips hint emission
+  # because the storeID is empty and a synthetic id risks colliding
+  # with a user-named store. Confirm no `- store/` line appears.
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+
+  run_madder tree-capture -format json src
+  assert_success
+
+  local rid
+  rid="$(receipt_id_of_group "$output")"
+  [[ -n $rid ]] || fail "no receipt id: $output"
+
+  run_madder cat "$rid"
+  assert_success
+  echo "$output" | grep -qE '^- store/' &&
+    fail "default-store receipt should not emit a store-hint: $output"
+  return 0
+}
+
 function tree_capture_warns_when_dir_shadows_store { # @test
 
   # A bare arg "shadowed" matches both a directory in CWD and a
