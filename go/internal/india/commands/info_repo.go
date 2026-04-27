@@ -143,42 +143,35 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			}
 
 		default:
-			// Transport-only keys (host, port, user, …) from the local
-			// typed config first; falling through to the authoritative
-			// blob-store-properties from GetBlobStoreConfig() (ADR 0005 /
-			// #60) only on a miss. With TomlSFTPV0 no longer satisfying
-			// ConfigHashType (#83), the local config can no longer shadow
-			// remote truth, so a local-first lookup is safe and avoids
-			// dialing for transport-only keys.
-			value, ok := configKVs[key]
-
-			var cfg blob_store_configs.Config
-			if !ok {
-				var kvs map[string]string
-				cfg, kvs = getStoreConfig()
-				value, ok = kvs[key]
+			// Local-first lookup. The local typed config holds transport
+			// keys (host, port, user, …); GetBlobStoreConfig() holds
+			// blob-store properties (hash, buckets, compression). For
+			// SFTP that means consulting the remote — only worth the
+			// SSH dial on a miss.
+			if value, ok := configKVs[key]; ok {
+				env.GetUI().Print(value)
+				continue
 			}
 
-			if !ok {
-				if cfg == nil {
-					cfg, _ = getStoreConfig()
-				}
-				availableKeys := mergeKeyNames(
-					blob_store_configs.ConfigKeyNames(blobStoreConfig.Blob),
-					blob_store_configs.ConfigKeyNames(cfg),
-				)
-
-				errors.ContextCancelWithBadRequestf(
-					env,
-					"unsupported info key: %q\navailable keys: %s",
-					key,
-					strings.Join(availableKeys, ", "),
-				)
-
-				return
+			cfg, kvs := getStoreConfig()
+			if value, ok := kvs[key]; ok {
+				env.GetUI().Print(value)
+				continue
 			}
 
-			env.GetUI().Print(value)
+			availableKeys := mergeKeyNames(
+				blob_store_configs.ConfigKeyNames(blobStoreConfig.Blob),
+				blob_store_configs.ConfigKeyNames(cfg),
+			)
+
+			errors.ContextCancelWithBadRequestf(
+				env,
+				"unsupported info key: %q\navailable keys: %s",
+				key,
+				strings.Join(availableKeys, ", "),
+			)
+
+			return
 		}
 	}
 }

@@ -279,12 +279,9 @@ function sftp_init_hash_buckets_default { # @test
 }
 
 function sftp_info_repo_host_stays_local { # @test
-  # Per ADR 0005 §"Negative consequences": reading host / port stays
-  # purely local; reading compression-type / hash_type-id opens the
-  # SSH/SFTP connection. #83 dropped ConfigHashType stubs from
-  # TomlSFTPV0 and flipped the lookup order in info_repo.go so
-  # transport keys are served from the local typed config without a
-  # dial.
+  # Reading transport keys (host, port, user, …) on an SFTP store must
+  # not open the SSH/SFTP connection. Backend-property keys
+  # (compression-type, hash_type-id) still do.
   init_sftp_test_store
 
   run_madder info-repo .sftp-test host
