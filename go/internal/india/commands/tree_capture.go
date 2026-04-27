@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
@@ -246,8 +247,12 @@ func planCapture(
 	}
 
 	current := captureGroup{}
-	flush := func() {
+	flush := func() error {
+		if collisionErr := checkRootCollisions(current.roots); collisionErr != nil {
+			return collisionErr
+		}
 		groups = append(groups, current)
+		return nil
 	}
 
 	for _, arg := range args {
@@ -269,7 +274,9 @@ func planCapture(
 				return
 			}
 			if len(current.roots) > 0 {
-				flush()
+				if err = flush(); err != nil {
+					return
+				}
 			}
 
 			current = captureGroup{
@@ -286,7 +293,9 @@ func planCapture(
 	}
 
 	if len(current.roots) > 0 {
-		flush()
+		if err = flush(); err != nil {
+			return
+		}
 	} else if !current.storeID.IsEmpty() {
 		err = errors.ErrorWithStackf(
 			"blob-store-id %q has no following directories",
@@ -333,10 +342,16 @@ type classifiedArg struct {
 // it anyway, and the resulting one-entry "type=symlink" receipt would
 // surprise a user who expected the linked tree's contents. Users who
 // want that should resolve the symlink before passing it in.
+//
+// Per RFC 0003 §Producer Rules §Root Scoping, dir args are also
+// refused if they don't resolve to PWD or a descendant of PWD.
 func classifyArg(arg string) classifiedArg {
 	info, err := os.Lstat(arg)
 	switch {
 	case err == nil && info.IsDir():
+		if scopeErr := checkRootScope(arg); scopeErr != nil {
+			return classifiedArg{kind: argKindError, err: scopeErr}
+		}
 		return classifiedArg{kind: argKindDir}
 	case err == nil:
 		return classifiedArg{
@@ -364,6 +379,51 @@ func classifyArg(arg string) classifiedArg {
 			arg,
 		),
 	}
+}
+
+// checkRootScope refuses dir args that resolve outside PWD per RFC
+// 0003 §Producer Rules §Root Scoping. Mirrors git's "outside
+// repository" diagnostic; PWD is the implicit work tree.
+func checkRootScope(arg string) error {
+	pwd, err := os.Getwd()
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	abs, err := filepath.Abs(arg)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+
+	rel, err := filepath.Rel(pwd, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return errors.ErrorWithStackf(
+			"%s: outside working directory at %s\nhint: cd to a parent directory containing %s, then re-run",
+			arg, pwd, arg,
+		)
+	}
+
+	return nil
+}
+
+// checkRootCollisions refuses two roots within a single store-group
+// that resolve to the same path under filepath.Clean per RFC 0003
+// §Producer Rules §Root Collision Detection.
+func checkRootCollisions(roots []captureRoot) error {
+	seen := make(map[string]string, len(roots))
+
+	for _, r := range roots {
+		clean := filepath.Clean(r.path)
+		if first, ok := seen[clean]; ok {
+			return errors.ErrorWithStackf(
+				"roots %q and %q both resolve to %q after Clean\nhint: pass each directory only once per store-group",
+				first, r.path, clean,
+			)
+		}
+		seen[clean] = r.path
+	}
+
+	return nil
 }
 
 // walkRoot walks rootArg with filepath.WalkDir (which does not follow
