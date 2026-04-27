@@ -234,6 +234,10 @@ func planCapture(
 				roots:        []captureRoot{{path: "."}},
 			}}, nil, nil
 		case argKindDir:
+			if scopeErr := checkRootScope(args[0]); scopeErr != nil {
+				return nil, []classifyFailure{{arg: args[0], err: scopeErr}},
+					errors.ErrorWithStackf("no usable directories or store-ids in arguments")
+			}
 			return []captureGroup{{
 				roots: []captureRoot{{
 					path:         args[0],
@@ -285,6 +289,13 @@ func planCapture(
 			}
 
 		case argKindDir:
+			if scopeErr := checkRootScope(arg); scopeErr != nil {
+				classifyFails = append(classifyFails, classifyFailure{
+					arg: arg,
+					err: scopeErr,
+				})
+				continue
+			}
 			current.roots = append(current.roots, captureRoot{
 				path:         arg,
 				shadowNotice: shadowNoticeFor(arg, shadowCandidates),
@@ -342,16 +353,10 @@ type classifiedArg struct {
 // it anyway, and the resulting one-entry "type=symlink" receipt would
 // surprise a user who expected the linked tree's contents. Users who
 // want that should resolve the symlink before passing it in.
-//
-// Per RFC 0003 §Producer Rules §Root Scoping, dir args are also
-// refused if they don't resolve to PWD or a descendant of PWD.
 func classifyArg(arg string) classifiedArg {
 	info, err := os.Lstat(arg)
 	switch {
 	case err == nil && info.IsDir():
-		if scopeErr := checkRootScope(arg); scopeErr != nil {
-			return classifiedArg{kind: argKindError, err: scopeErr}
-		}
 		return classifiedArg{kind: argKindDir}
 	case err == nil:
 		return classifiedArg{
