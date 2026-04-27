@@ -308,6 +308,34 @@ function sftp_info_repo_config_immutable_encodes_remote { # @test
   refute_output --partial 'remote-path'
 }
 
+function sftp_write_compresses_per_remote_config { # @test
+  # ADR 0005: the remote blob_store-config dictates the on-wire shape.
+  # init_sftp_test_store provisions zstd. After writing a blob, the
+  # bytes on the remote disk MUST start with the zstd magic
+  # (28 b5 2f fd). If makeEnvDirConfig still falls back to
+  # env_dir.DefaultConfig (compression-none), the bytes will equal the
+  # plaintext and this assertion fails — exactly the #66 regression.
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'compress me please' >"$blob"
+
+  run_madder write .sftp-test "$blob"
+  assert_success
+
+  # The test SFTP server (madder-test-sftp-server) re-roots absolute
+  # paths under its CWD ($BATS_TEST_TMPDIR), so the blob lives at
+  # $BATS_TEST_TMPDIR/<remote-path>/<bucket>/<digest>. Locate by hash
+  # bucket layout: blake2b256/<2-hex-bucket>/<rest-of-digest>.
+  local on_disk
+  on_disk="$(find "$BATS_TEST_TMPDIR" -type f -path '*/blake2b256/*' -print -quit)"
+  [[ -n $on_disk ]] || fail "no blob file found under $BATS_TEST_TMPDIR"
+
+  local magic
+  magic="$(xxd -p -l 4 "$on_disk")"
+  [[ $magic == '28b52ffd' ]] || fail "expected zstd magic at start of $on_disk; got $magic"
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
