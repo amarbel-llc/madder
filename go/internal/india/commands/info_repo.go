@@ -81,12 +81,9 @@ func (cmd InfoRepo) Run(req futility.Request) {
 	blobStoreConfig := blobStore.Config
 	configKVs := blob_store_configs.ConfigKeyValues(blobStoreConfig.Blob)
 
-	// storeConfig + storeConfigKVs are populated lazily by getStoreConfig
-	// below. Per ADR 0005 / issue #60 the authoritative
-	// blob-store-properties config lives on GetBlobStoreConfig(), which
-	// for SFTP forces a remote read; deferring keeps `info-repo
-	// config-path` and other non-store-property keys from triggering an
-	// SSH dial when the user asked for nothing that needs it.
+	// Lazy: GetBlobStoreConfig() forces a remote read for SFTP. Pulling
+	// it only when a key actually needs it keeps transport-only and
+	// pseudo-key requests off the network.
 	var (
 		storeConfig    blob_store_configs.Config
 		storeConfigKVs map[string]string
