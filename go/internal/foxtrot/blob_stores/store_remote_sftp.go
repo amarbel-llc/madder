@@ -50,8 +50,9 @@ type remoteSftp struct {
 	multiHash       bool
 	defaultHashType markl.FormatHash
 
-	// TODO populate blobIOWrapper with env_repo.FileNameBlobStoreConfig at
-	// `config.GetRemotePath()`
+	// blobIOWrapper holds the remote config's compression / encryption
+	// view per ADR 0005. Populated by readRemoteConfig; nil before
+	// initializeOnce runs.
 	blobIOWrapper        domain_interfaces.BlobIOWrapper
 	sshClientInitializer func() (*ssh.Client, error)
 	sshClient            *ssh.Client
@@ -215,6 +216,16 @@ func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 		return err
 	}
 
+	if ioWrapper, ok := remoteConfig.(domain_interfaces.BlobIOWrapper); ok {
+		blobStore.blobIOWrapper = ioWrapper
+	} else {
+		err = errors.Errorf(
+			"remote blob store config type %T does not provide blob IO wrapper information",
+			remoteConfig,
+		)
+		return err
+	}
+
 	blobStore.uiPrinter.Printf(
 		"remote config: hash=%s buckets=%v multi-hash=%t",
 		blobStore.defaultHashType.GetMarklFormatId(),
@@ -304,26 +315,11 @@ func (blobStore *remoteSftp) GetLocalBlobStore() domain_interfaces.BlobStore {
 }
 
 func (blobStore *remoteSftp) makeEnvDirConfig() env_dir.Config {
-	// Per ADR 0005, blob-store properties (compression, encryption)
-	// live on the remote config, not the local transport. All call
-	// sites here run after initializeOnce, and readRemoteConfig
-	// already rejects configs missing the sibling ConfigHashType /
-	// ConfigLocalHashBucketed interfaces — a config that satisfies
-	// those but not BlobIOWrapper would be a tree shape we don't
-	// produce.
-	ioWrapper, ok := blobStore.remoteConfig.(domain_interfaces.BlobIOWrapper)
-	if !ok {
-		panic(errors.Errorf(
-			"remote config type %T does not implement BlobIOWrapper",
-			blobStore.remoteConfig,
-		))
-	}
-
 	return env_dir.MakeConfig(
 		blobStore.defaultHashType,
 		env_dir.MakeHashBucketPathJoinFunc(blobStore.buckets),
-		ioWrapper.GetBlobCompression(),
-		ioWrapper.GetBlobEncryption(),
+		blobStore.blobIOWrapper.GetBlobCompression(),
+		blobStore.blobIOWrapper.GetBlobEncryption(),
 	)
 }
 
