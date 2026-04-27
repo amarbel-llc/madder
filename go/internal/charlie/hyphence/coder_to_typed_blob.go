@@ -163,16 +163,16 @@ func (coder CoderToTypedBlob[O]) EncodeTo(
 			return n, err
 		}
 
-		bufferedWriter.WriteString(Boundary + "\n")
-		n += n1
+		n2, err = bufferedWriter.WriteString(Boundary + "\n")
+		n += int64(n2)
 
 		if err != nil {
 			err = errors.Wrap(err)
 			return n, err
 		}
 
-		bufferedWriter.WriteString("\n")
-		n += n1
+		n2, err = bufferedWriter.WriteString("\n")
+		n += int64(n2)
 
 		if err != nil {
 			err = errors.Wrap(err)

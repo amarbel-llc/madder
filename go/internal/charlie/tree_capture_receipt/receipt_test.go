@@ -243,8 +243,8 @@ func TestWrite_SortedByRootThenPath(t *testing.T) {
 	}
 
 	wantOrder := []string{
-		`"root":"./docs"`,                  // ./docs sorts before ./src
-		`"path":"a.txt","root":"./src"`,    // src/a before src/z
+		`"root":"./docs"`,               // ./docs sorts before ./src
+		`"path":"a.txt","root":"./src"`, // src/a before src/z
 		`"path":"z.txt","root":"./src"`,
 	}
 	for i, want := range wantOrder {

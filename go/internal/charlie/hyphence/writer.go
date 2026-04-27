@@ -41,8 +41,8 @@ func (writer Writer) WriteTo(ioWriter io.Writer) (n int64, err error) {
 			return n, err
 		}
 
-		bufferedWriter.WriteString(Boundary + "\n")
-		n += n1
+		n2, err = bufferedWriter.WriteString(Boundary + "\n")
+		n += int64(n2)
 
 		if err != nil {
 			err = errors.Wrap(err)
@@ -50,8 +50,8 @@ func (writer Writer) WriteTo(ioWriter io.Writer) (n int64, err error) {
 		}
 
 		if writer.Blob != nil {
-			bufferedWriter.WriteString("\n")
-			n += n1
+			n2, err = bufferedWriter.WriteString("\n")
+			n += int64(n2)
 
 			if err != nil {
 				err = errors.Wrap(err)
