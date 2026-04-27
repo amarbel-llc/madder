@@ -1,11 +1,12 @@
 package command_components
 
 import (
+	"io"
 	"path/filepath"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
+	"github.com/amarbel-llc/madder/go/internal/charlie/files"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -51,10 +52,14 @@ func (cmd Init) InitBlobStore(
 		return path
 	}
 
-	if err := hyphence.EncodeToFile(
-		blob_store_configs.Coder,
-		config,
+	// Per ADR 0005 / #65, blob_store-config is immutable per store
+	// identity: write read-only via the atomic tmp+chmod+rename helper.
+	if err := files.WriteImmutable(
 		path.GetConfig(),
+		func(w io.Writer) error {
+			_, err := blob_store_configs.Coder.EncodeTo(config, w)
+			return err
+		},
 	); err != nil {
 		envBlobStore.Cancel(err)
 		return path
