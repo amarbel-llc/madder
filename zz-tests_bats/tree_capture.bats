@@ -255,6 +255,55 @@ function tree_capture_file_arg_is_failure { # @test
   assert_failure
 }
 
+function tree_capture_refuses_parent_escape_root { # @test
+  # RFC 0003 §Producer Rules §Root Scoping: capture-roots MUST be PWD
+  # or descendants thereof. A `..` from a non-CWD PWD escapes by
+  # construction, regardless of what lives above.
+  init_store
+
+  mkdir -p inner
+  echo "x" >inner/x.txt
+
+  pushd inner >/dev/null
+  run_madder tree-capture -format json ..
+  popd >/dev/null
+
+  assert_failure
+  echo "$output" | grep -qF 'outside working directory' ||
+    fail "expected parent-escape refusal: $output"
+}
+
+function tree_capture_refuses_absolute_root { # @test
+  # RFC 0003 §Producer Rules §Root Scoping: an absolute path that
+  # resolves outside PWD MUST be refused. Use a sibling of PWD inside
+  # BATS_RUN_TMPDIR so the path exists but is not a descendant of PWD.
+  init_store
+
+  local outside="$BATS_RUN_TMPDIR/outside-$$"
+  mkdir -p "$outside"
+  echo "x" >"$outside/x.txt"
+
+  run_madder tree-capture -format json "$outside"
+  assert_failure
+  echo "$output" | grep -qF 'outside working directory' ||
+    fail "expected absolute-path refusal: $output"
+}
+
+function tree_capture_refuses_collision_after_clean { # @test
+  # RFC 0003 §Producer Rules §Root Collision Detection: two roots
+  # within the same store-group that resolve to the same path under
+  # filepath.Clean MUST be refused.
+  init_store
+
+  mkdir src
+  echo "s" >src/s.txt
+
+  run_madder tree-capture -format json src ./src
+  assert_failure
+  echo "$output" | grep -qF 'both resolve to' ||
+    fail "expected collision refusal: $output"
+}
+
 function tree_capture_warns_when_dir_shadows_store { # @test
 
   # A bare arg "shadowed" matches both a directory in CWD and a
