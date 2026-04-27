@@ -39,7 +39,7 @@
       # Burnt into the binary via the fork's auto-injected -ldflags.
       # Single source of truth for the release version; `just bump-version`
       # sed-rewrites this line.
-      madderVersion = "0.2.4";
+      madderVersion = "0.2.5";
       # shortRev for clean builds, dirtyShortRev for dirty working trees
       # (so devshell builds show `dirty-abcdef` rather than masquerading
       # as a clean release), "unknown" as a last-resort fallback.
