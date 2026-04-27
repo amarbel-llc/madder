@@ -171,6 +171,10 @@ func WriteRemoteConfig(
 
 	uiPrinter.Printf("writing remote blob store config to %q...", configPath)
 
+	// Asymmetric with the local path's wrapped os.ErrExist: SFTP has
+	// no portable equivalent, so callers can't errors.Is this against
+	// fs.ErrExist. The string form is sufficient for the threat model
+	// (operator typo, not concurrent madder).
 	if _, statErr := sftpClient.Stat(configPath); statErr == nil {
 		err = errors.Errorf(
 			"remote blob_store-config already present at %q; refusing to overwrite",
@@ -203,6 +207,10 @@ func WriteRemoteConfig(
 		_ = sftpClient.Remove(tmpPath)
 	}
 
+	// sftpClient.Create lacks an O_EXCL equivalent — it truncates if
+	// the path exists. The 8 random bytes in tmpPath make collisions
+	// with a parallel writer vanishingly unlikely; a stray prior tmp
+	// would have to share that suffix exactly.
 	var configFile *sftp.File
 
 	if configFile, err = sftpClient.Create(tmpPath); err != nil {
