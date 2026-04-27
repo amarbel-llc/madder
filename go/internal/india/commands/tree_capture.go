@@ -10,10 +10,13 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_sink"
+	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -163,7 +166,8 @@ func (cmd TreeCapture) Run(req futility.Request) {
 			continue
 		}
 
-		receiptID, err := writeReceiptBlob(blobStore, entries)
+		hint := computeStoreHint(blobStore, group.storeID)
+		receiptID, err := writeReceiptBlob(blobStore, entries, hint)
 		if err != nil {
 			sink.Failure(
 				fmt.Sprintf("(receipt:%s)", quoteEmpty(storeName)),
@@ -554,10 +558,12 @@ func writeFileBlob(
 // writeReceiptBlob serializes entries via tree_capture_receipt.Write
 // into a new blob in blobStore. The output is deterministic:
 // equivalent inputs yield byte-identical receipts and identical blob
-// IDs.
+// IDs. When hint is non-nil, the receipt's hyphence metadata block
+// carries an RFC 0003 store-hint line.
 func writeReceiptBlob(
 	blobStore blob_stores.BlobStoreInitialized,
 	entries []tree_capture_receipt.Entry,
+	hint *tree_capture_receipt.StoreHint,
 ) (id string, err error) {
 	wc, err := blobStore.MakeBlobWriter(nil)
 	if err != nil {
@@ -566,13 +572,59 @@ func writeReceiptBlob(
 	}
 	defer errors.DeferredCloser(&err, wc)
 
-	if _, err = tree_capture_receipt.Write(wc, entries); err != nil {
+	if _, err = tree_capture_receipt.WriteWithHint(wc, entries, hint); err != nil {
 		err = errors.Wrap(err)
 		return
 	}
 
 	id = wc.GetMarklId().String()
 	return
+}
+
+// computeStoreHint builds the RFC 0003 store-hint metadata for a
+// receipt. Returns nil for the default store (storeID empty) per
+// #92's open call (a): we'd otherwise emit an ambiguous synthetic id
+// that could collide with a user-named store called "default".
+//
+// Otherwise the hint pairs the local storeID with the markl-id of the
+// store's blob_store-config blob, computed by re-encoding the config
+// through a digesting writer. The store's defaultHashType is used so
+// the hint's markl-id is computed in the same hash family the store
+// publishes blobs under.
+func computeStoreHint(
+	blobStore blob_stores.BlobStoreInitialized,
+	storeID blob_store_id.Id,
+) *tree_capture_receipt.StoreHint {
+	if storeID.IsEmpty() {
+		return nil
+	}
+
+	cfg := blobStore.BlobStore.GetBlobStoreConfig()
+	if cfg == nil {
+		return nil
+	}
+
+	hashFormat := blobStore.BlobStore.GetDefaultHashType()
+	if hashFormat == nil {
+		return nil
+	}
+
+	hash, _ := hashFormat.GetHash() //repool:owned
+	digester := markl_io.MakeWriter(hash, nil)
+
+	typedCfg := &hyphence.TypedBlob[blob_store_configs.Config]{
+		Type: blob_store_configs.TypeStructForConfig(cfg),
+		Blob: cfg,
+	}
+
+	if _, err := blob_store_configs.Coder.EncodeTo(typedCfg, digester); err != nil {
+		return nil
+	}
+
+	return &tree_capture_receipt.StoreHint{
+		StoreId:       storeID.String(),
+		ConfigMarklId: digester.GetMarklId().String(),
+	}
 }
 
 func quoteEmpty(s string) string {
