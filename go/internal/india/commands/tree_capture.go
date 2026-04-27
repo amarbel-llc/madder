@@ -235,8 +235,11 @@ func planCapture(
 			}}, nil, nil
 		case argKindDir:
 			if scopeErr := checkRootScope(args[0]); scopeErr != nil {
-				return nil, []classifyFailure{{arg: args[0], err: scopeErr}},
-					errors.ErrorWithStackf("no usable directories or store-ids in arguments")
+				// Match the multi-arg loop: scope failures route to
+				// classifyFails and surface via the sink. The post-classify
+				// "failCount > 0" path in Run produces the cancel message;
+				// no synthetic planErr is needed.
+				return nil, []classifyFailure{{arg: args[0], err: scopeErr}}, nil
 			}
 			return []captureGroup{{
 				roots: []captureRoot{{

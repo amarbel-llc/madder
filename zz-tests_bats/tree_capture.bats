@@ -300,8 +300,8 @@ function tree_capture_refuses_collision_after_clean { # @test
 
   run_madder tree-capture -format json src ./src
   assert_failure
-  echo "$output" | grep -qF 'both resolve to' ||
-    fail "expected collision refusal: $output"
+  echo "$output" | grep -qF 'roots "src" and "./src" both resolve to "src"' ||
+    fail "expected exact RFC 0003 collision diagnostic: $output"
 }
 
 function tree_capture_warns_when_dir_shadows_store { # @test
