@@ -291,6 +291,24 @@ function sftp_info_repo_host_stays_local { # @test
   refute_output --partial 'connected to'
 }
 
+function sftp_info_repo_config_immutable_encodes_remote { # @test
+  # Per ADR 0005 §"info-repo … config-immutable wire shape", the
+  # config-immutable pseudo-key on an SFTP store encodes
+  # GetBlobStoreConfig() (the remote TomlV3) — not the local
+  # TomlSFTPV0 transport. The refute_output lines are the load-bearing
+  # pin: they catch an encoder that accidentally falls back to local.
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test config-immutable
+  assert_success
+  assert_output --partial 'compression-type'
+  assert_output --partial 'zstd'
+  assert_output --partial 'hash_type-id'
+  assert_output --partial 'blake2b256'
+  refute_output --partial 'private-key-path'
+  refute_output --partial 'remote-path'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
