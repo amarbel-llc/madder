@@ -304,15 +304,19 @@ func (blobStore *remoteSftp) GetLocalBlobStore() domain_interfaces.BlobStore {
 }
 
 func (blobStore *remoteSftp) makeEnvDirConfig() env_dir.Config {
-	// Per ADR 0005, the remote blob_store-config dictates compression
-	// and encryption. remoteConfig is populated by readRemoteConfig
-	// during initializeOnce. Callers reach this only via paths that
-	// already ran initialization (write/read), so a missing remote
-	// config here is a programming error rather than a missing-file
-	// case to handle.
+	// Per ADR 0005, blob-store properties (compression, encryption)
+	// live on the remote config, not the local transport. All call
+	// sites here run after initializeOnce, and readRemoteConfig
+	// already rejects configs missing the sibling ConfigHashType /
+	// ConfigLocalHashBucketed interfaces — a config that satisfies
+	// those but not BlobIOWrapper would be a tree shape we don't
+	// produce.
 	ioWrapper, ok := blobStore.remoteConfig.(domain_interfaces.BlobIOWrapper)
 	if !ok {
-		return env_dir.DefaultConfig
+		panic(errors.Errorf(
+			"remote config type %T does not implement BlobIOWrapper",
+			blobStore.remoteConfig,
+		))
 	}
 
 	return env_dir.MakeConfig(
