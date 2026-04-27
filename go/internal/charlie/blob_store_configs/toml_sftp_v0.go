@@ -103,11 +103,3 @@ func (blobStoreConfig *TomlSFTPV0) GetRemotePath() string {
 func (blobStoreConfig *TomlSFTPV0) GetKnownHostsFile() string {
 	return blobStoreConfig.KnownHostsFile
 }
-
-func (blobStoreConfig *TomlSFTPV0) SupportsMultiHash() bool {
-	return false
-}
-
-func (blobStoreConfig *TomlSFTPV0) GetDefaultHashTypeId() string {
-	return DefaultHashTypeId
-}
