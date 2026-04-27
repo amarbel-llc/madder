@@ -95,19 +95,14 @@ func WriteWithHint(w io.Writer, entries []Entry, hint *StoreHint) (int64, error)
 		return entries[i].Path < entries[j].Path
 	})
 
-	body := &bodyWriter{entries: entries}
-
 	hw := hyphence.Writer{
 		Metadata: &metadataWriter{hint: hint},
-		Blob:     body,
+		Blob:     &bodyWriter{entries: entries},
 	}
 
 	n, err := hw.WriteTo(w)
 	if err != nil {
 		return n, errors.Wrap(err)
-	}
-	if body.err != nil {
-		return n, errors.Wrap(body.err)
 	}
 
 	return n, nil
@@ -140,11 +135,11 @@ func (mw *metadataWriter) WriteTo(w io.Writer) (int64, error) {
 	return total, nil
 }
 
-// bodyWriter emits the NDJSON body of a receipt. Per-entry encode
-// errors are captured on err; WriteTo stops at the first failure.
+// bodyWriter emits the NDJSON body of a receipt. WriteTo stops at the
+// first encode/write failure; hyphence.Writer surfaces the error to
+// the caller.
 type bodyWriter struct {
 	entries []Entry
-	err     error
 }
 
 func (bw *bodyWriter) WriteTo(w io.Writer) (int64, error) {
@@ -153,14 +148,12 @@ func (bw *bodyWriter) WriteTo(w io.Writer) (int64, error) {
 	for i := range bw.entries {
 		line, err := encodeEntry(bw.entries[i])
 		if err != nil {
-			bw.err = err
 			return total, err
 		}
 
 		n, err := w.Write(line)
 		total += int64(n)
 		if err != nil {
-			bw.err = err
 			return total, err
 		}
 	}

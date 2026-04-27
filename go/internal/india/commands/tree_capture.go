@@ -166,7 +166,13 @@ func (cmd TreeCapture) Run(req futility.Request) {
 			continue
 		}
 
-		hint := computeStoreHint(blobStore, group.storeID)
+		hint, hintErr := computeStoreHint(blobStore, group.storeID)
+		if hintErr != nil {
+			sink.Notice(fmt.Sprintf(
+				"notice: omitting store-hint for store=%s: %v",
+				quoteEmpty(storeName), hintErr,
+			))
+		}
 		receiptID, err := writeReceiptBlob(blobStore, entries, hint)
 		if err != nil {
 			sink.Failure(
@@ -582,31 +588,32 @@ func writeReceiptBlob(
 }
 
 // computeStoreHint builds the RFC 0003 store-hint metadata for a
-// receipt. Returns nil for the default store (storeID empty) per
-// #92's open call (a): we'd otherwise emit an ambiguous synthetic id
-// that could collide with a user-named store called "default".
+// receipt. Returns (nil, nil) for the default store to avoid
+// colliding with user-named stores. Returns a non-nil error when the
+// hint should have been computable but failed; callers MAY treat that
+// as a soft failure (RFC 0003 §Producer Rules §Receipt Metadata: Store
+// Hint permits MAY-omit).
 //
-// Otherwise the hint pairs the local storeID with the markl-id of the
-// store's blob_store-config blob, computed by re-encoding the config
-// through a digesting writer. The store's defaultHashType is used so
-// the hint's markl-id is computed in the same hash family the store
+// The hint pairs storeID with the markl-id of the store's
+// blob_store-config blob, computed in the store's default hash family
+// so consumers can validate it under the same hash the store
 // publishes blobs under.
 func computeStoreHint(
 	blobStore blob_stores.BlobStoreInitialized,
 	storeID blob_store_id.Id,
-) *tree_capture_receipt.StoreHint {
+) (*tree_capture_receipt.StoreHint, error) {
 	if storeID.IsEmpty() {
-		return nil
+		return nil, nil
 	}
 
 	cfg := blobStore.BlobStore.GetBlobStoreConfig()
 	if cfg == nil {
-		return nil
+		return nil, nil
 	}
 
 	hashFormat := blobStore.BlobStore.GetDefaultHashType()
 	if hashFormat == nil {
-		return nil
+		return nil, nil
 	}
 
 	hash, _ := hashFormat.GetHash() //repool:owned
@@ -618,13 +625,13 @@ func computeStoreHint(
 	}
 
 	if _, err := blob_store_configs.Coder.EncodeTo(typedCfg, digester); err != nil {
-		return nil
+		return nil, errors.Wrap(err)
 	}
 
 	return &tree_capture_receipt.StoreHint{
 		StoreId:       storeID.String(),
 		ConfigMarklId: digester.GetMarklId().String(),
-	}
+	}, nil
 }
 
 func quoteEmpty(s string) string {

@@ -347,9 +347,8 @@ function tree_capture_default_store_omits_hint { # @test
 
   run_madder cat "$rid"
   assert_success
-  echo "$output" | grep -qE '^- store/' &&
+  ! echo "$output" | grep -qE '^- store/' ||
     fail "default-store receipt should not emit a store-hint: $output"
-  return 0
 }
 
 function tree_capture_warns_when_dir_shadows_store { # @test
