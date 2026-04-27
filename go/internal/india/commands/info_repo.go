@@ -143,19 +143,26 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			}
 
 		default:
-			// Authoritative blob-store-properties first (ADR 0005 / #60),
-			// then transport-only keys from the local typed config (host,
-			// port, user, …). The local typed config is consulted second
-			// so its stub values for hash_type-id / supports-multi-hash
-			// don't shadow the truth that lives on the remote.
-			cfg, kvs := getStoreConfig()
+			// Transport-only keys (host, port, user, …) from the local
+			// typed config first; falling through to the authoritative
+			// blob-store-properties from GetBlobStoreConfig() (ADR 0005 /
+			// #60) only on a miss. With TomlSFTPV0 no longer satisfying
+			// ConfigHashType (#83), the local config can no longer shadow
+			// remote truth, so a local-first lookup is safe and avoids
+			// dialing for transport-only keys.
+			value, ok := configKVs[key]
 
-			value, ok := kvs[key]
+			var cfg blob_store_configs.Config
 			if !ok {
-				value, ok = configKVs[key]
+				var kvs map[string]string
+				cfg, kvs = getStoreConfig()
+				value, ok = kvs[key]
 			}
 
 			if !ok {
+				if cfg == nil {
+					cfg, _ = getStoreConfig()
+				}
 				availableKeys := mergeKeyNames(
 					blob_store_configs.ConfigKeyNames(blobStoreConfig.Blob),
 					blob_store_configs.ConfigKeyNames(cfg),
