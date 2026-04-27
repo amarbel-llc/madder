@@ -1,11 +1,11 @@
 // Package tree_capture_sink carries the per-entry result stream for
-// `madder capture-tree`. Each filesystem entry becomes one TAP test
+// `madder tree-capture`. Each filesystem entry becomes one TAP test
 // point or one NDJSON record; each store group ends with a summary
 // (TAP `ok` test point or NDJSON `store_group_receipt` record). Notices
 // (store switches, shadow warnings) and per-arg failures use the
 // dedicated methods.
 //
-// blob_write_sink covers the `madder write` event shape; capture-tree's
+// blob_write_sink covers the `madder write` event shape; tree-capture's
 // per-entry events carry filesystem metadata that doesn't fit there, so
 // it gets its own sink.
 package tree_capture_sink
@@ -27,8 +27,8 @@ import (
 // `type` field discriminates entries from summaries.
 const summaryRecordType = "store_group_receipt"
 
-// Sink streams capture-tree results in either TAP or NDJSON form. Each
-// concrete sink is single-threaded; capture-tree's walk is sequential.
+// Sink streams tree-capture results in either TAP or NDJSON form. Each
+// concrete sink is single-threaded; tree-capture's walk is sequential.
 type Sink interface {
 	// SetStore sets the store-id stamped onto subsequent Entry and
 	// StoreGroupReceipt records. Called once per store group before its

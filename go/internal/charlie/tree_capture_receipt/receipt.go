@@ -1,5 +1,5 @@
 // Package tree_capture_receipt encodes the per-store-group receipt blob
-// produced by `madder capture-tree`. The receipt is a hyphence-wrapped
+// produced by `madder tree-capture`. The receipt is a hyphence-wrapped
 // NDJSON document: a single metadata line declaring the type tag,
 // followed by one JSON object per filesystem entry. Entries are sorted
 // by (Root, Path) so equivalent inputs yield byte-identical receipts —

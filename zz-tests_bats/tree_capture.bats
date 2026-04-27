@@ -3,10 +3,10 @@ setup() {
   export output
 }
 
-# bats file_tags=capture_tree
+# bats file_tags=tree_capture
 
 # extract the receipt id of the first (or only) store group from a
-# capture-tree NDJSON stream.
+# tree-capture NDJSON stream.
 receipt_id_of_group() {
   local out="$1" idx="${2:-1}"
   echo "$out" | grep -F '"type":"store_group_receipt"' |
@@ -30,7 +30,7 @@ receipt_store_of_group() {
     sed -E 's/.*"store":"([^"]*)".*/\1/'
 }
 
-function capture_tree_simple_dir { # @test
+function tree_capture_simple_dir { # @test
 
   init_store
 
@@ -39,7 +39,7 @@ function capture_tree_simple_dir { # @test
   echo "beta" >tree/b.txt
   echo "gamma" >tree/sub/c.txt
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   assert_success
 
   # One receipt summary record.
@@ -74,7 +74,7 @@ function capture_tree_simple_dir { # @test
     fail "missing root dir entry: $output"
 }
 
-function capture_tree_records_symlink_target { # @test
+function tree_capture_records_symlink_target { # @test
 
   init_store
 
@@ -82,7 +82,7 @@ function capture_tree_records_symlink_target { # @test
   echo "real" >tree/real.txt
   ln -s real.txt tree/link.txt
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   assert_success
 
   local rid
@@ -96,7 +96,7 @@ function capture_tree_records_symlink_target { # @test
     fail "symlink entry missing or wrong shape: $output"
 }
 
-function capture_tree_includes_dotfiles { # @test
+function tree_capture_includes_dotfiles { # @test
 
   init_store
 
@@ -104,7 +104,7 @@ function capture_tree_includes_dotfiles { # @test
   echo "v" >tree/.hidden
   echo "x" >tree/visible
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   assert_success
 
   local rid
@@ -116,7 +116,7 @@ function capture_tree_includes_dotfiles { # @test
     fail "dotfile not captured: $output"
 }
 
-function capture_tree_zero_args_uses_pwd_into_default { # @test
+function tree_capture_zero_args_uses_pwd_into_default { # @test
 
   # Use a non-CWD-relative store so it remains findable after cd.
   run_madder init -encryption none default
@@ -126,7 +126,7 @@ function capture_tree_zero_args_uses_pwd_into_default { # @test
   echo "x" >tree/x.txt
 
   cd tree
-  run_madder capture-tree -format json
+  run_madder tree-capture -format json
   assert_success
 
   local rid count store
@@ -139,7 +139,7 @@ function capture_tree_zero_args_uses_pwd_into_default { # @test
   [[ -z $store ]] || fail "default store should produce empty store id, got '$store'"
 }
 
-function capture_tree_one_arg_store_id_uses_pwd { # @test
+function tree_capture_one_arg_store_id_uses_pwd { # @test
 
   # Non-CWD-relative stores so they remain findable after cd.
   run_madder init -encryption none default
@@ -151,7 +151,7 @@ function capture_tree_one_arg_store_id_uses_pwd { # @test
   echo "y" >tree/y.txt
 
   cd tree
-  run_madder capture-tree -format json alt
+  run_madder tree-capture -format json alt
   assert_success
 
   local rid count store
@@ -164,7 +164,7 @@ function capture_tree_one_arg_store_id_uses_pwd { # @test
   [[ $store == "alt" ]] || fail "expected store=alt, got '$store'"
 }
 
-function capture_tree_multi_store_group { # @test
+function tree_capture_multi_store_group { # @test
 
   init_store
   run_madder init -encryption none .alt
@@ -174,7 +174,7 @@ function capture_tree_multi_store_group { # @test
   echo "s" >src/s.txt
   echo "d" >docs/d.txt
 
-  run_madder capture-tree -format json .default src .alt docs
+  run_madder tree-capture -format json .default src .alt docs
   assert_success
 
   # Two distinct summaries.
@@ -193,7 +193,7 @@ function capture_tree_multi_store_group { # @test
   [[ $rid1 != "$rid2" ]] || fail "distinct trees should have distinct receipts ($rid1)"
 }
 
-function capture_tree_trailing_store_with_no_dirs_errors { # @test
+function tree_capture_trailing_store_with_no_dirs_errors { # @test
 
   init_store
   run_madder init -encryption none .alt
@@ -202,11 +202,11 @@ function capture_tree_trailing_store_with_no_dirs_errors { # @test
   mkdir src
   echo "s" >src/s.txt
 
-  run_madder capture-tree -format json .default src .alt
+  run_madder tree-capture -format json .default src .alt
   assert_failure
 }
 
-function capture_tree_back_to_back_stores_errors { # @test
+function tree_capture_back_to_back_stores_errors { # @test
 
   init_store
   run_madder init -encryption none .alt
@@ -215,11 +215,11 @@ function capture_tree_back_to_back_stores_errors { # @test
   mkdir src
   echo "s" >src/s.txt
 
-  run_madder capture-tree -format json .default .alt src
+  run_madder tree-capture -format json .default .alt src
   assert_failure
 }
 
-function capture_tree_is_deterministic { # @test
+function tree_capture_is_deterministic { # @test
 
   init_store
 
@@ -228,13 +228,13 @@ function capture_tree_is_deterministic { # @test
   echo "beta" >tree/b.txt
   echo "gamma" >tree/sub/c.txt
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   assert_success
   local rid_first
   rid_first="$(receipt_id_of_group "$output")"
   [[ -n $rid_first ]] || fail "first run: no receipt id: $output"
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   assert_success
   local rid_second
   rid_second="$(receipt_id_of_group "$output")"
@@ -244,18 +244,18 @@ function capture_tree_is_deterministic { # @test
     fail "receipt IDs differ across runs of identical trees: '$rid_first' vs '$rid_second'"
 }
 
-function capture_tree_file_arg_is_failure { # @test
+function tree_capture_file_arg_is_failure { # @test
 
   init_store
 
   echo "lone" >loose.txt
 
-  # capture-tree only takes directories, never files.
-  run_madder capture-tree -format json loose.txt
+  # tree-capture only takes directories, never files.
+  run_madder tree-capture -format json loose.txt
   assert_failure
 }
 
-function capture_tree_warns_when_dir_shadows_store { # @test
+function tree_capture_warns_when_dir_shadows_store { # @test
 
   # A bare arg "shadowed" matches both a directory in CWD and a
   # configured blob-store-id. The dir wins (matching `write`'s
@@ -268,7 +268,7 @@ function capture_tree_warns_when_dir_shadows_store { # @test
   mkdir shadowed
   echo "x" >shadowed/x.txt
 
-  run_madder capture-tree -format json shadowed
+  run_madder tree-capture -format json shadowed
   assert_success
 
   # Receipt is for the default store (the dir won; no store switch).
@@ -285,7 +285,7 @@ function capture_tree_warns_when_dir_shadows_store { # @test
     fail "expected shadow warning in output: $output"
 }
 
-function capture_tree_per_entry_failure_continues_walk { # @test
+function tree_capture_per_entry_failure_continues_walk { # @test
 
   # If one file in the tree is unreadable, the run reports that as a
   # per-entry failure but still captures siblings and exits non-zero.
@@ -301,7 +301,7 @@ function capture_tree_per_entry_failure_continues_walk { # @test
   echo "secret" >tree/secret.txt
   chmod 000 tree/secret.txt
 
-  run_madder capture-tree -format json tree
+  run_madder tree-capture -format json tree
   # Restore perms before any assert_* might exit, so bats can clean up.
   chmod 644 tree/secret.txt
 

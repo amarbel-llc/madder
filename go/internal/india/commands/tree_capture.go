@@ -23,23 +23,23 @@ import (
 )
 
 func init() {
-	utility.AddCmd("capture-tree", &CaptureTree{
+	utility.AddCmd("tree-capture", &TreeCapture{
 		Format: output_format.Default,
 	})
 }
 
-type CaptureTree struct {
+type TreeCapture struct {
 	command_components.EnvBlobStore
 
 	Format output_format.Format
 }
 
 var (
-	_ interfaces.CommandComponentWriter = (*CaptureTree)(nil)
-	_ futility.CommandWithParams        = (*CaptureTree)(nil)
+	_ interfaces.CommandComponentWriter = (*TreeCapture)(nil)
+	_ futility.CommandWithParams        = (*TreeCapture)(nil)
 )
 
-func (cmd *CaptureTree) GetParams() []futility.Param {
+func (cmd *TreeCapture) GetParams() []futility.Param {
 	return []futility.Param{
 		futility.Arg[*values.String]{
 			Name:        "args",
@@ -49,7 +49,7 @@ func (cmd *CaptureTree) GetParams() []futility.Param {
 	}
 }
 
-func (cmd CaptureTree) GetDescription() futility.Description {
+func (cmd TreeCapture) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "capture a directory tree into a blob store",
 		Long: "Walk one or more directories and write every regular " +
@@ -81,7 +81,7 @@ func (cmd CaptureTree) GetDescription() futility.Description {
 	}
 }
 
-func (cmd CaptureTree) Complete(
+func (cmd TreeCapture) Complete(
 	req futility.Request,
 	envLocal env_local.Env,
 	commandLine futility.CommandLineInput,
@@ -92,13 +92,13 @@ func (cmd CaptureTree) Complete(
 	}
 }
 
-func (cmd *CaptureTree) SetFlagDefinitions(
+func (cmd *TreeCapture) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 }
 
-func (cmd CaptureTree) Run(req futility.Request) {
+func (cmd TreeCapture) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	args := req.PopArgs()
@@ -180,7 +180,7 @@ func (cmd CaptureTree) Run(req futility.Request) {
 	if failCount > 0 {
 		errors.ContextCancelWithBadRequestf(
 			req,
-			"capture-tree failed entries: %d",
+			"tree-capture failed entries: %d",
 			failCount,
 		)
 		return
@@ -342,7 +342,7 @@ func classifyArg(arg string) classifiedArg {
 		return classifiedArg{
 			kind: argKindError,
 			err: errors.ErrorWithStackf(
-				"%q exists but is not a directory; capture-tree only takes directories (resolve symlinks with realpath if needed)",
+				"%q exists but is not a directory; tree-capture only takes directories (resolve symlinks with realpath if needed)",
 				arg,
 			),
 		}

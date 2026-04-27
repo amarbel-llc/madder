@@ -23,13 +23,13 @@ tree-capture-receipt - madder filesystem-tree capture manifest format
 # DESCRIPTION
 
 A tree-capture receipt is a hyphence-wrapped NDJSON manifest produced by
-**madder capture-tree** (see **madder**(1)). It enumerates every filesystem
+**madder tree-capture** (see **madder**(1)). It enumerates every filesystem
 entry visited under one capture-root or set of capture-roots, recording each
 entry's relative path, type, POSIX permission bits, and either its
 content-addressable blob ID (regular files) or its target string
 (symbolic links).
 
-Receipts are blobs themselves: every capture-tree run writes its receipt
+Receipts are blobs themselves: every tree-capture run writes its receipt
 into the active store and reports the receipt's markl-id on stdout. A
 single markl-id is therefore enough to enumerate every blob produced by
 that run.
@@ -103,7 +103,7 @@ Special files (devices, fifos, sockets) appear with **type:"other"**
 and no blob.
 
 A symbolic link passed as a capture-root is rejected with an error ---
-**capture-tree** uses **lstat**(2) when classifying its arguments and
+**tree-capture** uses **lstat**(2) when classifying its arguments and
 will not silently produce a one-entry symlink receipt. Resolve such
 arguments with **realpath**(1) (or pass the linked directory directly)
 if the symlink's target is what you wanted.
