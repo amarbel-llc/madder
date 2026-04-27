@@ -9,6 +9,21 @@ function init_default { # @test
   init_store
 }
 
+function init_default_config_is_read_only { # @test
+  # Per ADR 0005, blob_store-config files are immutable per store
+  # identity. #65 enforces this on disk via 0o444 mode bits so vim or
+  # concurrent writers can't silently mutate the store's identity.
+  init_store
+
+  local config=".madder/local/share/blob_stores/default/blob_store-config"
+  [[ -f $config ]] || fail "expected config at $config"
+
+  local mode
+  # GNU stat in the nix devshell.
+  mode="$(stat -c '%a' "$config")"
+  [[ $mode == '444' ]] || fail "expected mode 444 on $config; got $mode"
+}
+
 function init_idempotent_fails { # @test
 
   init_store

@@ -308,6 +308,24 @@ function sftp_info_repo_config_immutable_encodes_remote { # @test
   refute_output --partial 'remote-path'
 }
 
+function sftp_init_remote_config_is_read_only { # @test
+  # Per ADR 0005, blob_store-config files are immutable per store
+  # identity. #65 enforces this on disk via 0o444 mode bits, on the
+  # SFTP remote as well as locally.
+  init_sftp_test_store
+
+  # The test SFTP server re-roots absolute paths under its CWD
+  # ($BATS_TEST_TMPDIR); the remote config lands inside that subtree.
+  local remote_config
+  remote_config="$(find "$BATS_TEST_TMPDIR" -type f -name 'blob_store-config' \
+    -path "*sftp-remote*" -print -quit)"
+  [[ -n $remote_config ]] || fail "no remote blob_store-config found"
+
+  local mode
+  mode="$(stat -c '%a' "$remote_config")"
+  [[ $mode == '444' ]] || fail "expected mode 444 on $remote_config; got $mode"
+}
+
 function sftp_write_compresses_per_remote_config { # @test
   # Per ADR 0005, the remote blob_store-config dictates on-wire shape.
   # init_sftp_test_store provisions zstd, so a published blob's bytes
