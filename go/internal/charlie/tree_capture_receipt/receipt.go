@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"sort"
 
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -21,9 +22,20 @@ import (
 const TypeTag = "madder-tree_capture-receipt-v1"
 
 // Header is the literal byte sequence that precedes the NDJSON body in
-// every receipt. Exposed so tests can assert on it without re-deriving
-// the hyphence boundary form.
-const Header = "---\n! " + TypeTag + "\n---\n\n"
+// every receipt when no StoreHint is present. Derived from the
+// hyphence boundary + type-tag line; exposed for tests that strip it
+// to inspect just the body.
+const Header = hyphence.Boundary + "\n" +
+	"! " + TypeTag + "\n" +
+	hyphence.Boundary + "\n\n"
+
+// StoreHint is the optional `- store/<id> < <markl-id>` metadata line
+// per RFC 0003 §Producer Rules §Receipt Metadata: Store Hint.
+// Consumers (tree-restore) use it to auto-resolve the source store.
+type StoreHint struct {
+	StoreId       string
+	ConfigMarklId string
+}
 
 // EntryType categorizes a filesystem entry. The string values are the
 // canonical wire tags written into the receipt's "type" field.
@@ -64,10 +76,18 @@ type recordV1 struct {
 }
 
 // Write serializes entries as a hyphence-wrapped NDJSON receipt to w.
+// Equivalent to WriteWithHint(w, entries, nil).
+func Write(w io.Writer, entries []Entry) (int64, error) {
+	return WriteWithHint(w, entries, nil)
+}
+
+// WriteWithHint serializes entries as a hyphence-wrapped NDJSON
+// receipt to w, optionally prefixing a store-hint metadata line per
+// RFC 0003 §Producer Rules §Receipt Metadata: Store Hint.
 // Entries are sorted in place by (Root, Path) before encoding so two
 // captures of the same tree produce byte-identical output. Returns the
 // number of bytes written.
-func Write(w io.Writer, entries []Entry) (int64, error) {
+func WriteWithHint(w io.Writer, entries []Entry, hint *StoreHint) (int64, error) {
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Root != entries[j].Root {
 			return entries[i].Root < entries[j].Root
@@ -75,24 +95,73 @@ func Write(w io.Writer, entries []Entry) (int64, error) {
 		return entries[i].Path < entries[j].Path
 	})
 
+	body := &bodyWriter{entries: entries}
+
+	hw := hyphence.Writer{
+		Metadata: &metadataWriter{hint: hint},
+		Blob:     body,
+	}
+
+	n, err := hw.WriteTo(w)
+	if err != nil {
+		return n, errors.Wrap(err)
+	}
+	if body.err != nil {
+		return n, errors.Wrap(body.err)
+	}
+
+	return n, nil
+}
+
+// metadataWriter emits the receipt's hyphence metadata block: an
+// optional store-hint line followed by the type line. hyphence.Writer
+// wraps this output in `---\n` boundaries.
+type metadataWriter struct {
+	hint *StoreHint
+}
+
+func (mw *metadataWriter) WriteTo(w io.Writer) (int64, error) {
 	var total int64
 
-	headerBytes, err := io.WriteString(w, Header)
+	if mw.hint != nil {
+		n, err := fmt.Fprintf(w, "- store/%s < %s\n", mw.hint.StoreId, mw.hint.ConfigMarklId)
+		total += int64(n)
+		if err != nil {
+			return total, errors.Wrap(err)
+		}
+	}
+
+	n, err := io.WriteString(w, "! "+TypeTag+"\n")
+	total += int64(n)
 	if err != nil {
 		return total, errors.Wrap(err)
 	}
-	total += int64(headerBytes)
 
-	for i := range entries {
-		line, err := encodeEntry(entries[i])
+	return total, nil
+}
+
+// bodyWriter emits the NDJSON body of a receipt. Per-entry encode
+// errors are captured on err; WriteTo stops at the first failure.
+type bodyWriter struct {
+	entries []Entry
+	err     error
+}
+
+func (bw *bodyWriter) WriteTo(w io.Writer) (int64, error) {
+	var total int64
+
+	for i := range bw.entries {
+		line, err := encodeEntry(bw.entries[i])
 		if err != nil {
-			return total, errors.Wrap(err)
+			bw.err = err
+			return total, err
 		}
 
 		n, err := w.Write(line)
 		total += int64(n)
 		if err != nil {
-			return total, errors.Wrap(err)
+			bw.err = err
+			return total, err
 		}
 	}
 

@@ -25,6 +25,70 @@ func TestWrite_HeaderExact(t *testing.T) {
 	}
 }
 
+func TestWriteWithHint_NilProducesIdenticalBytesToWrite(t *testing.T) {
+	entries := []Entry{
+		{Path: "a.txt", Root: "src", Type: TypeFile, Mode: 0o644, Size: 10, BlobId: "blake2b256-x"},
+	}
+
+	var bufWrite, bufHintNil bytes.Buffer
+
+	if _, err := Write(&bufWrite, append([]Entry{}, entries...)); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if _, err := WriteWithHint(&bufHintNil, append([]Entry{}, entries...), nil); err != nil {
+		t.Fatalf("WriteWithHint(nil): %v", err)
+	}
+
+	if bufWrite.String() != bufHintNil.String() {
+		t.Fatalf("nil hint should be byte-identical to Write\n  Write: %q\n  Hint=nil: %q",
+			bufWrite.String(), bufHintNil.String())
+	}
+}
+
+func TestWriteWithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
+	hint := &StoreHint{
+		StoreId:       ".work",
+		ConfigMarklId: "blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd",
+	}
+
+	var buf bytes.Buffer
+
+	if _, err := WriteWithHint(&buf, nil, hint); err != nil {
+		t.Fatalf("WriteWithHint: %v", err)
+	}
+
+	got := buf.String()
+	const want = "---\n" +
+		"- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd\n" +
+		"! madder-tree_capture-receipt-v1\n" +
+		"---\n\n"
+	if got != want {
+		t.Fatalf("hint header mismatch\n  got: %q\n  want: %q", got, want)
+	}
+}
+
+func TestWriteWithHint_Deterministic(t *testing.T) {
+	hint := &StoreHint{StoreId: ".work", ConfigMarklId: "blake2b256-x"}
+	entries := []Entry{
+		{Path: "b", Root: "src", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "blake2b256-b"},
+		{Path: "a", Root: "src", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "blake2b256-a"},
+	}
+
+	var buf1, buf2 bytes.Buffer
+
+	if _, err := WriteWithHint(&buf1, append([]Entry{}, entries...), hint); err != nil {
+		t.Fatalf("first WriteWithHint: %v", err)
+	}
+	if _, err := WriteWithHint(&buf2, append([]Entry{}, entries...), hint); err != nil {
+		t.Fatalf("second WriteWithHint: %v", err)
+	}
+
+	if buf1.String() != buf2.String() {
+		t.Fatalf("WriteWithHint not deterministic\n  first:  %q\n  second: %q",
+			buf1.String(), buf2.String())
+	}
+}
+
 func TestWrite_FileEntryShape(t *testing.T) {
 	entries := []Entry{
 		{
