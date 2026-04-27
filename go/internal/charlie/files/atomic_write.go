@@ -46,7 +46,7 @@ func WriteImmutable(
 		return err
 	}
 
-	tmpPath, err := tmpSibling(path)
+	tmpPath, err := TmpSibling(path)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -95,7 +95,9 @@ func WriteImmutable(
 	return err
 }
 
-func tmpSibling(path string) (string, error) {
+// TmpSibling returns a path of the form `<path>.tmp_<rand>`, suitable
+// for an atomic-rename write protocol.
+func TmpSibling(path string) (string, error) {
 	var buf [8]byte
 
 	if _, err := rand.Read(buf[:]); err != nil {

@@ -1,9 +1,6 @@
 package blob_stores
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"fmt"
 	"path"
 	"strings"
 
@@ -196,7 +193,7 @@ func WriteRemoteConfig(
 	// Per ADR 0005 / #65, the remote blob_store-config is immutable.
 	// Mirror the local helper's tmp-write + chmod 0o444 + atomic
 	// rename, but over the SFTP file API.
-	tmpPath, err := sftpTmpSibling(configPath)
+	tmpPath, err := files.TmpSibling(configPath)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -241,14 +238,4 @@ func WriteRemoteConfig(
 	uiPrinter.Printf("remote blob store config written successfully")
 
 	return err
-}
-
-func sftpTmpSibling(p string) (string, error) {
-	var buf [8]byte
-
-	if _, err := rand.Read(buf[:]); err != nil {
-		return "", errors.Wrap(err)
-	}
-
-	return fmt.Sprintf("%s.tmp_%s", p, hex.EncodeToString(buf[:])), nil
 }

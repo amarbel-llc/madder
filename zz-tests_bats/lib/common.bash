@@ -39,3 +39,9 @@ init_store() {
   run_madder init -encryption none "${1:-.default}"
   assert_success
 }
+
+# Returns octal mode bits (e.g. '444', '644'). GNU stat in the nix
+# devshell.
+file_mode() {
+  stat -c '%a' "$1"
+}

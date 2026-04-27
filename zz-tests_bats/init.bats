@@ -19,8 +19,7 @@ function init_default_config_is_read_only { # @test
   [[ -f $config ]] || fail "expected config at $config"
 
   local mode
-  # GNU stat in the nix devshell.
-  mode="$(stat -c '%a' "$config")"
+  mode="$(file_mode "$config")"
   [[ $mode == '444' ]] || fail "expected mode 444 on $config; got $mode"
 }
 

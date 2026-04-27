@@ -322,7 +322,7 @@ function sftp_init_remote_config_is_read_only { # @test
   [[ -n $remote_config ]] || fail "no remote blob_store-config found"
 
   local mode
-  mode="$(stat -c '%a' "$remote_config")"
+  mode="$(file_mode "$remote_config")"
   [[ $mode == '444' ]] || fail "expected mode 444 on $remote_config; got $mode"
 }
 
