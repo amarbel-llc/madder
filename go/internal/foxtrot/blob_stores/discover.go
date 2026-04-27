@@ -1,6 +1,9 @@
 package blob_stores
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"path"
 	"strings"
 
@@ -9,6 +12,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/charlie/files"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -170,6 +174,14 @@ func WriteRemoteConfig(
 
 	uiPrinter.Printf("writing remote blob store config to %q...", configPath)
 
+	if _, statErr := sftpClient.Stat(configPath); statErr == nil {
+		err = errors.Errorf(
+			"remote blob_store-config already present at %q; refusing to overwrite",
+			configPath,
+		)
+		return err
+	}
+
 	config := &blob_store_configs.DefaultType{
 		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
 		HashBuckets:     discovered.Buckets,
@@ -181,21 +193,62 @@ func WriteRemoteConfig(
 		Blob: config,
 	}
 
-	var configFile *sftp.File
-
-	if configFile, err = sftpClient.Create(configPath); err != nil {
-		err = errors.Wrapf(err, "failed to create remote config file %q", configPath)
+	// Per ADR 0005 / #65, the remote blob_store-config is immutable.
+	// Mirror the local helper's tmp-write + chmod 0o444 + atomic
+	// rename, but over the SFTP file API.
+	tmpPath, err := sftpTmpSibling(configPath)
+	if err != nil {
+		err = errors.Wrap(err)
 		return err
 	}
 
-	defer errors.DeferredCloser(&err, configFile)
+	cleanup := func() {
+		_ = sftpClient.Remove(tmpPath)
+	}
+
+	var configFile *sftp.File
+
+	if configFile, err = sftpClient.Create(tmpPath); err != nil {
+		err = errors.Wrapf(err, "failed to create tmp config file %q", tmpPath)
+		return err
+	}
 
 	if _, err = blob_store_configs.Coder.EncodeTo(typedConfig, configFile); err != nil {
-		err = errors.Wrapf(err, "failed to write remote config to %q", configPath)
+		_ = configFile.Close()
+		cleanup()
+		err = errors.Wrapf(err, "failed to write remote config to %q", tmpPath)
+		return err
+	}
+
+	if err = configFile.Close(); err != nil {
+		cleanup()
+		err = errors.Wrap(err)
+		return err
+	}
+
+	if err = sftpClient.Chmod(tmpPath, files.ImmutableFileMode); err != nil {
+		cleanup()
+		err = errors.Wrapf(err, "failed to chmod %q", tmpPath)
+		return err
+	}
+
+	if err = sftpClient.Rename(tmpPath, configPath); err != nil {
+		cleanup()
+		err = errors.Wrapf(err, "failed to rename %q -> %q", tmpPath, configPath)
 		return err
 	}
 
 	uiPrinter.Printf("remote blob store config written successfully")
 
 	return err
+}
+
+func sftpTmpSibling(p string) (string, error) {
+	var buf [8]byte
+
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", errors.Wrap(err)
+	}
+
+	return fmt.Sprintf("%s.tmp_%s", p, hex.EncodeToString(buf[:])), nil
 }
