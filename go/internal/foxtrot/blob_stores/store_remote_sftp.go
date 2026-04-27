@@ -304,11 +304,23 @@ func (blobStore *remoteSftp) GetLocalBlobStore() domain_interfaces.BlobStore {
 }
 
 func (blobStore *remoteSftp) makeEnvDirConfig() env_dir.Config {
-	return env_dir.DefaultConfig
-	// return env_dir.MakeConfig(
-	// 	blobStore.blobIOWrapper.GetBlobCompression(),
-	// 	blobStore.blobIOWrapper.GetBlobEncryption(),
-	// )
+	// Per ADR 0005, the remote blob_store-config dictates compression
+	// and encryption. remoteConfig is populated by readRemoteConfig
+	// during initializeOnce. Callers reach this only via paths that
+	// already ran initialization (write/read), so a missing remote
+	// config here is a programming error rather than a missing-file
+	// case to handle.
+	ioWrapper, ok := blobStore.remoteConfig.(domain_interfaces.BlobIOWrapper)
+	if !ok {
+		return env_dir.DefaultConfig
+	}
+
+	return env_dir.MakeConfig(
+		blobStore.defaultHashType,
+		env_dir.MakeHashBucketPathJoinFunc(blobStore.buckets),
+		ioWrapper.GetBlobCompression(),
+		ioWrapper.GetBlobEncryption(),
+	)
 }
 
 func (blobStore *remoteSftp) remotePathForMerkleId(
