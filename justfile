@@ -245,25 +245,26 @@ tag version message:
   gum log --level info "Pushed $tag"
   git tag -v "$tag"
 
-# Sed-rewrite madderVersion in flake.nix to the given semver. The
-# version string is burnt into the binary at build time via -ldflags
-# (see go/internal/0/buildinfo), so flake.nix is the single source of
-# truth. No-op if already at the target version. Usage: just
-# bump-version 0.0.2
+# Sed-rewrite MADDER_VERSION in version.env to the given semver.
+# version.env is the single source of truth for the release version;
+# flake.nix reads it via builtins.readFile, the bats version test
+# reads it directly, and the binary picks it up via -ldflags injection
+# (see go/internal/0/buildinfo). No-op if already at the target.
+# Usage: just bump-version 0.0.2
 [group("maint")]
 bump-version new_version:
   #!/usr/bin/env bash
   set -euo pipefail
-  current=$(grep 'madderVersion = ' flake.nix | sed 's/.*"\(.*\)".*/\1/')
+  current=$(grep '^MADDER_VERSION=' version.env | cut -d= -f2)
   if [[ "$current" == "{{new_version}}" ]]; then
     gum log --level info "already at {{new_version}}"
     exit 0
   fi
-  sed -i.bak 's/madderVersion = "'"$current"'"/madderVersion = "{{new_version}}"/' flake.nix && rm flake.nix.bak
-  gum log --level info "bumped madderVersion: $current → {{new_version}}"
+  sed -i.bak 's/^MADDER_VERSION=.*/MADDER_VERSION={{new_version}}/' version.env && rm version.env.bak
+  gum log --level info "bumped MADDER_VERSION: $current → {{new_version}}"
 
-# Cut a release: must be run on master. Bumps madderVersion in
-# flake.nix, commits the bump with a changelog-style message built
+# Cut a release: must be run on master. Bumps MADDER_VERSION in
+# version.env, commits the bump with a changelog-style message built
 # from commits since the last go/v* tag, pushes master, then signs
 # and pushes the go/v{{version}} tag. The "go/v" prefix is added for
 # you, so pass the semver without it. Usage: just release 0.0.2
@@ -296,11 +297,11 @@ release version:
     msg="$header"
   fi
   just bump-version "{{version}}"
-  if ! git diff --quiet flake.nix; then
-    git add flake.nix
+  if ! git diff --quiet version.env; then
+    git add version.env
     git commit -m "chore: release go/v{{version}}"
     git push origin master
-    gum log --level info "pushed flake.nix bump to master"
+    gum log --level info "pushed version.env bump to master"
   fi
   tag="go/v{{version}}"
   if [[ -n "$prev" ]]; then

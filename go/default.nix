@@ -6,6 +6,13 @@
   purse-first,
   system,
   man7Src ? null,
+  # Test-only inputs consumed by the bats variants' installCheckPhase
+  # (madder-race today, madder + madder-cover later). Defaulted to null
+  # so direct `import ./go/default.nix` callers without a flake context
+  # still work — they just can't run the bats lanes. versionEnv is the
+  # source-of-truth file the bats version test consults.
+  batsSrc ? null,
+  versionEnv ? null,
   # Passed to buildGoApplication's `version` and `commit` attrs; the
   # fork's nixpkgs auto-injects them as `-X main.version` and
   # `-X main.commit` ldflags on every subPackage. Defaulted so that

@@ -5,9 +5,11 @@ setup() {
 
 # bats file_tags=version
 
-# Covers the version-burnin wiring end-to-end: flake.nix defines
-# madderVersion and madderCommit, go/default.nix passes them via -ldflags
-# to go/internal/0/buildinfo, and `madder version` prints them.
+# Covers the version-burnin wiring end-to-end: version.env at repo
+# root is the source of truth, flake.nix reads it via builtins
+# .readFile, go/default.nix passes it through to buildGoApplication's
+# -ldflags injection into go/internal/0/buildinfo, and `madder version`
+# prints them.
 #
 # When these tests run under bats, MADDER_BIN points at the nix-built
 # binary, which means the ldflags MUST have fired. A devshell `go build`
@@ -33,10 +35,10 @@ function version_prints_burnt_in_identity { # @test
   refute_output --partial 'dev+unknown'
 }
 
-function version_matches_flake_version { # @test
-  # The version prefix before '+' must match the madderVersion
-  # literal in flake.nix. Guards against drift between bump-version
-  # sed target and the ldflag target.
+function version_matches_source_of_truth { # @test
+  # The version prefix before '+' must match MADDER_VERSION in
+  # version.env, the source of truth for releases. Guards against
+  # drift between bump-version's sed target and the ldflag target.
   run_madder version
   assert_success
 
@@ -47,11 +49,11 @@ function version_matches_flake_version { # @test
   local got_version
   got_version="$(echo "$output" | head -n1 | cut -d+ -f1)"
 
-  local flake_version
-  flake_version="$(grep 'madderVersion = ' "${BATS_TEST_DIRNAME}/../flake.nix" | sed 's/.*"\(.*\)".*/\1/')"
+  local expected_version
+  expected_version="$(grep '^MADDER_VERSION=' "${BATS_TEST_DIRNAME}/../version.env" | cut -d= -f2)"
 
-  [[ $got_version == "$flake_version" ]] ||
-    fail "madder version prefix '$got_version' does not match flake.nix madderVersion '$flake_version'"
+  [[ $got_version == "$expected_version" ]] ||
+    fail "madder version prefix '$got_version' does not match version.env MADDER_VERSION '$expected_version'"
 }
 
 function version_madder_cache_matches_madder { # @test

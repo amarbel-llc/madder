@@ -36,10 +36,14 @@
       ...
     }:
     let
-      # Burnt into the binary via the fork's auto-injected -ldflags.
-      # Single source of truth for the release version; `just bump-version`
-      # sed-rewrites this line.
-      madderVersion = "0.3.1";
+      # version.env at repo root is the single source of truth for
+      # the release version. Burnt into the binary via the fork's
+      # auto-injected -ldflags; consumed by bats too. `just bump-version`
+      # sed-rewrites version.env. Match expression captures everything
+      # after `MADDER_VERSION=` up to the line break.
+      madderVersion = builtins.head (builtins.match
+        ".*MADDER_VERSION=([^\n]+).*"
+        (builtins.readFile ./version.env));
       # shortRev for clean builds, dirtyShortRev for dirty working trees
       # (so devshell builds show `dirty-abcdef` rather than masquerading
       # as a clean release), "unknown" as a last-resort fallback.
@@ -58,6 +62,13 @@
             system
             ;
           man7Src = ./docs/man.7;
+          # Test-only inputs for the bats lanes' installCheckPhase.
+          # Kept out of the build-time `src` closure so test-only
+          # changes don't trigger a full Go rebuild. `version.env`
+          # is the source of truth for the release version (read by
+          # both flake.nix and version.bats).
+          batsSrc = ./zz-tests_bats;
+          versionEnv = ./version.env;
           version = madderVersion;
           commit = madderCommit;
         };
