@@ -84,12 +84,55 @@ let
   # default `just test` target builds this variant. Build artifacts are
   # NOT release-suitable — race-instrumented binaries are slower and
   # not what we ship.
+  #
+  # Beyond the unit-suite checkPhase (Go-level race detection), this
+  # variant also runs the bats suite against the race-instrumented
+  # `$out/bin/madder` via installCheckPhase, catching races that only
+  # surface in real CLI flows. net_cap-tagged scenarios are filtered
+  # out — they need loopback binding the nix sandbox doesn't grant.
   madder-race = madder.overrideAttrs (old: {
     pname = "madder-race";
+
+    # Race detection requires CGO and a -race build flag for the
+    # binaries (not just the test binaries). buildGoApplication's
+    # goBuildHook picks up buildFlagsArray and passes it through to
+    # `go install`.
+    CGO_ENABLED = 1;
+    buildFlagsArray = (old.buildFlagsArray or [ ]) ++ [ "-race" ];
+
     checkPhase = ''
       runHook preCheck
       go test -tags test -race -p $NIX_BUILD_CORES ./...
       runHook postCheck
+    '';
+
+    nativeInstallCheckInputs = (old.nativeInstallCheckInputs or [ ]) ++ [
+      bob.packages.${system}.batman
+    ];
+
+    doInstallCheck = batsSrc != null && versionEnv != null;
+    installCheckPhase = ''
+      runHook preInstallCheck
+
+      # Stage bats sources to a writable scratch dir. batman walks the
+      # directory tree, requires a fence.jsonc per group, and runs each
+      # group under fence with that policy.
+      mkdir -p stage/zz-tests_bats
+      cp -r ${batsSrc}/* stage/zz-tests_bats/
+      chmod -R u+w stage
+
+      # version_matches_source_of_truth reads MADDER_VERSION from
+      # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
+      # layout: stage/version.env is sibling of stage/zz-tests_bats/.
+      cp ${versionEnv} stage/version.env
+
+      export MADDER_BIN="$out/bin/madder"
+      export PATH="$out/bin:$PATH"
+
+      cd stage/zz-tests_bats
+      batman . -- --filter-tags '!net_cap'
+
+      runHook postInstallCheck
     '';
   });
 

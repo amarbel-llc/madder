@@ -1,0 +1,39 @@
+// Fence policy for madder's bats suite, consumed by `batman` from
+// bob's batman package. Each *.bats group running under batman is
+// spawned via `fence` with these settings — the `net_cap`-tagged
+// SFTP scenarios are filtered out before this policy applies, so
+// no network access is needed here.
+//
+// $BATS_TEST_TMPDIR / $XDG_LOG_HOME are per-test paths bats and the
+// inventory-log helpers populate; both must be writable by the test
+// body. fence supports env-var expansion in path entries (verified
+// by reading bob's fence implementation; revisit if a test fails
+// with "denied write to /…/$BATS_TEST_TMPDIR/…").
+{
+  "allowPty": false,
+
+  "network": {
+    "allowedDomains": []
+  },
+
+  "filesystem": {
+    "strictDenyRead": true,
+    "allowRead": [
+      "/nix/store",
+      "$BATS_TEST_TMPDIR",
+      "$XDG_LOG_HOME",
+      "$HOME"
+    ],
+    "allowExecute": ["/nix/store"],
+    "allowWrite": [
+      "$BATS_TEST_TMPDIR",
+      "$XDG_LOG_HOME",
+      "/tmp"
+    ]
+  },
+
+  "command": {
+    "useDefaults": true,
+    "acceptSharedBinaryCannotRuntimeDeny": ["chroot"]
+  }
+}
