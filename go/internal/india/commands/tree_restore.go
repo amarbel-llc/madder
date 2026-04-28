@@ -26,10 +26,9 @@ func init() {
 // per FDR 0001 (docs/features/0001-tree-restore.md) and RFC 0003
 // §Consumer Rules.
 //
-// Phase A scope: parse args, validate destination preconditions, parse
-// the receipt, run path sanitization across all entries. No
-// materialization; phase B adds per-type write logic and phase C adds
-// store-hint resolution.
+// Validates destination preconditions, parses the receipt, runs path
+// sanitization across all entries, then materializes per-type
+// (file/dir/symlink/other). Store-hint resolution lands as phase C.
 type TreeRestore struct {
 	command_components.EnvBlobStore
 }
@@ -227,9 +226,9 @@ func pathConfinedTo(materialized, dest string) bool {
 //	symlink → os.Symlink with literal target; mode ignored
 //	other   → skip with stderr notice
 //
-// The destination root is created (MkdirAll, mode 0o755) before
-// iteration so file/symlink writes inside top-level subdirs of <dest>
-// don't fail when their parent dir entry hasn't been visited yet.
+// <dest> itself is never an entry path — entries materialize *under*
+// <dest> via filepath.Join — so the consumer creates it explicitly
+// (MkdirAll, mode 0o755) before iterating.
 //
 // Per FDR §Limitations §No mid-stream rollback: a blob-read or write
 // failure mid-stream leaves the destination partial; cleanup is the

@@ -174,7 +174,11 @@ function tree_restore_round_trips_dir { # @test
 
   mkdir -p src/inner/deeper
   echo "x" >src/inner/deeper/x.txt
-  chmod 0755 src/inner
+  # Non-default mode: 0o755 is the default umask-modulated MkdirAll
+  # mode, so testing against it can't distinguish a captured-mode
+  # restore from a fresh MkdirAll. 0o750 forces the capture-side mode
+  # bits to flow through.
+  chmod 0750 src/inner
 
   local rid
   rid="$(capture_receipt_id src)"
@@ -189,7 +193,7 @@ function tree_restore_round_trips_dir { # @test
 
   local mode
   mode="$(file_mode out/src/inner)"
-  [[ $mode == '755' ]] || fail "expected mode 755 on restored dir; got $mode"
+  [[ $mode == '750' ]] || fail "expected mode 750 on restored dir; got $mode"
 }
 
 function tree_restore_round_trips_symlink { # @test
