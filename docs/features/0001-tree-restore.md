@@ -106,7 +106,16 @@ entry:
 3. `e.root` is the empty string.
 
 Refusal happens BEFORE `<dest>` is created, before any blob is opened,
-and before any byte is written. Diagnostics:
+and before any byte is written.
+
+Diagnostics use a multi-line shape: a single `error:` summary line,
+followed by indented `key: value` payload lines. This is a
+deliberate FDR-level convention (see [Limitations](#limitations) for
+the rationale and the comparison to `tree-capture`'s single-line
+`error:` + `hint:` style). The shape is appropriate here because the
+RFC mandates that the diagnostic identify multiple distinct fields
+(root, path, materialized, destination) per refusal, and a single
+line cannot fit them all readably:
 
 - Path escape:
 
@@ -136,6 +145,24 @@ newlines or other unusual-but-legal characters. Tested by
 `tree_restore_round_trips_unusual_filenames` (deferred — see
 [Limitations](#limitations)).
 
+#### Multi-root receipts
+
+Per [RFC 0003] §Multi-Root Receipts, a receipt MAY contain entries
+from multiple positional roots when a single store-group capture had
+multiple top-level directory arguments. Each distinct value of
+`e.root` materializes as a top-level subdirectory under `<dest>`, via
+the same `filepath.Clean(filepath.Join(dest, e.root, e.path))`
+formula used in [Sanitization](#sanitization).
+
+The consumer MUST NOT re-canonicalize `e.root` beyond what
+`filepath.Join` + `filepath.Clean` provides. Producer-side root
+collision detection (#91) guarantees that no two distinct values of
+`e.root` within a single receipt resolve to the same path under
+`filepath.Clean`, so consumers MAY rely on root-distinctness as a
+structural invariant for reporting and diagnostics — but MUST NOT use
+it as a security pre-condition (the sanitization checks defend
+against hand-crafted receipts regardless of producer conformance).
+
 #### Per-type materialization
 
 Per [RFC 0003] §Consumer Rules §Per-Type Materialization, for each
@@ -144,7 +171,7 @@ entry `e` accepted by [Sanitization](#sanitization):
 | `e.type` | Materialization |
 |---|---|
 | `file` | Resolve `e.blob_id` against the resolved store. Open `materialized` for write (create-only, `os.O_WRONLY|os.O_CREATE|os.O_EXCL`, mode `0o666` modulo umask). Stream the blob via `io.Copy(file, blobReader)` — `BlobReader` provides `io.WriterTo`. On success, `os.Chmod(materialized, e.mode & 0o777)`. |
-| `dir` | `os.MkdirAll(materialized, e.mode & 0o777)`. The MkdirAll behavior is acceptable here because §Sanitization guarantees `materialized` is rooted under `dest` and the receipt has a `dir` entry for every ancestor dir per the producer's walk. |
+| `dir` | `os.MkdirAll(materialized, e.mode & 0o777)`. `MkdirAll` is safe because §Sanitization confines `materialized` to under `<dest>`. (Conformant producers also emit a `dir` entry for every ancestor — `filepath.WalkDir` visits every directory it descends into — but the consumer MUST NOT rely on producer conformance for safety per [RFC 0003] §Security Considerations.) |
 | `symlink` | `os.Symlink(e.target, materialized)`. The mode field MUST be ignored. The target string is the literal value from `e.target` — NOT resolved, NOT cleaned, NOT validated against the destination's containment. (See [Limitations](#limitations) on symlink-following.) |
 | `other` | Skip with a notice: `notice: skipping entry of type "other": <materialized>`. The consumer MUST NOT attempt to recreate devices, FIFOs, sockets, or other special files. |
 
@@ -194,10 +221,13 @@ via the following procedure (after the receipt has been parsed):
        notice: falling back to active store
 
 The receipt blob ITSELF is fetched in phase 1 via the same store
-resolution as the entries' blobs. If the receipt is in store A and the
-entries reference store B (per the hint), this is a non-issue today
-because all entries in a single receipt come from a single store-group
-per RFC 0003's producer rules.
+resolution as the entries' blobs. The current `tree-capture` producer
+emits one receipt blob per store-group ([RFC 0003] §Introduction),
+which means in practice all entries in a single receipt resolve via
+the same store. RFC 0003 does not normatively forbid cross-store
+entries within a single receipt, so a future producer or hand-crafted
+receipt could legitimately split entries across stores — but the v1
+consumer does not handle that case (see [Limitations](#limitations)).
 
 The local config-blob markl-id is computed the same way `tree-capture`
 computes the hint at write time (see #92's `computeStoreHint`):
@@ -312,6 +342,62 @@ follow-up issue or deferred to a future schema version.
   in v1's matrix; it is filed as a follow-up. The Go-level sanitizer
   permits them by construction (it only refuses NUL bytes, empty
   roots, and parent-escape).
+- **No mid-stream rollback.** If a `file` entry's blob read fails
+  partway through `io.Copy` (network drop, hash mismatch, etc.), the
+  consumer aborts and the destination is left in a partial state.
+  Diagnostic shape:
+
+      error: <materialized>: blob read failed
+        blob_id: <e.blob_id>
+        cause: <wrapped err>
+      hint: remove <dest> and re-run
+
+  [RFC 0003] §Consumer Rules does not mandate transactional rollback;
+  this FDR explicitly chooses leave-partial-on-mid-stream-failure
+  rather than reverse-walk-and-delete. Cleanup is the operator's job.
+- **No `other → skip` bats scenario in v1.** [RFC 0003] §Conformance
+  Testing lists `tree_restore_skips_type_other_with_notice` as
+  required; the v1 matrix omits it because injecting a `type:"other"`
+  entry without root privileges (FIFO via `mkfifo` works on POSIX but
+  not on macOS in the bats sandcastle environment) is awkward. The
+  Go-level switch arm IS implemented and emits the notice; only the
+  end-to-end bats coverage is deferred. Filed as a follow-up.
+- **Hash-family mismatch in store-hint falls through to
+  missing-fallback.** [RFC 0003] §Store-Hint Resolution does not
+  specify behavior when the receipt's hint markl-id uses a hash
+  family the locally-configured store cannot reproduce (e.g. receipt
+  hash is `sha512` but local store is `blake2b256`). This FDR chooses
+  to treat that case as branch 4 (missing-fallback) with a notice
+  naming the hash-family mismatch:
+
+      notice: receipt store-hint uses hash family <hint-hash> not
+      supported by local store <hint.StoreId> (<local-hash>)
+      notice: falling back to active store
+
+  This is an FDR-level decision, not an RFC-level one. If the RFC is
+  amended to specify the behavior, this Limitations bullet should be
+  removed.
+- **Multi-line diagnostic style is FDR-introduced.** The standard
+  diagnostic style elsewhere in madder (e.g. `tree-capture`'s
+  `checkRootScope` / `checkRootCollisions`) uses a single `error:`
+  line plus an optional `hint:` line. This FDR introduces two
+  variants:
+  - **Multi-line indented payload.** For sanitization refusals
+    (path-escape, NUL-byte, empty-root, store-hint mismatch payload),
+    the `error:` line is followed by indented `key: value` lines
+    naming each distinct field [RFC 0003] requires the diagnostic to
+    surface (root, path, materialized, destination, etc.). Single
+    lines cannot fit them all readably.
+  - **Multi-prefix on store-hint mismatch.** The mismatch case uses
+    three severity prefixes — `warning:` (config drift), `error:`
+    (refuse without `-store`), `hint:` (override syntax) — to surface
+    the diagnosis-then-refuse-then-action triple that [RFC 0003]
+    §Store-Hint Resolution mandates.
+
+  These are intentional FDR-level conventions. Future diagnostics
+  with similar shapes SHOULD follow them. If the project later
+  consolidates on a single diagnostic shape, this FDR's strings
+  should be re-examined.
 
 ## More Information
 
@@ -344,13 +430,19 @@ is the v1 acceptance criterion:
 | §Per-Type Materialization (other → skip) | `tree_restore_skips_type_other_with_notice` (DEFERRED — hard to inject without root) |
 | §Store-Hint Resolution §Auto-use | `tree_restore_uses_hint_store_when_config_matches` |
 | §Store-Hint Resolution §Mismatch-warn | `tree_restore_warns_on_config_drift` |
-| §Store-Hint Resolution §Missing-fallback | `tree_restore_falls_back_to_active_store_on_missing_hint` |
-| §Store-Hint Resolution (no hint) | `tree_restore_falls_back_to_active_store_on_missing_hint` |
-| §Store-Hint Resolution (-store override) | `tree_restore_store_flag_overrides_hint` |
+| §Store-Hint Resolution §Missing-fallback (hint present, store missing) | `tree_restore_falls_back_to_active_store_on_missing_hint` |
+| §Store-Hint Resolution (no hint at all) | `tree_restore_falls_back_to_active_store_on_no_hint` |
+| §Store-Hint Resolution (-store override, FDR-added) | `tree_restore_store_flag_overrides_hint` |
 
-Tests that share a row (no-hint and missing-fallback) are folded
-together because the diagnostic shape is identical; the receipt
-fixture differs.
+The two fallback cases (hint-points-at-missing-store vs.
+no-hint-line-at-all) are split into separate tests because, although
+the *diagnostic shape* is similar, the *triggering wire-format* is
+different (presence-of-hint-line vs. absence) and tying each test to
+a single fixture keeps debug failures clearly attributable.
+
+The `-store` override row is FDR-added (not in the [RFC 0003]
+§Conformance Testing matrix). Documenting it here so the matrix is
+auditable as a superset rather than a divergence.
 
 [RFC 0003]: ../rfcs/0003-tree-capture-restore-rules.md
 [#87]: https://github.com/amarbel-llc/madder/issues/87
