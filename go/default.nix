@@ -45,6 +45,17 @@ let
       dagnabit export
     '';
 
+    # buildGoApplication's stock goCheckHook only tests subPackages, which
+    # are cmd/* directories that have no test files. Override checkPhase
+    # to test all packages with the `test` build tag (gates internal
+    # test-only symbols like ui.T / ui.TestContext). doCheck stays true
+    # by default in buildGoApplication.
+    checkPhase = ''
+      runHook preCheck
+      go test -tags test -p $NIX_BUILD_CORES ./...
+      runHook postCheck
+    '';
+
     # madder-gen_man takes a *prefix* and writes to {prefix}/share/man/man1/
     postInstall = ''
       $out/bin/madder-gen_man $out
@@ -59,6 +70,47 @@ let
       done
     '';
   };
+
+  # madder-race exercises the same package-level test surface as `madder`
+  # but with the Go race detector enabled. Concurrent-write paths
+  # (pack_parallel, blob_mover link publish) are load-bearing, so the
+  # default `just test` target builds this variant. Build artifacts are
+  # NOT release-suitable — race-instrumented binaries are slower and
+  # not what we ship.
+  madder-race = madder.overrideAttrs (old: {
+    pname = "madder-race";
+    checkPhase = ''
+      runHook preCheck
+      go test -tags test -race -p $NIX_BUILD_CORES ./...
+      runHook postCheck
+    '';
+  });
+
+  # madder-cover runs the unit suite with coverage collection enabled
+  # and writes the profile to $out/coverage.out. Coverage collection
+  # uses installCheckPhase (after $out exists from installPhase) rather
+  # than checkPhase so the profile lands at a stable path callers can
+  # read. View the HTML report with
+  # `go tool cover -html=result/coverage.out`.
+  # The justfile recipe `test-go-cover` invokes this and tails the
+  # func summary.
+  madder-cover = madder.overrideAttrs (old: {
+    pname = "madder-cover";
+    # Suppress the default checkPhase — its job (running the suite)
+    # is being replaced with an installCheckPhase that emits the
+    # coverage profile to $out.
+    doCheck = false;
+    doInstallCheck = true;
+    installCheckPhase = ''
+      runHook preInstallCheck
+      go test -tags test \
+        -coverprofile=$out/coverage.out \
+        -covermode=atomic \
+        -p $NIX_BUILD_CORES \
+        ./...
+      runHook postInstallCheck
+    '';
+  });
 
   # Devshell-only test harness for SFTP integration tests (RFC 0001).
   # Intentionally NOT included in the `packages` output — release
@@ -76,7 +128,7 @@ let
 in
 {
   packages = {
-    inherit madder;
+    inherit madder madder-race madder-cover;
     default = madder;
   };
 
