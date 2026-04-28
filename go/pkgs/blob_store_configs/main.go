@@ -43,22 +43,24 @@ type (
 )
 
 var (
-	Coder                         = internal.Coder
-	ConfigKeyNames                = internal.ConfigKeyNames
-	ConfigKeyValues               = internal.ConfigKeyValues
-	DecodeTomlInventoryArchiveV0  = internal.DecodeTomlInventoryArchiveV0
-	DecodeTomlInventoryArchiveV1  = internal.DecodeTomlInventoryArchiveV1
-	DecodeTomlInventoryArchiveV2  = internal.DecodeTomlInventoryArchiveV2
-	DecodeTomlLocalHashBucketedV1 = internal.DecodeTomlLocalHashBucketedV1
-	DecodeTomlLocalHashBucketedV2 = internal.DecodeTomlLocalHashBucketedV2
-	DecodeTomlPointerV0           = internal.DecodeTomlPointerV0
-	DecodeTomlSFTPV0              = internal.DecodeTomlSFTPV0
-	DecodeTomlSFTPViaSSHConfigV0  = internal.DecodeTomlSFTPViaSSHConfigV0
-	DecodeTomlUriV0               = internal.DecodeTomlUriV0
-	DecodeTomlV3                  = internal.DecodeTomlV3
-	Default                       = internal.Default
-	DefaultHashBuckets            = internal.DefaultHashBuckets
-	DefaultHashType               = internal.DefaultHashType
+	Coder                            = internal.Coder
+	ConfigKeyNames                   = internal.ConfigKeyNames
+	ConfigKeyValues                  = internal.ConfigKeyValues
+	DecodeTomlInventoryArchiveV0     = internal.DecodeTomlInventoryArchiveV0
+	DecodeTomlInventoryArchiveV1     = internal.DecodeTomlInventoryArchiveV1
+	DecodeTomlInventoryArchiveV2     = internal.DecodeTomlInventoryArchiveV2
+	DecodeTomlLocalHashBucketedV1    = internal.DecodeTomlLocalHashBucketedV1
+	DecodeTomlLocalHashBucketedV2    = internal.DecodeTomlLocalHashBucketedV2
+	DecodeTomlPointerV0              = internal.DecodeTomlPointerV0
+	DecodeTomlSFTPV0                 = internal.DecodeTomlSFTPV0
+	DecodeTomlSFTPViaSSHConfigV0     = internal.DecodeTomlSFTPViaSSHConfigV0
+	DecodeTomlUriV0                  = internal.DecodeTomlUriV0
+	DecodeTomlV3                     = internal.DecodeTomlV3
+	Default                          = internal.Default
+	DefaultHashBuckets               = internal.DefaultHashBuckets
+	DefaultHashType                  = internal.DefaultHashType
+	SetMultiEncryptionFlagDefinition = internal.SetMultiEncryptionFlagDefinition
+	TypeStructForConfig              = internal.TypeStructForConfig
 )
 
 const (

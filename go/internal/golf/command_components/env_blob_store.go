@@ -1,16 +1,12 @@
 package command_components
 
 import (
-	"os"
-	"strings"
-
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
 )
@@ -80,34 +76,25 @@ func (cmd EnvBlobStore) makeEnvLocal(
 }
 
 // makeBlobWriteObserver returns the observer to wire into env_dir for
-// this command invocation. Resolves the disable contract:
+// this command invocation. The CLI-only --no-inventory-log flag
+// short-circuits to a NopObserver here; the env-var disable
+// (MADDER_INVENTORY_LOG=0) and the FileObserver+ContextCloseAfter
+// wiring are handled by inventory_log.WireDefault, which library
+// importers also use (#76).
 //
-//  1. MADDER_INVENTORY_LOG=0 (exactly "0") → no-op observer.
-//  2. --no-inventory-log global flag, if the utility's GlobalFlags
-//     satisfies inventoryLogFlagsReader and reports true → no-op
-//     observer.
-//  3. Otherwise → FileObserver rooted at
-//     inventory_log.MadderInventoryLogDir(), with its Close registered
-//     as an After hook on req.Context. The hook fires when
-//     errCtx.Run() inside futility's wrapped.Run completes, flushing
-//     hyphence's bufio.Writer and the file before RunCLI returns.
-//     Without this, the body adapter goroutine would be killed mid-
-//     stream on process exit and the trailing buffer would be lost.
-//     See ADR 0004's superseded-by note and madder#75.
+// Both *FileObserver and NopObserver satisfy domain_interfaces
+// .BlobWriteObserver directly, so we type-assert rather than wrap
+// with AsBlobWriteObserver — wrapping would hide *FileObserver's
+// DescriptionSetter capability from the write command's type
+// assertion (write.go:134).
 func makeBlobWriteObserver(
 	req futility.Request,
 ) domain_interfaces.BlobWriteObserver {
-	if strings.TrimSpace(os.Getenv("MADDER_INVENTORY_LOG")) == "0" {
-		return inventory_log.NopObserver{}
-	}
-
 	if g, ok := req.Utility.GlobalFlags.(inventoryLogFlagsReader); ok {
 		if g.IsInventoryLogDisabled() {
 			return inventory_log.NopObserver{}
 		}
 	}
 
-	obs := inventory_log.NewFileObserver(inventory_log.MadderInventoryLogDir())
-	errors.ContextCloseAfter(req.Context, obs)
-	return obs
+	return inventory_log.WireDefault(req.Context).(domain_interfaces.BlobWriteObserver)
 }

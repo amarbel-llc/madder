@@ -7,6 +7,8 @@
 // --no-inventory-log or MADDER_INVENTORY_LOG=0.
 package inventory_log
 
+//go:generate dagnabit export
+
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 )

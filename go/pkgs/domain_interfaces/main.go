@@ -16,6 +16,7 @@ type (
 	BlobReader                                                          = internal.BlobReader
 	BlobReaderFactory                                                   = internal.BlobReaderFactory
 	BlobStore                                                           = internal.BlobStore
+	BlobStoreConfig                                                     = internal.BlobStoreConfig
 	BlobWriteEvent                                                      = internal.BlobWriteEvent
 	BlobWriteObserver                                                   = internal.BlobWriteObserver
 	BlobWriteOp                                                         = internal.BlobWriteOp
@@ -31,6 +32,7 @@ type (
 	Hash                                                                = internal.Hash
 	Lock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]        = internal.Lock[KEY, KEY_PTR]
 	LockMutable[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]] = internal.LockMutable[KEY, KEY_PTR]
+	LogEvent                                                            = internal.LogEvent
 	MarklFormat                                                         = internal.MarklFormat
 	MarklFormatGetter                                                   = internal.MarklFormatGetter
 	MarklId                                                             = internal.MarklId
