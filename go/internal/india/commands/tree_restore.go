@@ -281,9 +281,9 @@ func materializeEntries(
 
 // materializeFile opens the materialized path create-only, streams the
 // blob into it via io.Copy, then applies the captured POSIX
-// permissions. The blob reader is required to be seekable and to
-// satisfy io.WriterTo so io.Copy uses its WriteTo path; we do not
-// buffer the file content.
+// permissions. domain_interfaces.BlobReader satisfies io.WriterTo, so
+// io.Copy uses the WriteTo fast path and the file content is never
+// buffered in memory.
 func materializeFile(
 	blobStore blob_stores.BlobStoreInitialized,
 	e tree_capture_receipt.EntryV1,
