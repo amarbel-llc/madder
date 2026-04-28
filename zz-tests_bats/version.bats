@@ -18,6 +18,14 @@ function version_prints_burnt_in_identity { # @test
   run_madder version
   assert_success
 
+  # Skip when the binary under test was built without ldflag injection
+  # (devshell `go build` for race/cover lanes — see #56). The third
+  # scenario in this file still runs there because it only compares
+  # the two binaries to each other.
+  if [[ $output == 'dev+unknown' ]]; then
+    skip "binary built without -X main.version/commit ldflags (#56)"
+  fi
+
   # Format: <version>+<commit>. Nix builds always override defaults.
   # Accept anything that fits "nonempty+nonempty" and rule out the
   # dev fallback explicitly.
@@ -31,6 +39,10 @@ function version_matches_flake_version { # @test
   # sed target and the ldflag target.
   run_madder version
   assert_success
+
+  if [[ $output == 'dev+unknown' ]]; then
+    skip "binary built without -X main.version/commit ldflags (#56)"
+  fi
 
   local got_version
   got_version="$(echo "$output" | head -n1 | cut -d+ -f1)"
