@@ -10,6 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -147,6 +148,13 @@ type Init struct {
 	discover        bool
 	desc            futility.Description
 
+	// Encryption is the value of -encryption when the typed config is
+	// SFTP. ADR 0005 forbids storing encryption on the local SFTP
+	// transport config, so the flag lands on the Init command itself
+	// and is threaded into the remote `blob_store-config` via
+	// ensureRemoteConfigExists.
+	Encryption []markl.Id
+
 	command_components.EnvBlobStore
 	command_components.Init
 }
@@ -181,6 +189,11 @@ func (cmd *Init) SetFlagDefinitions(
 			"discover",
 			false,
 			"Discover remote blob store config from existing directory structure",
+		)
+
+		blob_store_configs.SetMultiEncryptionFlagDefinition(
+			flagDefinitions,
+			&cmd.Encryption,
 		)
 	}
 }
@@ -373,9 +386,12 @@ func makeSSHClientForSFTPConfig(
 // ensureRemoteConfigExists makes sure the SFTP remote has a
 // blob_store-config at its root. If one is already there it is left
 // alone (someone — a prior init or an external tool — has already
-// populated it). If absent, a default TomlV3 config is written
-// matching what `madder init -encryption none` produces locally
-// (HashTypeDefault, DefaultHashBuckets, CompressionTypeDefault).
+// populated it). If absent, a default TomlV3 config is written using
+// HashTypeDefault, DefaultHashBuckets, CompressionTypeDefault, and
+// any encryption recipients passed via the -encryption flag. The
+// flag lands on the Init command itself rather than on TomlSFTPV0
+// because ADR 0005 reserves the local SFTP config for transport
+// fields only.
 //
 // The remote directory itself is mkdir'd if missing.
 //
@@ -436,6 +452,7 @@ func (cmd *Init) ensureRemoteConfigExists(
 		blob_stores.DiscoveredConfig{
 			HashTypeId: string(blob_store_configs.HashTypeDefault),
 			Buckets:    blob_store_configs.DefaultHashBuckets,
+			Encryption: cmd.Encryption,
 		},
 		printer,
 	); err != nil {

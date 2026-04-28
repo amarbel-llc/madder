@@ -63,6 +63,10 @@ var (
 	ConfigKeyNames     = charlie_bsc.ConfigKeyNames
 )
 
+var (
+	SetMultiEncryptionFlagDefinition = charlie_bsc.SetMultiEncryptionFlagDefinition
+)
+
 // Re-export generated Decode/Encode functions
 var (
 	DecodeTomlLocalHashBucketedV1 = charlie_bsc.DecodeTomlLocalHashBucketedV1

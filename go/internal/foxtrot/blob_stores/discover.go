@@ -21,6 +21,13 @@ type DiscoveredConfig struct {
 	HashTypeId string
 	MultiHash  bool
 	Buckets    []int
+
+	// Encryption is set when seeding a fresh remote (the bootstrap path
+	// in init.go's ensureRemoteConfigExists, where the caller threads the
+	// `-encryption` flag through). DiscoverRemoteConfig leaves it empty —
+	// probing an existing remote learns its encryption from the remote
+	// `blob_store-config`, not from directory layout.
+	Encryption []markl.Id
 }
 
 func DiscoverRemoteConfig(
@@ -187,6 +194,7 @@ func WriteRemoteConfig(
 		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
 		HashBuckets:     discovered.Buckets,
 		CompressionType: compression_type.CompressionTypeDefault,
+		Encryption:      discovered.Encryption,
 	}
 
 	typedConfig := &hyphence.TypedBlob[blob_store_configs.Config]{

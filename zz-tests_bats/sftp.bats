@@ -441,6 +441,54 @@ function sftp_fsck_json_auto_detects { # @test
   refute_output --partial 'TAP version 14'
 }
 
+function sftp_init_with_encryption { # @test
+  # Mirrors init_with_encryption (init.bats) for SFTP. ADR 0005 routes
+  # the -encryption flag to the remote TomlV3, so info-repo must surface
+  # a non-empty markl-id and a blob round-trip must work end-to-end.
+  local remote_root="$BATS_TEST_TMPDIR/sftp-encrypted"
+  run_madder init-sftp-explicit \
+    -host 127.0.0.1 \
+    -port "$SFTP_PORT" \
+    -user testuser \
+    -password anything \
+    -remote-path "$remote_root" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    -encryption generate \
+    .sftp-encrypted
+  assert_success
+
+  run_madder info-repo .sftp-encrypted encryption
+  assert_success
+  assert_output --regexp '.+'
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "encrypted-sftp-roundtrip" >"$blob"
+
+  run_madder write -format tap .sftp-encrypted "$blob"
+  assert_success
+  local hash
+  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+  [[ -n $hash ]] || fail "write returned empty hash. output: $output"
+
+  run_madder cat .sftp-encrypted "$hash"
+  assert_success
+  assert_output --partial "encrypted-sftp-roundtrip"
+}
+
+function sftp_init_without_encryption { # @test
+  # Symmetric to init_without_encryption (init.bats:42). With no
+  # -encryption flag, info-repo encryption prints no encryption id
+  # value. The merged $output carries SFTP transport log lines
+  # (dialing, connecting, …) on stderr; the local-store assert_output
+  # '' shape doesn't apply, so refute the presence of any markl-id
+  # value on the output stream.
+  init_sftp_test_store
+
+  run_madder info-repo .sftp-test encryption
+  assert_success
+  refute_output --regexp '^[a-z0-9]+-[A-Za-z0-9]+$'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
