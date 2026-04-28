@@ -18,24 +18,21 @@ setup() {
 #   - tree_restore_refuses_nul_byte_in_path
 #   - tree_restore_refuses_empty_root
 
-# write_blob_id pipes content through `madder write -format tap` and
+# write_blob_id pipes a file through `madder write -format tap` and
 # echoes just the blob-id (the 4th column of the `ok 1 - ...` line).
 # Used to inject a hand-crafted receipt blob without touching any
-# tree-capture-specific layout.
+# tree-capture-specific layout. Pass an explicit store-id as the first
+# arg to target a non-default store: `write_blob_id .work path`.
 write_blob_id() {
-  local path="$1"
-  run_madder write -format tap "$path"
-  assert_success
-  echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
-}
-
-# write_blob_id_to writes the file to the named store and echoes the
-# resulting blob-id. Used when a test must inject a synthesized blob
-# into a specific store rather than the active default.
-write_blob_id_to() {
-  local store="$1"
-  local path="$2"
-  run_madder write -format tap "$store" "$path"
+  local store path
+  if [[ $# -eq 1 ]]; then
+    path="$1"
+    run_madder write -format tap "$path"
+  else
+    store="$1"
+    path="$2"
+    run_madder write -format tap "$store" "$path"
+  fi
   assert_success
   echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
 }
@@ -367,7 +364,7 @@ function tree_restore_store_flag_overrides_hint { # @test
   mkdir src
   echo "y" >src/y.txt
   local blob_id
-  blob_id="$(write_blob_id_to .work src/y.txt)"
+  blob_id="$(write_blob_id .work src/y.txt)"
   [[ -n $blob_id ]] || fail "write returned empty blob id"
 
   # Synthesize a receipt with a stale hint pointing at .work and
@@ -388,7 +385,7 @@ RECEIPT
   # tree-restore fetches the receipt against the resolved store —
   # `-store .work` makes phase 1 read from .work.
   local rid
-  rid="$(write_blob_id_to .work "$receipt_path")"
+  rid="$(write_blob_id .work "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
   # Without -store, this would trigger branch 3 (drift refusal).

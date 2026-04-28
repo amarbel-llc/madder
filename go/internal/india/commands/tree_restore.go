@@ -115,10 +115,6 @@ func (cmd *TreeRestore) Run(req futility.Request) {
 // Materialization MUST NOT recover from a mid-stream blob read failure
 // (FDR §Limitations: no rollback) — the destination is left partial
 // in that case and the diagnostic names the failed entry.
-//
-// Store resolution per FDR §Store-Hint Resolution: -store wins; else
-// the receipt is fetched from the default store, then the
-// materialization store is selected from the receipt's optional Hint.
 func (cmd *TreeRestore) runRestore(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
@@ -161,14 +157,12 @@ func (cmd *TreeRestore) runRestore(
 
 // readReceiptBlob fetches and parses the receipt blob.
 //
-// Per FDR §Store-Hint Resolution, phase 1 ("Resolve store + parse
-// receipt") is bootstrapping: the hint isn't parsed yet, so the only
-// signal available is the -store flag. With -store set, the receipt
-// MUST live in that store. With -store unset, the receipt could
-// legitimately be in any configured store (the producer wrote it to
-// the same store as the captured entries) — try the default first,
-// then fall back across remaining stores. This mirrors `cat`'s
-// "remaining stores are searched automatically" behavior.
+// Phase 1 of FDR §Store-Hint Resolution is bootstrapping: the hint
+// isn't parsed yet, so -store is the only available signal. With
+// -store unset, fall back across configured stores using HasBlob
+// probes — mirrors cat.go's blobFromRemainingStores. The
+// GetBlobStoresSorted ordering pins the search order so two stores
+// holding receipts with colliding ids resolve deterministically.
 func readReceiptBlob(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptId *markl.Id,
@@ -186,44 +180,37 @@ func readReceiptBlob(
 		return blob, nil
 	}
 
-	defaultStore, remaining := envBlobStore.GetDefaultBlobStoreAndRemaining()
-	if blob, _, err := tree_capture_receipt.Read(defaultStore, receiptId); err == nil {
-		return blob, nil
-	}
-
-	for _, store := range remaining {
-		if blob, _, err := tree_capture_receipt.Read(store, receiptId); err == nil {
-			return blob, nil
+	for _, store := range envBlobStore.GetBlobStoresSorted() {
+		if !store.HasBlob(receiptId) {
+			continue
 		}
+		blob, _, err := tree_capture_receipt.Read(store, receiptId)
+		if err != nil {
+			return nil, errors.Wrapf(err, "read receipt %s", receiptId)
+		}
+		return blob, nil
 	}
 
 	return nil, errors.ErrorWithStackf(
 		"receipt %s not found in any configured store", receiptId)
 }
 
-// resolveMaterializationStore implements the five-branch FDR
-// §Store-Hint Resolution flow for entry materialization:
-//
-//  1. -store flag wins (suppresses every other branch).
-//  2. Hint present, store configured, config-hash matches → silent.
-//  3. Hint present, store configured, config-hash differs → refuse.
-//  4. Hint present, store NOT configured locally → fall back, notice.
-//  5. No hint → fall back, notice.
-//
-// Branch 3 emits the multi-prefix diagnostic (warning: drift,
-// error: refuse-without-override, hint: override syntax) and returns
-// the error so the framework cancels the request.
+// resolveMaterializationStore implements FDR §Store-Hint Resolution
+// for entry materialization. -store wins; otherwise the hint dictates
+// the store, with config-drift diagnostics on mismatch. A missing
+// hint or missing/malformed/incompatible store falls back to the
+// active default with a stderr notice — the FDR §Limitations
+// §Hash-family mismatch carve-out widens that fallback path to
+// include compute failures.
 func resolveMaterializationStore(
 	envBlobStore command_components.BlobStoreEnv,
 	hint *tree_capture_receipt.StoreHint,
 	storeOverride string,
 ) (blob_stores.BlobStoreInitialized, error) {
-	// Branch 1: -store wins, no diagnostics from the hint flow.
 	if storeOverride != "" {
 		return resolveStoreById(envBlobStore, storeOverride)
 	}
 
-	// Branch 5: no hint — fall back with notice.
 	if hint == nil {
 		fmt.Fprintln(os.Stderr, "notice: receipt carries no store hint")
 		fmt.Fprintln(os.Stderr, "notice: falling back to active store")
@@ -242,7 +229,6 @@ func resolveMaterializationStore(
 	stores := envBlobStore.GetBlobStores()
 	hintedStore, ok := stores[hintId.String()]
 	if !ok {
-		// Branch 4: store not configured locally.
 		fmt.Fprintf(os.Stderr,
 			"notice: receipt names store %q which is not configured locally\n",
 			hint.StoreId)
@@ -252,8 +238,6 @@ func resolveMaterializationStore(
 
 	localHint, err := computeStoreHint(hintedStore, hintId)
 	if err != nil || localHint == nil {
-		// Hash-family mismatch or compute failure — treat as branch 4
-		// per FDR §Limitations §Hash-family mismatch.
 		fmt.Fprintf(os.Stderr,
 			"notice: cannot compute local config-markl-id for store %q: %v\n",
 			hint.StoreId, err)
@@ -262,11 +246,9 @@ func resolveMaterializationStore(
 	}
 
 	if localHint.ConfigMarklId == hint.ConfigMarklId {
-		// Branch 2: auto-use, silent.
 		return hintedStore, nil
 	}
 
-	// Branch 3: config drift, refuse without -store override.
 	fmt.Fprintf(os.Stderr,
 		"warning: store %s has been re-configured since this receipt was written\n"+
 			"  receipt config-hash: %s\n"+
