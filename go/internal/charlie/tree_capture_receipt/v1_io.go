@@ -8,9 +8,9 @@ import (
 	"io/fs"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -29,25 +29,16 @@ func WriteV1(w io.Writer, entries []EntryV1) (int64, error) {
 }
 
 // WriteV1WithHint serializes entries as a hyphence-wrapped v1 receipt
-// to w, optionally prefixing a store-hint metadata line per RFC 0003
-// §Producer Rules §Receipt Metadata: Store Hint. Entries are sorted in
-// place by (Root, Path) before encoding so two captures of the same
-// tree produce byte-identical output. Returns the number of bytes
-// written.
+// to w via the package's Coder, optionally prefixing a store-hint
+// metadata line per RFC 0003 §Producer Rules §Receipt Metadata: Store
+// Hint.
 func WriteV1WithHint(w io.Writer, entries []EntryV1, hint *StoreHint) (int64, error) {
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Root != entries[j].Root {
-			return entries[i].Root < entries[j].Root
-		}
-		return entries[i].Path < entries[j].Path
-	})
-
-	hw := hyphence.Writer{
-		Metadata: &v1MetadataWriter{hint: hint},
-		Blob:     &v1BodyWriter{entries: entries},
+	tb := &hyphence.TypedBlob[Blob]{
+		Type: TypeStructV1,
+		Blob: &V1{Hint: hint, Entries: entries},
 	}
 
-	n, err := hw.WriteTo(w)
+	n, err := Coder.EncodeTo(tb, w)
 	if err != nil {
 		return n, errors.Wrap(err)
 	}
@@ -55,57 +46,105 @@ func WriteV1WithHint(w io.Writer, entries []EntryV1, hint *StoreHint) (int64, er
 	return n, nil
 }
 
-// v1MetadataWriter emits the receipt's hyphence metadata block: an
-// optional store-hint line followed by the type line. hyphence.Writer
-// wraps this output in `---\n` boundaries.
-type v1MetadataWriter struct {
-	hint *StoreHint
+// v1BodyCoder is the version-specific blob coder for v1 receipts.
+// CoderTypeMapWithoutType dispatches to it when the metadata pass
+// reports typedBlob.Type == TypeStructV1.
+//
+// On decode, the metadata coder has already populated *typedBlob.Blob
+// with a *V1 carrying the optional Hint; this coder streams NDJSON
+// entries from the bufferedReader into (*V1).Entries.
+//
+// On encode, the metadata coder has already emitted the type and
+// hint lines; this coder streams sorted NDJSON entries from
+// (*V1).Entries.
+type v1BodyCoder struct{}
+
+var _ interfaces.CoderBufferedReadWriter[*Blob] = v1BodyCoder{}
+
+func (v1BodyCoder) DecodeFrom(
+	blobPtr *Blob,
+	bufferedReader *bufio.Reader,
+) (n int64, err error) {
+	v1, ok := (*blobPtr).(*V1)
+	if !ok {
+		v1 = &V1{}
+		*blobPtr = v1
+	}
+
+	for {
+		var line []byte
+		line, err = readNDJSONLine(bufferedReader)
+		n += int64(len(line))
+
+		if err != nil && err != io.EOF {
+			return n, errors.Wrap(err)
+		}
+
+		if len(line) > 0 {
+			var rec recordV1
+			if jerr := json.Unmarshal(line, &rec); jerr != nil {
+				return n, errors.Wrapf(jerr,
+					"tree_capture_receipt: decode body line: %q", line)
+			}
+
+			entry, derr := decodeV1Record(rec)
+			if derr != nil {
+				return n, errors.Wrap(derr)
+			}
+
+			v1.Entries = append(v1.Entries, entry)
+		}
+
+		if err == io.EOF {
+			err = nil
+			return n, nil
+		}
+	}
 }
 
-func (mw *v1MetadataWriter) WriteTo(w io.Writer) (int64, error) {
-	var total int64
+func (v1BodyCoder) EncodeTo(
+	blobPtr *Blob,
+	bufferedWriter *bufio.Writer,
+) (n int64, err error) {
+	v1, ok := (*blobPtr).(*V1)
+	if !ok {
+		return 0, errors.ErrorWithStackf(
+			"tree_capture_receipt: v1BodyCoder.EncodeTo: expected *V1, got %T", *blobPtr)
+	}
 
-	if mw.hint != nil {
-		n, err := fmt.Fprintf(w, "- store/%s < %s\n", mw.hint.StoreId, mw.hint.ConfigMarklId)
-		total += int64(n)
+	entries := append([]EntryV1(nil), v1.Entries...)
+	sortEntries(entries)
+
+	for i := range entries {
+		var line []byte
+		line, err = encodeV1Entry(entries[i])
 		if err != nil {
-			return total, errors.Wrap(err)
+			return n, errors.Wrap(err)
+		}
+
+		var n1 int
+		n1, err = bufferedWriter.Write(line)
+		n += int64(n1)
+		if err != nil {
+			return n, errors.Wrap(err)
 		}
 	}
 
-	n, err := io.WriteString(w, "! "+TypeTagV1+"\n")
-	total += int64(n)
-	if err != nil {
-		return total, errors.Wrap(err)
-	}
-
-	return total, nil
+	return n, nil
 }
 
-// v1BodyWriter emits the NDJSON body of a v1 receipt. WriteTo stops at
-// the first encode/write failure; hyphence.Writer surfaces the error
-// to the caller.
-type v1BodyWriter struct {
-	entries []EntryV1
-}
+// readNDJSONLine reads one '\n'-terminated line from br, returning the
+// bytes (without the trailing '\n'). io.EOF is returned when the
+// stream is exhausted; the caller checks for and tolerates a final
+// non-empty line without a trailing newline.
+func readNDJSONLine(br *bufio.Reader) ([]byte, error) {
+	line, err := br.ReadBytes('\n')
 
-func (bw *v1BodyWriter) WriteTo(w io.Writer) (int64, error) {
-	var total int64
-
-	for i := range bw.entries {
-		line, err := encodeV1Entry(bw.entries[i])
-		if err != nil {
-			return total, err
-		}
-
-		n, err := w.Write(line)
-		total += int64(n)
-		if err != nil {
-			return total, err
-		}
+	if len(line) > 0 && line[len(line)-1] == '\n' {
+		line = line[:len(line)-1]
 	}
 
-	return total, nil
+	return line, err
 }
 
 // recordV1 is the on-disk JSON shape for one entry in
@@ -155,135 +194,6 @@ func encodeV1Entry(e EntryV1) ([]byte, error) {
 	return append(body, '\n'), nil
 }
 
-// ReadV1 parses a hyphence-wrapped v1 receipt from r. The receipt's
-// type-id MUST match TypeTagV1; an unknown type-id is an error rather
-// than silent fallback (callers needing dispatch should peek the
-// metadata via the dispatcher in store.go).
-func ReadV1(r io.Reader) (V1, error) {
-	var v1 V1
-
-	mr := &v1MetadataReader{}
-	br := &v1BodyReader{}
-
-	hr := hyphence.Reader{
-		RequireMetadata: true,
-		Metadata:        mr,
-		Blob:            br,
-	}
-
-	if _, err := hr.ReadFrom(r); err != nil {
-		return v1, errors.Wrap(err)
-	}
-
-	if mr.typeTag != TypeTagV1 {
-		return v1, errors.ErrorWithStackf(
-			"tree_capture_receipt: expected type-tag %q, got %q",
-			TypeTagV1, mr.typeTag,
-		)
-	}
-
-	v1.Hint = mr.hint
-	v1.Entries = br.entries
-
-	return v1, nil
-}
-
-// v1MetadataReader implements io.ReaderFrom for the metadata block
-// piped from hyphence.Reader. Recognizes the `! <type>` line and the
-// optional `- store/<id> < <markl-id>` line.
-type v1MetadataReader struct {
-	typeTag string
-	hint    *StoreHint
-}
-
-func (mr *v1MetadataReader) ReadFrom(r io.Reader) (int64, error) {
-	var total int64
-	scanner := bufio.NewScanner(r)
-
-	for scanner.Scan() {
-		line := scanner.Text()
-		total += int64(len(line) + 1)
-
-		switch {
-		case strings.HasPrefix(line, "! "):
-			mr.typeTag = strings.TrimPrefix(line, "! ")
-
-		case strings.HasPrefix(line, "- store/"):
-			rest := strings.TrimPrefix(line, "- store/")
-			sep := " < "
-			i := strings.Index(rest, sep)
-			if i < 0 {
-				return total, errors.ErrorWithStackf(
-					"tree_capture_receipt: malformed store-hint line %q", line,
-				)
-			}
-			mr.hint = &StoreHint{
-				StoreId:       rest[:i],
-				ConfigMarklId: rest[i+len(sep):],
-			}
-
-		default:
-			// Per RFC 0003 §Producer Rules and hyphence(7), unrecognized
-			// metadata lines MUST be tolerated. Skip silently.
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return total, errors.Wrap(err)
-	}
-
-	return total, nil
-}
-
-// v1BodyReader implements io.ReaderFrom for the NDJSON body piped
-// from hyphence.Reader. Thin wrapper around decodeV1Body so ReadV1
-// (single-version path) and the dispatcher in store.go (which buffers
-// the body before knowing the version) share decode logic.
-type v1BodyReader struct {
-	entries []EntryV1
-}
-
-func (br *v1BodyReader) ReadFrom(r io.Reader) (int64, error) {
-	entries, n, err := decodeV1Body(r)
-	br.entries = entries
-	return n, err
-}
-
-// decodeV1Body parses the NDJSON body of a v1 receipt. Each non-empty
-// line is decoded into recordV1 and promoted to EntryV1.
-func decodeV1Body(r io.Reader) ([]EntryV1, int64, error) {
-	var entries []EntryV1
-	var total int64
-	scanner := bufio.NewScanner(r)
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		total += int64(len(line) + 1)
-
-		if len(line) == 0 {
-			continue
-		}
-
-		var rec recordV1
-		if err := json.Unmarshal(line, &rec); err != nil {
-			return entries, total, errors.Wrapf(err, "tree_capture_receipt: decode body line: %q", line)
-		}
-
-		entry, err := decodeV1Record(rec)
-		if err != nil {
-			return entries, total, errors.Wrap(err)
-		}
-
-		entries = append(entries, entry)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return entries, total, errors.Wrap(err)
-	}
-
-	return entries, total, nil
-}
-
 func decodeV1Record(rec recordV1) (EntryV1, error) {
 	mode, err := strconv.ParseUint(rec.Mode, 8, 32)
 	if err != nil {
@@ -316,4 +226,15 @@ func decodeV1Record(rec recordV1) (EntryV1, error) {
 	}
 
 	return entry, nil
+}
+
+// sortEntries sorts in place by (Root, Path). Producer-side
+// determinism: equivalent inputs yield byte-identical receipts.
+func sortEntries(entries []EntryV1) {
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Root != entries[j].Root {
+			return entries[i].Root < entries[j].Root
+		}
+		return entries[i].Path < entries[j].Path
+	})
 }

@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 )
 
-func TestReadV1_RoundTripNoHint(t *testing.T) {
-	// Inputs in arbitrary order. WriteV1 sorts in place by (Root, Path),
-	// so the wire ordering is the sorted permutation of these entries.
+func TestCoder_DecodeFrom_RoundTripNoHint(t *testing.T) {
 	input := []EntryV1{
 		{Path: "a.txt", Root: "src", Type: TypeFile, Mode: 0o644, Size: 10, BlobId: "blake2b256-x"},
 		{Path: ".", Root: "src", Type: TypeDir, Mode: 0o755},
@@ -25,108 +25,82 @@ func TestReadV1_RoundTripNoHint(t *testing.T) {
 		t.Fatalf("WriteV1: %v", err)
 	}
 
-	got, err := ReadV1(&buf)
-	if err != nil {
-		t.Fatalf("ReadV1: %v", err)
+	tb := &hyphence.TypedBlob[Blob]{}
+	if _, err := Coder.DecodeFrom(tb, &buf); err != nil {
+		t.Fatalf("Coder.DecodeFrom: %v", err)
 	}
 
-	if got.Hint != nil {
-		t.Errorf("expected nil Hint, got %+v", got.Hint)
+	if tb.Type != TypeStructV1 {
+		t.Errorf("Type: got %v want %v", tb.Type, TypeStructV1)
 	}
 
-	if len(got.Entries) != len(wantSorted) {
-		t.Fatalf("entries len: got %d want %d", len(got.Entries), len(wantSorted))
+	v1, ok := tb.Blob.(*V1)
+	if !ok {
+		t.Fatalf("Blob: got %T want *V1", tb.Blob)
 	}
 
+	if v1.Hint != nil {
+		t.Errorf("expected nil Hint, got %+v", v1.Hint)
+	}
+
+	if len(v1.Entries) != len(wantSorted) {
+		t.Fatalf("entries len: got %d want %d", len(v1.Entries), len(wantSorted))
+	}
 	for i := range wantSorted {
-		if got.Entries[i] != wantSorted[i] {
-			t.Errorf("entries[%d]:\n  got:  %+v\n  want: %+v", i, got.Entries[i], wantSorted[i])
+		if v1.Entries[i] != wantSorted[i] {
+			t.Errorf("entries[%d]:\n  got:  %+v\n  want: %+v", i, v1.Entries[i], wantSorted[i])
 		}
 	}
 }
 
-func TestReadV1_RoundTripWithHint(t *testing.T) {
+func TestCoder_DecodeFrom_RoundTripWithHint(t *testing.T) {
 	hint := &StoreHint{
 		StoreId:       ".work",
 		ConfigMarklId: "blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd",
 	}
-
-	want := []EntryV1{
+	entries := []EntryV1{
 		{Path: "a.txt", Root: "src", Type: TypeFile, Mode: 0o644, Size: 10, BlobId: "blake2b256-x"},
 	}
 
 	var buf bytes.Buffer
-	if _, err := WriteV1WithHint(&buf, append([]EntryV1{}, want...), hint); err != nil {
+	if _, err := WriteV1WithHint(&buf, append([]EntryV1{}, entries...), hint); err != nil {
 		t.Fatalf("WriteV1WithHint: %v", err)
 	}
 
-	got, err := ReadV1(&buf)
-	if err != nil {
-		t.Fatalf("ReadV1: %v", err)
+	tb := &hyphence.TypedBlob[Blob]{}
+	if _, err := Coder.DecodeFrom(tb, &buf); err != nil {
+		t.Fatalf("Coder.DecodeFrom: %v", err)
 	}
 
-	if got.Hint == nil {
+	v1, ok := tb.Blob.(*V1)
+	if !ok {
+		t.Fatalf("Blob: got %T want *V1", tb.Blob)
+	}
+
+	if v1.Hint == nil {
 		t.Fatalf("expected non-nil Hint, got nil")
 	}
-	if got.Hint.StoreId != hint.StoreId {
-		t.Errorf("Hint.StoreId: got %q want %q", got.Hint.StoreId, hint.StoreId)
+	if v1.Hint.StoreId != hint.StoreId {
+		t.Errorf("Hint.StoreId: got %q want %q", v1.Hint.StoreId, hint.StoreId)
 	}
-	if got.Hint.ConfigMarklId != hint.ConfigMarklId {
-		t.Errorf("Hint.ConfigMarklId: got %q want %q", got.Hint.ConfigMarklId, hint.ConfigMarklId)
-	}
-}
-
-func TestReadFrom_DispatchesV1(t *testing.T) {
-	want := []EntryV1{
-		{Path: "a", Root: ".", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "x"},
-	}
-
-	var buf bytes.Buffer
-	if _, err := WriteV1(&buf, append([]EntryV1{}, want...)); err != nil {
-		t.Fatalf("WriteV1: %v", err)
-	}
-
-	blob, typeTag, err := ReadFrom(&buf)
-	if err != nil {
-		t.Fatalf("ReadFrom: %v", err)
-	}
-
-	if typeTag != TypeTagV1 {
-		t.Errorf("typeTag: got %q want %q", typeTag, TypeTagV1)
-	}
-
-	v1, ok := blob.(*V1)
-	if !ok {
-		t.Fatalf("expected *V1, got %T", blob)
-	}
-
-	if len(v1.Entries) != 1 || v1.Entries[0].Path != "a" {
-		t.Errorf("entries: got %+v", v1.Entries)
+	if v1.Hint.ConfigMarklId != hint.ConfigMarklId {
+		t.Errorf("Hint.ConfigMarklId: got %q want %q", v1.Hint.ConfigMarklId, hint.ConfigMarklId)
 	}
 }
 
-func TestReadFrom_RejectsUnknownTypeTag(t *testing.T) {
+func TestCoder_DecodeFrom_RejectsUnknownTypeTag(t *testing.T) {
 	receipt := "---\n! madder-tree_capture-receipt-v999\n---\n\n"
 
-	_, typeTag, err := ReadFrom(strings.NewReader(receipt))
-	if err == nil {
+	tb := &hyphence.TypedBlob[Blob]{}
+	if _, err := Coder.DecodeFrom(tb, strings.NewReader(receipt)); err == nil {
 		t.Fatal("expected error for unknown type-tag, got nil")
 	}
-	if typeTag != "madder-tree_capture-receipt-v999" {
-		t.Errorf("typeTag: got %q want %q", typeTag, "madder-tree_capture-receipt-v999")
-	}
 }
 
-func TestReadV1_RejectsWrongTypeTag(t *testing.T) {
-	receipt := "---\n! madder-tree_capture-receipt-v999\n---\n\n"
-
-	_, err := ReadV1(strings.NewReader(receipt))
-	if err == nil {
-		t.Fatal("expected error for wrong type-tag, got nil")
-	}
-}
-
-func TestReadV1_TolerantOfUnknownMetadataLine(t *testing.T) {
+func TestCoder_DecodeFrom_TolerantOfUnknownDashKey(t *testing.T) {
+	// Hyphence(7) tolerates unknown metadata keys. A `- future-key …`
+	// line whose value does NOT start with `store/` is silently
+	// ignored by our metadata coder.
 	receipt := "---\n" +
 		"- store/.work < blake2b256-x\n" +
 		"- future-key value\n" +
@@ -134,12 +108,17 @@ func TestReadV1_TolerantOfUnknownMetadataLine(t *testing.T) {
 		"---\n\n" +
 		`{"path":"a","root":".","type":"file","mode":"0644","size":1,"blob_id":"x"}` + "\n"
 
-	got, err := ReadV1(strings.NewReader(receipt))
-	if err != nil {
-		t.Fatalf("ReadV1: %v", err)
+	tb := &hyphence.TypedBlob[Blob]{}
+	if _, err := Coder.DecodeFrom(tb, strings.NewReader(receipt)); err != nil {
+		t.Fatalf("Coder.DecodeFrom: %v", err)
 	}
 
-	if got.Hint == nil || got.Hint.StoreId != ".work" {
-		t.Errorf("expected hint .work, got %+v", got.Hint)
+	v1, ok := tb.Blob.(*V1)
+	if !ok {
+		t.Fatalf("Blob: got %T want *V1", tb.Blob)
+	}
+
+	if v1.Hint == nil || v1.Hint.StoreId != ".work" {
+		t.Errorf("expected hint .work, got %+v", v1.Hint)
 	}
 }
