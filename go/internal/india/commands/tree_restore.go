@@ -7,9 +7,7 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -88,20 +86,18 @@ func (cmd TreeRestore) Run(req futility.Request) {
 
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
-	if err := cmd.runRestore(req, envBlobStore, receiptIdStr, dest); err != nil {
+	if err := cmd.runRestore(envBlobStore, receiptIdStr, dest); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)
 	}
 }
 
-// runRestore performs the phase-A flow: precondition check, receipt
-// parse, sanitization. Returns the first refusal as an error;
-// successful return means phase A passed and phase B (materialization,
-// pending) would proceed.
+// runRestore validates preconditions, parses the receipt, and runs
+// path sanitization across every entry. Returns the first refusal as
+// an error; successful return means phase A passed.
 //
-// Phase A side-effects: none. The destination is not created, the
-// store is read-only, no blobs are opened beyond the receipt itself.
+// Phase A is read-only: the destination is not created, the store is
+// not written to, no blobs beyond the receipt itself are opened.
 func (cmd TreeRestore) runRestore(
-	req futility.Request,
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
 	dest string,
@@ -110,26 +106,34 @@ func (cmd TreeRestore) runRestore(
 		return err
 	}
 
-	receiptId, err := parseReceiptId(receiptIdStr)
-	if err != nil {
-		return err
+	var receiptId markl.Id
+	if err := receiptId.Set(receiptIdStr); err != nil {
+		return errors.Wrapf(err, "parse receipt-id %q", receiptIdStr)
 	}
 
-	blobStore := envBlobStore.GetDefaultBlobStore()
-
-	v1, err := loadReceiptV1(blobStore, receiptId)
+	blob, _, err := tree_capture_receipt.Read(
+		envBlobStore.GetDefaultBlobStore(),
+		&receiptId,
+	)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "read receipt %s", &receiptId)
+	}
+
+	v1, ok := blob.(*tree_capture_receipt.V1)
+	if !ok {
+		return errors.ErrorWithStackf(
+			"receipt %s: unexpected blob shape %T (expected *V1)",
+			&receiptId, blob)
 	}
 
 	if err := validateEntries(v1.Entries, dest); err != nil {
 		return err
 	}
 
-	// Phase B: materialize. Phase C: store-hint resolution.
-	// For now, surface a notice so a user invoking phase A's binary
-	// gets a clear signal that the command parses and validates but
-	// doesn't yet write anything.
+	// Phase A scaffolding: surface a no-op success notice so a user
+	// invoking the v1 binary today sees a clear signal that the
+	// command parses and validates but doesn't yet materialize. Phase
+	// B replaces this with the actual materialization summary.
 	fmt.Fprintf(os.Stderr,
 		"notice: tree-restore phase A: %d entries validated; "+
 			"materialization pending\n",
@@ -149,38 +153,6 @@ func assertDestinationDoesNotExist(dest string) error {
 		return errors.Wrapf(err, "stat %q", dest)
 	}
 	return nil
-}
-
-func parseReceiptId(s string) (*markl.Id, error) {
-	var id markl.Id
-	if err := id.Set(s); err != nil {
-		return nil, errors.Wrapf(err, "parse receipt-id %q", s)
-	}
-	return &id, nil
-}
-
-func loadReceiptV1(
-	blobStore blob_stores.BlobStoreInitialized,
-	receiptId *markl.Id,
-) (*tree_capture_receipt.V1, error) {
-	reader, err := blobStore.MakeBlobReader(receiptId)
-	if err != nil {
-		return nil, errors.Wrapf(err, "open receipt blob %s", receiptId)
-	}
-	defer errors.DeferredCloser(&err, reader)
-
-	tb := &hyphence.TypedBlob[tree_capture_receipt.Blob]{}
-	if _, err = tree_capture_receipt.Coder.DecodeFrom(tb, reader); err != nil {
-		return nil, errors.Wrapf(err, "decode receipt blob %s", receiptId)
-	}
-
-	v1, ok := tb.Blob.(*tree_capture_receipt.V1)
-	if !ok {
-		return nil, errors.ErrorWithStackf(
-			"receipt %s: unexpected blob shape %T (expected *V1)",
-			receiptId, tb.Blob)
-	}
-	return v1, nil
 }
 
 // validateEntries runs the RFC 0003 §Consumer Rules §Path Sanitization
