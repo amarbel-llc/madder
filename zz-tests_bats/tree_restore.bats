@@ -55,6 +55,10 @@ function tree_restore_refuses_existing_destination { # @test
   assert_failure
   echo "$output" | grep -qF 'destination already exists' \
     || fail "expected dest-exists refusal: $output"
+
+  # No-side-effects symmetry with the injection-based scenarios: the
+  # pre-existing dest should remain empty after the refusal.
+  [[ -z "$(ls -A dest)" ]] || fail "dest not left empty after refusal"
 }
 
 # tree_restore_refuses_path_escape_no_partial_writes asserts a

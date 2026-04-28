@@ -50,7 +50,7 @@ func (cmd *TreeRestore) GetParams() []futility.Param {
 	}
 }
 
-func (cmd TreeRestore) GetDescription() futility.Description {
+func (cmd *TreeRestore) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "restore a captured tree from a receipt blob",
 		Long: "Materialize a directory tree previously captured by " +
@@ -67,7 +67,7 @@ func (cmd TreeRestore) GetDescription() futility.Description {
 	}
 }
 
-func (cmd TreeRestore) Complete(
+func (cmd *TreeRestore) Complete(
 	req futility.Request,
 	envLocal env_local.Env,
 	commandLine futility.CommandLineInput,
@@ -79,7 +79,7 @@ func (cmd *TreeRestore) SetFlagDefinitions(
 ) {
 }
 
-func (cmd TreeRestore) Run(req futility.Request) {
+func (cmd *TreeRestore) Run(req futility.Request) {
 	receiptIdStr := req.PopArg("receipt-id")
 	dest := req.PopArg("dest")
 	req.AssertNoMoreArgs()
@@ -97,7 +97,7 @@ func (cmd TreeRestore) Run(req futility.Request) {
 //
 // Phase A is read-only: the destination is not created, the store is
 // not written to, no blobs beyond the receipt itself are opened.
-func (cmd TreeRestore) runRestore(
+func (cmd *TreeRestore) runRestore(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
 	dest string,
@@ -130,10 +130,11 @@ func (cmd TreeRestore) runRestore(
 		return err
 	}
 
-	// Phase A scaffolding: surface a no-op success notice so a user
-	// invoking the v1 binary today sees a clear signal that the
-	// command parses and validates but doesn't yet materialize. Phase
-	// B replaces this with the actual materialization summary.
+	// PHASE-A SCAFFOLDING — REMOVE IN PHASE B.
+	// Surface a no-op success notice so a user invoking the v1 binary
+	// today sees a clear signal that the command parses and validates
+	// but doesn't yet materialize. Phase B replaces this with the
+	// actual materialization summary.
 	fmt.Fprintf(os.Stderr,
 		"notice: tree-restore phase A: %d entries validated; "+
 			"materialization pending\n",
@@ -163,6 +164,10 @@ func assertDestinationDoesNotExist(dest string) error {
 // The materialized path used for the boundary check is
 // `filepath.Clean(filepath.Join(dest, e.root, e.path))`. The
 // destination boundary is `filepath.Clean(dest)`.
+//
+// The `error: ` prefix in the FDR-quoted diagnostics is added by the
+// framework via ContextCancelWithBadRequestError; the strings here
+// start at the noun.
 func validateEntries(entries []tree_capture_receipt.EntryV1, dest string) error {
 	cleanDest := filepath.Clean(dest)
 
