@@ -2,12 +2,14 @@ package commands
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -91,12 +93,15 @@ func (cmd *TreeRestore) Run(req futility.Request) {
 	}
 }
 
-// runRestore validates preconditions, parses the receipt, and runs
-// path sanitization across every entry. Returns the first refusal as
-// an error; successful return means phase A passed.
+// runRestore validates preconditions, parses the receipt, runs path
+// sanitization across every entry, then materializes per-type. Returns
+// the first refusal or write failure as an error.
 //
-// Phase A is read-only: the destination is not created, the store is
-// not written to, no blobs beyond the receipt itself are opened.
+// Sanitization runs before any disk write per FDR §Sanitization: the
+// entire receipt is refused atomically if any entry would escape.
+// Materialization MUST NOT recover from a mid-stream blob read failure
+// (FDR §Limitations: no rollback) — the destination is left partial
+// in that case and the diagnostic names the failed entry.
 func (cmd *TreeRestore) runRestore(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
@@ -111,10 +116,9 @@ func (cmd *TreeRestore) runRestore(
 		return errors.Wrapf(err, "parse receipt-id %q", receiptIdStr)
 	}
 
-	blob, _, err := tree_capture_receipt.Read(
-		envBlobStore.GetDefaultBlobStore(),
-		&receiptId,
-	)
+	blobStore := envBlobStore.GetDefaultBlobStore()
+
+	blob, _, err := tree_capture_receipt.Read(blobStore, &receiptId)
 	if err != nil {
 		return errors.Wrapf(err, "read receipt %s", &receiptId)
 	}
@@ -130,17 +134,7 @@ func (cmd *TreeRestore) runRestore(
 		return err
 	}
 
-	// PHASE-A SCAFFOLDING — REMOVE IN PHASE B.
-	// Surface a no-op success notice so a user invoking the v1 binary
-	// today sees a clear signal that the command parses and validates
-	// but doesn't yet materialize. Phase B replaces this with the
-	// actual materialization summary.
-	fmt.Fprintf(os.Stderr,
-		"notice: tree-restore phase A: %d entries validated; "+
-			"materialization pending\n",
-		len(v1.Entries))
-
-	return nil
+	return materializeEntries(blobStore, v1.Entries, dest)
 }
 
 func assertDestinationDoesNotExist(dest string) error {
@@ -223,4 +217,108 @@ func pathConfinedTo(materialized, dest string) bool {
 		return true
 	}
 	return strings.HasPrefix(materialized, dest+string(os.PathSeparator))
+}
+
+// materializeEntries iterates entries in receipt order and writes each
+// to disk per its type. Per FDR §Per-Type Materialization:
+//
+//	file    → create-only open + io.Copy + chmod
+//	dir     → MkdirAll
+//	symlink → os.Symlink with literal target; mode ignored
+//	other   → skip with stderr notice
+//
+// The destination root is created (MkdirAll, mode 0o755) before
+// iteration so file/symlink writes inside top-level subdirs of <dest>
+// don't fail when their parent dir entry hasn't been visited yet.
+//
+// Per FDR §Limitations §No mid-stream rollback: a blob-read or write
+// failure mid-stream leaves the destination partial; cleanup is the
+// operator's job. The diagnostic names the entry that failed.
+func materializeEntries(
+	blobStore blob_stores.BlobStoreInitialized,
+	entries []tree_capture_receipt.EntryV1,
+	dest string,
+) error {
+	cleanDest := filepath.Clean(dest)
+
+	if err := os.MkdirAll(cleanDest, 0o755); err != nil {
+		return errors.Wrapf(err, "create destination %q", cleanDest)
+	}
+
+	for i := range entries {
+		e := entries[i]
+		materialized := filepath.Clean(filepath.Join(cleanDest, e.Root, e.Path))
+
+		switch e.Type {
+		case tree_capture_receipt.TypeFile:
+			if err := materializeFile(blobStore, e, materialized); err != nil {
+				return err
+			}
+
+		case tree_capture_receipt.TypeDir:
+			if err := os.MkdirAll(materialized, e.Mode.Perm()); err != nil {
+				return errors.Wrapf(err, "mkdir %q", materialized)
+			}
+
+		case tree_capture_receipt.TypeSymlink:
+			if err := os.Symlink(e.Target, materialized); err != nil {
+				return errors.Wrapf(err, "symlink %q -> %q", materialized, e.Target)
+			}
+
+		case tree_capture_receipt.TypeOther:
+			fmt.Fprintf(os.Stderr,
+				"notice: skipping entry of type %q: %s\n",
+				e.Type, materialized)
+
+		default:
+			return errors.ErrorWithStackf(
+				"%s: unknown entry type %q", materialized, e.Type)
+		}
+	}
+
+	return nil
+}
+
+// materializeFile opens the materialized path create-only, streams the
+// blob into it via io.Copy, then applies the captured POSIX
+// permissions. The blob reader is required to be seekable and to
+// satisfy io.WriterTo so io.Copy uses its WriteTo path; we do not
+// buffer the file content.
+func materializeFile(
+	blobStore blob_stores.BlobStoreInitialized,
+	e tree_capture_receipt.EntryV1,
+	materialized string,
+) (err error) {
+	var blobId markl.Id
+	if err = blobId.Set(e.BlobId); err != nil {
+		return errors.Wrapf(err, "%s: parse blob_id %q", materialized, e.BlobId)
+	}
+
+	reader, err := blobStore.MakeBlobReader(&blobId)
+	if err != nil {
+		return errors.Wrapf(err, "%s: open blob %s", materialized, &blobId)
+	}
+	defer errors.DeferredCloser(&err, reader)
+
+	file, err := os.OpenFile(
+		materialized,
+		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
+		0o666,
+	)
+	if err != nil {
+		return errors.Wrapf(err, "create %q", materialized)
+	}
+	defer errors.DeferredCloser(&err, file)
+
+	if _, err = io.Copy(file, reader); err != nil {
+		return errors.Wrapf(err,
+			"%s: blob read failed\n  blob_id: %s",
+			materialized, &blobId)
+	}
+
+	if err = os.Chmod(materialized, e.Mode.Perm()); err != nil {
+		return errors.Wrapf(err, "chmod %q", materialized)
+	}
+
+	return nil
 }

@@ -35,8 +35,8 @@ capture_receipt_id() {
   local dir="$1"
   run_madder tree-capture -format json "$dir"
   assert_success
-  echo "$output" | grep -F '"type":"store_group_receipt"' \
-    | sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
+  echo "$output" | grep -F '"type":"store_group_receipt"' |
+    sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
 }
 
 function tree_restore_refuses_existing_destination { # @test
@@ -53,8 +53,8 @@ function tree_restore_refuses_existing_destination { # @test
 
   run_madder tree-restore "$rid" dest
   assert_failure
-  echo "$output" | grep -qF 'destination already exists' \
-    || fail "expected dest-exists refusal: $output"
+  echo "$output" | grep -qF 'destination already exists' ||
+    fail "expected dest-exists refusal: $output"
 
   # No-side-effects symmetry with the injection-based scenarios: the
   # pre-existing dest should remain empty after the refusal.
@@ -83,8 +83,8 @@ RECEIPT
 
   run_madder tree-restore "$rid" out
   assert_failure
-  echo "$output" | grep -qF 'entry escapes destination' \
-    || fail "expected escape refusal: $output"
+  echo "$output" | grep -qF 'entry escapes destination' ||
+    fail "expected escape refusal: $output"
 
   [[ ! -e out ]] || fail "expected out/ not to exist after refusal; found it"
 }
@@ -108,8 +108,8 @@ RECEIPT
 
   run_madder tree-restore "$rid" out
   assert_failure
-  echo "$output" | grep -qF 'NUL byte' \
-    || fail "expected NUL-byte refusal: $output"
+  echo "$output" | grep -qF 'NUL byte' ||
+    fail "expected NUL-byte refusal: $output"
 
   [[ ! -e out ]] || fail "expected out/ not to exist after refusal"
 }
@@ -133,8 +133,88 @@ RECEIPT
 
   run_madder tree-restore "$rid" out
   assert_failure
-  echo "$output" | grep -qF 'empty root' \
-    || fail "expected empty-root refusal: $output"
+  echo "$output" | grep -qF 'empty root' ||
+    fail "expected empty-root refusal: $output"
 
   [[ ! -e out ]] || fail "expected out/ not to exist after refusal"
+}
+
+# Phase B: per-type materialization round-trips.
+# Each scenario captures a tree with a specific entry type, restores
+# it into a fresh dest, and asserts the materialized layout matches
+# the captured one byte-for-byte.
+
+function tree_restore_round_trips_file { # @test
+  init_store
+
+  mkdir src
+  printf 'hello\nworld\n' >src/greeting.txt
+  chmod 0644 src/greeting.txt
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+
+  [[ -f out/src/greeting.txt ]] ||
+    fail "expected out/src/greeting.txt to exist"
+
+  diff src/greeting.txt out/src/greeting.txt ||
+    fail "restored content differs from captured"
+
+  local mode
+  mode="$(file_mode out/src/greeting.txt)"
+  [[ $mode == '644' ]] || fail "expected mode 644 on restored file; got $mode"
+}
+
+function tree_restore_round_trips_dir { # @test
+  init_store
+
+  mkdir -p src/inner/deeper
+  echo "x" >src/inner/deeper/x.txt
+  chmod 0755 src/inner
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+
+  [[ -d out/src/inner ]] || fail "expected out/src/inner to be a dir"
+  [[ -d out/src/inner/deeper ]] || fail "expected out/src/inner/deeper to be a dir"
+  [[ -f out/src/inner/deeper/x.txt ]] || fail "expected nested file to exist"
+
+  local mode
+  mode="$(file_mode out/src/inner)"
+  [[ $mode == '755' ]] || fail "expected mode 755 on restored dir; got $mode"
+}
+
+function tree_restore_round_trips_symlink { # @test
+  init_store
+
+  mkdir src
+  echo "target content" >src/target.txt
+  ln -s target.txt src/link
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+
+  [[ -L out/src/link ]] || fail "expected out/src/link to be a symlink"
+
+  local target
+  target="$(readlink out/src/link)"
+  [[ $target == 'target.txt' ]] ||
+    fail "expected symlink target 'target.txt', got '$target'"
+
+  # The link resolves through the restored target, so reading it gives
+  # the captured content.
+  diff src/target.txt out/src/link ||
+    fail "symlink-resolved content differs from captured target"
 }
