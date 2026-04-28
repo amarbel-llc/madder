@@ -7,36 +7,36 @@ import (
 	"testing"
 )
 
-func TestWrite_HeaderExact(t *testing.T) {
+func TestWrite_HeaderV1Exact(t *testing.T) {
 	var buf bytes.Buffer
 
-	if _, err := Write(&buf, nil); err != nil {
+	if _, err := WriteV1(&buf, nil); err != nil {
 		t.Fatalf("Write empty: %v", err)
 	}
 
 	got := buf.String()
-	if got != Header {
-		t.Fatalf("empty receipt should be exactly Header; got %q", got)
+	if got != HeaderV1 {
+		t.Fatalf("empty receipt should be exactly HeaderV1; got %q", got)
 	}
 
 	const want = "---\n! madder-tree_capture-receipt-v1\n---\n\n"
 	if got != want {
-		t.Fatalf("Header drift; got %q want %q", got, want)
+		t.Fatalf("HeaderV1 drift; got %q want %q", got, want)
 	}
 }
 
-func TestWriteWithHint_NilProducesIdenticalBytesToWrite(t *testing.T) {
-	entries := []Entry{
+func TestWriteV1WithHint_NilProducesIdenticalBytesToWrite(t *testing.T) {
+	entries := []EntryV1{
 		{Path: "a.txt", Root: "src", Type: TypeFile, Mode: 0o644, Size: 10, BlobId: "blake2b256-x"},
 	}
 
 	var bufWrite, bufHintNil bytes.Buffer
 
-	if _, err := Write(&bufWrite, append([]Entry{}, entries...)); err != nil {
+	if _, err := WriteV1(&bufWrite, append([]EntryV1{}, entries...)); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
-	if _, err := WriteWithHint(&bufHintNil, append([]Entry{}, entries...), nil); err != nil {
-		t.Fatalf("WriteWithHint(nil): %v", err)
+	if _, err := WriteV1WithHint(&bufHintNil, append([]EntryV1{}, entries...), nil); err != nil {
+		t.Fatalf("WriteV1WithHint(nil): %v", err)
 	}
 
 	if bufWrite.String() != bufHintNil.String() {
@@ -45,7 +45,7 @@ func TestWriteWithHint_NilProducesIdenticalBytesToWrite(t *testing.T) {
 	}
 }
 
-func TestWriteWithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
+func TestWriteV1WithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
 	hint := &StoreHint{
 		StoreId:       ".work",
 		ConfigMarklId: "blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd",
@@ -53,8 +53,8 @@ func TestWriteWithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
 
 	var buf bytes.Buffer
 
-	if _, err := WriteWithHint(&buf, nil, hint); err != nil {
-		t.Fatalf("WriteWithHint: %v", err)
+	if _, err := WriteV1WithHint(&buf, nil, hint); err != nil {
+		t.Fatalf("WriteV1WithHint: %v", err)
 	}
 
 	got := buf.String()
@@ -67,30 +67,30 @@ func TestWriteWithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
 	}
 }
 
-func TestWriteWithHint_Deterministic(t *testing.T) {
+func TestWriteV1WithHint_Deterministic(t *testing.T) {
 	hint := &StoreHint{StoreId: ".work", ConfigMarklId: "blake2b256-x"}
-	entries := []Entry{
+	entries := []EntryV1{
 		{Path: "b", Root: "src", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "blake2b256-b"},
 		{Path: "a", Root: "src", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "blake2b256-a"},
 	}
 
 	var buf1, buf2 bytes.Buffer
 
-	if _, err := WriteWithHint(&buf1, append([]Entry{}, entries...), hint); err != nil {
-		t.Fatalf("first WriteWithHint: %v", err)
+	if _, err := WriteV1WithHint(&buf1, append([]EntryV1{}, entries...), hint); err != nil {
+		t.Fatalf("first WriteV1WithHint: %v", err)
 	}
-	if _, err := WriteWithHint(&buf2, append([]Entry{}, entries...), hint); err != nil {
-		t.Fatalf("second WriteWithHint: %v", err)
+	if _, err := WriteV1WithHint(&buf2, append([]EntryV1{}, entries...), hint); err != nil {
+		t.Fatalf("second WriteV1WithHint: %v", err)
 	}
 
 	if buf1.String() != buf2.String() {
-		t.Fatalf("WriteWithHint not deterministic\n  first:  %q\n  second: %q",
+		t.Fatalf("WriteV1WithHint not deterministic\n  first:  %q\n  second: %q",
 			buf1.String(), buf2.String())
 	}
 }
 
 func TestWrite_FileEntryShape(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{
 			Path:   "foo.go",
 			Root:   "./src",
@@ -102,11 +102,11 @@ func TestWrite_FileEntryShape(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	body := strings.TrimPrefix(buf.String(), Header)
+	body := strings.TrimPrefix(buf.String(), HeaderV1)
 	const want = `{"path":"foo.go","root":"./src","type":"file","mode":"0644","size":1234,"blob_id":"blake3-x256-sha2-x256:deadbeef"}` + "\n"
 	if body != want {
 		t.Fatalf("file entry mismatch\ngot:  %q\nwant: %q", body, want)
@@ -114,16 +114,16 @@ func TestWrite_FileEntryShape(t *testing.T) {
 }
 
 func TestWrite_DirEntryOmitsFileFields(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{Path: ".", Root: "./src", Type: TypeDir, Mode: 0o755},
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	body := strings.TrimPrefix(buf.String(), Header)
+	body := strings.TrimPrefix(buf.String(), HeaderV1)
 	const want = `{"path":".","root":"./src","type":"dir","mode":"0755"}` + "\n"
 	if body != want {
 		t.Fatalf("dir entry mismatch\ngot:  %q\nwant: %q", body, want)
@@ -131,7 +131,7 @@ func TestWrite_DirEntryOmitsFileFields(t *testing.T) {
 }
 
 func TestWrite_SymlinkEntryHasTargetNotBlob(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{
 			Path:   "link",
 			Root:   "./src",
@@ -142,11 +142,11 @@ func TestWrite_SymlinkEntryHasTargetNotBlob(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	body := strings.TrimPrefix(buf.String(), Header)
+	body := strings.TrimPrefix(buf.String(), HeaderV1)
 	const want = `{"path":"link","root":"./src","type":"symlink","mode":"0777","target":"../bar"}` + "\n"
 	if body != want {
 		t.Fatalf("symlink entry mismatch\ngot:  %q\nwant: %q", body, want)
@@ -154,16 +154,16 @@ func TestWrite_SymlinkEntryHasTargetNotBlob(t *testing.T) {
 }
 
 func TestWrite_OtherEntryHasNoExtras(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{Path: "fifo", Root: ".", Type: TypeOther, Mode: 0o600},
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	body := strings.TrimPrefix(buf.String(), Header)
+	body := strings.TrimPrefix(buf.String(), HeaderV1)
 	const want = `{"path":"fifo","root":".","type":"other","mode":"0600"}` + "\n"
 	if body != want {
 		t.Fatalf("other entry mismatch\ngot:  %q\nwant: %q", body, want)
@@ -184,7 +184,7 @@ func TestWrite_ModePerm_LeadingZeros(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			err := mustWriteOne(t, &buf, Entry{
+			err := mustWriteOne(t, &buf, EntryV1{
 				Path:   "f",
 				Root:   ".",
 				Type:   TypeFile,
@@ -205,7 +205,7 @@ func TestWrite_ModePerm_LeadingZeros(t *testing.T) {
 func TestWrite_StripsHighModeBits(t *testing.T) {
 	// fs.FileMode includes type bits (ModeDir, ModeSymlink) above the
 	// permission bits. The receipt should render only the perm bits.
-	entries := []Entry{
+	entries := []EntryV1{
 		{
 			Path: ".",
 			Root: ".",
@@ -215,7 +215,7 @@ func TestWrite_StripsHighModeBits(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -225,18 +225,18 @@ func TestWrite_StripsHighModeBits(t *testing.T) {
 }
 
 func TestWrite_SortedByRootThenPath(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{Path: "z.txt", Root: "./src", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "b1"},
 		{Path: "a.txt", Root: "./src", Type: TypeFile, Mode: 0o644, Size: 2, BlobId: "b2"},
 		{Path: "m.txt", Root: "./docs", Type: TypeFile, Mode: 0o644, Size: 3, BlobId: "b3"},
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err != nil {
+	if _, err := WriteV1(&buf, entries); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
-	body := strings.TrimPrefix(buf.String(), Header)
+	body := strings.TrimPrefix(buf.String(), HeaderV1)
 	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
 	if len(lines) != 3 {
 		t.Fatalf("expected 3 lines, got %d: %q", len(lines), lines)
@@ -255,18 +255,18 @@ func TestWrite_SortedByRootThenPath(t *testing.T) {
 }
 
 func TestWrite_DeterministicAcrossCalls(t *testing.T) {
-	build := func() []Entry {
-		return []Entry{
+	build := func() []EntryV1 {
+		return []EntryV1{
 			{Path: "b", Root: ".", Type: TypeFile, Mode: 0o644, Size: 2, BlobId: "y"},
 			{Path: "a", Root: ".", Type: TypeFile, Mode: 0o644, Size: 1, BlobId: "x"},
 		}
 	}
 
 	var first, second bytes.Buffer
-	if _, err := Write(&first, build()); err != nil {
+	if _, err := WriteV1(&first, build()); err != nil {
 		t.Fatalf("first Write: %v", err)
 	}
-	if _, err := Write(&second, build()); err != nil {
+	if _, err := WriteV1(&second, build()); err != nil {
 		t.Fatalf("second Write: %v", err)
 	}
 
@@ -276,18 +276,18 @@ func TestWrite_DeterministicAcrossCalls(t *testing.T) {
 }
 
 func TestWrite_RejectsUnknownType(t *testing.T) {
-	entries := []Entry{
+	entries := []EntryV1{
 		{Path: "x", Root: ".", Type: "bogus", Mode: 0o644},
 	}
 
 	var buf bytes.Buffer
-	if _, err := Write(&buf, entries); err == nil {
+	if _, err := WriteV1(&buf, entries); err == nil {
 		t.Fatalf("expected error for unknown type, got nil")
 	}
 }
 
-func mustWriteOne(t *testing.T, buf *bytes.Buffer, e Entry) error {
+func mustWriteOne(t *testing.T, buf *bytes.Buffer, e EntryV1) error {
 	t.Helper()
-	_, err := Write(buf, []Entry{e})
+	_, err := WriteV1(buf, []EntryV1{e})
 	return err
 }

@@ -31,8 +31,8 @@ type benchIndexEntry struct {
 // here keeps the per-entry retention measurement honest. The hash
 // IS repooled because the next iteration borrows a fresh hash from
 // the same pool slot.
-func makeBenchEntries(n int) []Entry {
-	out := make([]Entry, n)
+func makeBenchEntries(n int) []EntryV1 {
+	out := make([]EntryV1, n)
 	for i := 0; i < n; i++ {
 		h, hRepool := markl.FormatHashSha256.Get()
 		_, _ = h.Write([]byte(fmt.Sprintf("blob-content-%d", i)))
@@ -40,7 +40,7 @@ func makeBenchEntries(n int) []Entry {
 		blobId := id.String()
 		hRepool()
 
-		out[i] = Entry{
+		out[i] = EntryV1{
 			Path:   fmt.Sprintf("internal/foxtrot/blob_stores/store_local_%06d.go", i),
 			Root:   "go",
 			Type:   TypeFile,

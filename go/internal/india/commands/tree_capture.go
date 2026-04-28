@@ -148,7 +148,7 @@ func (cmd TreeCapture) Run(req futility.Request) {
 
 		sink.SetStore(storeName)
 
-		var entries []tree_capture_receipt.Entry
+		var entries []tree_capture_receipt.EntryV1
 
 		for _, root := range group.roots {
 			if root.shadowNotice != "" {
@@ -446,13 +446,13 @@ func checkRootCollisions(roots []captureRoot) error {
 
 // walkRoot walks rootArg with filepath.WalkDir (which does not follow
 // symlinks), writes every regular file as a blob into store, appends a
-// tree_capture_receipt.Entry for every entry it visited, and emits live
+// tree_capture_receipt.EntryV1 for every entry it visited, and emits live
 // per-entry events on the sink. Returns the count of per-entry
 // failures encountered during the walk.
 func walkRoot(
 	store blob_stores.BlobStoreInitialized,
 	rootArg string,
-	accum *[]tree_capture_receipt.Entry,
+	accum *[]tree_capture_receipt.EntryV1,
 	sink tree_capture_sink.Sink,
 ) int {
 	var failCount int
@@ -486,7 +486,7 @@ func walkRoot(
 		rel = filepath.ToSlash(rel)
 
 		mode := info.Mode()
-		entry := tree_capture_receipt.Entry{
+		entry := tree_capture_receipt.EntryV1{
 			Path: rel,
 			Root: rootArg,
 			Mode: mode,
@@ -568,7 +568,7 @@ func writeFileBlob(
 // carries an RFC 0003 store-hint line.
 func writeReceiptBlob(
 	blobStore blob_stores.BlobStoreInitialized,
-	entries []tree_capture_receipt.Entry,
+	entries []tree_capture_receipt.EntryV1,
 	hint *tree_capture_receipt.StoreHint,
 ) (id string, err error) {
 	wc, err := blobStore.MakeBlobWriter(nil)
@@ -578,7 +578,7 @@ func writeReceiptBlob(
 	}
 	defer errors.DeferredCloser(&err, wc)
 
-	if _, err = tree_capture_receipt.WriteWithHint(wc, entries, hint); err != nil {
+	if _, err = tree_capture_receipt.WriteV1WithHint(wc, entries, hint); err != nil {
 		err = errors.Wrap(err)
 		return
 	}

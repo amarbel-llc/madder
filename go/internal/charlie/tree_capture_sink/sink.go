@@ -37,7 +37,7 @@ type Sink interface {
 
 	// Entry reports one filesystem entry that was successfully captured
 	// under the active store.
-	Entry(e tree_capture_receipt.Entry)
+	Entry(e tree_capture_receipt.EntryV1)
 
 	// StoreGroupReceipt reports the receipt blob produced for the
 	// active store group, after every entry under that group has been
@@ -82,7 +82,7 @@ type tapSink struct {
 
 func (s *tapSink) SetStore(store string) { s.store = store }
 
-func (s *tapSink) Entry(e tree_capture_receipt.Entry) {
+func (s *tapSink) Entry(e tree_capture_receipt.EntryV1) {
 	s.tw.Ok(formatTAPEntry(e))
 }
 
@@ -105,7 +105,7 @@ func (s *tapSink) Finalize() {
 	s.tw.Plan()
 }
 
-func formatTAPEntry(e tree_capture_receipt.Entry) string {
+func formatTAPEntry(e tree_capture_receipt.EntryV1) string {
 	rel := joinRootPath(e.Root, e.Path)
 	mode := fmt.Sprintf("%04o", e.Mode.Perm())
 
@@ -170,7 +170,7 @@ type summaryRecord struct {
 
 func (s *jsonSink) SetStore(store string) { s.store = store }
 
-func (s *jsonSink) Entry(e tree_capture_receipt.Entry) {
+func (s *jsonSink) Entry(e tree_capture_receipt.EntryV1) {
 	rec := entryRecord{
 		Path:  e.Path,
 		Root:  e.Root,
