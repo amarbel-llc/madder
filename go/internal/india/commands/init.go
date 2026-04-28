@@ -255,6 +255,23 @@ func (cmd *Init) runDiscover(
 		return
 	}
 
+	// -discover means "adopt whatever's already at the remote." Honoring
+	// -encryption alongside it would produce a half-encrypted store —
+	// pre-existing blobs cleartext, new blobs encrypted, decryption
+	// fragmented. Refuse the combination per #98. Encryption rotation
+	// of an existing store is a separate command (not yet built).
+	if len(cmd.encryption) > 0 {
+		errors.ContextCancelWithBadRequestError(
+			req,
+			errors.Errorf(
+				"-encryption cannot be combined with -discover; "+
+					"-discover adopts the existing remote layout, "+
+					"-encryption requires a fresh store",
+			),
+		)
+		return
+	}
+
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
 		fmt.Sprintf("(blob_store: %s) ", blobStoreId),

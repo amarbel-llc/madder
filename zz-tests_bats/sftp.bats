@@ -491,6 +491,28 @@ function sftp_init_with_encryption { # @test
   fi
 }
 
+function sftp_init_discover_rejects_encryption { # @test
+  # Per #98, `init-sftp-explicit -discover -encryption` is refused at
+  # flag-handling time: -discover adopts the existing remote layout,
+  # -encryption requires a fresh store, and combining them would
+  # produce a half-encrypted store with fragmented decryption. The
+  # bootstrap path (without -discover) handles -encryption correctly
+  # in #57.
+  local remote_root="$BATS_TEST_TMPDIR/sftp-discover-encryption"
+  run_madder init-sftp-explicit \
+    -discover \
+    -host 127.0.0.1 \
+    -port "$SFTP_PORT" \
+    -user testuser \
+    -password anything \
+    -remote-path "$remote_root" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    -encryption generate \
+    .sftp-discover-enc
+  assert_failure
+  assert_output --partial '-encryption cannot be combined with -discover'
+}
+
 function sftp_init_without_encryption { # @test
   # Symmetric to init_without_encryption (init.bats:42). With no
   # -encryption flag, the remote config-immutable view emits an empty

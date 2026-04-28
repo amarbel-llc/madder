@@ -63,9 +63,7 @@ var (
 	ConfigKeyNames     = charlie_bsc.ConfigKeyNames
 )
 
-var (
-	SetMultiEncryptionFlagDefinition = charlie_bsc.SetMultiEncryptionFlagDefinition
-)
+var SetMultiEncryptionFlagDefinition = charlie_bsc.SetMultiEncryptionFlagDefinition
 
 // Re-export generated Decode/Encode functions
 var (
