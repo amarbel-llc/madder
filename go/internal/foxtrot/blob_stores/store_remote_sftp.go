@@ -368,13 +368,74 @@ func (blobStore *remoteSftp) HasBlob(
 func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.MarklId] {
 	blobStore.initializeOnce()
 
+	if blobStore.multiHash {
+		return blobStore.allBlobsMultiHash()
+	}
+	return blobStore.allBlobsForBase(
+		strings.TrimPrefix(blobStore.config.GetRemotePath(), "/"),
+		blobStore.defaultHashType,
+	)
+}
+
+// allBlobsMultiHash walks each `<basePath>/<format-id>/` subtree under
+// the remote root, picking the matching hash type per subtree. Mirrors
+// localAllBlobsMultihash so paths reconstruct as
+// `<bucket>/<rest>` (without the format-id prefix); a single basePath
+// walker would yield `<format-id>/<bucket>/<rest>` and the format-id
+// segment would corrupt SetHexStringFromRelPath's hex decode (#55
+// fsck regression).
+func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_interfaces.MarklId] {
 	return func(yield func(domain_interfaces.MarklId, error) bool) {
 		basePath := strings.TrimPrefix(blobStore.config.GetRemotePath(), "/")
 
-		// Walk through the two-level directory structure (Git-like bucketing)
+		entries, err := blobStore.sftpClient.ReadDir(basePath)
+		if err != nil {
+			yield(nil, errors.Wrapf(err, "BasePath: %q", basePath))
+			return
+		}
+
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+
+			hashTypeId := entry.Name()
+			if hashTypeId == "." {
+				continue
+			}
+
+			hashType, err := markl.GetFormatHashOrError(hashTypeId)
+			if err != nil {
+				if !yield(nil, errors.Wrap(err)) {
+					return
+				}
+				continue
+			}
+
+			subBase := filepath.Join(basePath, hashTypeId)
+			for id, err := range blobStore.allBlobsForBase(subBase, hashType) {
+				if !yield(id, err) {
+					return
+				}
+			}
+		}
+	}
+}
+
+// allBlobsForBase walks `basePath` and yields a markl id reconstructed
+// from each leaf path, using `hashType` as the format. Caller is
+// responsible for choosing a basePath that does NOT contain the
+// format-id segment — see allBlobsMultiHash. The walker yields paths
+// relative to the SFTP server root (no leading `/`), so we re-base
+// them via filepath.Rel before reconstructing the id.
+func (blobStore *remoteSftp) allBlobsForBase(
+	basePath string,
+	hashType markl.FormatHash,
+) interfaces.SeqError[domain_interfaces.MarklId] {
+	return func(yield func(domain_interfaces.MarklId, error) bool) {
 		walker := blobStore.sftpClient.Walk(basePath)
 
-		digest, repool := blobStore.defaultHashType.GetBlobId()
+		digest, repool := hashType.GetBlobId()
 		defer repool()
 
 		for walker.Step() {
@@ -382,40 +443,25 @@ func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.Ma
 				if !yield(nil, errors.Wrapf(err, "BasePath: %q", basePath)) {
 					return
 				}
-
 				continue
 			}
 
-			info := walker.Stat()
-
-			if info.IsDir() {
+			if walker.Stat().IsDir() {
 				continue
 			}
 
-			currentPath := walker.Path()
-
-			{
-				var err error
-
-				if currentPath, err = filepath.Rel(basePath, currentPath); err != nil {
-					if !yield(
-						nil,
-						errors.Wrapf(err, "BasePath: %q", basePath),
-					) {
-						return
-					}
+			relPath, err := filepath.Rel(basePath, walker.Path())
+			if err != nil {
+				if !yield(nil, errors.Wrapf(err, "BasePath: %q", basePath)) {
+					return
 				}
+				continue
 			}
 
-			if err := markl.SetHexStringFromAbsolutePath(
-				digest,
-				currentPath,
-				basePath,
-			); err != nil {
+			if err := markl.SetHexStringFromRelPath(digest, relPath); err != nil {
 				if !yield(nil, errors.Wrap(err)) {
 					return
 				}
-
 				continue
 			}
 

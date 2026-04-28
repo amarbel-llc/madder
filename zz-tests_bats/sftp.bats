@@ -350,6 +350,97 @@ function sftp_write_compresses_per_remote_config { # @test
   [[ $magic == '28b52ffd' ]] || fail "expected zstd magic at start of $on_disk; got $magic"
 }
 
+function sftp_cross_hash_sync { # @test
+  # Mirrors cross_hash_sync (sync.bats) for the SFTP transport: write a
+  # blob into a local blake2b256 store, then sync into an SFTP-backed
+  # store and confirm the blob materializes there.
+  init_store
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "cross-hash-sftp-test" >"$blob"
+
+  run_madder write -format tap "$blob"
+  assert_success
+  local blob_id
+  blob_id="$(echo "$output" | grep -oP 'blake2b256-\S+' | head -1)"
+  [[ -n $blob_id ]] || fail "write returned empty blob_id: $output"
+
+  run_madder sync .default .sftp-test
+  assert_success
+
+  run_madder cat .sftp-test "$blob_id"
+  assert_success
+  assert_line "cross-hash-sftp-test"
+}
+
+function sftp_sync_idempotent { # @test
+  # Mirrors sync_idempotent (sync.bats): a second sync over an
+  # already-synced blob is a no-op refusal-free success.
+  init_store
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sftp-idempotent-test" >"$blob"
+  run_madder write "$blob"
+  assert_success
+
+  run_madder sync .default .sftp-test
+  assert_success
+
+  run_madder sync .default .sftp-test
+  assert_success
+}
+
+function sftp_sync_json_auto_detects { # @test
+  # Mirrors sync_json_auto_detects (sync.bats): NDJSON state records
+  # round-trip through the SFTP transport.
+  init_store
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sftp-sync-json-test" >"$blob"
+  run_madder write -format tap "$blob"
+  assert_success
+
+  run_madder sync .default .sftp-test
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial 'TAP version 14'
+}
+
+function sftp_fsck_with_blobs { # @test
+  # Mirrors with_blobs (fsck.bats): a healthy SFTP store with blobs
+  # fsck-passes without a 'not ok' line.
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "fsck sftp content" >"$blob"
+  run_madder write -format tap .sftp-test "$blob"
+  assert_success
+
+  run_madder fsck -format tap .sftp-test
+  assert_success
+  assert_output --partial "TAP version 14"
+  refute_output --partial "not ok"
+}
+
+function sftp_fsck_json_auto_detects { # @test
+  # Mirrors fsck_json_auto_detects (fsck.bats) for SFTP: piped stdout
+  # auto-selects NDJSON; verified records are emitted.
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sftp fsck json" >"$blob"
+  run_madder write -format tap .sftp-test "$blob"
+  assert_success
+
+  run_madder fsck .sftp-test
+  assert_success
+  assert_output --partial '"state":"verified"'
+  refute_output --partial 'TAP version 14'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store
