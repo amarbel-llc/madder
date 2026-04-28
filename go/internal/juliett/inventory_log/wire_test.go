@@ -1,8 +1,10 @@
 package inventory_log
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -78,20 +80,39 @@ func TestWireWithCleanup_EnvDisableReturnsNopAndNoOpCleanup(t *testing.T) {
 	}
 }
 
-// TestWireWithCleanup_EnabledReturnsFileObserver guards the happy
-// path: a real FileObserver is returned and its Close (cleanup) does
-// not error on a clean shutdown.
-func TestWireWithCleanup_EnabledReturnsFileObserver(t *testing.T) {
+// TestWireWithCleanup_EnabledEmitsToConfiguredLogHome guards the happy
+// path end-to-end: with XDG_LOG_HOME pointed at a fresh tmp dir, an
+// emitted event lands as a session file under
+// $XDG_LOG_HOME/madder/inventory_log/, and cleanup flushes without
+// error. Stronger than asserting *FileObserver alone — confirms the
+// log home env var actually flows into the FileObserver's root path.
+func TestWireWithCleanup_EnabledEmitsToConfiguredLogHome(t *testing.T) {
+	logHome := t.TempDir()
 	t.Setenv(envVarDisable, "")
-	t.Setenv("XDG_LOG_HOME", t.TempDir())
+	t.Setenv("XDG_LOG_HOME", logHome)
 
 	obs, cleanup := WireWithCleanup()
-	defer cleanup() //nolint:errcheck // covered below
 
 	if _, ok := obs.(*FileObserver); !ok {
-		t.Errorf("expected *FileObserver, got %T", obs)
+		t.Fatalf("expected *FileObserver, got %T", obs)
 	}
+
+	obs.Emit(domain_interfaces.BlobWriteEvent{
+		StoreId: ".test",
+		Op:      domain_interfaces.BlobWriteOpWritten,
+	})
+
 	if err := cleanup(); err != nil {
-		t.Errorf("cleanup: %v", err)
+		t.Fatalf("cleanup: %v", err)
+	}
+
+	matches, err := filepath.Glob(
+		filepath.Join(logHome, "madder", "inventory_log", "*", "*.hyphence"),
+	)
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
+	if len(matches) == 0 {
+		t.Errorf("expected a session file under %s, found none", logHome)
 	}
 }

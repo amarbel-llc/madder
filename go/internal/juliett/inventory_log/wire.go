@@ -4,13 +4,24 @@ import (
 	"os"
 	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
-// envVarDisable is the exact value of MADDER_INVENTORY_LOG that
-// suppresses the log. Mirrors command_components.makeBlobWriteObserver
-// so the CLI and library entry points agree.
+// envVarDisable is the exact env var name that suppresses the log when
+// set to "0". Mirrors command_components.makeBlobWriteObserver so the
+// CLI and library entry points agree on the disable contract.
 const envVarDisable = "MADDER_INVENTORY_LOG"
+
+// Compile-time assertion that every concrete value WireDefault and
+// WireWithCleanup return also satisfies domain_interfaces.BlobWriteObserver.
+// command_components.makeBlobWriteObserver type-asserts the returned
+// Observer to BlobWriteObserver; that assertion stays safe as long as
+// every concrete return path here implements both interfaces.
+var (
+	_ domain_interfaces.BlobWriteObserver = NopObserver{}
+	_ domain_interfaces.BlobWriteObserver = (*FileObserver)(nil)
+)
 
 // WireDefault constructs a FileObserver rooted at MadderInventoryLogDir
 // and registers its Close on ctx via errors.ContextCloseAfter, so the
