@@ -5,9 +5,9 @@
 // Set() from each binary's init().
 //
 // The `version` subcommand is the canonical consumer; any future code
-// that needs to report build identity (e.g. a User-Agent header, an MCP
-// initialize response, a crash-report footer) should also read from
-// here rather than hardcoding a second string.
+// that needs to report build identity (e.g. a User-Agent header, a
+// crash-report footer) should also read from here rather than
+// hardcoding a second string.
 package buildinfo
 
 var (

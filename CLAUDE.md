@@ -1,8 +1,8 @@
 # madder
 
-Madder is a content-addressable blob storage CLI and MCP server. The entry
-point is `go/cmd/madder/`; the build produces a single `madder` binary plus
-its man pages.
+Madder is a content-addressable blob storage CLI. The entry point is
+`go/cmd/madder/`; the build produces a single `madder` binary plus its
+man pages.
 
 ## History: madder was extracted from dodder
 
