@@ -268,8 +268,12 @@ bump-version new_version:
 # and pushes the go/v{{version}} tag. The "go/v" prefix is added for
 # you, so pass the semver without it. Usage: just release 0.0.2
 #
-# Use `just tag <version> <message>` directly if you want to
-# control the commit message yourself without bumping.
+# The `tag` recipe stays standalone for callers that want to control
+# the commit message themselves without bumping. Release inlines the
+# tag-step here because passing a multi-line message across `just`
+# recipe boundaries was unreliable — the inner recipe saw a malformed
+# argument and `git tag -s` would fail in a way that didn't surface
+# until much later (see madder release-v0.3.0 incident).
 [group("maint")]
 release version:
   #!/usr/bin/env bash
@@ -298,7 +302,15 @@ release version:
     git push origin master
     gum log --level info "pushed flake.nix bump to master"
   fi
-  just tag "{{version}}" "$msg"
+  tag="go/v{{version}}"
+  if [[ -n "$prev" ]]; then
+    gum log --level info "Previous: $prev"
+    git log --oneline "$prev"..HEAD -- go/ || true
+  fi
+  git tag -s -m "$msg" "$tag"
+  gum log --level info "Created tag: $tag"
+  git push origin "$tag"
+  gum log --level info "Pushed $tag"
 
 [group("maint")]
 gomod2nix:
