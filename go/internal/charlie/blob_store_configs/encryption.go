@@ -53,19 +53,12 @@ func setEncryptionFlagDefinition(
 	)
 }
 
-// SetMultiEncryptionFlagDefinition exposes the package-internal flag
-// registration so callers outside blob_store_configs (notably the
-// init command, which routes the flag onto the Init struct rather than
-// onto the wire-config struct per ADR 0005) can reuse the exact same
-// `-encryption none|generate|<path>|<markl-id>` parsing.
+// SetMultiEncryptionFlagDefinition registers the
+// `-encryption none|generate|<path>|<markl-id>` parser used by both
+// wire-config types (TomlV3 et al.) and the init command itself,
+// which routes the flag onto the Init struct rather than onto
+// TomlSFTPV0 per ADR 0005.
 func SetMultiEncryptionFlagDefinition(
-	flagSet interfaces.CLIFlagDefinitions,
-	keys *[]markl.Id,
-) {
-	setMultiEncryptionFlagDefinition(flagSet, keys)
-}
-
-func setMultiEncryptionFlagDefinition(
 	flagSet interfaces.CLIFlagDefinitions,
 	keys *[]markl.Id,
 ) {

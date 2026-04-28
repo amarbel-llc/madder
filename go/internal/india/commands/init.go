@@ -148,12 +148,12 @@ type Init struct {
 	discover        bool
 	desc            futility.Description
 
-	// Encryption is the value of -encryption when the typed config is
+	// encryption is the value of -encryption when the typed config is
 	// SFTP. ADR 0005 forbids storing encryption on the local SFTP
 	// transport config, so the flag lands on the Init command itself
 	// and is threaded into the remote `blob_store-config` via
 	// ensureRemoteConfigExists.
-	Encryption []markl.Id
+	encryption []markl.Id
 
 	command_components.EnvBlobStore
 	command_components.Init
@@ -193,7 +193,7 @@ func (cmd *Init) SetFlagDefinitions(
 
 		blob_store_configs.SetMultiEncryptionFlagDefinition(
 			flagDefinitions,
-			&cmd.Encryption,
+			&cmd.encryption,
 		)
 	}
 }
@@ -452,7 +452,7 @@ func (cmd *Init) ensureRemoteConfigExists(
 		blob_stores.DiscoveredConfig{
 			HashTypeId: string(blob_store_configs.HashTypeDefault),
 			Buckets:    blob_store_configs.DefaultHashBuckets,
-			Encryption: cmd.Encryption,
+			Encryption: cmd.encryption,
 		},
 		printer,
 	); err != nil {

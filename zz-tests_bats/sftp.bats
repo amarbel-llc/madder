@@ -445,6 +445,8 @@ function sftp_init_with_encryption { # @test
   # Mirrors init_with_encryption (init.bats) for SFTP. ADR 0005 routes
   # the -encryption flag to the remote TomlV3, so info-repo must surface
   # a non-empty markl-id and a blob round-trip must work end-to-end.
+  # Add an on-disk check (mirroring sftp_write_compresses_per_remote_config)
+  # so a regression that silently no-ops the IO wrapper would still fail.
   local remote_root="$BATS_TEST_TMPDIR/sftp-encrypted"
   run_madder init-sftp-explicit \
     -host 127.0.0.1 \
@@ -473,20 +475,33 @@ function sftp_init_with_encryption { # @test
   run_madder cat .sftp-encrypted "$hash"
   assert_success
   assert_output --partial "encrypted-sftp-roundtrip"
+
+  # On-disk bytes MUST NOT contain the cleartext marker. If the IO
+  # wrapper silently fell back to plaintext, this assertion would
+  # catch the regression even though the round-trip above succeeds.
+  # The test SFTP server re-roots absolute paths under its CWD
+  # ($BATS_TEST_TMPDIR), matching the find pattern used in
+  # sftp_write_compresses_per_remote_config.
+  local on_disk
+  on_disk="$(find "$BATS_TEST_TMPDIR" -type f -path '*/blake2b256/*' -print -quit)"
+  [[ -n $on_disk ]] || fail "no blob file found under $BATS_TEST_TMPDIR"
+
+  if grep -q 'encrypted-sftp-roundtrip' "$on_disk"; then
+    fail "expected encrypted bytes on disk; found cleartext at $on_disk"
+  fi
 }
 
 function sftp_init_without_encryption { # @test
   # Symmetric to init_without_encryption (init.bats:42). With no
-  # -encryption flag, info-repo encryption prints no encryption id
-  # value. The merged $output carries SFTP transport log lines
-  # (dialing, connecting, …) on stderr; the local-store assert_output
-  # '' shape doesn't apply, so refute the presence of any markl-id
-  # value on the output stream.
+  # -encryption flag, the remote config-immutable view emits an empty
+  # encryption list. Use config-immutable rather than `info-repo
+  # encryption` because under bats `run` stderr is merged with stdout,
+  # so dialing log lines confound a plain `assert_output ''` check.
   init_sftp_test_store
 
-  run_madder info-repo .sftp-test encryption
+  run_madder info-repo .sftp-test config-immutable
   assert_success
-  refute_output --regexp '^[a-z0-9]+-[A-Za-z0-9]+$'
+  assert_output --partial 'encryption = []'
 }
 
 function sftp_write_record_has_contracted_fields { # @test

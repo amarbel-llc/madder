@@ -50,7 +50,7 @@ func (blobStoreConfig *TomlV3) SetFlagDefinitions(
 		"determines the hash type used for new blobs written to the store",
 	)
 
-	setMultiEncryptionFlagDefinition(flagSet, &blobStoreConfig.Encryption)
+	SetMultiEncryptionFlagDefinition(flagSet, &blobStoreConfig.Encryption)
 
 	flagSet.BoolVar(
 		&blobStoreConfig.VerifyOnCollision,
