@@ -29,6 +29,17 @@ write_blob_id() {
   echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
 }
 
+# write_blob_id_to writes the file to the named store and echoes the
+# resulting blob-id. Used when a test must inject a synthesized blob
+# into a specific store rather than the active default.
+write_blob_id_to() {
+  local store="$1"
+  local path="$2"
+  run_madder write -format tap "$store" "$path"
+  assert_success
+  echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
+}
+
 # capture_receipt_id captures the directory under PWD into the active
 # store and echoes the receipt blob-id from the JSON sink record.
 capture_receipt_id() {
@@ -221,4 +232,172 @@ function tree_restore_round_trips_symlink { # @test
   # the captured content.
   diff src/target.txt out/src/link ||
     fail "symlink-resolved content differs from captured target"
+}
+
+# Phase C: RFC 0003 §Store-Hint Resolution branches.
+
+function tree_restore_uses_hint_store_when_config_matches { # @test
+  # Branch 2: hint present, store configured locally, config-hash
+  # matches → silent auto-use.
+  init_store
+  run_madder init -encryption none .work
+  assert_success
+
+  mkdir src
+  echo "x" >src/x.txt
+
+  run_madder tree-capture -format json .work src
+  assert_success
+  local rid
+  rid="$(echo "$output" | grep -F '"type":"store_group_receipt"' |
+    sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  # Restore must NOT emit any of the hint-resolution notices when the
+  # match path fires.
+  run_madder tree-restore "$rid" out
+  assert_success
+  refute_output --partial 'falling back to active store'
+  refute_output --partial 'no store hint'
+  refute_output --partial 'has been re-configured'
+
+  [[ -f out/src/x.txt ]] || fail "expected restored file"
+}
+
+function tree_restore_warns_on_config_drift { # @test
+  # Branch 3: hint present, store configured, but the config-hash in
+  # the hint does NOT match the local store's current config-hash.
+  # Synthesize a receipt whose hint claims a stale digest.
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/drift-receipt"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	- store/.default < blake2b256-stalehashstalehashstalehashstalehashstalehashstalehashstalehashstale
+	! madder-tree_capture-receipt-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  run_madder tree-restore "$rid" out
+  assert_failure
+  echo "$output" | grep -qF 'has been re-configured since this receipt was written' ||
+    fail "expected drift warning: $output"
+  echo "$output" | grep -qF 'pass -store' ||
+    fail "expected -store override hint: $output"
+
+  [[ ! -e out ]] || fail "expected out/ not to exist after refusal"
+}
+
+function tree_restore_falls_back_to_active_store_on_missing_hint { # @test
+  # Branch 4: hint names a store that is not configured locally.
+  # Synthesize a receipt naming a store-id that was never init'd.
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/missing-store-receipt"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	- store/.never_configured < blake2b256-arbitraryhasharbitraryhasharbitraryhasharbitraryhasharbitr
+	! madder-tree_capture-receipt-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+  echo "$output" | grep -qF 'is not configured locally' ||
+    fail "expected missing-store notice: $output"
+  echo "$output" | grep -qF 'falling back to active store' ||
+    fail "expected fallback notice: $output"
+
+  [[ -d out/src ]] || fail "expected out/src to be created via fallback"
+}
+
+function tree_restore_falls_back_to_active_store_on_no_hint { # @test
+  # Branch 5: receipt carries no `- store/...` line.
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/no-hint-receipt"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	! madder-tree_capture-receipt-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+  echo "$output" | grep -qF 'no store hint' ||
+    fail "expected no-hint notice: $output"
+  echo "$output" | grep -qF 'falling back to active store' ||
+    fail "expected fallback notice: $output"
+
+  [[ -d out/src ]] || fail "expected out/src to be created via fallback"
+}
+
+function tree_restore_store_flag_overrides_hint { # @test
+  # Branch 1: -store flag wins over hint resolution. We synthesize a
+  # receipt whose hint would trigger drift (branch 3) AND pass -store
+  # to point at a configured store; the override must suppress the
+  # drift refusal and proceed silently.
+  init_store
+  run_madder init -encryption none .work
+  assert_success
+
+  # Write y.txt as a blob into .work so the entry's blob_id
+  # actually resolves there. Use the tap output to capture the id.
+  mkdir src
+  echo "y" >src/y.txt
+  local blob_id
+  blob_id="$(write_blob_id_to .work src/y.txt)"
+  [[ -n $blob_id ]] || fail "write returned empty blob id"
+
+  # Synthesize a receipt with a stale hint pointing at .work and
+  # one file entry whose blob_id is resolvable in .work.
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/override-receipt"
+  cat >"$receipt_path" <<RECEIPT
+---
+- store/.work < blake2b256-stalehashstalehashstalehashstalehashstalehashstalehashstalehashstale
+! madder-tree_capture-receipt-v1
+---
+
+{"path":".","root":"src","type":"dir","mode":"0755"}
+{"path":"y.txt","root":"src","type":"file","mode":"0644","size":2,"blob_id":"$blob_id"}
+RECEIPT
+
+  # The receipt itself must live in .work because phase 1 of
+  # tree-restore fetches the receipt against the resolved store —
+  # `-store .work` makes phase 1 read from .work.
+  local rid
+  rid="$(write_blob_id_to .work "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  # Without -store, this would trigger branch 3 (drift refusal).
+  # With -store, it must succeed silently — no drift warning, no
+  # fallback notice.
+  run_madder tree-restore -store .work "$rid" out
+  assert_success
+  refute_output --partial 'has been re-configured'
+  refute_output --partial 'falling back'
+
+  [[ -f out/src/y.txt ]] || fail "expected restored file via -store override"
 }
