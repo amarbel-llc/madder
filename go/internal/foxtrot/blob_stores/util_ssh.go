@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -44,15 +45,22 @@ func MakeSSHAgent(
 
 func makeHostKeyCallback(
 	knownHostsFile string,
-) (ssh.HostKeyCallback, error) {
+) (ssh.HostKeyCallback, []string, error) {
 	var files []string
 
 	if knownHostsFile != "" {
 		files = append(files, knownHostsFile)
 	} else {
+		if sshHome := os.Getenv("SSH_HOME"); sshHome != "" {
+			sshHomeKnownHosts := filepath.Join(sshHome, "known_hosts")
+			if _, err := os.Stat(sshHomeKnownHosts); err == nil {
+				files = append(files, sshHomeKnownHosts)
+			}
+		}
+
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to determine home directory for known_hosts")
+			return nil, nil, errors.Wrapf(err, "failed to determine home directory for known_hosts")
 		}
 
 		userKnownHosts := filepath.Join(homeDir, ".ssh", "known_hosts")
@@ -67,18 +75,68 @@ func makeHostKeyCallback(
 	}
 
 	if len(files) == 0 {
-		return nil, errors.Errorf(
-			"no known_hosts files found; create ~/.ssh/known_hosts or specify --known-hosts-file",
+		return nil, nil, errors.Errorf(
+			"no known_hosts files found; create ~/.ssh/known_hosts, set $SSH_HOME, or specify --known-hosts-file",
 		)
 	}
 
 	callback, err := knownhosts.New(files...)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse known_hosts files: %v", files)
+		return nil, files, errors.Wrapf(err, "failed to parse known_hosts files: %v", files)
 	}
 
-	return callback, nil
+	return callback, files, nil
 }
+
+// hostKeyAlgorithmsForKnownHosts returns the host-key algorithm names that
+// are recorded for `addr` in the loaded known_hosts files. The result is
+// suitable for assignment to ssh.ClientConfig.HostKeyAlgorithms so the SSH
+// negotiation prefers a key type we have a verified entry for. Returns an
+// empty slice when no entries match the host (let Go's defaults apply).
+//
+// Background: golang.org/x/crypto/ssh/knownhosts does not expose a direct
+// enumeration API. The standard workaround (golang/go#29286, also used by
+// github.com/skeema/knownhosts) is to invoke the callback with a synthetic
+// placeholder key and read the Want slice off the returned *KeyError. See
+// issue #99.
+func hostKeyAlgorithmsForKnownHosts(
+	callback ssh.HostKeyCallback,
+	addr string,
+) []string {
+	err := callback(addr, &net.TCPAddr{}, hostKeyAlgorithmsProbe{})
+	if err == nil {
+		return nil
+	}
+
+	var keyErr *knownhosts.KeyError
+	if !errors.As(err, &keyErr) {
+		return nil
+	}
+
+	seen := map[string]struct{}{}
+	var algos []string
+
+	for _, k := range keyErr.Want {
+		t := k.Key.Type()
+		if _, ok := seen[t]; ok {
+			continue
+		}
+		seen[t] = struct{}{}
+		algos = append(algos, t)
+	}
+
+	return algos
+}
+
+// hostKeyAlgorithmsProbe is a sentinel ssh.PublicKey used only to probe the
+// known_hosts callback for its recorded keys. Its Type and Marshal cannot
+// match any real recorded entry, so the callback always reports a mismatch
+// — exposing the list of trusted keys via *knownhosts.KeyError.Want.
+type hostKeyAlgorithmsProbe struct{}
+
+func (hostKeyAlgorithmsProbe) Type() string                          { return "madder-host-key-algorithms-probe" }
+func (hostKeyAlgorithmsProbe) Marshal() []byte                       { return nil }
+func (hostKeyAlgorithmsProbe) Verify([]byte, *ssh.Signature) error   { return errors.Errorf("probe key cannot verify signatures") }
 
 // TODO refactor `blob_store_configs.ConfigSFTP` for ssh-client-specific methods
 func MakeSSHClientForExplicitConfig(
@@ -87,8 +145,9 @@ func MakeSSHClientForExplicitConfig(
 	config blob_store_configs.ConfigSFTPConfigExplicit,
 ) (sshClient *ssh.Client, err error) {
 	var hostKeyCallback ssh.HostKeyCallback
+	var knownHostsFiles []string
 
-	if hostKeyCallback, err = makeHostKeyCallback(
+	if hostKeyCallback, knownHostsFiles, err = makeHostKeyCallback(
 		config.GetKnownHostsFile(),
 	); err != nil {
 		err = errors.Wrap(err)
@@ -137,6 +196,18 @@ func MakeSSHClientForExplicitConfig(
 		config.GetPort(),
 	)
 
+	clientConfig.HostKeyAlgorithms = hostKeyAlgorithmsForKnownHosts(
+		hostKeyCallback,
+		addr,
+	)
+
+	uiPrinter.Printf(
+		"verifying host key for %q against known_hosts: [%s]; algorithms: [%s]",
+		addr,
+		strings.Join(knownHostsFiles, ", "),
+		strings.Join(clientConfig.HostKeyAlgorithms, ", "),
+	)
+
 	if sshClient, err = sshDial(ctx, uiPrinter, clientConfig, addr); err != nil {
 		err = errors.Wrap(err)
 		return sshClient, err
@@ -158,8 +229,9 @@ func MakeSSHClientFromSSHConfig(
 	}
 
 	var hostKeyCallback ssh.HostKeyCallback
+	var knownHostsFiles []string
 
-	if hostKeyCallback, err = makeHostKeyCallback(
+	if hostKeyCallback, knownHostsFiles, err = makeHostKeyCallback(
 		config.GetKnownHostsFile(),
 	); err != nil {
 		err = errors.Wrap(err)
@@ -184,6 +256,18 @@ func MakeSSHClientFromSSHConfig(
 	}
 
 	addr := fmt.Sprintf("%s:%s", url.Hostname(), port)
+
+	clientConfig.HostKeyAlgorithms = hostKeyAlgorithmsForKnownHosts(
+		hostKeyCallback,
+		addr,
+	)
+
+	uiPrinter.Printf(
+		"verifying host key for %q against known_hosts: [%s]; algorithms: [%s]",
+		addr,
+		strings.Join(knownHostsFiles, ", "),
+		strings.Join(clientConfig.HostKeyAlgorithms, ", "),
+	)
 
 	if sshClient, err = sshDial(ctx, uiPrinter, clientConfig, addr); err != nil {
 		err = errors.Wrap(err)
