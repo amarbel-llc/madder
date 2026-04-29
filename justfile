@@ -17,21 +17,24 @@ build:
 build-go:
   cd go && go build ./...
 
-# Build race-instrumented CLI binaries under .tmp/race/, for use by
-# test-bats-race. Kept out of the default build because the race
-# instrumentation is slow and the binaries are unsuitable for release.
-[group("build")]
-build-go-race:
-  mkdir -p {{justfile_directory()}}/.tmp/race
-  cd go && go build -race -o {{justfile_directory()}}/.tmp/race/ ./cmd/madder ./cmd/madder-cache
-
 # Build coverage-instrumented CLI binaries under .tmp/cover-bin/, for
 # use by test-bats-cover. The -cover flag wires the binaries to write
-# per-process coverage to $GOCOVERDIR at runtime.
+# per-process coverage to $GOCOVERDIR at runtime. Stamps version+commit
+# via -ldflags so version.bats matches the source-of-truth check, just
+# like the nix lanes (madder, madder-race) do automatically via
+# buildGoApplication's auto-injected ldflags.
 [group("build")]
 build-go-cover:
+  #!/usr/bin/env bash
+  set -euo pipefail
   mkdir -p {{justfile_directory()}}/.tmp/cover-bin
-  cd go && go build -cover -covermode=atomic -o {{justfile_directory()}}/.tmp/cover-bin/ ./cmd/madder ./cmd/madder-cache
+  version="$(grep '^MADDER_VERSION=' {{justfile_directory()}}/version.env | cut -d= -f2)"
+  commit="$(git -C {{justfile_directory()}} rev-parse --short HEAD 2>/dev/null || echo unknown)"
+  cd go && go build \
+    -cover -covermode=atomic \
+    -ldflags="-X main.version=$version -X main.commit=$commit" \
+    -o {{justfile_directory()}}/.tmp/cover-bin/ \
+    ./cmd/madder ./cmd/madder-cache
 
 # Regenerate pkgs/ facades from internal/ packages via dagnabit.
 [group("build")]
@@ -128,18 +131,24 @@ verify-internal-pkg subpath:
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
 
-# Run Go unit tests with coverage collection. Writes the profile to
-# .tmp/go-cover.out and prints the total coverage. View the full HTML
-# report with `cd go && go tool cover -html=../.tmp/go-cover.out`.
+# Run Go unit tests with coverage collection. Writes covdata fragments
+# to .tmp/cover-data/unit/ (mergeable with the bats lane via cover-all)
+# and a textfmt profile to .tmp/go-cover.out (the legacy interface).
+# View the full HTML report with
+# `cd go && go tool cover -html=../.tmp/go-cover.out`.
 [group("test")]
 test-go-cover *flags:
   #!/usr/bin/env bash
   set -euo pipefail
+  unit_dir="{{justfile_directory()}}/.tmp/cover-data/unit"
   out="{{justfile_directory()}}/.tmp/go-cover.out"
-  mkdir -p "$(dirname "$out")"
+  rm -rf "$unit_dir"
+  mkdir -p "$unit_dir" "$(dirname "$out")"
   cd go
-  go test -tags test -coverprofile="$out" -covermode=atomic {{flags}} ./...
-  echo "==> Coverage written to $out"
+  go test -tags test -cover -covermode=atomic {{flags}} ./... \
+    -args -test.gocoverdir="$unit_dir" >/dev/null
+  go tool covdata textfmt -i="$unit_dir" -o="$out"
+  echo "==> Coverage written to $out (fragments at $unit_dir)"
   go tool cover -func="$out" | tail -n 1
 
 # Run bats integration tests. Excludes net_cap-tagged tests (loopback-
@@ -167,8 +176,10 @@ test-bats-race:
   nix build .#madder-race --print-build-logs
 
 # Run bats integration tests against coverage-instrumented binaries.
-# Collects GOCOVERDIR fragments into a per-run temp dir and converts
-# them to a Go coverage profile at .tmp/cover-data/bats-coverage.out.
+# Collects GOCOVERDIR fragments under /tmp (sandcastle write-root
+# constraint) and persists them to .tmp/cover-data/bats/ so cover-all
+# can merge them with the unit lane. Also emits a textfmt profile at
+# .tmp/cover-data/bats-coverage.out for standalone bats-only inspection.
 #
 # GOCOVERDIR is placed under /tmp explicitly (not TMPDIR) because the
 # bats sandcastle harness restricts the binary's write roots to /tmp
@@ -179,18 +190,86 @@ test-bats-race:
 test-bats-cover: build-go-cover
   #!/usr/bin/env bash
   set -euo pipefail
-  cover_data="$(mktemp -d /tmp/madder-cover-XXXXXX)"
-  trap 'rm -rf "$cover_data"' EXIT
+  scratch="$(mktemp -d /tmp/madder-cover-XXXXXX)"
+  trap 'rm -rf "$scratch"' EXIT
 
-  GOCOVERDIR="$cover_data" \
+  GOCOVERDIR="$scratch" \
     MADDER_BIN="{{justfile_directory()}}/.tmp/cover-bin/madder" \
     just zz-tests_bats/test
 
-  out_dir="{{justfile_directory()}}/.tmp/cover-data"
-  mkdir -p "$out_dir"
-  (cd go && go tool covdata textfmt -i="$cover_data" -o="$out_dir/bats-coverage.out")
-  echo "==> Coverage written to $out_dir/bats-coverage.out"
-  (cd go && go tool cover -func="$out_dir/bats-coverage.out" | tail -n 1)
+  bats_dir="{{justfile_directory()}}/.tmp/cover-data/bats"
+  rm -rf "$bats_dir"
+  mkdir -p "$bats_dir"
+  cp -r "$scratch"/* "$bats_dir"/
+
+  out="{{justfile_directory()}}/.tmp/cover-data/bats-coverage.out"
+  (cd go && go tool covdata textfmt -i="$bats_dir" -o="$out")
+  echo "==> Coverage written to $out (fragments at $bats_dir)"
+  (cd go && go tool cover -func="$out" | tail -n 1)
+
+# Merge unit-test and bats coverage into a combined profile at
+# .tmp/cover-data/merged.out. Depends on test-go-cover and test-bats-cover
+# having produced fragments under .tmp/cover-data/{unit,bats}/. Use this
+# to see the full coverage picture across both lanes — anything still
+# uncovered after both passes is a real gap.
+[group("test")]
+cover-merged: test-go-cover test-bats-cover
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cover_data="{{justfile_directory()}}/.tmp/cover-data"
+  merged_dir="$cover_data/merged"
+  out="$cover_data/merged.out"
+  rm -rf "$merged_dir"
+  mkdir -p "$merged_dir"
+  cd go
+  go tool covdata merge -i="$cover_data/unit,$cover_data/bats" -o="$merged_dir"
+  go tool covdata textfmt -i="$merged_dir" -o="$out"
+  echo "==> Merged coverage written to $out"
+  go tool cover -func="$out" | tail -n 1
+
+# Per-package coverage rollup with delta columns. Shows unit %, bats %,
+# merged %, and bats-delta (how much bats adds beyond unit). Sorted
+# ascending by merged % so the worst-covered packages surface first.
+# Depends on cover-merged so all three profiles exist.
+[group("test")]
+cover-summary: cover-merged
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cover_data="{{justfile_directory()}}/.tmp/cover-data"
+  awk_path="$cover_data/rollup.awk"
+  cat > "$awk_path" <<'AWK_EOF'
+  /^mode:/ { next }
+  {
+    split($1, a, ":")
+    split(a[1], p, "/")
+    pkg = ""
+    for (i = 1; i < length(p); i++) pkg = pkg p[i] "/"
+    sub(/\/$/, "", pkg)
+    stmts = $(NF-1)
+    count = $NF
+    total[pkg] += stmts
+    if (count + 0 > 0) covered[pkg] += stmts
+  }
+  END {
+    for (k in total) {
+      c = covered[k] + 0
+      t = total[k]
+      printf "%s\t%.1f\n", k, (t > 0 ? 100*c/t : 0)
+    }
+  }
+  AWK_EOF
+  unit_pct="$cover_data/by-package.unit"
+  bats_pct="$cover_data/by-package.bats"
+  merged_pct="$cover_data/by-package.merged"
+  awk -f "$awk_path" "{{justfile_directory()}}/.tmp/go-cover.out" | sort > "$unit_pct"
+  awk -f "$awk_path" "$cover_data/bats-coverage.out"             | sort > "$bats_pct"
+  awk -f "$awk_path" "$cover_data/merged.out"                    | sort > "$merged_pct"
+  printf '%-72s %7s %7s %8s %9s\n' "PACKAGE" "UNIT%" "BATS%" "MERGED%" "BATS_DELTA"
+  printf '%-72s %7s %7s %8s %9s\n' "------------------------------------------------------------------------" "-----" "-----" "-------" "----------"
+  join -t $'\t' -a 1 -a 2 -e '0.0' -o '0,1.2,2.2' "$unit_pct" "$bats_pct" \
+    | join -t $'\t' -a 1 -a 2 -e '0.0' -o '0,1.2,1.3,2.2' - "$merged_pct" \
+    | sort -t $'\t' -k4 -n \
+    | awk -F $'\t' '{ printf "%-72s %6.1f%% %6.1f%% %7.1f%% %+9.1f\n", $1, $2, $3, $4, $3-$2 }'
 
 # Run specific bats test files.
 [group("test")]
