@@ -6,10 +6,10 @@
   purse-first,
   system,
   man7Src ? null,
-  # Test-only inputs consumed by the bats variants' installCheckPhase
-  # (madder-race today, madder + madder-cover later). Defaulted to null
-  # so direct `import ./go/default.nix` callers without a flake context
-  # still work — they just can't run the bats lanes. versionEnv is the
+  # Test-only inputs consumed by the bats installCheckPhase shared
+  # between `madder` and `madder-race`. Defaulted to null so direct
+  # `import ./go/default.nix` callers without a flake context still
+  # work — they just can't run the bats lanes. versionEnv is the
   # source-of-truth file the bats version test consults.
   batsSrc ? null,
   versionEnv ? null,
@@ -28,7 +28,51 @@ let
   };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  madder = pkgs.buildGoApplication {
+  # Shared bats installCheckPhase: runs the bats suite against the
+  # derivation's `$out/bin/madder` after installPhase. Used by `madder`
+  # (release lane) and `madder-race` (race-instrumented lane) so a
+  # nix-build failure means the suite failed against a real installed
+  # binary. net_cap-tagged scenarios are filtered out — they need
+  # loopback binding the nix sandbox doesn't grant.
+  #
+  # Plain `bats --no-sandbox` (not bob's batman wrapper): on Darwin the
+  # sandcastle/fence path shells out to /usr/bin/sandbox-exec, which the
+  # nix build sandbox doesn't expose. The build sandbox is already an
+  # isolation layer, so the extra wrapping is redundant here.
+  #
+  # jq is referenced inline by cli_contract.bats helpers (parsing
+  # `write -check` JSON output to compute "missing" digests). Other
+  # scenarios use only coreutils + the binary under test, both already
+  # on PATH inside the nix build sandbox.
+  batsInstallCheck = {
+    doInstallCheck = batsSrc != null && versionEnv != null;
+    nativeInstallCheckInputs = [ pkgs-master.jq ];
+    installCheckPhase = ''
+      runHook preInstallCheck
+
+      # Stage bats sources to a writable scratch dir; bats writes
+      # per-test temp dirs and BATS_LIB_PATH discovery walks from there.
+      mkdir -p stage/zz-tests_bats
+      cp -r ${batsSrc}/* stage/zz-tests_bats/
+      chmod -R u+w stage
+
+      # version_matches_source_of_truth reads MADDER_VERSION from
+      # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
+      # layout: stage/version.env is sibling of stage/zz-tests_bats/.
+      cp ${versionEnv} stage/version.env
+
+      export MADDER_BIN="$out/bin/madder"
+
+      cd stage/zz-tests_bats
+      ${bob.packages.${system}.batman}/bin/bats --no-sandbox \
+        --filter-tags '!net_cap' \
+        *.bats
+
+      runHook postInstallCheck
+    '';
+  };
+
+  madder = pkgs.buildGoApplication ({
     pname = "madder";
     inherit version commit;
     src = ./.;
@@ -76,7 +120,7 @@ let
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';
-  };
+  } // batsInstallCheck);
 
   # madder-race exercises the same package-level test surface as `madder`
   # but with the Go race detector enabled. Concurrent-write paths
@@ -85,11 +129,9 @@ let
   # NOT release-suitable — race-instrumented binaries are slower and
   # not what we ship.
   #
-  # Beyond the unit-suite checkPhase (Go-level race detection), this
-  # variant also runs the bats suite against the race-instrumented
-  # `$out/bin/madder` via installCheckPhase, catching races that only
-  # surface in real CLI flows. net_cap-tagged scenarios are filtered
-  # out — they need loopback binding the nix sandbox doesn't grant.
+  # The shared bats installCheckPhase (inherited from `madder` via
+  # overrideAttrs) reruns the suite against the race-instrumented
+  # `$out/bin/madder`, catching races that only surface in real CLI flows.
   madder-race = madder.overrideAttrs (old: {
     pname = "madder-race";
 
@@ -105,35 +147,6 @@ let
       go test -tags test -race -p $NIX_BUILD_CORES ./...
       runHook postCheck
     '';
-
-    nativeInstallCheckInputs = (old.nativeInstallCheckInputs or [ ]) ++ [
-      bob.packages.${system}.batman
-    ];
-
-    doInstallCheck = batsSrc != null && versionEnv != null;
-    installCheckPhase = ''
-      runHook preInstallCheck
-
-      # Stage bats sources to a writable scratch dir. batman walks the
-      # directory tree, requires a fence.jsonc per group, and runs each
-      # group under fence with that policy.
-      mkdir -p stage/zz-tests_bats
-      cp -r ${batsSrc}/* stage/zz-tests_bats/
-      chmod -R u+w stage
-
-      # version_matches_source_of_truth reads MADDER_VERSION from
-      # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
-      # layout: stage/version.env is sibling of stage/zz-tests_bats/.
-      cp ${versionEnv} stage/version.env
-
-      export MADDER_BIN="$out/bin/madder"
-      export PATH="$out/bin:$PATH"
-
-      cd stage/zz-tests_bats
-      batman . -- --filter-tags '!net_cap'
-
-      runHook postInstallCheck
-    '';
   });
 
   # madder-cover runs the unit suite with coverage collection enabled
@@ -144,6 +157,12 @@ let
   # `go tool cover -html=result/coverage.out`.
   # The justfile recipe `test-go-cover` invokes this and tails the
   # func summary.
+  #
+  # The bats suite is intentionally NOT run here: this lane's purpose
+  # is unit-test coverage (Go-level), and madder-race already exercises
+  # the bats suite against an instrumented binary. Mixing CLI bats
+  # coverage in here would conflate two signals — the coverage profile
+  # would no longer correspond to "what `go test` covered."
   madder-cover = madder.overrideAttrs (old: {
     pname = "madder-cover";
     # Suppress the default checkPhase — its job (running the suite)

@@ -155,12 +155,16 @@ test-bats: build
 test-bats-net-cap: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-net-cap
 
-# Run bats integration tests against race-instrumented binaries built
-# by build-go-race. Catches data races that the unit-test -race pass
-# won't, since several code paths only execute in the real CLI.
+# Run bats integration tests against race-instrumented binaries.
+# Catches data races that the unit-test -race pass won't, since several
+# code paths only execute in the real CLI. Driven by `nix build
+# .#madder-race`, which runs the bats suite as installCheckPhase against
+# the race-instrumented `$out/bin/madder`. net_cap-tagged scenarios are
+# filtered out by the derivation — they need loopback binding the nix
+# sandbox doesn't grant.
 [group("test")]
-test-bats-race: build-go-race
-  MADDER_BIN={{justfile_directory()}}/.tmp/race/madder just zz-tests_bats/test
+test-bats-race:
+  nix build .#madder-race --print-build-logs
 
 # Run bats integration tests against coverage-instrumented binaries.
 # Collects GOCOVERDIR fragments into a per-run temp dir and converts
