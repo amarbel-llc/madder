@@ -441,6 +441,149 @@ function sftp_fsck_json_auto_detects { # @test
   refute_output --partial 'TAP version 14'
 }
 
+function sftp_fsck_tap14_output { # @test
+  # Symmetric to tap14_output (fsck.bats): an empty SFTP store
+  # fsck-passes cleanly under tap formatting.
+  init_sftp_test_store
+
+  run_madder fsck -format tap .sftp-test
+  assert_success
+  assert_output --partial "TAP version 14"
+  assert_output --partial "1.."
+  refute_output --partial "not ok"
+}
+
+function sftp_fsck_json_reports_missing { # @test
+  # Mirrors fsck_json_reports_missing (fsck.bats) for SFTP. Delete
+  # the remote blob files (re-rooted under $BATS_TEST_TMPDIR by the
+  # test SFTP server) so AllBlobs sees the IDs but HasBlob fails.
+  init_sftp_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "blob to remove" >"$blob"
+  run_madder write .sftp-test "$blob"
+  assert_success
+
+  find "$BATS_TEST_TMPDIR/sftp-remote" -type f -path '*/blake2b256/*' -delete 2>/dev/null || true
+
+  run_madder fsck -format json .sftp-test
+  assert_output --partial '"store":'
+}
+
+# create_sftp_archive_config writes a local inventory_archive
+# blob_store-config that pulls loose blobs from the SFTP store. The
+# local archive store stays on the host filesystem; only the loose
+# source is SFTP-backed. Mirrors create_archive_config in pack.bats.
+create_sftp_archive_config() {
+  local store_name="$1"
+  local delta_enabled="$2"
+  local config_dir=".madder/local/share/blob_stores/${store_name}"
+
+  mkdir -p "$config_dir"
+
+  cat >"${config_dir}/blob_store-config" <<-'HEADER'
+	---
+	! toml-blob_store_config-inventory_archive-v1
+	---
+HEADER
+
+  cat >>"${config_dir}/blob_store-config" <<-EOM
+
+	hash_type-id = "blake2b256"
+	compression-type = "zstd"
+	loose-blob-store-id = ".sftp-test"
+	encryption = ""
+	max-pack-size = 0
+
+	[delta]
+	enabled = ${delta_enabled}
+	algorithm = "bsdiff"
+	min-blob-size = 0
+	max-blob-size = 0
+	size-ratio = 0.0
+EOM
+}
+
+function sftp_pack_with_delta { # @test
+  # Mirrors pack_with_delta (pack.bats) with the loose source on
+  # SFTP. The archive itself stays local; pack iterates the SFTP
+  # loose store via AllBlobs to collect candidates.
+  init_sftp_test_store
+  create_sftp_archive_config "archive" "true"
+
+  local blob1="$BATS_TEST_TMPDIR/blob1.txt"
+  local blob2="$BATS_TEST_TMPDIR/blob2.txt"
+  local prefix
+  prefix="$(for i in $(seq 1 50); do
+    echo "shared content line ${i} with some padding to make it large enough for delta compression"
+  done)"
+
+  printf '%s\nunique suffix alpha\n' "$prefix" >"$blob1"
+  printf '%s\nunique suffix beta\n' "$prefix" >"$blob2"
+
+  local hash1 hash2
+
+  run_madder write -format tap .sftp-test "$blob1"
+  assert_success
+  hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run_madder write -format tap .sftp-test "$blob2"
+  assert_success
+  hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run timeout --preserve-status 10s "$MADDER_BIN" pack
+  assert_success
+
+  run_madder cat "$hash1"
+  assert_success
+  assert_output --partial "unique suffix alpha"
+
+  run_madder cat "$hash2"
+  assert_success
+  assert_output --partial "unique suffix beta"
+
+  run find .madder/local/share/blob_stores/archive -name '*.inventory_archive-v1' -type f
+  assert_success
+  assert_output
+}
+
+function sftp_pack_without_delta { # @test
+  # Mirrors pack_without_delta (pack.bats) with the loose source on SFTP.
+  init_sftp_test_store
+  create_sftp_archive_config "archive" "false"
+
+  local blob1="$BATS_TEST_TMPDIR/blob1.txt"
+  local blob2="$BATS_TEST_TMPDIR/blob2.txt"
+
+  echo "no delta alpha" >"$blob1"
+  echo "no delta beta" >"$blob2"
+
+  local hash1 hash2
+
+  run_madder write -format tap .sftp-test "$blob1"
+  assert_success
+  hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run_madder write -format tap .sftp-test "$blob2"
+  assert_success
+  hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run timeout --preserve-status 10s "$MADDER_BIN" pack
+  assert_success
+
+  run_madder cat "$hash1"
+  assert_success
+  assert_output "no delta alpha"
+
+  run_madder cat "$hash2"
+  assert_success
+  assert_output "no delta beta"
+
+  run find .madder/local/share/blob_stores/archive -name '*.inventory_archive-v1' -type f
+  assert_success
+  assert_output
+}
+
 function sftp_init_with_encryption { # @test
   # Mirrors init_with_encryption (init.bats) for SFTP. ADR 0005 routes
   # the -encryption flag to the remote TomlV3, so info-repo must surface
