@@ -9,9 +9,9 @@ setup() {
 # root is the source of truth, flake.nix reads it via builtins
 # .readFile, go/default.nix passes it through to buildGoApplication's
 # -ldflags injection into go/internal/0/buildinfo, and `madder version`
-# prints them. The justfile recipes that produce non-nix binaries
-# (build-go-cover) stamp the same ldflags from version.env so this
-# suite passes uniformly across all lanes.
+# prints them. All lanes (madder, madder-race, madder-cli-cover) build
+# under buildGoApplication, so the ldflags are auto-injected uniformly
+# and `dev+unknown` defaults never reach this suite.
 
 function version_prints_burnt_in_identity { # @test
   run_madder version

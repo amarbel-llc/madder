@@ -17,25 +17,6 @@ build:
 build-go:
   cd go && go build ./...
 
-# Build coverage-instrumented CLI binaries under .tmp/cover-bin/, for
-# use by test-bats-cover. The -cover flag wires the binaries to write
-# per-process coverage to $GOCOVERDIR at runtime. Stamps version+commit
-# via -ldflags so version.bats matches the source-of-truth check, just
-# like the nix lanes (madder, madder-race) do automatically via
-# buildGoApplication's auto-injected ldflags.
-[group("build")]
-build-go-cover:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  mkdir -p {{justfile_directory()}}/.tmp/cover-bin
-  version="$(grep '^MADDER_VERSION=' {{justfile_directory()}}/version.env | cut -d= -f2)"
-  commit="$(git -C {{justfile_directory()}} rev-parse --short HEAD 2>/dev/null || echo unknown)"
-  cd go && go build \
-    -cover -covermode=atomic \
-    -ldflags="-X main.version=$version -X main.commit=$commit" \
-    -o {{justfile_directory()}}/.tmp/cover-bin/ \
-    ./cmd/madder ./cmd/madder-cache
-
 # Regenerate pkgs/ facades from internal/ packages via dagnabit.
 [group("build")]
 generate-facades:
@@ -175,35 +156,34 @@ test-bats-net-cap: build
 test-bats-race:
   nix build .#madder-race --print-build-logs
 
-# Run bats integration tests against coverage-instrumented binaries.
-# Collects GOCOVERDIR fragments under /tmp (sandcastle write-root
-# constraint) and persists them to .tmp/cover-data/bats/ so cover-all
-# can merge them with the unit lane. Also emits a textfmt profile at
-# .tmp/cover-data/bats-coverage.out for standalone bats-only inspection.
+# Run bats integration tests against a coverage-instrumented binary.
+# Driven by `nix build .#madder-cli-cover`, which builds the binary
+# with `go build -cover`, runs the bats suite under a fresh GOCOVERDIR
+# in the nix sandbox, then persists covdata fragments and a textfmt
+# profile to `$out/`. `--no-link` skips creating a result symlink (we
+# don't want to clobber `./result` and don't want a parallel
+# `result-cli-cover` either); the store path comes back via
+# `--print-out-paths` and we copy the artifacts we want into
+# `.tmp/cover-data/` for the cover-merged / cover-summary recipes.
 #
-# GOCOVERDIR is placed under /tmp explicitly (not TMPDIR) because the
-# bats sandcastle harness restricts the binary's write roots to /tmp
-# and the test's own BATS_TEST_TMPDIR. A GOCOVERDIR inside the repo's
-# .tmp/ (which is where $TMPDIR often points in nix-shell) trips
-# "read-only file system" errors from the cover runtime.
+# net_cap-tagged scenarios are filtered out by the derivation — they
+# need loopback binding the nix sandbox doesn't grant.
 [group("test")]
-test-bats-cover: build-go-cover
+test-bats-cover:
   #!/usr/bin/env bash
   set -euo pipefail
-  scratch="$(mktemp -d /tmp/madder-cover-XXXXXX)"
-  trap 'rm -rf "$scratch"' EXIT
-
-  GOCOVERDIR="$scratch" \
-    MADDER_BIN="{{justfile_directory()}}/.tmp/cover-bin/madder" \
-    just zz-tests_bats/test
+  out_path="$(nix build .#madder-cli-cover --no-link --print-out-paths --print-build-logs)"
 
   bats_dir="{{justfile_directory()}}/.tmp/cover-data/bats"
   rm -rf "$bats_dir"
   mkdir -p "$bats_dir"
-  cp -r "$scratch"/* "$bats_dir"/
+  cp "$out_path"/covdata/* "$bats_dir"/
+  chmod -R u+w "$bats_dir"
 
   out="{{justfile_directory()}}/.tmp/cover-data/bats-coverage.out"
-  (cd go && go tool covdata textfmt -i="$bats_dir" -o="$out")
+  cp "$out_path/coverage.out" "$out"
+  chmod u+w "$out"
+
   echo "==> Coverage written to $out (fragments at $bats_dir)"
   (cd go && go tool cover -func="$out" | tail -n 1)
 

@@ -28,46 +28,148 @@ let
   };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # Shared bats installCheckPhase: runs the bats suite against the
-  # derivation's `$out/bin/madder` after installPhase. Used by `madder`
-  # (release lane) and `madder-race` (race-instrumented lane) so a
-  # nix-build failure means the suite failed against a real installed
-  # binary. net_cap-tagged scenarios are filtered out — they need
-  # loopback binding the nix sandbox doesn't grant.
+  # =========================================================================
+  # Tracer-bullet implementations of buildGoCover and buildGoRace as proposed
+  # in amarbel-llc/nixpkgs#13. These are deliberately co-located with their
+  # one consumer (this file) for now — once the API stabilizes here, lift
+  # them into pkgs/build-support/gomod2nix/default.nix in the fork.
   #
-  # Plain `bats --no-sandbox` (not bob's batman wrapper): on Darwin the
-  # sandcastle/fence path shells out to /usr/bin/sandbox-exec, which the
-  # nix build sandbox doesn't expose. The build sandbox is already an
-  # isolation layer, so the extra wrapping is redundant here.
+  # The helpers operate via overrideAttrs on a base derivation produced by
+  # buildGoApplication, rather than wrapping buildGoApplication directly.
+  # That keeps the call site for `madder-race` / `madder-cli-cover` close
+  # to today's idiom (override the release derivation), and avoids forcing
+  # the upstream API into a particular argument shape before we know what
+  # works.
+  # =========================================================================
+
+  # buildGoRace: race-instrumented variant of an existing buildGoApplication
+  # derivation. Sets CGO_ENABLED, appends `-race` to buildFlagsArray (so the
+  # `go install` that produces $out/bin/* picks it up), and overrides
+  # checkPhase to also pass `-race` to `go test`. Caller's existing
+  # checkPhase tags / -p handling are preserved by passing them in via the
+  # `tags` arg.
+  buildGoRace = { base, tags ? [ ], pnameSuffix ? "-race" }:
+    base.overrideAttrs (old: {
+      pname = "${old.pname}${pnameSuffix}";
+      CGO_ENABLED = 1;
+      # See note on buildGoCover.preBuild — buildFlagsArray must be set
+      # as a true bash array via preBuild rather than as a nix list attr.
+      preBuild = (old.preBuild or "") + ''
+        buildFlagsArray+=("-race")
+      '';
+      checkPhase = ''
+        runHook preCheck
+        go test ${if tags == [ ] then "" else "-tags ${pkgs-master.lib.concatStringsSep "," tags}"} -race -p $NIX_BUILD_CORES ./...
+        runHook postCheck
+      '';
+    });
+
+  # buildGoCover: coverage-instrumented variant of an existing
+  # buildGoApplication derivation. Builds the binary with `go build -cover
+  # -covermode=atomic`, then runs `coverIntegrationCommand` (which the
+  # caller provides as a phase fragment) under a fresh $GOCOVERDIR. After
+  # the integration command, the helper:
+  #   - copies the binary covdata fragments to $out/covdata/  (mergeable)
+  #   - converts them to textfmt at $out/coverage.out         (inspectable)
+  #
+  # The caller's `coverIntegrationCommand` runs against `$out/bin/<binary>`
+  # with $GOCOVERDIR already exported. It is responsible for whatever test
+  # plumbing it needs (MADDER_BIN, staging files, etc.).
+  buildGoCover =
+    { base
+    , coverIntegrationCommand
+    , pnameSuffix ? "-cli-cover"
+    , extraNativeInstallCheckInputs ? [ ]
+    }:
+    base.overrideAttrs (old: {
+      pname = "${old.pname}${pnameSuffix}";
+
+      # buildFlagsArray must be set as a true bash array, not via a
+      # nix list attr — stdenv serializes list attrs as space-joined
+      # strings that the goBuildHook treats as a single argv entry,
+      # which breaks for multi-flag values like `-covermode=atomic`.
+      # Setting it in preBuild puts it in the bash environment as an
+      # actual array, which `declare -p > $TMPDIR/buildFlagsArray`
+      # can then round-trip correctly.
+      preBuild = (old.preBuild or "") + ''
+        buildFlagsArray+=("-cover" "-covermode=atomic")
+      '';
+
+      # The base derivation's postInstall invokes the instrumented
+      # `$out/bin/madder-gen_man` to render man pages. Without a
+      # GOCOVERDIR exported, the cover runtime prints a warning to
+      # stderr ("GOCOVERDIR not set, no coverage data emitted"). The
+      # man-gen run isn't part of the integration coverage surface,
+      # so route its fragments to a discardable scratch dir before
+      # running the existing postInstall.
+      postInstall = ''
+        export GOCOVERDIR="$(mktemp -d)"
+      '' + (old.postInstall or "");
+
+      doInstallCheck = true;
+      nativeInstallCheckInputs =
+        (old.nativeInstallCheckInputs or [ ])
+        ++ extraNativeInstallCheckInputs;
+      installCheckPhase = ''
+        runHook preInstallCheck
+
+        gocover_data="$(mktemp -d)"
+        export GOCOVERDIR="$gocover_data"
+
+        ${coverIntegrationCommand}
+
+        mkdir -p $out/covdata $out
+        cp -r "$gocover_data"/* $out/covdata/
+        go tool covdata textfmt -i="$gocover_data" -o="$out/coverage.out"
+
+        runHook postInstallCheck
+      '';
+    });
+
+  # Shared bats invocation: stages the bats sources + version.env into
+  # a writable scratch dir, exports MADDER_BIN, and runs the suite under
+  # `bats --no-sandbox` (the nix build sandbox is already an isolation
+  # layer; sandcastle/fence on Darwin needs /usr/bin/sandbox-exec which
+  # the nix sandbox doesn't expose).
+  #
+  # net_cap-tagged scenarios are filtered out — they need loopback
+  # binding the nix sandbox doesn't grant.
+  #
+  # Used by:
+  #   - batsInstallCheck (consumed by madder + madder-race via attrset
+  #     merge / overrideAttrs)
+  #   - madder-cli-cover (passed as coverIntegrationCommand to buildGoCover)
   #
   # jq is referenced inline by cli_contract.bats helpers (parsing
-  # `write -check` JSON output to compute "missing" digests). Other
-  # scenarios use only coreutils + the binary under test, both already
-  # on PATH inside the nix build sandbox.
+  # `write -check` JSON output to compute "missing" digests).
+  batsRunCommand = ''
+    mkdir -p stage/zz-tests_bats
+    cp -r ${batsSrc}/* stage/zz-tests_bats/
+    chmod -R u+w stage
+
+    # version_matches_source_of_truth reads MADDER_VERSION from
+    # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
+    # layout: stage/version.env is sibling of stage/zz-tests_bats/.
+    cp ${versionEnv} stage/version.env
+
+    export MADDER_BIN="$out/bin/madder"
+
+    cd stage/zz-tests_bats
+    ${bob.packages.${system}.batman}/bin/bats --no-sandbox \
+      --filter-tags '!net_cap' \
+      *.bats
+    cd "$NIX_BUILD_TOP"
+  '';
+
+  # Shared bats installCheckPhase: runs the bats suite against the
+  # derivation's `$out/bin/madder` after installPhase. Used by `madder`
+  # (release lane) and `madder-race` (race-instrumented lane).
   batsInstallCheck = {
     doInstallCheck = batsSrc != null && versionEnv != null;
     nativeInstallCheckInputs = [ pkgs-master.jq ];
     installCheckPhase = ''
       runHook preInstallCheck
-
-      # Stage bats sources to a writable scratch dir; bats writes
-      # per-test temp dirs and BATS_LIB_PATH discovery walks from there.
-      mkdir -p stage/zz-tests_bats
-      cp -r ${batsSrc}/* stage/zz-tests_bats/
-      chmod -R u+w stage
-
-      # version_matches_source_of_truth reads MADDER_VERSION from
-      # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
-      # layout: stage/version.env is sibling of stage/zz-tests_bats/.
-      cp ${versionEnv} stage/version.env
-
-      export MADDER_BIN="$out/bin/madder"
-
-      cd stage/zz-tests_bats
-      ${bob.packages.${system}.batman}/bin/bats --no-sandbox \
-        --filter-tags '!net_cap' \
-        *.bats
-
+      ${batsRunCommand}
       runHook postInstallCheck
     '';
   };
@@ -132,22 +234,10 @@ let
   # The shared bats installCheckPhase (inherited from `madder` via
   # overrideAttrs) reruns the suite against the race-instrumented
   # `$out/bin/madder`, catching races that only surface in real CLI flows.
-  madder-race = madder.overrideAttrs (old: {
-    pname = "madder-race";
-
-    # Race detection requires CGO and a -race build flag for the
-    # binaries (not just the test binaries). buildGoApplication's
-    # goBuildHook picks up buildFlagsArray and passes it through to
-    # `go install`.
-    CGO_ENABLED = 1;
-    buildFlagsArray = (old.buildFlagsArray or [ ]) ++ [ "-race" ];
-
-    checkPhase = ''
-      runHook preCheck
-      go test -tags test -race -p $NIX_BUILD_CORES ./...
-      runHook postCheck
-    '';
-  });
+  madder-race = buildGoRace {
+    base = madder;
+    tags = [ "test" ];
+  };
 
   # madder-cover runs the unit suite with coverage collection enabled
   # and writes the profile to $out/coverage.out. Coverage collection
@@ -181,6 +271,24 @@ let
     '';
   });
 
+  # madder-cli-cover builds the CLI binary with `go build -cover`, then
+  # runs the bats suite against the instrumented `$out/bin/madder` under
+  # a fresh $GOCOVERDIR. After the suite, the helper persists binary
+  # covdata fragments to `$out/covdata/` (mergeable with unit-test
+  # fragments via `go tool covdata merge`) and a textfmt profile to
+  # `$out/coverage.out` (inspectable with `go tool cover`).
+  #
+  # This complements madder-cover (unit-test coverage) — the two answer
+  # different questions: madder-cover shows what `go test` covers,
+  # madder-cli-cover shows what the bats suite exercises through the
+  # real CLI. Merging them (via `just cover-merged`) gives the full
+  # picture.
+  madder-cli-cover = buildGoCover {
+    base = madder;
+    extraNativeInstallCheckInputs = [ pkgs-master.jq ];
+    coverIntegrationCommand = batsRunCommand;
+  };
+
   # Devshell-only test harness for SFTP integration tests (RFC 0001).
   # Intentionally NOT included in the `packages` output — release
   # artifacts must not ship a server that accepts any password.
@@ -197,7 +305,7 @@ let
 in
 {
   packages = {
-    inherit madder madder-race madder-cover;
+    inherit madder madder-race madder-cover madder-cli-cover;
     default = madder;
   };
 
