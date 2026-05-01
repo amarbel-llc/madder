@@ -1,5 +1,7 @@
 package inventory_archive
 
+//go:generate dagnabit export
+
 import (
 	"crypto/sha256"
 	"crypto/sha512"
