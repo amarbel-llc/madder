@@ -485,11 +485,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1777042677,
-        "narHash": "sha256-PkHa8cSqjNVD/ug5VNyC0ebwAVRJxvw92FFLWinbdQs=",
+        "lastModified": 1777636935,
+        "narHash": "sha256-pRNhwjQZX/KkWeE8LsA/qcl5aSjlAaGt2uhCo/S3f1A=",
         "owner": "amarbel-llc",
         "repo": "nixpkgs",
-        "rev": "9bad1e489bd4c713da002618bd825372d35430af",
+        "rev": "c00387d5103bc0bda58e86b19e99f56250e75edf",
         "type": "github"
       },
       "original": {

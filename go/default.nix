@@ -28,104 +28,6 @@ let
   };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # =========================================================================
-  # Tracer-bullet implementations of buildGoCover and buildGoRace as proposed
-  # in amarbel-llc/nixpkgs#13. These are deliberately co-located with their
-  # one consumer (this file) for now — once the API stabilizes here, lift
-  # them into pkgs/build-support/gomod2nix/default.nix in the fork.
-  #
-  # The helpers operate via overrideAttrs on a base derivation produced by
-  # buildGoApplication, rather than wrapping buildGoApplication directly.
-  # That keeps the call site for `madder-race` / `madder-cli-cover` close
-  # to today's idiom (override the release derivation), and avoids forcing
-  # the upstream API into a particular argument shape before we know what
-  # works.
-  # =========================================================================
-
-  # buildGoRace: race-instrumented variant of an existing buildGoApplication
-  # derivation. Sets CGO_ENABLED, appends `-race` to buildFlagsArray (so the
-  # `go install` that produces $out/bin/* picks it up), and overrides
-  # checkPhase to also pass `-race` to `go test`. Caller's existing
-  # checkPhase tags / -p handling are preserved by passing them in via the
-  # `tags` arg.
-  buildGoRace = { base, tags ? [ ], pnameSuffix ? "-race" }:
-    base.overrideAttrs (old: {
-      pname = "${old.pname}${pnameSuffix}";
-      CGO_ENABLED = 1;
-      # See note on buildGoCover.preBuild — buildFlagsArray must be set
-      # as a true bash array via preBuild rather than as a nix list attr.
-      preBuild = (old.preBuild or "") + ''
-        buildFlagsArray+=("-race")
-      '';
-      checkPhase = ''
-        runHook preCheck
-        go test ${if tags == [ ] then "" else "-tags ${pkgs-master.lib.concatStringsSep "," tags}"} -race -p $NIX_BUILD_CORES ./...
-        runHook postCheck
-      '';
-    });
-
-  # buildGoCover: coverage-instrumented variant of an existing
-  # buildGoApplication derivation. Builds the binary with `go build -cover
-  # -covermode=atomic`, then runs `coverIntegrationCommand` (which the
-  # caller provides as a phase fragment) under a fresh $GOCOVERDIR. After
-  # the integration command, the helper:
-  #   - copies the binary covdata fragments to $out/covdata/  (mergeable)
-  #   - converts them to textfmt at $out/coverage.out         (inspectable)
-  #
-  # The caller's `coverIntegrationCommand` runs against `$out/bin/<binary>`
-  # with $GOCOVERDIR already exported. It is responsible for whatever test
-  # plumbing it needs (MADDER_BIN, staging files, etc.).
-  buildGoCover =
-    { base
-    , coverIntegrationCommand
-    , pnameSuffix ? "-cli-cover"
-    , extraNativeInstallCheckInputs ? [ ]
-    }:
-    base.overrideAttrs (old: {
-      pname = "${old.pname}${pnameSuffix}";
-
-      # buildFlagsArray must be set as a true bash array, not via a
-      # nix list attr — stdenv serializes list attrs as space-joined
-      # strings that the goBuildHook treats as a single argv entry,
-      # which breaks for multi-flag values like `-covermode=atomic`.
-      # Setting it in preBuild puts it in the bash environment as an
-      # actual array, which `declare -p > $TMPDIR/buildFlagsArray`
-      # can then round-trip correctly.
-      preBuild = (old.preBuild or "") + ''
-        buildFlagsArray+=("-cover" "-covermode=atomic")
-      '';
-
-      # The base derivation's postInstall invokes the instrumented
-      # `$out/bin/madder-gen_man` to render man pages. Without a
-      # GOCOVERDIR exported, the cover runtime prints a warning to
-      # stderr ("GOCOVERDIR not set, no coverage data emitted"). The
-      # man-gen run isn't part of the integration coverage surface,
-      # so route its fragments to a discardable scratch dir before
-      # running the existing postInstall.
-      postInstall = ''
-        export GOCOVERDIR="$(mktemp -d)"
-      '' + (old.postInstall or "");
-
-      doInstallCheck = true;
-      nativeInstallCheckInputs =
-        (old.nativeInstallCheckInputs or [ ])
-        ++ extraNativeInstallCheckInputs;
-      installCheckPhase = ''
-        runHook preInstallCheck
-
-        gocover_data="$(mktemp -d)"
-        export GOCOVERDIR="$gocover_data"
-
-        ${coverIntegrationCommand}
-
-        mkdir -p $out/covdata $out
-        cp -r "$gocover_data"/* $out/covdata/
-        go tool covdata textfmt -i="$gocover_data" -o="$out/coverage.out"
-
-        runHook postInstallCheck
-      '';
-    });
-
   # Shared bats invocation: stages the bats sources + version.env into
   # a writable scratch dir, exports MADDER_BIN, and runs the suite under
   # `bats --no-sandbox` (the nix build sandbox is already an isolation
@@ -260,7 +162,7 @@ let
   # The shared bats installCheckPhase (inherited from `madder` via
   # overrideAttrs) reruns the suite against the race-instrumented
   # `$out/bin/madder`, catching races that only surface in real CLI flows.
-  madder-race = buildGoRace {
+  madder-race = pkgs.buildGoRace {
     base = madder;
     tags = [ "test" ];
   };
@@ -309,7 +211,7 @@ let
   # madder-cli-cover shows what the bats suite exercises through the
   # real CLI. Merging them (via `just cover-merged`) gives the full
   # picture.
-  madder-cli-cover = buildGoCover {
+  madder-cli-cover = pkgs.buildGoCover {
     base = madder;
     extraNativeInstallCheckInputs = [ pkgs-master.jq ];
     coverIntegrationCommand = mkBatsRunCommand { };
