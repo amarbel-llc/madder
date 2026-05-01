@@ -98,9 +98,11 @@ content:
 **# text**
 :   Description. Multiple description lines are space-concatenated.
 
-**- identifier**
-:   Tag (bare name like **todo**) or object reference (contains **/**).
-    References may include locks: **- object-id < markl-id**
+**- value**
+:   Tag or object reference. The value is any UTF-8 text with no newlines;
+    framing parsers treat it as opaque. Convention: bare values like **todo**
+    are tags, values containing **/** are object references, and either may
+    carry a lock as **- value < markl-id**.
 
 **< object-id**
 :   Explicit object reference. Same syntax as **-** references.
