@@ -256,10 +256,15 @@ cover-summary: cover-merged
 test-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-targets {{targets}}
 
-# Run bats tests filtered by tag.
+# Run bats tests filtered by file_tag. Drives the auto-generated
+# `.#bats-${tag}` flake output (one per `# bats file_tags=` directive
+# discovered at flake-eval time). The lane runs under nix's build
+# sandbox against the same `$out/bin/madder` `.#madder` produces, so
+# dev-loop and release share one cache. `nix flake show` lists every
+# available bats lane.
 [group("test")]
-test-bats-tags *tags: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-tags {{tags}}
+test-bats-tags *tags:
+  nix build --print-build-logs --no-link .#bats-{{tags}}
 
 #   _____                          _
 #  |  ___|__  _ __ _ __ ___   __ _| |_

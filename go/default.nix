@@ -132,17 +132,36 @@ let
   # layer; sandcastle/fence on Darwin needs /usr/bin/sandbox-exec which
   # the nix sandbox doesn't expose).
   #
-  # net_cap-tagged scenarios are filtered out — they need loopback
-  # binding the nix sandbox doesn't grant.
+  # `filter` is forwarded verbatim to `bats --filter-tags`. Default
+  # `!net_cap` excludes loopback-binding scenarios the nix sandbox
+  # doesn't grant; mkBatsLane callers override with arbitrary tag
+  # expressions for dev-loop selection.
+  #
+  # `madderBin` is the path string MADDER_BIN should point at. Default
+  # `$out/bin/madder` is a bash literal (the `$` is plain text in nix's
+  # `''` strings) — appropriate for installCheckPhase where bats runs
+  # against the just-installed binary in the same derivation. mkBatsLane
+  # passes a nix-resolved store path (`${base}/bin/madder`) so its
+  # derivation references an existing `madder` build instead of
+  # rebuilding Go per filter.
+  #
+  # `--jobs $NIX_BUILD_CORES` and `BATS_TEST_TIMEOUT=30` mirror
+  # zz-tests_bats/justfile so dev-loop and release lanes share the
+  # same parallelism/timeout contract.
   #
   # Used by:
-  #   - batsInstallCheck (consumed by madder + madder-race via attrset
-  #     merge / overrideAttrs)
+  #   - mkBatsInstallCheck (consumed by madder + madder-race via
+  #     attrset merge)
   #   - madder-cli-cover (passed as coverIntegrationCommand to buildGoCover)
+  #   - mkBatsLane (filtered dev-loop lanes built against an existing
+  #     madder derivation)
   #
   # jq is referenced inline by cli_contract.bats helpers (parsing
   # `write -check` JSON output to compute "missing" digests).
-  batsRunCommand = ''
+  mkBatsRunCommand = {
+    filter ? "!net_cap",
+    madderBin ? "$out/bin/madder",
+  }: ''
     mkdir -p stage/zz-tests_bats
     cp -r ${batsSrc}/* stage/zz-tests_bats/
     chmod -R u+w stage
@@ -152,11 +171,13 @@ let
     # layout: stage/version.env is sibling of stage/zz-tests_bats/.
     cp ${versionEnv} stage/version.env
 
-    export MADDER_BIN="$out/bin/madder"
+    export MADDER_BIN="${madderBin}"
+    export BATS_TEST_TIMEOUT=30
 
     cd stage/zz-tests_bats
     ${bob.packages.${system}.batman}/bin/bats --no-sandbox \
-      --filter-tags '!net_cap' \
+      --jobs $NIX_BUILD_CORES \
+      --filter-tags '${filter}' \
       *.bats
     cd "$NIX_BUILD_TOP"
   '';
@@ -164,15 +185,20 @@ let
   # Shared bats installCheckPhase: runs the bats suite against the
   # derivation's `$out/bin/madder` after installPhase. Used by `madder`
   # (release lane) and `madder-race` (race-instrumented lane).
-  batsInstallCheck = {
+  mkBatsInstallCheck = { filter ? "!net_cap" }: {
     doInstallCheck = batsSrc != null && versionEnv != null;
     nativeInstallCheckInputs = [ pkgs-master.jq ];
     installCheckPhase = ''
       runHook preInstallCheck
-      ${batsRunCommand}
+      ${mkBatsRunCommand { inherit filter; }}
       runHook postInstallCheck
     '';
   };
+
+  # Sanitize a bats `--filter-tags` expression for use as a derivation
+  # name suffix. Replaces shell-unfriendly characters with `_`.
+  batsLaneSuffix = filter:
+    builtins.replaceStrings [ "!" "," ":" " " ] [ "not_" "_" "_" "_" ] filter;
 
   madder = pkgs.buildGoApplication ({
     pname = "madder";
@@ -222,7 +248,7 @@ let
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';
-  } // batsInstallCheck);
+  } // mkBatsInstallCheck { });
 
   # madder-race exercises the same package-level test surface as `madder`
   # but with the Go race detector enabled. Concurrent-write paths
@@ -286,8 +312,85 @@ let
   madder-cli-cover = buildGoCover {
     base = madder;
     extraNativeInstallCheckInputs = [ pkgs-master.jq ];
-    coverIntegrationCommand = batsRunCommand;
+    coverIntegrationCommand = mkBatsRunCommand { };
   };
+
+  # mkBatsLane: standalone derivation that runs the bats suite against
+  # an existing `madder` build (referenced by store path), filtered by
+  # tag expression. The auto-generated `bats-${tag}` flake outputs (see
+  # `batsLaneOutputs` below) are the canonical entry points; this
+  # function is kept internal so the same shape can be reused for the
+  # `bats-default` lane and any future hand-rolled lanes.
+  #
+  # Crucially this does NOT rebuild Go — the bats lane references
+  # `${base}/bin/madder` from an upstream `madder` derivation that's
+  # already in the cache. Per-filter cache miss only re-runs the bats
+  # suite, never the compile. Going through the standard flake-eval
+  # path (named output, no `--impure --expr` workaround) means the
+  # consumed `madder` derivation is bit-identical to `.#madder`'s,
+  # so dev-loop and release share a single cache lane.
+  #
+  # Output is a stamp file (touched on success); the derivation exists
+  # to stand for "the bats suite passed under this filter for this base."
+  mkBatsLane = { filter ? "!net_cap", base ? madder }:
+    pkgs.runCommand
+      "${base.pname}-bats-${batsLaneSuffix filter}"
+      {
+        nativeBuildInputs = [ pkgs-master.jq ];
+      }
+      (mkBatsRunCommand {
+        inherit filter;
+        madderBin = "${base}/bin/madder";
+      } + ''
+        touch $out
+      '');
+
+  # Auto-discover bats `file_tags` directives at flake-eval time and
+  # produce one `bats-${tag}` derivation per unique tag, plus a
+  # `bats-default` lane for the standard `!net_cap` filter.
+  #
+  # Each `.bats` file declares its tags via a `# bats file_tags=foo,bar`
+  # comment. This block reads all `.bats` files under `batsSrc`, splits
+  # those directives, deduplicates, and produces a `mkBatsLane` per
+  # unique tag. Adding/removing tags in a `.bats` file invalidates the
+  # eval cache — the right behavior, but worth knowing.
+  #
+  # Only file-level tags are surfaced; per-test `@test`-line tags are
+  # not auto-discovered. Use `mkBatsLane` directly for ad-hoc filters.
+  #
+  # Empty when batsSrc is null (non-flake import path), so direct
+  # `import ./go/default.nix` callers without a flake context stay
+  # working — they just don't get the bats lane outputs.
+  batsLaneOutputs =
+    if batsSrc == null then { }
+    else
+      let
+        batsFiles = builtins.filter
+          (f: pkgs-master.lib.hasSuffix ".bats" f)
+          (builtins.attrNames (builtins.readDir batsSrc));
+
+        extractFileTags = file:
+          let
+            content = builtins.readFile (batsSrc + "/${file}");
+            lines = pkgs-master.lib.splitString "\n" content;
+            tagLines = builtins.filter
+              (l: pkgs-master.lib.hasPrefix "# bats file_tags=" l)
+              lines;
+          in
+            if tagLines == [ ] then [ ]
+            else pkgs-master.lib.splitString ","
+              (pkgs-master.lib.removePrefix "# bats file_tags="
+                (builtins.head tagLines));
+
+        allFileTags = pkgs-master.lib.unique
+          (pkgs-master.lib.concatMap extractFileTags batsFiles);
+      in
+        pkgs-master.lib.listToAttrs (map
+          (tag: pkgs-master.lib.nameValuePair "bats-${tag}"
+            (mkBatsLane { filter = tag; }))
+          allFileTags) // {
+          bats-default = mkBatsLane { filter = "!net_cap"; };
+        };
 
   # Devshell-only test harness for SFTP integration tests (RFC 0001).
   # Intentionally NOT included in the `packages` output — release
@@ -307,7 +410,7 @@ in
   packages = {
     inherit madder madder-race madder-cover madder-cli-cover;
     default = madder;
-  };
+  } // batsLaneOutputs;
 
   devShells.default = pkgs-master.mkShell {
     packages = [
