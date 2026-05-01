@@ -204,6 +204,38 @@ function tree_restore_round_trips_dir { # @test
   [[ $mode == '750' ]] || fail "expected mode 750 on restored dir; got $mode"
 }
 
+function tree_restore_skips_type_other_with_notice { # @test
+  # RFC 0003 §Consumer Rules §Per-Type Materialization: entries of
+  # type "other" (devices, fifos, sockets) are skipped with a notice.
+  # Inject a hand-crafted receipt with a type:"other" entry so the
+  # test doesn't depend on tree-capture's ability to capture
+  # non-regular files in the test environment.
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/other-receipt"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	! madder-tree_capture-receipt-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+	{"path":"fifo","root":"src","type":"other","mode":"0600"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  run_madder tree-restore "$rid" out
+  assert_success
+  echo "$output" | grep -qF 'skipping entry of type "other"' ||
+    fail "expected skip notice for type:other: $output"
+
+  [[ -d out/src ]] || fail "expected out/src dir to be created"
+  [[ ! -e out/src/fifo ]] || fail "expected out/src/fifo NOT to exist"
+}
+
 function tree_restore_round_trips_symlink { # @test
   init_store
 
