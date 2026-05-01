@@ -97,7 +97,7 @@ func TestWrite_FileEntryShape(t *testing.T) {
 			Type:   TypeFile,
 			Mode:   0o644,
 			Size:   1234,
-			BlobId: "blake3-x256-sha2-x256:deadbeef",
+			BlobId: "blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd",
 		},
 	}
 
@@ -107,7 +107,7 @@ func TestWrite_FileEntryShape(t *testing.T) {
 	}
 
 	body := strings.TrimPrefix(buf.String(), HeaderV1)
-	const want = `{"path":"foo.go","root":"./src","type":"file","mode":"0644","size":1234,"blob_id":"blake3-x256-sha2-x256:deadbeef"}` + "\n"
+	const want = `{"path":"foo.go","root":"./src","type":"file","mode":"0644","size":1234,"blob_id":"blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd"}` + "\n"
 	if body != want {
 		t.Fatalf("file entry mismatch\ngot:  %q\nwant: %q", body, want)
 	}

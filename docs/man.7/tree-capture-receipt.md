@@ -140,8 +140,8 @@ A receipt for a small two-file directory:
     ---
 
     {"path":".","root":"./src","type":"dir","mode":"0755"}
-    {"path":"main.go","root":"./src","type":"file","mode":"0644","size":482,"blob_id":"blake3-x256-sha2-x256:f3a2..."}
-    {"path":"go.mod","root":"./src","type":"file","mode":"0644","size":92,"blob_id":"blake3-x256-sha2-x256:9d11..."}
+    {"path":"main.go","root":"./src","type":"file","mode":"0644","size":482,"blob_id":"blake2b256-9ft3m74l5t…"}
+    {"path":"go.mod","root":"./src","type":"file","mode":"0644","size":92,"blob_id":"blake2b256-2ppwjrvfg3…"}
 
 A receipt covering a symlink and a non-regular file:
 
@@ -152,7 +152,7 @@ A receipt covering a symlink and a non-regular file:
     {"path":".","root":"vendor","type":"dir","mode":"0755"}
     {"path":"latest","root":"vendor","type":"symlink","mode":"0777","target":"v1.2.3"}
     {"path":"v1.2.3","root":"vendor","type":"dir","mode":"0755"}
-    {"path":"v1.2.3/lib.so","root":"vendor","type":"file","mode":"0755","size":18432,"blob_id":"blake3-x256-sha2-x256:11ab..."}
+    {"path":"v1.2.3/lib.so","root":"vendor","type":"file","mode":"0755","size":18432,"blob_id":"blake2b256-wp380jqj2z…"}
 
 # SEE ALSO
 
