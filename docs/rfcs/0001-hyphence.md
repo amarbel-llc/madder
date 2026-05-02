@@ -105,6 +105,32 @@ Hyphence has no version indicator. The format itself is unversioned and stable; 
 
 This document is RFC 0001. Future format additions or revisions MUST be tracked in subsequent RFCs (e.g., `docs/rfcs/0002-hyphence-extensions.md`) that supersede or extend this one.
 
+## Conformance
+
+A conforming implementation of hyphence MUST satisfy the requirements in this RFC at the **wire-format level**. Implementations have latitude in their internal API design — typed wrappers, validation hooks, and ergonomic conveniences are not part of the spec. The wire format is.
+
+### Required (MUST)
+
+- All BOUNDARY-line, body-separator, and metadata-line requirements in sections **Document Grammar** through **Encoder Behavior**.
+- Round-trip preservation: bytes written by a conforming encoder MUST decode to the same metadata fields and body bytes when read by any conforming decoder.
+- All test vectors in `go/internal/charlie/hyphence/testdata/rfc_vectors.txt` MUST produce the documented outcome (see **Test Vectors**).
+
+### Permitted (MAY)
+
+- **Typed API wrappers.** An implementation MAY type-wrap any metadata-line content field as long as the wire serialization round-trips correctly. This includes validating structs, whitespace normalization, case folding, and ergonomic accessors. The Go reference implementation wraps the type identifier in `ids.TypeStruct` (which lower-cases and trims `! ` prefix characters); this is implementation latitude, not a wire-format requirement. A different implementation MAY use a plain `string` for the same field and remain conforming.
+- **Lenient legacy-data mode.** An implementation MAY expose an opt-in mode that accepts input without the body separator (see **Body Separator**). Lenient mode is NOT part of the spec; documents written by conforming emitters MUST always include the separator. The Go reference implementation calls this mode `AllowMissingSeparator` and defaults it to `false`.
+- **Performance and ergonomics.** Buffering strategies, streaming vs. batch decoding, error-context shaping, error-type granularity beyond the typed missing-separator sentinel, and similar implementation decisions are out of scope.
+
+### Out of scope
+
+- Implementation language, runtime, or platform.
+- In-memory representation of decoded objects, persistence layers, caching.
+- The internal format of the BODY itself — this RFC defines the envelope; the BODY's interpretation is the concern of the type identified by the `!` line.
+
+### Wire-format extensions
+
+Adding new PREFIX characters or modifying the semantics of existing ones is a **wire-format change**, not implementation latitude. Such changes MUST be tracked in a superseding or extending RFC (per **Versioning**). A decoder that encounters an unknown PREFIX MUST emit a parse error per **Decoder Behavior** — extensions are not silently forward-compatible. Two implementations that disagree on PREFIX semantics are NOT both conforming.
+
 ## Test Vectors
 
 A normative set of test vectors lives at `go/internal/charlie/hyphence/testdata/rfc_vectors.txt`. Each non-comment, non-empty line is a tab-separated tuple:
