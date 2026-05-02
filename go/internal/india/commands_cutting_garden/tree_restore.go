@@ -21,7 +21,7 @@ import (
 
 func init() {
 	utility.AddCmd("tree-restore", &TreeRestore{
-		EnvBlobStore: command_components.EnvBlobStore{BlobStoreParentUtility: "madder"},
+		EnvBlobStore: command_components.EnvBlobStore{BlobStoreXDGScope: "madder"},
 	})
 }
 

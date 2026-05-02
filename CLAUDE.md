@@ -9,10 +9,10 @@ symlink) from the same Go module, plus their man pages.
 
 `cutting-garden` (`go/cmd/cutting-garden/`,
 `go/internal/india/commands_cutting_garden/`) is the filesystem-tree
-capture/restore CLI. It has its own utility identity for CLI/XDG
-purposes but consumes madder's blob-store machinery as a library —
-`command_components.EnvBlobStore`'s `BlobStoreParentUtility = "madder"`
-on its commands resolves blob stores against madder's
+capture/restore CLI. It has its own utility identity for CLI purposes
+but consumes madder's blob-store machinery as a library —
+`command_components.EnvBlobStore`'s `BlobStoreXDGScope = "madder"` on
+its commands resolves blob stores against madder's
 `$XDG_*_HOME/madder/blob_stores/` paths. The wire-format type tag
 `madder-tree_capture-receipt-v1` stays as today's identifier; once
 cutting-garden moves to its own repo, the tag joins the same

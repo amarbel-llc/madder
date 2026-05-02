@@ -10,6 +10,17 @@ import (
 
 // TODO separate read-only from write
 
+// utilityName names the XDG scope this env reads/writes — the `<scope>`
+// segment in `$XDG_*_HOME/<scope>/`. It is decoupled from any CLI /
+// process-identity notion (which lives in cli_main / futility.Utility);
+// multiple env_dir instances with different utility names can coexist
+// in the same process and address disjoint XDG scopes that don't
+// affect each other. See command_components.EnvBlobStore.BlobStoreXDGScope
+// for one such use: cutting-garden (CLI identity = "cutting-garden")
+// constructs an env_dir with utilityName="madder" so it operates on
+// madder's blob store paths. The deeper struct-state /
+// multi-scope-composition refactor is tracked separately.
+
 func MakeDefault(
 	context errors.Context,
 	utilityName string,

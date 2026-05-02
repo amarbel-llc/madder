@@ -28,7 +28,7 @@ import (
 
 func init() {
 	utility.AddCmd("tree-capture", &TreeCapture{
-		EnvBlobStore: command_components.EnvBlobStore{BlobStoreParentUtility: "madder"},
+		EnvBlobStore: command_components.EnvBlobStore{BlobStoreXDGScope: "madder"},
 		Format:       output_format.Default,
 	})
 }

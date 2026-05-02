@@ -1,10 +1,10 @@
 # commands_cutting_garden
 
 `cutting-garden` CLI commands. The binary is a sibling of `madder` —
-its own Utility namespace ($XDG_*_HOME/cutting-garden/...) but a
-client of madder's blob-store machinery via the `command_components`
-mixin's `BlobStoreParentUtility = "madder"` setting (see ADR 0007 if
-landed, or the cutting-garden extraction plan otherwise).
+its own Utility identity for CLI purposes, but a client of madder's
+blob-store machinery via the `command_components` mixin's
+`BlobStoreXDGScope = "madder"` setting (see the cutting-garden
+extraction plan).
 
 ## Subcommands
 
