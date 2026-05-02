@@ -186,6 +186,15 @@ zz-tests_bats/tree_restore.bats             # run_cg / require_bin CG_BIN
    `cli_main.Run(utility, "cg")` — doubles the binary count and
    forks the help banner. Skip it.
 
+   **No separate flake output**: cutting-garden ships as a binary
+   inside the existing `madder` derivation (`subPackages` entry).
+   Consumers that want just cutting-garden read
+   `${madder}/bin/cutting-garden` from the same store path — no
+   `packages.cutting-garden` flake output today. A separate output
+   becomes interesting at the eventual repo split, when madder and
+   cutting-garden are separately versioned; introducing it pre-split
+   forks the release cadence for no functional gain.
+
 ### Phase 4: Tests
 
 8. **`zz-tests_bats/lib/common.bash`** — add a `require_bin CG_BIN
@@ -198,7 +207,9 @@ zz-tests_bats/tree_restore.bats             # run_cg / require_bin CG_BIN
    creates a blob store still uses `run_madder init` — these tests
    exercise the producer/consumer pair, not the store-management
    primitives. Receipt-blob retrieval (`madder cat <id>`) likewise
-   stays on `run_madder`.
+   stays on `run_madder`. There are no shared fixture files — both
+   `.bats` files build their input trees inline in `setup()` — so the
+   migration is a `run_madder` → `run_cg` find-and-replace per file.
 
 10. **`go/default.nix`** — extend `mkBatsRunCommand` to export
     `CG_BIN` alongside `MADDER_BIN`. The default
@@ -208,9 +219,19 @@ zz-tests_bats/tree_restore.bats             # run_cg / require_bin CG_BIN
     `bats-tree_restore`) auto-discover from file_tags so they don't
     need new entries — they just need `CG_BIN` to exist.
 
-11. **`commands/main_test.go`** — if it asserts on the set of
-    registered subcommands, update the expected list to drop
-    `tree-capture` and `tree-restore`. (Verify before editing.)
+    **Parameterization deferred**: `mkBatsRunCommand` becomes the
+    second binary-pointer this helper threads. The principled fix
+    — generalizing to a `binaries` map (env-var-name → store path) —
+    is the upstream move tracked by amarbel-llc/nixpkgs#14. Resist
+    doing it inline here: ad-hoc `cgBin` keeps the cutting-garden
+    PR small, and the upstream issue gets a real second consumer to
+    validate its shape against.
+
+11. **`commands/main_test.go`** is a no-op for this plan. The single
+    test (`TestUtilityHasCommands`) only asserts that some commands
+    are registered (`count > 0`); it doesn't enumerate names. Removing
+    `tree-capture`/`tree-restore` won't break it. Verify
+    post-extraction.
 
 ### Phase 5: Documentation
 
@@ -314,7 +335,10 @@ below are the ones this plan will execute against.
   different env-var name), users get inconsistent suppression
   semantics across the two binaries. Mitigate with a shared helper
   factored out of `commands/main.go` if the duplication smells —
-  but only if it smells; one verbatim copy is cheap.
+  but only if it smells; one verbatim copy is cheap. If it does need
+  factoring, the helper lives in `golf/command_components/`
+  (alongside `EnvBlobStore`), where structurally-typed cross-utility
+  glue already congregates.
 - **RFC / man7 prose drift**: `tree-capture-receipt(7)` and RFC
   0003 are user-facing specs; rewording "madder" to "cutting-garden"
   is mechanical but easy to miss in one spot. Final pass with
