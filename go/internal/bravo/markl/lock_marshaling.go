@@ -16,8 +16,8 @@ func MakeLockCoder[
 ](
 	lock domain_interfaces.Lock[KEY, KEY_PTR],
 	requireValue bool,
-) lockBinaryMarshaler[KEY, KEY_PTR] {
-	return lockBinaryMarshaler[KEY, KEY_PTR]{
+) LockBinaryMarshaler[KEY, KEY_PTR] {
+	return LockBinaryMarshaler[KEY, KEY_PTR]{
 		requireValue: requireValue,
 		lock:         lock,
 	}
@@ -29,8 +29,8 @@ func MakeMutableLockCoder[
 ](
 	lock domain_interfaces.LockMutable[KEY, KEY_PTR],
 	requireValue bool,
-) mutableLockBinaryMarshaler[KEY, KEY_PTR] {
-	return mutableLockBinaryMarshaler[KEY, KEY_PTR]{
+) MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+	return MutableLockBinaryMarshaler[KEY, KEY_PTR]{
 		requireValue: requireValue,
 		lock:         lock,
 	}
@@ -41,7 +41,7 @@ func MakeLockCoderValueNotRequired[
 	KEY_PTR interfaces.ValuePtr[KEY],
 ](
 	lock domain_interfaces.Lock[KEY, KEY_PTR],
-) lockBinaryMarshaler[KEY, KEY_PTR] {
+) LockBinaryMarshaler[KEY, KEY_PTR] {
 	return MakeLockCoder[KEY, KEY_PTR](lock, false)
 }
 
@@ -50,7 +50,7 @@ func MakeMutableLockCoderValueNotRequired[
 	KEY_PTR interfaces.ValuePtr[KEY],
 ](
 	lock domain_interfaces.LockMutable[KEY, KEY_PTR],
-) mutableLockBinaryMarshaler[KEY, KEY_PTR] {
+) MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return MakeMutableLockCoder(lock, false)
 }
 
@@ -59,11 +59,11 @@ func MakeMutableLockCoderValueRequired[
 	KEY_PTR interfaces.ValuePtr[KEY],
 ](
 	lock domain_interfaces.LockMutable[KEY, KEY_PTR],
-) mutableLockBinaryMarshaler[KEY, KEY_PTR] {
+) MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return MakeMutableLockCoder(lock, true)
 }
 
-type lockBinaryMarshaler[
+type LockBinaryMarshaler[
 	KEY interfaces.Value,
 	KEY_PTR interfaces.ValuePtr[KEY],
 ] struct {
@@ -71,7 +71,7 @@ type lockBinaryMarshaler[
 	lock         domain_interfaces.Lock[KEY, KEY_PTR]
 }
 
-type mutableLockBinaryMarshaler[
+type MutableLockBinaryMarshaler[
 	KEY interfaces.Value,
 	KEY_PTR interfaces.ValuePtr[KEY],
 ] struct {
@@ -79,7 +79,7 @@ type mutableLockBinaryMarshaler[
 	lock         domain_interfaces.LockMutable[KEY, KEY_PTR]
 }
 
-func (marshaler lockBinaryMarshaler[KEY, KEY_PTR]) String() string {
+func (marshaler LockBinaryMarshaler[KEY, KEY_PTR]) String() string {
 	lock := marshaler.lock
 
 	if marshaler.requireValue && lock.GetValue().IsEmpty() {
@@ -91,7 +91,7 @@ func (marshaler lockBinaryMarshaler[KEY, KEY_PTR]) String() string {
 	}
 }
 
-func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) String() string {
+func (marshaler MutableLockBinaryMarshaler[KEY, KEY_PTR]) String() string {
 	lock := marshaler.lock
 
 	if marshaler.requireValue && lock.GetValue().IsEmpty() {
@@ -103,7 +103,7 @@ func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) String() string {
 	}
 }
 
-func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) Set(
+func (marshaler MutableLockBinaryMarshaler[KEY, KEY_PTR]) Set(
 	value string,
 ) (err error) {
 	lock := marshaler.lock
@@ -134,11 +134,11 @@ func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) Set(
 	return err
 }
 
-func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) MarshalBinary() (data []byte, err error) {
+func (marshaler MutableLockBinaryMarshaler[KEY, KEY_PTR]) MarshalBinary() (data []byte, err error) {
 	return marshaler.AppendBinary(nil)
 }
 
-func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) AppendBinary(
+func (marshaler MutableLockBinaryMarshaler[KEY, KEY_PTR]) AppendBinary(
 	bites []byte,
 ) ([]byte, error) {
 	bites = fmt.Append(bites, marshaler.lock.GetKey().String())
@@ -162,7 +162,7 @@ func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) AppendBinary(
 	return bites, nil
 }
 
-func (marshaler mutableLockBinaryMarshaler[KEY, KEY_PTR]) UnmarshalBinary(
+func (marshaler MutableLockBinaryMarshaler[KEY, KEY_PTR]) UnmarshalBinary(
 	bites []byte,
 ) (err error) {
 	if len(bites) == 0 {

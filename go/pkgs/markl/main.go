@@ -10,35 +10,37 @@ import (
 )
 
 type (
-	DiscoveredKey                                                = internal.DiscoveredKey
-	ErrFormatOperationNotSupported                               = internal.ErrFormatOperationNotSupported
-	ErrIsNull                                                    = internal.ErrIsNull
-	ErrNotEqual                                                  = internal.ErrNotEqual
-	ErrNotEqualBytes                                             = internal.ErrNotEqualBytes
-	ErrUnsupportedIdFormat                                       = internal.ErrUnsupportedIdFormat
-	Format                                                       = internal.Format
-	FormatHash                                                   = internal.FormatHash
-	FormatId                                                     = internal.FormatId
-	FormatPub                                                    = internal.FormatPub
-	FormatSec                                                    = internal.FormatSec
-	FuncFormatPubVerify                                          = internal.FuncFormatPubVerify
-	FuncFormatSecGenerate                                        = internal.FuncFormatSecGenerate
-	FuncFormatSecGetIOWrapper                                    = internal.FuncFormatSecGetIOWrapper
-	FuncFormatSecGetPublicKey                                    = internal.FuncFormatSecGetPublicKey
-	FuncFormatSecSign                                            = internal.FuncFormatSecSign
-	Hash                                                         = internal.Hash
-	Id                                                           = internal.Id
-	IdBinaryDecodingFormatTypeData                               = internal.IdBinaryDecodingFormatTypeData
-	IdBinaryDecodingTypeData                                     = internal.IdBinaryDecodingTypeData
-	IdBinaryEncodingFormatTypeData                               = internal.IdBinaryEncodingFormatTypeData
-	IdBinaryEncodingTypeData                                     = internal.IdBinaryEncodingTypeData
-	IdBroken                                                     = internal.IdBroken
-	IdFormat                                                     = internal.IdFormat
-	Lock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]] = internal.Lock[KEY, KEY_PTR]
-	Purpose                                                      = internal.Purpose
-	PurposeType                                                  = internal.PurposeType
-	RegisterPurposeOpts                                          = internal.RegisterPurposeOpts
-	Slice                                                        = internal.Slice
+	DiscoveredKey                                                                      = internal.DiscoveredKey
+	ErrFormatOperationNotSupported                                                     = internal.ErrFormatOperationNotSupported
+	ErrIsNull                                                                          = internal.ErrIsNull
+	ErrNotEqual                                                                        = internal.ErrNotEqual
+	ErrNotEqualBytes                                                                   = internal.ErrNotEqualBytes
+	ErrUnsupportedIdFormat                                                             = internal.ErrUnsupportedIdFormat
+	Format                                                                             = internal.Format
+	FormatHash                                                                         = internal.FormatHash
+	FormatId                                                                           = internal.FormatId
+	FormatPub                                                                          = internal.FormatPub
+	FormatSec                                                                          = internal.FormatSec
+	FuncFormatPubVerify                                                                = internal.FuncFormatPubVerify
+	FuncFormatSecGenerate                                                              = internal.FuncFormatSecGenerate
+	FuncFormatSecGetIOWrapper                                                          = internal.FuncFormatSecGetIOWrapper
+	FuncFormatSecGetPublicKey                                                          = internal.FuncFormatSecGetPublicKey
+	FuncFormatSecSign                                                                  = internal.FuncFormatSecSign
+	Hash                                                                               = internal.Hash
+	Id                                                                                 = internal.Id
+	IdBinaryDecodingFormatTypeData                                                     = internal.IdBinaryDecodingFormatTypeData
+	IdBinaryDecodingTypeData                                                           = internal.IdBinaryDecodingTypeData
+	IdBinaryEncodingFormatTypeData                                                     = internal.IdBinaryEncodingFormatTypeData
+	IdBinaryEncodingTypeData                                                           = internal.IdBinaryEncodingTypeData
+	IdBroken                                                                           = internal.IdBroken
+	IdFormat                                                                           = internal.IdFormat
+	Lock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]                       = internal.Lock[KEY, KEY_PTR]
+	LockBinaryMarshaler[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]        = internal.LockBinaryMarshaler[KEY, KEY_PTR]
+	MutableLockBinaryMarshaler[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]] = internal.MutableLockBinaryMarshaler[KEY, KEY_PTR]
+	Purpose                                                                            = internal.Purpose
+	PurposeType                                                                        = internal.PurposeType
+	RegisterPurposeOpts                                                                = internal.RegisterPurposeOpts
+	Slice                                                                              = internal.Slice
 )
 
 var (
@@ -121,8 +123,23 @@ func MakeErrLength[INTEGER constraints.Integer](expected INTEGER, actual INTEGER
 func MakeLock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]() internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLock[KEY, KEY_PTR]()
 }
+func MakeLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR], requireValue bool) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
+	return internal.MakeLockCoder[KEY, KEY_PTR](lock, requireValue)
+}
+func MakeLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR]) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
+	return internal.MakeLockCoderValueNotRequired[KEY, KEY_PTR](lock)
+}
 func MakeLockWith[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](key KEY, value domaininterfaces.MarklId) internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLockWith[KEY, KEY_PTR](key, value)
+}
+func MakeMutableLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR], requireValue bool) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+	return internal.MakeMutableLockCoder[KEY, KEY_PTR](lock, requireValue)
+}
+func MakeMutableLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+	return internal.MakeMutableLockCoderValueNotRequired[KEY, KEY_PTR](lock)
+}
+func MakeMutableLockCoderValueRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+	return internal.MakeMutableLockCoderValueRequired[KEY, KEY_PTR](lock)
 }
 
 const (
