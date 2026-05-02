@@ -1,12 +1,22 @@
 # Hyphence ownership convergence — design
 
-**Status:** approved (brainstorm), ready for implementation plan
+**Status:** completed 2026-05-02 (see Addendum below — the implementation collapsed to docs-only).
 
 **Date:** 2026-05-02
 
-**Tracks:** [#115](https://github.com/amarbel-llc/madder/issues/115)
+**Tracks:** [#115](https://github.com/amarbel-llc/madder/issues/115) (closed as completed)
 
-**Related:** dodder #41 (the production issue motivating dodder's strict-mode extensions), [#112](https://github.com/amarbel-llc/madder/issues/112) (parallel pattern: deleting dodder vocab from madder once dodder takes over its registrations)
+**Related:** dodder #41 (the production issue motivating dodder's strict-mode extensions), [#112](https://github.com/amarbel-llc/madder/issues/112) (parallel pattern: deleting dodder vocab from madder once dodder takes over its registrations), [dodder #157](https://github.com/amarbel-llc/dodder/issues/157) (the dodder-side migration follow-up filed after #115 shipped)
+
+> ## Addendum (2026-05-02 — post-implementation)
+>
+> This design assumed the code-port from dodder was the bulk of the work. **It turned out the port was already done in madder when the design was written** — `BlobTeeWriter`, `AllowMissingSeparator`, `peekSeparatorLine`, both boundary helpers, and all 7 separator-discipline tests were already at parity with dodder's. The actual implementation collapsed to docs-only:
+>
+> - Man page rebrand (drop "Dodder" branding, normative wording).
+> - `docs/rfcs/0001-hyphence.md` — project's first RFC, with formal MUST/SHOULD/MAY language and 26 normative statements.
+> - Test-vector file (`go/internal/charlie/hyphence/testdata/rfc_vectors.txt`) + conformance test harness (`TestRFCConformance_HyphenceTestVectors`).
+>
+> See `docs/plans/2026-05-02-hyphence-ownership.md` for the docs-only implementation plan and the close-issue comment on #115 for the recap. The "Code changes" section below describes work that did NOT need to happen — kept here for historical context.
 
 ## Goals
 

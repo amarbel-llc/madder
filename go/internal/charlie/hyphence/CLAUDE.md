@@ -9,3 +9,9 @@ I/O for hyphence (hyphen-fence) delimited format (metadata/content separation).
 ## Format
 
 Uses `---` as boundary between metadata and content sections.
+
+## See also
+
+- `docs/man.7/hyphence.md` — tutorial / reference manual.
+- `docs/rfcs/0001-hyphence.md` — normative format specification (MUST/SHOULD/MAY).
+- `testdata/rfc_vectors.txt` + `rfc_conformance_test.go` — RFC conformance test harness.
