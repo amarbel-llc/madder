@@ -55,19 +55,10 @@ func DecodeFromFile[
 	return typedBlob, err
 }
 
-// EncodeToFile is the symmetric counterpart to DecodeFromFile: writes
-// `typedBlob` through `coders.EncodeTo` to the file at `path`. A path of
-// "-" routes to stdout (the encode-side mirror of DecodeFromFileInto's
-// `path == "-"` → stdin shortcut). For real paths, the file is created
-// with `files.CreateExclusiveWriteOnly` so racing a concurrent writer
-// fails fast rather than producing a torn write.
-//
-// Originally lived here, removed in d583ed8 ("Closes #95: drop dead
-// EncodeToFile") when the last in-tree caller (the local blob_store-config
-// write) moved to files.WriteImmutable. Re-added because dodder's
-// hyphence-via-pkgs migration (issue #107, dodder #144) re-introduces
-// genuine callers — at least the slash-and-burn branch's
-// `internal/golf/env_repo/blob_store.go:222` config persistence path.
+// EncodeToFile writes typedBlob through coders.EncodeTo to path. A path
+// of "-" routes to stdout, mirroring DecodeFromFileInto's stdin
+// shortcut. For real paths, files.CreateExclusiveWriteOnly is used so a
+// concurrent writer fails fast rather than producing a torn write.
 func EncodeToFile[
 	BLOB any,
 	BLOB_PTR interfaces.Ptr[BLOB],

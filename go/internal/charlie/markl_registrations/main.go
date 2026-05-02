@@ -14,8 +14,6 @@
 // binary's main package:
 //
 //	import _ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
-//
-// Tracks #106 step 2/3.
 package markl_registrations
 
 //go:generate dagnabit export
