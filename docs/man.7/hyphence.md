@@ -2,12 +2,12 @@
 author:
 -
 date: April 2026
-title: HYPHENCE(7) Dodder \| Miscellaneous
+title: HYPHENCE(7) Madder \| Miscellaneous
 ---
 
 # NAME
 
-hyphence - dodder object serialization format
+hyphence - text-based metadata + body serialization format
 
 # SYNOPSIS
 
@@ -23,9 +23,10 @@ hyphence - dodder object serialization format
 # DESCRIPTION
 
 Hyphence (hyphen-fence) is a text-based serialization format that uses **---**
-boundary lines to enclose a metadata section. It is the primary persistence and
-interchange format for dodder objects: repository configs, blob store configs,
-workspace configs, type definitions, and user-facing zettels all use hyphence.
+boundary lines to enclose a metadata section followed by an optional body. It
+is used by madder for blob-store and tree-capture metadata, and by dodder for
+repository configs, blob store configs, workspace configs, type definitions,
+and user-facing zettels.
 
 # DOCUMENT STRUCTURE
 
@@ -80,7 +81,11 @@ between the closing **---** and the start of the body:
                     <-- required blank line
     Body starts here.
 
-Without this blank line, the body content is silently dropped during parsing.
+Decoders MUST reject input that omits this blank line. Implementations MAY
+expose an opt-in lenient mode for reading legacy data (see the
+**AllowMissingSeparator** field on the Go reference implementation), but that
+mode is NOT part of the format spec --- emitters MUST always include the
+separator.
 
 # METADATA LINES
 
@@ -164,4 +169,5 @@ A type definition with a lock:
 
 # SEE ALSO
 
-**markl-id**(7), **organize-text**(7), **blob-store**(7)
+**markl-id**(7), **organize-text**(7), **blob-store**(7). For the normative
+format specification, see `docs/rfcs/0001-hyphence.md`.
