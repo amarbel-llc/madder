@@ -1,4 +1,4 @@
-package tree_capture_receipt
+package capture_receipt
 
 import (
 	"bytes"
@@ -19,7 +19,7 @@ func TestWrite_HeaderV1Exact(t *testing.T) {
 		t.Fatalf("empty receipt should be exactly HeaderV1; got %q", got)
 	}
 
-	const want = "---\n! madder-tree_capture-receipt-v1\n---\n\n"
+	const want = "---\n! cutting_garden-capture_receipt-fs-v1\n---\n\n"
 	if got != want {
 		t.Fatalf("HeaderV1 drift; got %q want %q", got, want)
 	}
@@ -60,7 +60,7 @@ func TestWriteV1WithHint_EmitsStoreLineInCanonicalPosition(t *testing.T) {
 	got := buf.String()
 	const want = "---\n" +
 		"- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd\n" +
-		"! madder-tree_capture-receipt-v1\n" +
+		"! cutting_garden-capture_receipt-fs-v1\n" +
 		"---\n\n"
 	if got != want {
 		t.Fatalf("hint header mismatch\n  got: %q\n  want: %q", got, want)

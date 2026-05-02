@@ -1,4 +1,4 @@
-package tree_capture_receipt
+package capture_receipt
 
 import (
 	"fmt"
@@ -88,7 +88,7 @@ func retainedHeapBytes(build func() any) uint64 {
 }
 
 // BenchmarkAccumulatorRetention measures the heap held by the existing
-// in-memory `[]Entry` accumulator in tree_capture.Run. This is the
+// in-memory `[]Entry` accumulator in capture.Run. This is the
 // memory footprint #80's streaming refactor would relieve.
 func BenchmarkAccumulatorRetention(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {

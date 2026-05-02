@@ -9,7 +9,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -20,20 +20,20 @@ import (
 )
 
 func init() {
-	utility.AddCmd("tree-restore", &TreeRestore{
+	utility.AddCmd("restore", &Restore{
 		EnvBlobStore: command_components.EnvBlobStore{BlobStoreXDGScope: "madder"},
 	})
 }
 
-// TreeRestore implements `cutting-garden tree-restore <receipt-id> <dest>`
-// per FDR 0001 (docs/features/0001-tree-restore.md) and RFC 0003
+// Restore implements `cutting-garden restore <receipt-id> <dest>`
+// per FDR 0001 (docs/features/0001-restore.md) and RFC 0003
 // §Consumer Rules.
 //
 // Validates destination preconditions, parses the receipt, runs path
 // sanitization across all entries, resolves the source store from
 // the receipt's optional store-hint (or the -store override), then
 // materializes per-type (file/dir/symlink/other).
-type TreeRestore struct {
+type Restore struct {
 	command_components.EnvBlobStore
 
 	// Store is the value of the -store flag. When non-empty, it
@@ -43,15 +43,15 @@ type TreeRestore struct {
 }
 
 var (
-	_ interfaces.CommandComponentWriter = (*TreeRestore)(nil)
-	_ futility.CommandWithParams        = (*TreeRestore)(nil)
+	_ interfaces.CommandComponentWriter = (*Restore)(nil)
+	_ futility.CommandWithParams        = (*Restore)(nil)
 )
 
-func (cmd *TreeRestore) GetParams() []futility.Param {
+func (cmd *Restore) GetParams() []futility.Param {
 	return []futility.Param{
 		futility.Arg[*values.String]{
 			Name:        "receipt-id",
-			Description: "markl-id of a madder-tree_capture-receipt-v1 blob",
+			Description: "markl-id of a cutting_garden-capture_receipt-fs-v1 blob",
 		},
 		futility.Arg[*values.String]{
 			Name:        "dest",
@@ -60,11 +60,11 @@ func (cmd *TreeRestore) GetParams() []futility.Param {
 	}
 }
 
-func (cmd *TreeRestore) GetDescription() futility.Description {
+func (cmd *Restore) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "restore a captured tree from a receipt blob",
 		Long: "Materialize a directory tree previously captured by " +
-			"`cutting-garden tree-capture` into <dest>. The receipt is parsed, " +
+			"`cutting-garden capture` into <dest>. The receipt is parsed, " +
 			"each entry's destination path is validated against the " +
 			"sanitization rules in RFC 0003 §Consumer Rules, and per-" +
 			"type materialization writes files (streamed from their " +
@@ -77,14 +77,14 @@ func (cmd *TreeRestore) GetDescription() futility.Description {
 	}
 }
 
-func (cmd *TreeRestore) Complete(
+func (cmd *Restore) Complete(
 	req futility.Request,
 	envLocal env_local.Env,
 	commandLine futility.CommandLineInput,
 ) {
 }
 
-func (cmd *TreeRestore) SetFlagDefinitions(
+func (cmd *Restore) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.StringVar(
@@ -96,7 +96,7 @@ func (cmd *TreeRestore) SetFlagDefinitions(
 	)
 }
 
-func (cmd *TreeRestore) Run(req futility.Request) {
+func (cmd *Restore) Run(req futility.Request) {
 	receiptIdStr := req.PopArg("receipt-id")
 	dest := req.PopArg("dest")
 	req.AssertNoMoreArgs()
@@ -117,7 +117,7 @@ func (cmd *TreeRestore) Run(req futility.Request) {
 // Materialization MUST NOT recover from a mid-stream blob read failure
 // (FDR §Limitations: no rollback) — the destination is left partial
 // in that case and the diagnostic names the failed entry.
-func (cmd *TreeRestore) runRestore(
+func (cmd *Restore) runRestore(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
 	dest string,
@@ -136,7 +136,7 @@ func (cmd *TreeRestore) runRestore(
 		return err
 	}
 
-	v1, ok := blob.(*tree_capture_receipt.V1)
+	v1, ok := blob.(*capture_receipt.V1)
 	if !ok {
 		return errors.ErrorWithStackf(
 			"receipt %s: unexpected blob shape %T (expected *V1)",
@@ -169,13 +169,13 @@ func readReceiptBlob(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptId *markl.Id,
 	storeOverride string,
-) (tree_capture_receipt.Blob, error) {
+) (capture_receipt.Blob, error) {
 	if storeOverride != "" {
 		store, err := resolveStoreById(envBlobStore, storeOverride)
 		if err != nil {
 			return nil, err
 		}
-		blob, _, err := tree_capture_receipt.Read(store, receiptId)
+		blob, _, err := capture_receipt.Read(store, receiptId)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read receipt %s", receiptId)
 		}
@@ -186,7 +186,7 @@ func readReceiptBlob(
 		if !store.HasBlob(receiptId) {
 			continue
 		}
-		blob, _, err := tree_capture_receipt.Read(store, receiptId)
+		blob, _, err := capture_receipt.Read(store, receiptId)
 		if err != nil {
 			return nil, errors.Wrapf(err, "read receipt %s", receiptId)
 		}
@@ -206,7 +206,7 @@ func readReceiptBlob(
 // include compute failures.
 func resolveMaterializationStore(
 	envBlobStore command_components.BlobStoreEnv,
-	hint *tree_capture_receipt.StoreHint,
+	hint *capture_receipt.StoreHint,
 	storeOverride string,
 ) (blob_stores.BlobStoreInitialized, error) {
 	if storeOverride != "" {
@@ -312,7 +312,7 @@ func assertDestinationDoesNotExist(dest string) error {
 // The `error: ` prefix in the FDR-quoted diagnostics is added by the
 // framework via ContextCancelWithBadRequestError; the strings here
 // start at the noun.
-func validateEntries(entries []tree_capture_receipt.EntryV1, dest string) error {
+func validateEntries(entries []capture_receipt.EntryV1, dest string) error {
 	cleanDest := filepath.Clean(dest)
 
 	for i := range entries {
@@ -386,7 +386,7 @@ func pathConfinedTo(materialized, dest string) bool {
 // operator's job. The diagnostic names the entry that failed.
 func materializeEntries(
 	blobStore blob_stores.BlobStoreInitialized,
-	entries []tree_capture_receipt.EntryV1,
+	entries []capture_receipt.EntryV1,
 	dest string,
 ) error {
 	cleanDest := filepath.Clean(dest)
@@ -400,22 +400,22 @@ func materializeEntries(
 		materialized := filepath.Clean(filepath.Join(cleanDest, e.Root, e.Path))
 
 		switch e.Type {
-		case tree_capture_receipt.TypeFile:
+		case capture_receipt.TypeFile:
 			if err := materializeFile(blobStore, e, materialized); err != nil {
 				return err
 			}
 
-		case tree_capture_receipt.TypeDir:
+		case capture_receipt.TypeDir:
 			if err := os.MkdirAll(materialized, e.Mode.Perm()); err != nil {
 				return errors.Wrapf(err, "mkdir %q", materialized)
 			}
 
-		case tree_capture_receipt.TypeSymlink:
+		case capture_receipt.TypeSymlink:
 			if err := os.Symlink(e.Target, materialized); err != nil {
 				return errors.Wrapf(err, "symlink %q -> %q", materialized, e.Target)
 			}
 
-		case tree_capture_receipt.TypeOther:
+		case capture_receipt.TypeOther:
 			fmt.Fprintf(os.Stderr,
 				"notice: skipping entry of type %q: %s\n",
 				e.Type, materialized)
@@ -436,7 +436,7 @@ func materializeEntries(
 // buffered in memory.
 func materializeFile(
 	blobStore blob_stores.BlobStoreInitialized,
-	e tree_capture_receipt.EntryV1,
+	e capture_receipt.EntryV1,
 	materialized string,
 ) (err error) {
 	var blobId markl.Id

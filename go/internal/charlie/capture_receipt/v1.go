@@ -1,8 +1,8 @@
-package tree_capture_receipt
+package capture_receipt
 
 import "io/fs"
 
-// EntryV1 is one filesystem entry in a madder-tree_capture-receipt-v1
+// EntryV1 is one filesystem entry in a cutting_garden-capture_receipt-fs-v1
 // receipt body.
 //
 // Mode carries the lstat permission bits (only Mode.Perm() is rendered;
@@ -19,7 +19,7 @@ type EntryV1 struct {
 	Target string
 }
 
-// V1 is the parsed shape of a madder-tree_capture-receipt-v1 blob.
+// V1 is the parsed shape of a cutting_garden-capture_receipt-fs-v1 blob.
 // Hint is non-nil iff the receipt's hyphence metadata block carried a
 // store-hint line.
 type V1 struct {
@@ -38,7 +38,7 @@ const (
 
 // StoreHint is the optional `- store/<id> < <markl-id>` metadata line
 // per RFC 0003 §Producer Rules §Receipt Metadata: Store Hint.
-// Consumers (tree-restore) use it to auto-resolve the source store.
+// Consumers (restore) use it to auto-resolve the source store.
 //
 // The hint is wire-shape-shared across receipt versions: a v2 receipt
 // would carry the same hint structure even if its Entries change.

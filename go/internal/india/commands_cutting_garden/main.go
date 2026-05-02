@@ -35,15 +35,15 @@ func init() {
 	utility.Examples = append(utility.Examples,
 		futility.Example{
 			Description: "Capture a directory tree into the default blob store and parse the receipt id.",
-			Command:     "id=$(cutting-garden tree-capture ./project | jq -r '.id')",
+			Command:     "id=$(cutting-garden capture ./project | jq -r '.id')",
 		},
 		futility.Example{
 			Description: "Restore a captured tree to a fresh destination.",
-			Command:     "cutting-garden tree-restore \"$id\" ./restore",
+			Command:     "cutting-garden restore \"$id\" ./restore",
 		},
 		futility.Example{
 			Description: "Use the cg alias against a CWD-relative blob store.",
-			Command:     "cg tree-capture .archive ./project",
+			Command:     "cg capture .archive ./project",
 		},
 	)
 

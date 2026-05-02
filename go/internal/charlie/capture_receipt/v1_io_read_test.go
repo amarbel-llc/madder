@@ -1,4 +1,4 @@
-package tree_capture_receipt
+package capture_receipt
 
 import (
 	"bytes"
@@ -89,7 +89,7 @@ func TestCoder_DecodeFrom_RoundTripWithHint(t *testing.T) {
 }
 
 func TestCoder_DecodeFrom_RejectsUnknownTypeTag(t *testing.T) {
-	receipt := "---\n! madder-tree_capture-receipt-v999\n---\n\n"
+	receipt := "---\n! cutting_garden-capture_receipt-fs-v999\n---\n\n"
 
 	tb := &hyphence.TypedBlob[Blob]{}
 	if _, err := Coder.DecodeFrom(tb, strings.NewReader(receipt)); err == nil {

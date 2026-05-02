@@ -24,7 +24,8 @@ hyphence - text-based metadata + body serialization format
 
 Hyphence (hyphen-fence) is a text-based serialization format that uses **---**
 boundary lines to enclose a metadata section followed by an optional body. It
-is used by madder for blob-store and tree-capture metadata, and by dodder for
+is used by madder for blob-store metadata and by cutting-garden for
+capture-receipt metadata, and by dodder for
 repository configs, blob store configs, workspace configs, type definitions,
 and user-facing zettels.
 

@@ -1,4 +1,4 @@
-package tree_capture_receipt
+package capture_receipt
 
 import (
 	"bufio"
@@ -84,7 +84,7 @@ func (v1BodyCoder) DecodeFrom(
 			var rec recordV1
 			if jerr := json.Unmarshal(line, &rec); jerr != nil {
 				return n, errors.Wrapf(jerr,
-					"tree_capture_receipt: decode body line: %q", line)
+					"capture_receipt: decode body line: %q", line)
 			}
 
 			entry, derr := decodeV1Record(rec)
@@ -109,7 +109,7 @@ func (v1BodyCoder) EncodeTo(
 	v1, ok := (*blobPtr).(*V1)
 	if !ok {
 		return 0, errors.ErrorWithStackf(
-			"tree_capture_receipt: v1BodyCoder.EncodeTo: expected *V1, got %T", *blobPtr)
+			"capture_receipt: v1BodyCoder.EncodeTo: expected *V1, got %T", *blobPtr)
 	}
 
 	entries := append([]EntryV1(nil), v1.Entries...)
@@ -148,7 +148,7 @@ func readNDJSONLine(br *bufio.Reader) ([]byte, error) {
 }
 
 // recordV1 is the on-disk JSON shape for one entry in
-// madder-tree_capture-receipt-v1. omitempty keeps file-only fields out
+// cutting_garden-capture_receipt-fs-v1. omitempty keeps file-only fields out
 // of dir/symlink records and vice versa.
 type recordV1 struct {
 	Path   string `json:"path"`
@@ -181,7 +181,7 @@ func encodeV1Entry(e EntryV1) ([]byte, error) {
 
 	default:
 		return nil, errors.ErrorWithStackf(
-			"tree_capture_receipt: unknown entry type %q (path=%q root=%q)",
+			"capture_receipt: unknown entry type %q (path=%q root=%q)",
 			e.Type, e.Path, e.Root,
 		)
 	}
@@ -197,7 +197,7 @@ func encodeV1Entry(e EntryV1) ([]byte, error) {
 func decodeV1Record(rec recordV1) (EntryV1, error) {
 	mode, err := strconv.ParseUint(rec.Mode, 8, 32)
 	if err != nil {
-		return EntryV1{}, errors.Wrapf(err, "tree_capture_receipt: parse mode %q", rec.Mode)
+		return EntryV1{}, errors.Wrapf(err, "capture_receipt: parse mode %q", rec.Mode)
 	}
 
 	entry := EntryV1{
@@ -220,7 +220,7 @@ func decodeV1Record(rec recordV1) (EntryV1, error) {
 
 	default:
 		return EntryV1{}, errors.ErrorWithStackf(
-			"tree_capture_receipt: unknown entry type %q (path=%q root=%q)",
+			"capture_receipt: unknown entry type %q (path=%q root=%q)",
 			rec.Type, rec.Path, rec.Root,
 		)
 	}

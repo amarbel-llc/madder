@@ -1,4 +1,4 @@
-// Coder + version-dispatching machinery for tree-capture receipts.
+// Coder + version-dispatching machinery for capture receipts.
 //
 // Mirrors the dodder pattern (delta/blob_store_configs/coding.go):
 // a hyphence.CoderToTypedBlob[Blob] whose Metadata coder populates
@@ -12,7 +12,7 @@
 // pre-allocates a *V1 with the captured Hint set on it, so the body
 // coder for TypeTagV1 can stream NDJSON entries directly into the
 // existing struct.
-package tree_capture_receipt
+package capture_receipt
 
 import (
 	"bufio"
@@ -95,7 +95,7 @@ func (receiptMetadataCoder) DecodeFrom(
 		i := strings.Index(rest, sep)
 		if i < 0 {
 			return errors.ErrorWithStackf(
-				"tree_capture_receipt: malformed store-hint line: %q", value)
+				"capture_receipt: malformed store-hint line: %q", value)
 		}
 
 		hint = &StoreHint{

@@ -8,21 +8,21 @@ promotion-criteria: |
   shipped in at least one tagged madder release.
 ---
 
-# tree-restore
+# restore
 
 ## Problem Statement
 
-`cutting-garden tree-capture` writes a content-addressable receipt that records
+`cutting-garden capture` writes a content-addressable receipt that records
 every entry of a captured directory tree. Today there is no way to
 reconstruct that tree from a receipt: a user with a receipt id has no
 in-tree command that materializes the captured files, directories, and
 symlinks back onto disk. This feature adds the inverse —
-`cutting-garden tree-restore <receipt-id> <dest>` — covering the consumer side
+`cutting-garden restore <receipt-id> <dest>` — covering the consumer side
 of the operational contract specified by [RFC 0003] §Consumer Rules.
 
 The absence of a consumer also leaves [RFC 0003]'s store-hint
 mechanism unused: receipts now carry `- store/<id> < <markl-id>`
-metadata (per #92), but no in-tree code consumes it. `tree-restore` is
+metadata (per #92), but no in-tree code consumes it. `restore` is
 the first consumer that needs to resolve the source store, validate
 config drift, and surface the diagnostics RFC 0003 §Store-Hint
 Resolution specifies.
@@ -31,11 +31,11 @@ Resolution specifies.
 
 ### Synopsis
 
-    cutting-garden tree-restore [-store <id>] <receipt-id> <dest>
+    cutting-garden restore [-store <id>] <receipt-id> <dest>
 
 ### Positional arguments
 
-- `<receipt-id>` — the markl-id of a `madder-tree_capture-receipt-v1`
+- `<receipt-id>` — the markl-id of a `cutting_garden-capture_receipt-fs-v1`
   blob. Required.
 - `<dest>` — the directory the captured tree will be materialized
   under. MUST NOT exist at invocation time. Required.
@@ -60,7 +60,7 @@ Materialization happens in three phases:
 
 1. **Resolve store + parse receipt.** Use `-store` if set, else the
    active default store. Open the receipt blob. Parse via
-   `tree_capture_receipt.Coder.DecodeFrom` (the dispatcher in #87
+   `capture_receipt.Coder.DecodeFrom` (the dispatcher in #87
    step 2). The result is a `*V1` carrying optional `Hint` and
    `Entries`.
 
@@ -79,7 +79,7 @@ Materialization happens in three phases:
 
 Per [RFC 0003] §Consumer Rules §Destination Preconditions:
 
-- `<dest>` MUST NOT exist when `tree-restore` is invoked. The consumer
+- `<dest>` MUST NOT exist when `restore` is invoked. The consumer
   creates `<dest>` as part of restore.
 - `os.Lstat(dest)` is checked before any other work. If it returns nil
   error (i.e. the path exists), refuse with:
@@ -111,7 +111,7 @@ and before any byte is written.
 Diagnostics use a multi-line shape: a single `error:` summary line,
 followed by indented `key: value` payload lines. This is a
 deliberate FDR-level convention (see [Limitations](#limitations) for
-the rationale and the comparison to `tree-capture`'s single-line
+the rationale and the comparison to `capture`'s single-line
 `error:` + `hint:` style). The shape is appropriate here because the
 RFC mandates that the diagnostic identify multiple distinct fields
 (root, path, materialized, destination) per refusal, and a single
@@ -142,7 +142,7 @@ Newlines (`\n`, `\r`) and other valid-UTF-8 characters in `e.root` and
 `e.path` MUST be permitted. Per [RFC 0003] §Consumer Rules, the
 consumer MUST NOT reject an entry on the basis of its name containing
 newlines or other unusual-but-legal characters. Tested by
-`tree_restore_round_trips_unusual_filenames` (deferred — see
+`restore_round_trips_unusual_filenames` (deferred — see
 [Limitations](#limitations)).
 
 #### Multi-root receipts
@@ -221,7 +221,7 @@ via the following procedure (after the receipt has been parsed):
        notice: falling back to active store
 
 The receipt blob ITSELF is fetched in phase 1 via the same store
-resolution as the entries' blobs. The current `tree-capture` producer
+resolution as the entries' blobs. The current `capture` producer
 emits one receipt blob per store-group ([RFC 0003] §Introduction),
 which means in practice all entries in a single receipt resolve via
 the same store. RFC 0003 does not normatively forbid cross-store
@@ -229,7 +229,7 @@ entries within a single receipt, so a future producer or hand-crafted
 receipt could legitimately split entries across stores — but the v1
 consumer does not handle that case (see [Limitations](#limitations)).
 
-The local config-blob markl-id is computed the same way `tree-capture`
+The local config-blob markl-id is computed the same way `capture`
 computes the hint at write time (see #92's `computeStoreHint`):
 re-encode the store's `GetBlobStoreConfig()` through a digesting
 writer using the store's `GetDefaultHashType()`. Hash families MUST
@@ -239,7 +239,7 @@ local store does not support, the consumer falls through to branch 4
 
 ### MCP and TAP output
 
-`tree-restore` does NOT emit MCP-style structured output in v1. The
+`restore` does NOT emit MCP-style structured output in v1. The
 consumer's diagnostics are plain stderr lines. A future
 `-format json` flag is deferred (see [Limitations](#limitations)).
 
@@ -247,11 +247,11 @@ consumer's diagnostics are plain stderr lines. A future
 
 ### Round-trip
 
-    $ cutting-garden tree-capture -format json src
+    $ cutting-garden capture -format json src
     ok 1 - capture src
     ok 2 - receipt blake2b256-7g…
 
-    $ cutting-garden tree-restore blake2b256-7g… restored
+    $ cutting-garden restore blake2b256-7g… restored
     $ ls restored/src
     main.go
     go.mod
@@ -262,7 +262,7 @@ config-markl-id, no diagnostic.
 ### Refusal: destination exists
 
     $ mkdir out
-    $ cutting-garden tree-restore blake2b256-7g… out
+    $ cutting-garden restore blake2b256-7g… out
     error: out: destination already exists
     hint: choose a destination that does not exist, or remove this one
 
@@ -272,7 +272,7 @@ Exit nonzero. `out/` is unchanged.
 
 A hand-crafted receipt with `{"root":"src","path":"../../../etc/passwd",...}`:
 
-    $ cutting-garden tree-restore <receipt-id> out/
+    $ cutting-garden restore <receipt-id> out/
     error: entry escapes destination
       root: src
       path: ../../../etc/passwd
@@ -286,21 +286,21 @@ Exit nonzero. `out/` is NOT created.
 The receipt was written against `.work` whose config has since been
 rotated:
 
-    $ cutting-garden tree-restore <receipt-id> restored
+    $ cutting-garden restore <receipt-id> restored
     warning: store .work has been re-configured since this receipt was written
       receipt config-hash: blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
       current config-hash: blake2b256-3wp380jqj2zfrm6zevxqx3…
     error: pass -store <id> to override and use the current store
     hint: re-running with -store .work uses the current configuration
 
-    $ cutting-garden tree-restore -store .work <receipt-id> restored
+    $ cutting-garden restore -store .work <receipt-id> restored
     (proceeds against the current .work configuration)
 
 ### Symlink preservation
 
 A receipt with a `type:"symlink"` entry whose `target` is `../bar`:
 
-    $ cutting-garden tree-restore <receipt-id> restored
+    $ cutting-garden restore <receipt-id> restored
     $ readlink restored/src/link
     ../bar
 
@@ -313,7 +313,7 @@ follow-up issue or deferred to a future schema version.
 
 - **No mtime / atime / owner / group / xattrs / ACLs preservation.** The
   v1 receipt schema does not record these; preserving them is deferred
-  to `madder-tree_capture-receipt-v2` ([RFC 0003] §Producer Rules
+  to `cutting_garden-capture_receipt-fs-v2` ([RFC 0003] §Producer Rules
   §Body Schema).
 - **No overwrite, merge, or partial-restore policy.** `<dest>` MUST NOT
   exist; the consumer creates it. There is no `-force`, no `-merge`,
@@ -356,7 +356,7 @@ follow-up issue or deferred to a future schema version.
   this FDR explicitly chooses leave-partial-on-mid-stream-failure
   rather than reverse-walk-and-delete. Cleanup is the operator's job.
 - **No `other → skip` bats scenario in v1.** [RFC 0003] §Conformance
-  Testing lists `tree_restore_skips_type_other_with_notice` as
+  Testing lists `restore_skips_type_other_with_notice` as
   required; the v1 matrix omits it because injecting a `type:"other"`
   entry without root privileges (FIFO via `mkfifo` works on POSIX but
   not on macOS in the bats sandcastle environment) is awkward. The
@@ -378,7 +378,7 @@ follow-up issue or deferred to a future schema version.
   amended to specify the behavior, this Limitations bullet should be
   removed.
 - **Multi-line diagnostic style is FDR-introduced.** The standard
-  diagnostic style elsewhere in madder (e.g. `tree-capture`'s
+  diagnostic style elsewhere in madder (e.g. `capture`'s
   `checkRootScope` / `checkRootCollisions`) uses a single `error:`
   line plus an optional `hint:` line. This FDR introduces two
   variants:
@@ -401,8 +401,8 @@ follow-up issue or deferred to a future schema version.
 
 ## More Information
 
-- [RFC 0003] — Tree-Capture / Tree-Restore Operational Rules
-  (`docs/rfcs/0003-tree-capture-restore-rules.md`). Normative source
+- [RFC 0003] — Capture / Restore Operational Rules
+  (`docs/rfcs/0003-capture-restore-rules.md`). Normative source
   for every behavioral rule in this FDR.
 - [#87] — the issue this FDR resolves.
 - [#91] — producer-side root scoping + collision detection. Closes the
@@ -415,24 +415,24 @@ follow-up issue or deferred to a future schema version.
 ## Conformance test mapping
 
 For traceability, every normative rule in [RFC 0003] §Consumer Rules
-maps to a bats test in `zz-tests_bats/tree_restore.bats`. The matrix
+maps to a bats test in `zz-tests_bats/restore.bats`. The matrix
 is the v1 acceptance criterion:
 
 | [RFC 0003] § | Test |
 |---|---|
-| §Destination Preconditions | `tree_restore_refuses_existing_destination` |
-| §Path Sanitization (parent-escape) | `tree_restore_refuses_path_escape_no_partial_writes` |
-| §Path Sanitization (NUL byte) | `tree_restore_refuses_nul_byte_in_path` |
-| §Path Sanitization (empty root) | `tree_restore_refuses_empty_root` |
-| §Per-Type Materialization (file) | `tree_restore_round_trips_file` |
-| §Per-Type Materialization (dir) | `tree_restore_round_trips_dir` |
-| §Per-Type Materialization (symlink) | `tree_restore_round_trips_symlink` |
-| §Per-Type Materialization (other → skip) | `tree_restore_skips_type_other_with_notice` (DEFERRED — hard to inject without root) |
-| §Store-Hint Resolution §Auto-use | `tree_restore_uses_hint_store_when_config_matches` |
-| §Store-Hint Resolution §Mismatch-warn | `tree_restore_warns_on_config_drift` |
-| §Store-Hint Resolution §Missing-fallback (hint present, store missing) | `tree_restore_falls_back_to_active_store_on_missing_hint` |
-| §Store-Hint Resolution (no hint at all) | `tree_restore_falls_back_to_active_store_on_no_hint` |
-| §Store-Hint Resolution (-store override, FDR-added) | `tree_restore_store_flag_overrides_hint` |
+| §Destination Preconditions | `restore_refuses_existing_destination` |
+| §Path Sanitization (parent-escape) | `restore_refuses_path_escape_no_partial_writes` |
+| §Path Sanitization (NUL byte) | `restore_refuses_nul_byte_in_path` |
+| §Path Sanitization (empty root) | `restore_refuses_empty_root` |
+| §Per-Type Materialization (file) | `restore_round_trips_file` |
+| §Per-Type Materialization (dir) | `restore_round_trips_dir` |
+| §Per-Type Materialization (symlink) | `restore_round_trips_symlink` |
+| §Per-Type Materialization (other → skip) | `restore_skips_type_other_with_notice` (DEFERRED — hard to inject without root) |
+| §Store-Hint Resolution §Auto-use | `restore_uses_hint_store_when_config_matches` |
+| §Store-Hint Resolution §Mismatch-warn | `restore_warns_on_config_drift` |
+| §Store-Hint Resolution §Missing-fallback (hint present, store missing) | `restore_falls_back_to_active_store_on_missing_hint` |
+| §Store-Hint Resolution (no hint at all) | `restore_falls_back_to_active_store_on_no_hint` |
+| §Store-Hint Resolution (-store override, FDR-added) | `restore_store_flag_overrides_hint` |
 
 The two fallback cases (hint-points-at-missing-store vs.
 no-hint-line-at-all) are split into separate tests because, although
@@ -444,7 +444,7 @@ The `-store` override row is FDR-added (not in the [RFC 0003]
 §Conformance Testing matrix). Documenting it here so the matrix is
 auditable as a superset rather than a divergence.
 
-[RFC 0003]: ../rfcs/0003-tree-capture-restore-rules.md
+[RFC 0003]: ../rfcs/0003-capture-restore-rules.md
 [#87]: https://github.com/amarbel-llc/madder/issues/87
 [#91]: https://github.com/amarbel-llc/madder/issues/91
 [#92]: https://github.com/amarbel-llc/madder/issues/92

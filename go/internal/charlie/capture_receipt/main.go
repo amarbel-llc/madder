@@ -1,6 +1,6 @@
-// Package tree_capture_receipt encodes and decodes the per-store-group
-// receipt blob produced by `cutting-garden tree-capture` (and consumed by
-// `cutting-garden tree-restore`).
+// Package capture_receipt encodes and decodes the per-store-group
+// receipt blob produced by `cutting-garden capture` (and consumed by
+// `cutting-garden restore`).
 //
 // The receipt is a hyphence-wrapped NDJSON document: an optional
 // store-hint metadata line plus a single type-tag line, followed by
@@ -14,7 +14,7 @@
 // (EntryV1). Future versions land as sibling files (v2.go, v2_io.go)
 // without disturbing existing readers; the type-id discriminator on
 // the hyphence metadata block is the dispatch key.
-package tree_capture_receipt
+package capture_receipt
 
 // Blob is the lowest-common-denominator return type for a parsed
 // receipt across all wire versions. A successful parse returns a
@@ -23,4 +23,4 @@ type Blob any
 
 // TypeTagV1 is the hyphence `! type-string` written at the top of
 // every v1 receipt.
-const TypeTagV1 = "madder-tree_capture-receipt-v1"
+const TypeTagV1 = "cutting_garden-capture_receipt-fs-v1"

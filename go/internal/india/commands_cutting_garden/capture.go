@@ -14,8 +14,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_sink"
+	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/charlie/capture_sink"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -27,24 +27,24 @@ import (
 )
 
 func init() {
-	utility.AddCmd("tree-capture", &TreeCapture{
+	utility.AddCmd("capture", &Capture{
 		EnvBlobStore: command_components.EnvBlobStore{BlobStoreXDGScope: "madder"},
 		Format:       output_format.Default,
 	})
 }
 
-type TreeCapture struct {
+type Capture struct {
 	command_components.EnvBlobStore
 
 	Format output_format.Format
 }
 
 var (
-	_ interfaces.CommandComponentWriter = (*TreeCapture)(nil)
-	_ futility.CommandWithParams        = (*TreeCapture)(nil)
+	_ interfaces.CommandComponentWriter = (*Capture)(nil)
+	_ futility.CommandWithParams        = (*Capture)(nil)
 )
 
-func (cmd *TreeCapture) GetParams() []futility.Param {
+func (cmd *Capture) GetParams() []futility.Param {
 	return []futility.Param{
 		futility.Arg[*values.String]{
 			Name:        "args",
@@ -54,14 +54,14 @@ func (cmd *TreeCapture) GetParams() []futility.Param {
 	}
 }
 
-func (cmd TreeCapture) GetDescription() futility.Description {
+func (cmd Capture) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "capture a directory tree into a blob store",
 		Long: "Walk one or more directories and write every regular " +
 			"file as a content-addressable blob into the active " +
 			"store. Each capture run produces one receipt blob per " +
 			"store-group: a hyphence-wrapped NDJSON document " +
-			"(`! madder-tree_capture-receipt-v1`) listing every " +
+			"(`! cutting_garden-capture_receipt-fs-v1`) listing every " +
 			"captured entry with its relative path, type, POSIX " +
 			"permission bits, blob ID (or symlink target), and " +
 			"size. The receipt blob ID is reported on stdout. " +
@@ -86,7 +86,7 @@ func (cmd TreeCapture) GetDescription() futility.Description {
 	}
 }
 
-func (cmd TreeCapture) Complete(
+func (cmd Capture) Complete(
 	req futility.Request,
 	envLocal env_local.Env,
 	commandLine futility.CommandLineInput,
@@ -97,13 +97,13 @@ func (cmd TreeCapture) Complete(
 	}
 }
 
-func (cmd *TreeCapture) SetFlagDefinitions(
+func (cmd *Capture) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 }
 
-func (cmd TreeCapture) Run(req futility.Request) {
+func (cmd Capture) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	args := req.PopArgs()
@@ -111,12 +111,12 @@ func (cmd TreeCapture) Run(req futility.Request) {
 
 	groups, classifyFails, planErr := planCapture(args, shadowCandidates)
 
-	var sink tree_capture_sink.Sink
+	var sink capture_sink.Sink
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
-		sink = tree_capture_sink.NewNDJSON(os.Stdout, os.Stderr)
+		sink = capture_sink.NewNDJSON(os.Stdout, os.Stderr)
 	default:
-		sink = tree_capture_sink.NewTAP(os.Stdout)
+		sink = capture_sink.NewTAP(os.Stdout)
 	}
 
 	failCount := 0
@@ -149,7 +149,7 @@ func (cmd TreeCapture) Run(req futility.Request) {
 
 		sink.SetStore(storeName)
 
-		var entries []tree_capture_receipt.EntryV1
+		var entries []capture_receipt.EntryV1
 
 		for _, root := range group.roots {
 			if root.shadowNotice != "" {
@@ -192,7 +192,7 @@ func (cmd TreeCapture) Run(req futility.Request) {
 	if failCount > 0 {
 		errors.ContextCancelWithBadRequestf(
 			req,
-			"tree-capture failed entries: %d",
+			"capture failed entries: %d",
 			failCount,
 		)
 		return
@@ -376,7 +376,7 @@ func classifyArg(arg string) classifiedArg {
 		return classifiedArg{
 			kind: argKindError,
 			err: errors.ErrorWithStackf(
-				"%q exists but is not a directory; tree-capture only takes directories (resolve symlinks with realpath if needed)",
+				"%q exists but is not a directory; capture only takes directories (resolve symlinks with realpath if needed)",
 				arg,
 			),
 		}
@@ -447,14 +447,14 @@ func checkRootCollisions(roots []captureRoot) error {
 
 // walkRoot walks rootArg with filepath.WalkDir (which does not follow
 // symlinks), writes every regular file as a blob into store, appends a
-// tree_capture_receipt.EntryV1 for every entry it visited, and emits live
+// capture_receipt.EntryV1 for every entry it visited, and emits live
 // per-entry events on the sink. Returns the count of per-entry
 // failures encountered during the walk.
 func walkRoot(
 	store blob_stores.BlobStoreInitialized,
 	rootArg string,
-	accum *[]tree_capture_receipt.EntryV1,
-	sink tree_capture_sink.Sink,
+	accum *[]capture_receipt.EntryV1,
+	sink capture_sink.Sink,
 ) int {
 	var failCount int
 
@@ -487,7 +487,7 @@ func walkRoot(
 		rel = filepath.ToSlash(rel)
 
 		mode := info.Mode()
-		entry := tree_capture_receipt.EntryV1{
+		entry := capture_receipt.EntryV1{
 			Path: rel,
 			Root: rootArg,
 			Mode: mode,
@@ -501,11 +501,11 @@ func walkRoot(
 				failCount++
 				return nil
 			}
-			entry.Type = tree_capture_receipt.TypeSymlink
+			entry.Type = capture_receipt.TypeSymlink
 			entry.Target = target
 
 		case mode.IsDir():
-			entry.Type = tree_capture_receipt.TypeDir
+			entry.Type = capture_receipt.TypeDir
 
 		case mode.IsRegular():
 			id, size, err := writeFileBlob(store, p)
@@ -514,12 +514,12 @@ func walkRoot(
 				failCount++
 				return nil
 			}
-			entry.Type = tree_capture_receipt.TypeFile
+			entry.Type = capture_receipt.TypeFile
 			entry.Size = size
 			entry.BlobId = id.String()
 
 		default:
-			entry.Type = tree_capture_receipt.TypeOther
+			entry.Type = capture_receipt.TypeOther
 		}
 
 		*accum = append(*accum, entry)
@@ -562,15 +562,15 @@ func writeFileBlob(
 	return
 }
 
-// writeReceiptBlob serializes entries via tree_capture_receipt.Write
+// writeReceiptBlob serializes entries via capture_receipt.Write
 // into a new blob in blobStore. The output is deterministic:
 // equivalent inputs yield byte-identical receipts and identical blob
 // IDs. When hint is non-nil, the receipt's hyphence metadata block
 // carries an RFC 0003 store-hint line.
 func writeReceiptBlob(
 	blobStore blob_stores.BlobStoreInitialized,
-	entries []tree_capture_receipt.EntryV1,
-	hint *tree_capture_receipt.StoreHint,
+	entries []capture_receipt.EntryV1,
+	hint *capture_receipt.StoreHint,
 ) (id string, err error) {
 	wc, err := blobStore.MakeBlobWriter(nil)
 	if err != nil {
@@ -579,7 +579,7 @@ func writeReceiptBlob(
 	}
 	defer errors.DeferredCloser(&err, wc)
 
-	if _, err = tree_capture_receipt.WriteV1WithHint(wc, entries, hint); err != nil {
+	if _, err = capture_receipt.WriteV1WithHint(wc, entries, hint); err != nil {
 		err = errors.Wrap(err)
 		return
 	}
@@ -602,7 +602,7 @@ func writeReceiptBlob(
 func computeStoreHint(
 	blobStore blob_stores.BlobStoreInitialized,
 	storeID blob_store_id.Id,
-) (*tree_capture_receipt.StoreHint, error) {
+) (*capture_receipt.StoreHint, error) {
 	if storeID.IsEmpty() {
 		return nil, nil
 	}
@@ -629,7 +629,7 @@ func computeStoreHint(
 		return nil, errors.Wrap(err)
 	}
 
-	return &tree_capture_receipt.StoreHint{
+	return &capture_receipt.StoreHint{
 		StoreId:       storeID.String(),
 		ConfigMarklId: digester.GetMarklId().String(),
 	}, nil

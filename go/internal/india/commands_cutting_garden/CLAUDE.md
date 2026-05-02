@@ -8,8 +8,8 @@ extraction plan).
 
 ## Subcommands
 
-- `tree-capture`: walk a tree, write blobs + receipt
-- `tree-restore`: materialize a tree from a receipt
+- `capture`: walk a tree, write blobs + receipt
+- `restore`: materialize a tree from a receipt
 
 Wire format and receipt schema documented in
-`docs/man.7/tree-capture-receipt.md` and `docs/rfcs/0003-tree-capture-restore-rules.md`.
+`docs/man.7/capture-receipt.md` and `docs/rfcs/0003-capture-restore-rules.md`.

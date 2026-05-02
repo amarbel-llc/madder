@@ -3,24 +3,24 @@ status: accepted
 date: 2026-04-27
 ---
 
-# Tree-Capture / Tree-Restore Operational Rules
+# Capture / Restore Operational Rules
 
 ## Abstract
 
-This document specifies behavioral rules for producers (`cutting-garden tree-capture`) and consumers (`cutting-garden tree-restore`) of `madder-tree_capture-receipt-v1` blobs. The rules cover root scoping, root collision detection, store-hint metadata, restore-side path sanitization, and the per-type materialization contract. The receipt's record schema (paths, types, modes, blob references) is documented separately in `tree-capture-receipt(7)`; this document layers normative obligations on top of that schema so that a receipt written by any conformant producer is safe to restore by any conformant consumer.
+This document specifies behavioral rules for producers (`cutting-garden capture`) and consumers (`cutting-garden restore`) of `cutting_garden-capture_receipt-fs-v1` blobs. The rules cover root scoping, root collision detection, store-hint metadata, restore-side path sanitization, and the per-type materialization contract. The receipt's record schema (paths, types, modes, blob references) is documented separately in `capture-receipt(7)`; this document layers normative obligations on top of that schema so that a receipt written by any conformant producer is safe to restore by any conformant consumer.
 
 ## Introduction
 
-`cutting-garden tree-capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`tree-capture-receipt(7)`). The inverse — `cutting-garden tree-restore` — is being introduced under [#87](https://github.com/amarbel-llc/madder/issues/87) and consumes a receipt to materialize the captured tree on disk.
+`cutting-garden capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`capture-receipt(7)`). The inverse — `cutting-garden restore` — is being introduced under [#87](https://github.com/amarbel-llc/madder/issues/87) and consumes a receipt to materialize the captured tree on disk.
 
 For the producer/consumer pair to be safe and predictable, several rules need to be normative rather than implicit:
 
-1. **Capture roots** can today be any directory the user names, including those outside the current working directory or upward through `..`. That choice was deliberate in v1 of `tree-capture`, but it complicates the restore-side path-sanitization story and surfaces classic Zip-Slip-style risks. This RFC narrows capture-roots to PWD or descendants thereof, mirroring git's work-tree scoping (with PWD as the implicit work tree).
+1. **Capture roots** can today be any directory the user names, including those outside the current working directory or upward through `..`. That choice was deliberate in v1 of `capture`, but it complicates the restore-side path-sanitization story and surfaces classic Zip-Slip-style risks. This RFC narrows capture-roots to PWD or descendants thereof, mirroring git's work-tree scoping (with PWD as the implicit work tree).
 2. **Receipts** today carry no record of which store wrote them. The consumer must guess. This RFC defines an additive hyphence-metadata convention that lets a receipt name its origin store and lock the lookup to the store's config-blob digest, so consumers can self-resolve in the common case and detect drift in the uncommon one.
 3. **Restore-side path handling** has to be defense-in-depth against corrupt or hostile receipts. This RFC specifies the sanitization rule and the refusal conditions.
 4. **Per-entry materialization** has to be unambiguous across types (file, dir, symlink, other), since the receipt itself is content-addressed and consumers across machines must agree on what restore produces.
 
-The wire format of receipts is not respecified here. The hyphence type remains `madder-tree_capture-receipt-v1` and the body NDJSON schema is unchanged from `tree-capture-receipt(7)`. This RFC is purely additive metadata + behavioral obligations.
+The wire format of receipts is not respecified here. The hyphence type remains `cutting_garden-capture_receipt-fs-v1` and the body NDJSON schema is unchanged from `capture-receipt(7)`. This RFC is purely additive metadata + behavioral obligations.
 
 ## Requirements Language
 
@@ -30,8 +30,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### Roles
 
-- **Producer**: any tool that writes a `madder-tree_capture-receipt-v1` blob. The reference producer is `cutting-garden tree-capture`.
-- **Consumer**: any tool that reads a `madder-tree_capture-receipt-v1` blob to materialize the captured tree on disk. The reference consumer is `cutting-garden tree-restore`.
+- **Producer**: any tool that writes a `cutting_garden-capture_receipt-fs-v1` blob. The reference producer is `cutting-garden capture`.
+- **Consumer**: any tool that reads a `cutting_garden-capture_receipt-fs-v1` blob to materialize the captured tree on disk. The reference consumer is `cutting-garden restore`.
 
 A given binary MAY implement only the producer side, only the consumer side, or both.
 
@@ -41,7 +41,7 @@ A given binary MAY implement only the producer side, only the consumer side, or 
 
 A producer MUST refuse any positional capture-root argument that does not resolve to the producer's current working directory (PWD) or a descendant of PWD.
 
-For each positional argument `root` that classifies as a directory (per `tree-capture(1)`'s arg-classification rules), the producer MUST:
+For each positional argument `root` that classifies as a directory (per `capture(1)`'s arg-classification rules), the producer MUST:
 
 1. Compute `abs := filepath.Abs(root)` against PWD.
 2. Compute `rel, err := filepath.Rel(pwd, abs)`.
@@ -62,9 +62,9 @@ A producer MUST refuse a capture invocation if two or more positional capture-ro
 
 Examples that MUST be refused at planning time, before any walking begins:
 
-- `cutting-garden tree-capture src ./src`
-- `cutting-garden tree-capture vendor vendor/`
-- `cutting-garden tree-capture ./internal ./internal/.`
+- `cutting-garden capture src ./src`
+- `cutting-garden capture vendor vendor/`
+- `cutting-garden capture ./internal ./internal/.`
 
 The refusal error message MUST identify both colliding arguments and the canonicalized path they share.
 
@@ -72,7 +72,7 @@ The intent is that valid receipts never contain two `root` values that collapse 
 
 #### Symlink Roots
 
-A producer MUST refuse a positional capture-root that is itself a symbolic link (whether or not the link target is a directory). This is the existing behavior of `tree-capture`'s planner; it is restated here for completeness.
+A producer MUST refuse a positional capture-root that is itself a symbolic link (whether or not the link target is a directory). This is the existing behavior of `capture`'s planner; it is restated here for completeness.
 
 The intent is that symlinks are recorded in the body as `type:"symlink"` entries with their literal target string, not silently dereferenced. A user who intends to capture the linked tree's contents is expected to resolve the symlink with `realpath(1)` before invoking the producer.
 
@@ -84,10 +84,10 @@ When the producer knows the identifier and the configuration-blob digest of the 
 
 Where:
 
-- `<store-id>` is the producer's local identifier for the destination store. For `cutting-garden tree-capture` this is the `blob_store_id` (e.g. `default`, `.archive`, `.work`).
+- `<store-id>` is the producer's local identifier for the destination store. For `cutting-garden capture` this is the `blob_store_id` (e.g. `default`, `.archive`, `.work`).
 - `<config-markl-id>` is the markl-id of the destination store's `toml-blob_store_config-vN` blob, in the canonical text form produced by `markl-id(7)`.
 
-The line MUST appear in the receipt's hyphence metadata block, between the opening `---` boundary and the type line `! madder-tree_capture-receipt-v1`.
+The line MUST appear in the receipt's hyphence metadata block, between the opening `---` boundary and the type line `! cutting_garden-capture_receipt-fs-v1`.
 
 A producer MAY omit the line entirely if it cannot determine the destination store's identifier or if the store has no addressable configuration blob (e.g. an in-memory test fixture). Consumers MUST tolerate the absence of the line (see Store-Hint Resolution below).
 
@@ -95,9 +95,9 @@ The line is additive metadata. Older readers that do not interpret it MUST treat
 
 #### Body Schema
 
-The body's NDJSON schema is unchanged from `tree-capture-receipt(7)`. Producers MUST continue to emit entries sorted by `(root, path)` for byte-identical output across runs of equivalent inputs. The hyphence type MUST remain `madder-tree_capture-receipt-v1`.
+The body's NDJSON schema is unchanged from `capture-receipt(7)`. Producers MUST continue to emit entries sorted by `(root, path)` for byte-identical output across runs of equivalent inputs. The hyphence type MUST remain `cutting_garden-capture_receipt-fs-v1`.
 
-A producer that needs to record fields not specified in the v1 schema (for example, mtime or owner/group) MUST allocate a new type (`madder-tree_capture-receipt-v2`, etc.) rather than extending v1.
+A producer that needs to record fields not specified in the v1 schema (for example, mtime or owner/group) MUST allocate a new type (`cutting_garden-capture_receipt-fs-v2`, etc.) rather than extending v1.
 
 ### Consumer Rules
 
@@ -165,7 +165,7 @@ A receipt for two files under `src/` captured into store `.work` (whose `toml-bl
 
     ---
     - store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd
-    ! madder-tree_capture-receipt-v1
+    ! cutting_garden-capture_receipt-fs-v1
     ---
 
     {"path":".","root":"src","type":"dir","mode":"0755"}
@@ -176,11 +176,11 @@ The `blob_id` values in the body are abbreviated for readability; real receipts 
 
 ### Capture-Time Refusal: Non-Descendant Root
 
-User runs `tree-capture` from `/home/sasha/projects/foo` and attempts to capture a sibling directory:
+User runs `capture` from `/home/sasha/projects/foo` and attempts to capture a sibling directory:
 
     $ pwd
     /home/sasha/projects/foo
-    $ cutting-garden tree-capture ../bar
+    $ cutting-garden capture ../bar
     error: ../bar: outside working directory at /home/sasha/projects/foo
     hint: cd to a parent directory containing ../bar, then re-run
 
@@ -188,7 +188,7 @@ Exit code is nonzero. No blobs are written. No receipt is produced.
 
 ### Capture-Time Refusal: Root Collision
 
-    $ cutting-garden tree-capture src ./src
+    $ cutting-garden capture src ./src
     error: roots "src" and "./src" both resolve to "src" after Clean
     hint: pass each directory only once per store-group
 
@@ -199,14 +199,14 @@ Exit code is nonzero. No blobs are written.
 A hand-crafted receipt with a malicious `path` field:
 
     ---
-    ! madder-tree_capture-receipt-v1
+    ! cutting_garden-capture_receipt-fs-v1
     ---
 
     {"path":"../../../etc/passwd","root":"src","type":"file","mode":"0644","size":1234,"blob_id":"blake2b256-qpzry9x8gf2tvdw0s3jn54…"}
 
 When restored into `out/`:
 
-    $ cutting-garden tree-restore <receipt-id> out/
+    $ cutting-garden restore <receipt-id> out/
     error: entry escapes destination
       root: src
       path: ../../../etc/passwd
@@ -221,12 +221,12 @@ Given a receipt with hint `- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
 
 **Auto-use** — `.work` is configured locally and its config-blob hash matches:
 
-    $ cutting-garden tree-restore <receipt-id> out/
+    $ cutting-garden restore <receipt-id> out/
     # (no prompt, blobs resolve via .work)
 
 **Mismatch-warn** — `.work` is configured locally but its config-blob hash differs:
 
-    $ cutting-garden tree-restore <receipt-id> out/
+    $ cutting-garden restore <receipt-id> out/
     warning: store .work has been re-configured since this receipt was written
       receipt config-hash: blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
       current config-hash: blake2b256-3wp380jqj2zfrm6zevxqx3…
@@ -235,7 +235,7 @@ Given a receipt with hint `- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
 
 **Missing-fallback** — no `.work` configured locally:
 
-    $ cutting-garden tree-restore <receipt-id> out/
+    $ cutting-garden restore <receipt-id> out/
     notice: receipt names store ".work" which is not configured locally
     notice: falling back to active store
     # (proceeds with the active store; -store may override)
@@ -256,8 +256,8 @@ Consumers MUST NOT follow symlinks they create during restore in any subsequent 
 
 Conformance tests for this specification live in `zz-tests_bats/`:
 
-- `zz-tests_bats/tree_capture.bats` — producer rules. Existing file; new tests are added under #87's parent issue for Root Scoping and Root Collision.
-- `zz-tests_bats/tree_restore.bats` — consumer rules. To be created when [#87](https://github.com/amarbel-llc/madder/issues/87) lands.
+- `zz-tests_bats/capture.bats` — producer rules. Existing file; new tests are added under #87's parent issue for Root Scoping and Root Collision.
+- `zz-tests_bats/restore.bats` — consumer rules. To be created when [#87](https://github.com/amarbel-llc/madder/issues/87) lands.
 
 Tests use binary injection via `bats-emo`:
 
@@ -269,43 +269,43 @@ so an alternative implementation of `madder` (or of either subcommand) can be su
 
 | Requirement | Test File | Description |
 |---|---|---|
-| Producer Rules § Root Scoping (MUST refuse `../foo`) | `tree_capture.bats` | `tree_capture_refuses_parent_escape_root` |
-| Producer Rules § Root Scoping (MUST refuse absolute root) | `tree_capture.bats` | `tree_capture_refuses_absolute_root` |
-| Producer Rules § Root Collision Detection | `tree_capture.bats` | `tree_capture_refuses_collision_after_clean` |
-| Producer Rules § Symlink Roots | `tree_capture.bats` | (existing) |
-| Producer Rules § Receipt Metadata: Store Hint | `tree_capture.bats` | `tree_capture_emits_store_hint_when_known` |
-| Consumer Rules § Destination Preconditions | `tree_restore.bats` | `tree_restore_refuses_existing_destination` |
-| Consumer Rules § Path Sanitization (MUST refuse path-escape) | `tree_restore.bats` | `tree_restore_refuses_path_escape_no_partial_writes` |
-| Consumer Rules § Path Sanitization (MUST refuse NUL byte) | `tree_restore.bats` | `tree_restore_refuses_nul_byte_in_path` |
-| Consumer Rules § Per-Type Materialization (file/dir/symlink) | `tree_restore.bats` | `tree_restore_round_trips_<type>` |
-| Consumer Rules § Per-Type Materialization (other → skip) | `tree_restore.bats` | `tree_restore_skips_type_other_with_notice` |
-| Store-Hint Resolution § Auto-use | `tree_restore.bats` | `tree_restore_uses_hint_store_when_config_matches` |
-| Store-Hint Resolution § Mismatch-warn | `tree_restore.bats` | `tree_restore_warns_on_config_drift` |
-| Store-Hint Resolution § Missing-fallback | `tree_restore.bats` | `tree_restore_falls_back_to_active_store_on_missing_hint` |
+| Producer Rules § Root Scoping (MUST refuse `../foo`) | `capture.bats` | `capture_refuses_parent_escape_root` |
+| Producer Rules § Root Scoping (MUST refuse absolute root) | `capture.bats` | `capture_refuses_absolute_root` |
+| Producer Rules § Root Collision Detection | `capture.bats` | `capture_refuses_collision_after_clean` |
+| Producer Rules § Symlink Roots | `capture.bats` | (existing) |
+| Producer Rules § Receipt Metadata: Store Hint | `capture.bats` | `capture_emits_store_hint_when_known` |
+| Consumer Rules § Destination Preconditions | `restore.bats` | `restore_refuses_existing_destination` |
+| Consumer Rules § Path Sanitization (MUST refuse path-escape) | `restore.bats` | `restore_refuses_path_escape_no_partial_writes` |
+| Consumer Rules § Path Sanitization (MUST refuse NUL byte) | `restore.bats` | `restore_refuses_nul_byte_in_path` |
+| Consumer Rules § Per-Type Materialization (file/dir/symlink) | `restore.bats` | `restore_round_trips_<type>` |
+| Consumer Rules § Per-Type Materialization (other → skip) | `restore.bats` | `restore_skips_type_other_with_notice` |
+| Store-Hint Resolution § Auto-use | `restore.bats` | `restore_uses_hint_store_when_config_matches` |
+| Store-Hint Resolution § Mismatch-warn | `restore.bats` | `restore_warns_on_config_drift` |
+| Store-Hint Resolution § Missing-fallback | `restore.bats` | `restore_falls_back_to_active_store_on_missing_hint` |
 
 ## Compatibility
 
-This specification is the first formal spec of the `tree-capture` / `tree-restore` operational contract. The producer side (`tree-capture`) is partially deployed; this RFC adds two new producer-side requirements (Root Scoping, Root Collision Detection) and one new SHOULD (Store Hint metadata). Existing callers of `tree-capture` that pass non-PWD-descendant roots will see a refusal after these rules ship; this is a breaking change for any caller that relied on the prior permissive behavior. The breakage is intentional and motivated by Path Sanitization simplification on the consumer side.
+This specification is the first formal spec of the `capture` / `restore` operational contract. The producer side (`capture`) is partially deployed; this RFC adds two new producer-side requirements (Root Scoping, Root Collision Detection) and one new SHOULD (Store Hint metadata). Existing callers of `capture` that pass non-PWD-descendant roots will see a refusal after these rules ship; this is a breaking change for any caller that relied on the prior permissive behavior. The breakage is intentional and motivated by Path Sanitization simplification on the consumer side.
 
-The body schema (`madder-tree_capture-receipt-v1`) is preserved unchanged. Receipts produced before this RFC ships are accepted by conformant consumers. Receipts produced after this RFC ships are accepted by older readers (the new metadata line falls under hyphence's "lines may appear in any order" tolerance per `hyphence(7)`).
+The body schema (`cutting_garden-capture_receipt-fs-v1`) is preserved unchanged. Receipts produced before this RFC ships are accepted by conformant consumers. Receipts produced after this RFC ships are accepted by older readers (the new metadata line falls under hyphence's "lines may appear in any order" tolerance per `hyphence(7)`).
 
 Implementation lands in two phases:
 
-1. **Producer-side enforcement**: PWD-scoping check and collision detection in the `tree-capture` planner. Store-hint metadata emission in the receipt encoder. Filed as one or more issues stacked under #87.
-2. **Consumer**: `tree-restore` is implemented per #87. The producer-side phase MUST land first, so receipts produced once the consumer ships already conform to this RFC.
+1. **Producer-side enforcement**: PWD-scoping check and collision detection in the `capture` planner. Store-hint metadata emission in the receipt encoder. Filed as one or more issues stacked under #87.
+2. **Consumer**: `restore` is implemented per #87. The producer-side phase MUST land first, so receipts produced once the consumer ships already conform to this RFC.
 
 ## References
 
 ### Normative
 
-- `docs/man.7/tree-capture-receipt.md` — receipt body schema (record fields, sort order, hyphence type).
+- `docs/man.7/capture-receipt.md` — receipt body schema (record fields, sort order, hyphence type).
 - `docs/man.7/hyphence.md` — metadata block syntax.
 - `docs/man.7/markl-id.md` — canonical text encoding for content-addressable identifiers.
 - RFC 2119 — "Key words for use in RFCs to Indicate Requirement Levels", Bradner, S., March 1997.
 
 ### Informative
 
-- [#87](https://github.com/amarbel-llc/madder/issues/87) — `tree-restore` command implementation.
+- [#87](https://github.com/amarbel-llc/madder/issues/87) — `restore` command implementation.
 - [#88](https://github.com/amarbel-llc/madder/issues/88) — Pre-walk huh confirm-gate for large captures (independent of this RFC).
 - [#89](https://github.com/amarbel-llc/madder/issues/89) — `hyphence(7)` tag-syntax clarification (informative; this RFC's `- store/<id>` convention does not depend on the man-page wording fix).
 - `docs/decisions/0005-remote-driven-sftp-blob-stores.md` — adjacent ADR establishing that the remote `blob_store-config` is the source of truth for hash/buckets/compression/encryption, which informs this RFC's choice to lock the store-hint to the config-blob's markl-id rather than to the store's transport-layer settings.

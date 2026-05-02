@@ -12,7 +12,7 @@ Proposed. Will move to `accepted` upon merge of this RFC.
 
 ## Abstract
 
-Hyphence is a text-based serialization format for a metadata section followed by an optional body. Used by madder for blob-store and tree-capture metadata, and by dodder for repository configs, blob store configs, workspace configs, type definitions, and zettels. This RFC is the prescriptive specification; the user-facing tutorial description lives in `docs/man.7/hyphence.md`.
+Hyphence is a text-based serialization format for a metadata section followed by an optional body. Used by madder for blob-store metadata and by cutting-garden for capture-receipt metadata, and by dodder for repository configs, blob store configs, workspace configs, type definitions, and zettels. This RFC is the prescriptive specification; the user-facing tutorial description lives in `docs/man.7/hyphence.md`.
 
 ## Notational Conventions
 

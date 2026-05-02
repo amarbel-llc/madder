@@ -53,7 +53,7 @@ Issue #115 claims madder's existing emitters all already write the separator. St
 **Spot-check sites of varying risk:**
 
 - `internal/foxtrot/blob_stores/store_remote_sftp.go` — reads `blob_store-config` from SFTP. Remote-written by madder itself, should be fine; worth a real-data spot-check before merge.
-- `internal/charlie/tree_capture_receipt/v1_io.go` — reads tree-capture receipts. Madder-written so should conform.
+- `internal/charlie/capture_receipt/v1_io.go` — reads capture receipts. Madder-written so should conform.
 - `internal/india/commands/init_from.go` — reads import inputs that *may* have non-madder origin. **Uncertainty (likely low risk):** if `init_from` accepts hyphence input from external tools, it may need `AllowMissingSeparator: true` for the lenient-import path. Verify at implementation time; do not block design on this.
 
 ### API additions to public facade
@@ -165,7 +165,7 @@ The 7 separator-discipline tests in `coder_metadata_test.go` come over verbatim:
 
 ### Existing madder coverage stays
 
-The 14 import sites in madder go through their own test paths (bats, blob-store fsck, tree-capture roundtrips). Pre-merge runs all of them with the new strict default; the writer audit catches any silent breakage.
+The 14 import sites in madder go through their own test paths (bats, blob-store fsck, capture roundtrips). Pre-merge runs all of them with the new strict default; the writer audit catches any silent breakage.
 
 ### bats coverage is the practical confidence net
 

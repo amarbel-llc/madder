@@ -13,10 +13,11 @@ capture/restore CLI. It has its own utility identity for CLI purposes
 but consumes madder's blob-store machinery as a library —
 `command_components.EnvBlobStore`'s `BlobStoreXDGScope = "madder"` on
 its commands resolves blob stores against madder's
-`$XDG_*_HOME/madder/blob_stores/` paths. The wire-format type tag
-`madder-tree_capture-receipt-v1` stays as today's identifier; once
-cutting-garden moves to its own repo, the tag joins the same
-"intentional do not rename" bucket as the dodder constants below.
+`$XDG_*_HOME/madder/blob_stores/` paths. The capture-receipt
+wire-format type tag is `cutting_garden-capture_receipt-fs-v1`;
+cutting-garden owns the format and uses its own
+`<utility>-<artifact>-<subtype>-<version>` shape rather than madder's
+vocabulary, so the tag is not in #16's locked-strings bucket.
 
 The extraction plan is recorded at
 `docs/plans/2026-05-02-extract-cutting-garden.md`.

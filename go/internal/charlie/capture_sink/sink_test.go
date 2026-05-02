@@ -1,4 +1,4 @@
-package tree_capture_sink
+package capture_sink
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 )
 
 func TestNDJSON_FileEntry(t *testing.T) {
@@ -14,10 +14,10 @@ func TestNDJSON_FileEntry(t *testing.T) {
 	s := NewNDJSON(&out, &errOut)
 
 	s.SetStore("storeA")
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path:   "foo.go",
 		Root:   "./src",
-		Type:   tree_capture_receipt.TypeFile,
+		Type:   capture_receipt.TypeFile,
 		Mode:   0o644,
 		Size:   1234,
 		BlobId: "blake3:abc",
@@ -38,10 +38,10 @@ func TestNDJSON_DirEntry(t *testing.T) {
 	s := NewNDJSON(&out, &errOut)
 
 	s.SetStore("storeA")
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path: ".",
 		Root: "./src",
-		Type: tree_capture_receipt.TypeDir,
+		Type: capture_receipt.TypeDir,
 		Mode: 0o755,
 	})
 	s.Finalize()
@@ -56,10 +56,10 @@ func TestNDJSON_SymlinkEntry_DefaultStoreOmitsField(t *testing.T) {
 	var out, errOut bytes.Buffer
 	s := NewNDJSON(&out, &errOut)
 
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path:   "link",
 		Root:   ".",
-		Type:   tree_capture_receipt.TypeSymlink,
+		Type:   capture_receipt.TypeSymlink,
 		Mode:   0o777,
 		Target: "../bar",
 	})
@@ -118,13 +118,13 @@ func TestNDJSON_StoreScopesSubsequentEntries(t *testing.T) {
 	s := NewNDJSON(&out, &errOut)
 
 	s.SetStore("A")
-	s.Entry(tree_capture_receipt.EntryV1{
-		Path: "a", Root: ".", Type: tree_capture_receipt.TypeFile,
+	s.Entry(capture_receipt.EntryV1{
+		Path: "a", Root: ".", Type: capture_receipt.TypeFile,
 		Mode: 0o644, Size: 1, BlobId: "x",
 	})
 	s.SetStore("B")
-	s.Entry(tree_capture_receipt.EntryV1{
-		Path: "b", Root: ".", Type: tree_capture_receipt.TypeFile,
+	s.Entry(capture_receipt.EntryV1{
+		Path: "b", Root: ".", Type: capture_receipt.TypeFile,
 		Mode: 0o644, Size: 1, BlobId: "y",
 	})
 	s.StoreGroupReceipt("r", 1)
@@ -150,10 +150,10 @@ func TestTAP_EntryEmitsOk(t *testing.T) {
 	s := NewTAP(&buf)
 
 	s.SetStore("storeA")
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path:   "foo.go",
 		Root:   "./src",
-		Type:   tree_capture_receipt.TypeFile,
+		Type:   capture_receipt.TypeFile,
 		Mode:   0o644,
 		Size:   1234,
 		BlobId: "blake3:abc",
@@ -173,10 +173,10 @@ func TestTAP_DirEntryNoFileFields(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path: ".",
 		Root: "./src",
-		Type: tree_capture_receipt.TypeDir,
+		Type: capture_receipt.TypeDir,
 		Mode: 0o755,
 	})
 	s.Finalize()
@@ -195,10 +195,10 @@ func TestTAP_SymlinkEntry(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry(tree_capture_receipt.EntryV1{
+	s.Entry(capture_receipt.EntryV1{
 		Path:   "link",
 		Root:   "./src",
-		Type:   tree_capture_receipt.TypeSymlink,
+		Type:   capture_receipt.TypeSymlink,
 		Mode:   0o777,
 		Target: "../bar",
 	})
@@ -252,8 +252,8 @@ func TestTAP_FinalizeEmitsPlan(t *testing.T) {
 	var buf bytes.Buffer
 	s := NewTAP(&buf)
 
-	s.Entry(tree_capture_receipt.EntryV1{
-		Path: ".", Root: ".", Type: tree_capture_receipt.TypeDir, Mode: 0o755,
+	s.Entry(capture_receipt.EntryV1{
+		Path: ".", Root: ".", Type: capture_receipt.TypeDir, Mode: 0o755,
 	})
 	s.Finalize()
 

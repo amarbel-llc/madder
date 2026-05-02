@@ -1,14 +1,14 @@
-// Package tree_capture_sink carries the per-entry result stream for
-// `cutting-garden tree-capture`. Each filesystem entry becomes one TAP test
+// Package capture_sink carries the per-entry result stream for
+// `cutting-garden capture`. Each filesystem entry becomes one TAP test
 // point or one NDJSON record; each store group ends with a summary
 // (TAP `ok` test point or NDJSON `store_group_receipt` record). Notices
 // (store switches, shadow warnings) and per-arg failures use the
 // dedicated methods.
 //
-// blob_write_sink covers the `madder write` event shape; tree-capture's
+// blob_write_sink covers the `madder write` event shape; capture's
 // per-entry events carry filesystem metadata that doesn't fit there, so
 // it gets its own sink.
-package tree_capture_sink
+package capture_sink
 
 import (
 	"bufio"
@@ -18,7 +18,7 @@ import (
 
 	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tree_capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 )
 
 // summaryRecordType is the wire `type` value the NDJSON sink writes on
@@ -27,8 +27,8 @@ import (
 // `type` field discriminates entries from summaries.
 const summaryRecordType = "store_group_receipt"
 
-// Sink streams tree-capture results in either TAP or NDJSON form. Each
-// concrete sink is single-threaded; tree-capture's walk is sequential.
+// Sink streams capture results in either TAP or NDJSON form. Each
+// concrete sink is single-threaded; capture's walk is sequential.
 type Sink interface {
 	// SetStore sets the store-id stamped onto subsequent Entry and
 	// StoreGroupReceipt records. Called once per store group before its
@@ -37,7 +37,7 @@ type Sink interface {
 
 	// Entry reports one filesystem entry that was successfully captured
 	// under the active store.
-	Entry(e tree_capture_receipt.EntryV1)
+	Entry(e capture_receipt.EntryV1)
 
 	// StoreGroupReceipt reports the receipt blob produced for the
 	// active store group, after every entry under that group has been
@@ -82,7 +82,7 @@ type tapSink struct {
 
 func (s *tapSink) SetStore(store string) { s.store = store }
 
-func (s *tapSink) Entry(e tree_capture_receipt.EntryV1) {
+func (s *tapSink) Entry(e capture_receipt.EntryV1) {
 	s.tw.Ok(formatTAPEntry(e))
 }
 
@@ -105,16 +105,16 @@ func (s *tapSink) Finalize() {
 	s.tw.Plan()
 }
 
-func formatTAPEntry(e tree_capture_receipt.EntryV1) string {
+func formatTAPEntry(e capture_receipt.EntryV1) string {
 	rel := joinRootPath(e.Root, e.Path)
 	mode := fmt.Sprintf("%04o", e.Mode.Perm())
 
 	switch e.Type {
-	case tree_capture_receipt.TypeFile:
+	case capture_receipt.TypeFile:
 		return fmt.Sprintf("%s file mode=%s size=%d blob=%s", rel, mode, e.Size, e.BlobId)
-	case tree_capture_receipt.TypeDir:
+	case capture_receipt.TypeDir:
 		return fmt.Sprintf("%s dir mode=%s", rel, mode)
-	case tree_capture_receipt.TypeSymlink:
+	case capture_receipt.TypeSymlink:
 		return fmt.Sprintf("%s symlink mode=%s target=%s", rel, mode, e.Target)
 	default:
 		return fmt.Sprintf("%s %s mode=%s", rel, e.Type, mode)
@@ -145,7 +145,7 @@ type jsonSink struct {
 }
 
 // entryRecord is the wire shape of one captured entry on the NDJSON
-// stream. Mirrors tree_capture_receipt's recordV1 (so consumers can
+// stream. Mirrors capture_receipt's recordV1 (so consumers can
 // share a parser) and adds `store`. Source/Error are populated only
 // for failure records, which omit the entry fields.
 type entryRecord struct {
@@ -170,7 +170,7 @@ type summaryRecord struct {
 
 func (s *jsonSink) SetStore(store string) { s.store = store }
 
-func (s *jsonSink) Entry(e tree_capture_receipt.EntryV1) {
+func (s *jsonSink) Entry(e capture_receipt.EntryV1) {
 	rec := entryRecord{
 		Path:  e.Path,
 		Root:  e.Root,
@@ -180,10 +180,10 @@ func (s *jsonSink) Entry(e tree_capture_receipt.EntryV1) {
 	}
 
 	switch e.Type {
-	case tree_capture_receipt.TypeFile:
+	case capture_receipt.TypeFile:
 		rec.Size = e.Size
 		rec.BlobId = e.BlobId
-	case tree_capture_receipt.TypeSymlink:
+	case capture_receipt.TypeSymlink:
 		rec.Target = e.Target
 	}
 

@@ -2,17 +2,17 @@
 author:
 -
 date: April 2026
-title: TREE-CAPTURE-RECEIPT(7) Madder \| Miscellaneous
+title: CAPTURE-RECEIPT(7) Madder \| Miscellaneous
 ---
 
 # NAME
 
-tree-capture-receipt - madder filesystem-tree capture manifest format
+capture-receipt - cutting-garden filesystem-tree capture manifest format
 
 # SYNOPSIS
 
     ---
-    ! madder-tree_capture-receipt-v1
+    ! cutting_garden-capture_receipt-fs-v1
     ---
 
     {"path":".","root":"./src","type":"dir","mode":"0755"}
@@ -22,20 +22,20 @@ tree-capture-receipt - madder filesystem-tree capture manifest format
 
 # DESCRIPTION
 
-A tree-capture receipt is a hyphence-wrapped NDJSON manifest produced by
-**cutting-garden tree-capture** (see **cutting-garden**(1)). It enumerates every filesystem
+A capture receipt is a hyphence-wrapped NDJSON manifest produced by
+**cutting-garden capture** (see **cutting-garden**(1)). It enumerates every filesystem
 entry visited under one capture-root or set of capture-roots, recording each
 entry's relative path, type, POSIX permission bits, and either its
 content-addressable blob ID (regular files) or its target string
 (symbolic links).
 
-Receipts are blobs themselves: every tree-capture run writes its receipt
+Receipts are blobs themselves: every capture run writes its receipt
 into the active store and reports the receipt's markl-id on stdout. A
 single markl-id is therefore enough to enumerate every blob produced by
 that run.
 
 The format is hyphence (see **hyphence**(7)). The metadata block declares
-the type tag **madder-tree_capture-receipt-v1**; the body is one JSON
+the type tag **cutting_garden-capture_receipt-fs-v1**; the body is one JSON
 object per line (NDJSON), one per filesystem entry.
 
 # RECORD SCHEMA
@@ -103,7 +103,7 @@ Special files (devices, fifos, sockets) appear with **type:"other"**
 and no blob.
 
 A symbolic link passed as a capture-root is rejected with an error ---
-**tree-capture** uses **lstat**(2) when classifying its arguments and
+**capture** uses **lstat**(2) when classifying its arguments and
 will not silently produce a one-entry symlink receipt. Resolve such
 arguments with **realpath**(1) (or pass the linked directory directly)
 if the symlink's target is what you wanted.
@@ -136,7 +136,7 @@ should refuse to interpret it rather than guess.
 A receipt for a small two-file directory:
 
     ---
-    ! madder-tree_capture-receipt-v1
+    ! cutting_garden-capture_receipt-fs-v1
     ---
 
     {"path":".","root":"./src","type":"dir","mode":"0755"}
@@ -146,7 +146,7 @@ A receipt for a small two-file directory:
 A receipt covering a symlink and a non-regular file:
 
     ---
-    ! madder-tree_capture-receipt-v1
+    ! cutting_garden-capture_receipt-fs-v1
     ---
 
     {"path":".","root":"vendor","type":"dir","mode":"0755"}
