@@ -16,9 +16,67 @@ move to its own repo once it stabilizes. It mirrors the pattern
 established by `madder-cache` — a sibling utility built from the same
 go module, with its own `Utility` and its own command package.
 
-The eventual repo extraction (out of madder) is **not** in scope for
-this plan; this plan only carves the binary out within the existing
-repo and tees up the move.
+### Cuscuta-universe positioning
+
+Cutting-garden is part of the **cuscuta** universe of tools. Its
+position in the dependency stack is:
+
+```
+                  ┌─ nebulous ─┐
+   madder  ◀── cutting-garden ◀┼─ chrest    ─┤
+                  └─ dodder   ─┘
+```
+
+- **Downstream of madder**: cutting-garden writes its captured
+  blobs and receipts into madder blob stores. It depends on
+  madder as its storage substrate — no parallel store
+  implementation, no fork.
+- **Upstream of nebulous, chrest, and dodder**: those projects
+  consume cutting-garden's capture/restore primitives (as a Go
+  library *and* as a CLI; the binary is the public surface, the
+  Go packages are co-equal).
+
+The longer-term shape of cutting-garden is a **plugin host for
+capture/restore lifecycles across heterogeneous media**:
+filesystems today, then orgmode, caldav, GitHub issues, git
+repos, and more. Each medium becomes a plugin that owns its
+capture walk, its receipt schema, and its restore materialization.
+The current `tree-capture` / `tree-restore` are best understood
+as the FS plugin — they will eventually be siblings of
+`orgmode-capture`, `git-capture`, etc.
+
+### Scope of this plan
+
+This plan deliberately stays **narrow**: extract the existing two
+commands into a new binary, no plugin abstraction. The plugin
+seam is a follow-up plan — designed once we have the second real
+plugin in hand, so we don't pick the wrong abstraction with N=1.
+
+Specifically out of scope here:
+
+- **Plugin abstraction / registry**. Today `tree-capture` and
+  `tree-restore` are direct `utility.AddCmd(...)` registrations
+  on the cutting-garden utility, no different from how madder
+  registers its own commands. When the plugin abstraction lands
+  it'll be **both** in-process and out-of-process: native Go
+  plugins register in-process at `init()` time (mirroring
+  `utility.AddCmd`); non-Go plugins talk over a subprocess
+  boundary modeled on `hashicorp/go-plugin` (RPC over stdio,
+  versioned handshake, the host owns lifecycle). In-process
+  Go ships first because cuscuta is a Go ecosystem and the
+  type-safety pays for itself with N=2; the subprocess seam is
+  added when the first non-Go plugin actually shows up. Either
+  way, that's a follow-up plan, not this one.
+- **Generalizing the receipt format**. The hyphence type
+  `madder-tree_capture-receipt-v1` stays as today's wire format.
+  How tags get namespaced when there are multiple plugins
+  (per-plugin tags? envelope + inner blob? plugin-id + opaque
+  payload?) is deferred to the same generification pass. With
+  N=1 every choice is a guess; we'll pick once we have a real
+  second plugin to fit against.
+- **The eventual repo split**. Cutting-garden moves out of this
+  repo at some point; this plan only sets up the in-repo binary
+  and tees up the move.
 
 ## Non-goals
 
@@ -206,27 +264,42 @@ zz-tests_bats/tree_restore.bats             # run_cg / require_bin CG_BIN
 - `madder tree-capture --help` no longer lists `tree-capture` as a
   subcommand (and the same for `tree-restore`).
 
-## Open questions (please confirm before I touch code)
+## Decisions
 
-1. **Remove from madder, or dual-host?** This plan removes them.
-   Dual-hosting means two copies of identical code that drift; it
-   also defeats the point of the extraction. Recommend remove.
-   Confirm?
-2. **`cg` alias mechanism**: nix `postInstall` symlink (the plan's
-   choice) vs. a second `cmd/cg/main.go` binary vs. a shell alias
-   in user shell config. Confirm symlink?
-3. **Wire-format tag**: keep `madder-tree_capture-receipt-v1`.
-   Renaming would orphan every existing receipt blob in user stores.
-   Confirm keep?
-4. **Receipt and sink packages**: leave in
+The architectural questions are settled; the mechanical answers
+below are the ones this plan will execute against.
+
+**Architectural (locked):**
+
+- *Scope*: narrow extraction only. No plugin seam, no receipt
+  generification — those are follow-up plans, designed when there's
+  a second real plugin to anchor against.
+- *Plugin model (future)*: both. In-process Go registry first
+  (init-time, mirroring `utility.AddCmd`). Non-Go plugins later via
+  a `hashicorp/go-plugin`-inspired subprocess boundary. Decision
+  recorded here so the eventual seam doesn't relitigate it.
+- *Wire format (future)*: keep `madder-tree_capture-receipt-v1`
+  unchanged today. How tags get namespaced across plugins is
+  deferred to the generification pass.
+
+**Mechanical (locked):**
+
+1. *Remove from madder, not dual-host.* Dual-hosting drifts and
+   defeats the extraction. The two source files move; madder loses
+   the subcommands.
+2. *`cg` alias = nix `postInstall` symlink.* `cg --help` prints
+   "cutting-garden ..." in its banner; that's intentional, since
+   `cg` is a documented alias, not a separate tool.
+3. *Wire-format tag stays* `madder-tree_capture-receipt-v1`.
+   Renaming orphans every existing receipt blob in user stores.
+4. *Receipt and sink packages stay put* at
    `go/internal/charlie/tree_capture_receipt/` and
-   `go/internal/charlie/tree_capture_sink/` — move during the
-   eventual repo split, not now. Confirm leave?
-5. **Inventory-log + global `--no-inventory-log` flag**: copy
-   verbatim into the new utility. (This is a madder-side facility,
-   but cutting-garden writes through madder's blob store API and
-   inherits the log behavior; the global flag needs to be plumbed
-   so users can suppress.) Confirm copy?
+   `go/internal/charlie/tree_capture_sink/`. They migrate during
+   the eventual repo split, not now.
+5. *Inventory-log + `--no-inventory-log` global flag*: copy
+   verbatim into the new utility. Cutting-garden writes through
+   madder's blob store API and inherits the log behavior; the
+   global flag needs to be plumbed so users can suppress.
 
 ## Risks
 
