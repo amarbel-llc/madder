@@ -98,6 +98,7 @@ let
       "cmd/madder-cache"
       "cmd/madder-gen_man"
       "cmd/cutting-garden"
+      "cmd/cg"
     ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
@@ -128,7 +129,6 @@ let
     postInstall = ''
       $out/bin/madder-gen_man $out
       rm $out/bin/madder-gen_man
-      ln -s cutting-garden $out/bin/cg
     ''
     + pkgs-master.lib.optionalString (man7Src != null) ''
       mkdir -p $out/share/man/man7
