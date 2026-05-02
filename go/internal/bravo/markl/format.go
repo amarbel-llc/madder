@@ -118,14 +118,44 @@ func init() {
 			Generate: NonceGenerate32,
 		},
 	)
+
+	// Purpose-id → format-id aliases. Legacy on-disk data carries a
+	// purpose-id where a format-id is expected; the registry consults this
+	// map in GetFormatOrError. Move targets in step 2 of #106.
+	RegisterPurposeIdAlias("zit-repo-private_key-v1", FormatIdEd25519Sec)
+	RegisterPurposeIdAlias("dodder-repo-private_key-v1", FormatIdEd25519Sec)
 }
 
 var formats map[string]domain_interfaces.MarklFormat = map[string]domain_interfaces.MarklFormat{}
 
+// purposeIdToFormatIdAliases maps a purposeId-shaped string to a real
+// formatId so legacy on-disk data carrying a purpose-id where a format-id
+// is expected still resolves. Populated via RegisterPurposeIdAlias.
+var purposeIdToFormatIdAliases = map[string]string{}
+
+// RegisterPurposeIdAlias installs an alias from a purposeId-shaped string
+// to a formatId. Panics on duplicate alias to match the registry's
+// stability convention. The aliased formatId is not validated at
+// registration time — GetFormatOrError surfaces an unknown target via its
+// usual "unknown format id" error.
+func RegisterPurposeIdAlias(purposeId, formatId string) {
+	if existing, alreadyExists := purposeIdToFormatIdAliases[purposeId]; alreadyExists {
+		panic(
+			fmt.Sprintf(
+				"purpose-id alias already registered: %q -> %q (attempted %q)",
+				purposeId,
+				existing,
+				formatId,
+			),
+		)
+	}
+
+	purposeIdToFormatIdAliases[purposeId] = formatId
+}
+
 func GetFormatOrError(formatId string) (domain_interfaces.MarklFormat, error) {
-	switch formatId {
-	case "zit-repo-private_key-v1", "dodder-repo-private_key-v1":
-		formatId = FormatIdEd25519Sec
+	if aliased, ok := purposeIdToFormatIdAliases[formatId]; ok {
+		formatId = aliased
 	}
 
 	format, ok := formats[formatId]
@@ -193,7 +223,10 @@ func (format Format) GetSize() int {
 	return format.Size
 }
 
-func makeFormat(format domain_interfaces.MarklFormat) {
+// RegisterFormat installs a MarklFormat in the package-global registry.
+// Panics on nil format, empty format id, or duplicate registration. Returns
+// the registered format value so callers may keep a typed handle.
+func RegisterFormat(format domain_interfaces.MarklFormat) domain_interfaces.MarklFormat {
 	if format == nil {
 		panic("nil format")
 	}
@@ -217,4 +250,12 @@ func makeFormat(format domain_interfaces.MarklFormat) {
 	}
 
 	formats[formatId] = format
+	return format
+}
+
+// makeFormat is the legacy wrapper kept so existing init() blocks in this
+// package compile unchanged. New registrations should call RegisterFormat
+// directly.
+func makeFormat(format domain_interfaces.MarklFormat) {
+	RegisterFormat(format)
 }

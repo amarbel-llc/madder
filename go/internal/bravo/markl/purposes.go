@@ -90,19 +90,31 @@ func init() {
 		FormatIdEd25519Sig,
 	)
 
-	makePurpose(
-		PurposeObjectSigV1,
-		PurposeTypeObjectSig,
-		FormatIdEd25519Sig,
-		FormatIdEcdsaP256Sig,
-	)
+	RegisterPurpose(RegisterPurposeOpts{
+		Id:   PurposeObjectSigV1,
+		Type: PurposeTypeObjectSig,
+		FormatIds: []string{
+			FormatIdEd25519Sig,
+			FormatIdEcdsaP256Sig,
+		},
+		Related: map[string]string{
+			RelatedRoleDigest:    PurposeObjectDigestV1,
+			RelatedRoleMotherSig: PurposeObjectMotherSigV1,
+		},
+	})
 
-	makePurpose(
-		PurposeObjectSigV2,
-		PurposeTypeObjectSig,
-		FormatIdEd25519Sig,
-		FormatIdEcdsaP256Sig,
-	)
+	RegisterPurpose(RegisterPurposeOpts{
+		Id:   PurposeObjectSigV2,
+		Type: PurposeTypeObjectSig,
+		FormatIds: []string{
+			FormatIdEd25519Sig,
+			FormatIdEcdsaP256Sig,
+		},
+		Related: map[string]string{
+			RelatedRoleDigest:    PurposeObjectDigestV2,
+			RelatedRoleMotherSig: PurposeObjectMotherSigV2,
+		},
+	})
 
 	makePurpose(
 		PurposeRepoPrivateKeyV1,
@@ -158,6 +170,7 @@ type Purpose struct {
 	id        string
 	tipe      PurposeType
 	formatIds map[string]struct{}
+	related   map[string]string
 }
 
 func GetPurpose(purposeId string) Purpose {
@@ -170,27 +183,40 @@ func GetPurpose(purposeId string) Purpose {
 	return purpose
 }
 
-func makePurpose(purposeId string, purposeType PurposeType, formatIds ...string) {
-	_, alreadyExists := purposes[purposeId]
+// RegisterPurposeOpts is the public registration shape for purposes.
+//
+// Related is a free-form role → purposeId map (see ADR 0006). Values are
+// validated lazily: lookups via Purpose.GetRelated succeed for any registered
+// role, and a downstream caller passing the result to GetPurpose is what
+// surfaces typos.
+type RegisterPurposeOpts struct {
+	Id        string
+	Type      PurposeType
+	FormatIds []string
+	Related   map[string]string
+}
 
-	if alreadyExists {
-		panic(fmt.Sprintf("hash type already registered: %q", purposeId))
+// RegisterPurpose installs a Purpose in the package-global registry. Panics
+// if Id is already registered, or if FormatIds contains a duplicate. Returns
+// the constructed Purpose so callers may keep a typed handle.
+func RegisterPurpose(opts RegisterPurposeOpts) Purpose {
+	if _, alreadyExists := purposes[opts.Id]; alreadyExists {
+		panic(fmt.Sprintf("purpose already registered: %q", opts.Id))
 	}
 
 	purpose := Purpose{
-		id:        purposeId,
-		tipe:      purposeType,
-		formatIds: make(map[string]struct{}),
+		id:        opts.Id,
+		tipe:      opts.Type,
+		formatIds: make(map[string]struct{}, len(opts.FormatIds)),
+		related:   make(map[string]string, len(opts.Related)),
 	}
 
-	for _, formatId := range formatIds {
-		_, ok := purpose.formatIds[formatId]
-
-		if ok {
+	for _, formatId := range opts.FormatIds {
+		if _, ok := purpose.formatIds[formatId]; ok {
 			panic(
 				fmt.Sprintf("format id (%q) registered for purpose (%q) more than once",
 					formatId,
-					purposeId,
+					opts.Id,
 				),
 			)
 		}
@@ -198,39 +224,64 @@ func makePurpose(purposeId string, purposeType PurposeType, formatIds ...string)
 		purpose.formatIds[formatId] = struct{}{}
 	}
 
-	purposes[purposeId] = purpose
+	for role, relatedId := range opts.Related {
+		purpose.related[role] = relatedId
+	}
+
+	purposes[opts.Id] = purpose
+	return purpose
+}
+
+// makePurpose is the legacy variadic shim retained so existing init() blocks
+// in this package compile unchanged. New registrations should call
+// RegisterPurpose directly.
+func makePurpose(purposeId string, purposeType PurposeType, formatIds ...string) {
+	RegisterPurpose(RegisterPurposeOpts{
+		Id:        purposeId,
+		Type:      purposeType,
+		FormatIds: formatIds,
+	})
 }
 
 func (purpose Purpose) GetPurposeType() PurposeType {
 	return purpose.tipe
 }
 
+// GetRelated looks up a related purposeId by role. Returns ("", false) if
+// no purpose was registered under that role for this Purpose. The returned
+// purposeId is not validated against the registry — pass it to GetPurpose
+// to resolve.
+func (purpose Purpose) GetRelated(role string) (string, bool) {
+	relatedId, ok := purpose.related[role]
+	return relatedId, ok
+}
+
+// RelatedRoleDigest and RelatedRoleMotherSig are the role names used by
+// madder's own sig purposes. Other consumers may define their own role
+// constants — markl itself stays role-agnostic per ADR 0006.
+const (
+	RelatedRoleDigest    = "digest"
+	RelatedRoleMotherSig = "mother_sig"
+)
+
 func GetDigestTypeForSigType(sigId string) string {
 	sig := GetPurpose(sigId)
 
-	switch sig.id {
-	default:
+	digestId, ok := sig.GetRelated(RelatedRoleDigest)
+	if !ok {
 		panic(fmt.Sprintf("unsupported sig purpose: %q", sigId))
-
-	case PurposeObjectSigV1:
-		return PurposeObjectDigestV1
-
-	case PurposeObjectSigV2:
-		return PurposeObjectDigestV2
 	}
+
+	return digestId
 }
 
 func GetMotherSigTypeForSigType(sigId string) string {
 	sig := GetPurpose(sigId)
 
-	switch sig.id {
-	default:
+	motherSigId, ok := sig.GetRelated(RelatedRoleMotherSig)
+	if !ok {
 		panic(fmt.Sprintf("unsupported sig purpose: %q", sigId))
-
-	case PurposeObjectSigV1:
-		return PurposeObjectMotherSigV1
-
-	case PurposeObjectSigV2:
-		return PurposeObjectMotherSigV2
 	}
+
+	return motherSigId
 }

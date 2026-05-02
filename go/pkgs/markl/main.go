@@ -37,6 +37,7 @@ type (
 	Lock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]] = internal.Lock[KEY, KEY_PTR]
 	Purpose                                                      = internal.Purpose
 	PurposeType                                                  = internal.PurposeType
+	RegisterPurposeOpts                                          = internal.RegisterPurposeOpts
 	Slice                                                        = internal.Slice
 )
 
@@ -95,6 +96,9 @@ var (
 	PivyEcdhP256GetIOWrapper           = internal.PivyEcdhP256GetIOWrapper
 	ReadFrom                           = internal.ReadFrom
 	RegisterEcdsaP256SSHFormat         = internal.RegisterEcdsaP256SSHFormat
+	RegisterFormat                     = internal.RegisterFormat
+	RegisterPurpose                    = internal.RegisterPurpose
+	RegisterPurposeIdAlias             = internal.RegisterPurposeIdAlias
 	RegisterSSHEd25519Format           = internal.RegisterSSHEd25519Format
 	SetDigester                        = internal.SetDigester
 	SetFromPath                        = internal.SetFromPath
@@ -164,4 +168,6 @@ const (
 	PurposeTypeRequestAuth            = internal.PurposeTypeRequestAuth
 	PurposeTypeUnknown                = internal.PurposeTypeUnknown
 	PurposeV5MetadataDigestWithoutTai = internal.PurposeV5MetadataDigestWithoutTai
+	RelatedRoleDigest                 = internal.RelatedRoleDigest
+	RelatedRoleMotherSig              = internal.RelatedRoleMotherSig
 )
