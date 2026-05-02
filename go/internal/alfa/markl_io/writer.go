@@ -1,5 +1,7 @@
 package markl_io
 
+//go:generate dagnabit export
+
 import (
 	"io"
 

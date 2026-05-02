@@ -14,6 +14,7 @@ func MakeDefault(
 	context errors.Context,
 	utilityName string,
 	debugOptions debug.Options,
+	opts ...Option,
 ) env {
 	return MakeWithDefaultHome(
 		context,
@@ -21,6 +22,7 @@ func MakeDefault(
 		debugOptions,
 		true,
 		true,
+		opts...,
 	)
 }
 
@@ -28,6 +30,7 @@ func MakeDefaultNoInit(
 	context errors.Context,
 	utilityName string,
 	debugOptions debug.Options,
+	opts ...Option,
 ) env {
 	return MakeWithDefaultHome(
 		context,
@@ -35,6 +38,7 @@ func MakeDefaultNoInit(
 		debugOptions,
 		true,
 		false,
+		opts...,
 	)
 }
 
@@ -42,6 +46,7 @@ func MakeFromXDGDotenvPath(
 	context errors.Context,
 	debugOptions debug.Options,
 	xdgDotenvPath string,
+	opts ...Option,
 ) env {
 	dotenv := xdg.Dotenv{
 		XDG: &xdg.XDG{},
@@ -69,6 +74,7 @@ func MakeFromXDGDotenvPath(
 		context,
 		debugOptions,
 		*dotenv.XDG,
+		opts...,
 	)
 }
 
@@ -77,6 +83,7 @@ func MakeDefaultAndInitialize(
 	utilityName string,
 	do debug.Options,
 	repoId RepoId,
+	opts ...Option,
 ) env {
 	if repoId.IsSystem() {
 		panic(errors.WithoutStack(errors.Err501NotImplemented))
@@ -98,6 +105,7 @@ func MakeDefaultAndInitialize(
 			cwd,
 			utilityName,
 			do,
+			opts...,
 		)
 	}
 
@@ -116,6 +124,7 @@ func MakeDefaultAndInitialize(
 		utilityName,
 		home,
 		do,
+		opts...,
 	)
 }
 
@@ -125,8 +134,11 @@ func MakeWithDefaultHome(
 	debugOptions debug.Options,
 	permitCwdXDGOverride bool,
 	initialize bool,
+	opts ...Option,
 ) (env env) {
+	resolved := applyOptions(opts)
 	env.Context = context
+	env.envVarNames = resolved.envVarNames
 
 	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
 		env.Cancel(err)
@@ -164,8 +176,11 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 	xdgRootOverride string,
 	utilityName string,
 	debugOptions debug.Options,
+	opts ...Option,
 ) (env env) {
+	resolved := applyOptions(opts)
 	env.Context = context
+	env.envVarNames = resolved.envVarNames
 	env.xdgInitArgs.Cwd = xdgRootOverride
 
 	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
@@ -196,8 +211,11 @@ func MakeWithHomeAndInitialize(
 	utilityName string,
 	home string,
 	debugOptions debug.Options,
+	opts ...Option,
 ) (env env) {
+	resolved := applyOptions(opts)
 	env.Context = context
+	env.envVarNames = resolved.envVarNames
 
 	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
 		env.Cancel(err)
@@ -222,8 +240,11 @@ func MakeWithXDG(
 	context errors.Context,
 	debugOptions debug.Options,
 	xdg xdg.XDG,
+	opts ...Option,
 ) (env env) {
+	resolved := applyOptions(opts)
 	env.Context = context
+	env.envVarNames = resolved.envVarNames
 	env.XDG = xdg
 
 	if err := env.beforeXDG.initialize(debugOptions, xdg.UtilityName); err != nil {

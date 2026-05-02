@@ -1,5 +1,7 @@
 package env_dir
 
+//go:generate dagnabit export
+
 import (
 	"fmt"
 	"os"
@@ -12,13 +14,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
-)
-
-const (
-	// EnvBin is the env var name madder exports to subprocesses so they
-	// can find the madder binary that spawned them. Set in
-	// beforeXDG.initialize and surfaced via MakeCommonEnv / AddToEnvVars.
-	EnvBin = "BIN_MADDER"
 )
 
 type Env interface {
@@ -43,7 +38,8 @@ type Env interface {
 	AbsFromCwdOrSame(p string) (p1 string)
 
 	// GetVerifyOnCollisionOverride returns true when the runtime env var
-	// MADDER_VERIFY_ON_COLLISION is set to a truthy value. It is OR'd
+	// named by EnvVarNames.VerifyOnCollision (default
+	// MADDER_VERIFY_ON_COLLISION) is set to a truthy value. It is OR'd
 	// with the per-store config field by callers that publish blobs;
 	// see issue #31 and ADR 0003 for rationale. See #38 for the eventual
 	// migration from env var to CLI global flag.
@@ -92,7 +88,7 @@ func (env *env) initializeXDG() (err error) {
 	}
 
 	env.verifyOnCollisionOverride = parseBoolEnv(
-		os.Getenv("MADDER_VERIFY_ON_COLLISION"),
+		os.Getenv(env.envVarNames.VerifyOnCollision),
 	)
 
 	return err
@@ -140,7 +136,7 @@ func (env env) GetPid() int {
 }
 
 func (env env) AddToEnvVars(envVars interfaces.EnvVars) {
-	envVars[EnvBin] = env.GetExecPath()
+	envVars[env.envVarNames.Binary] = env.GetExecPath()
 }
 
 func (env env) GetExecPath() string {
@@ -221,7 +217,7 @@ func (env env) Rel(
 
 func (env env) MakeCommonEnv() map[string]string {
 	return map[string]string{
-		EnvBin: env.GetExecPath(),
+		env.envVarNames.Binary: env.GetExecPath(),
 	}
 }
 

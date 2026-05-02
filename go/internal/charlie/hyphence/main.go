@@ -1,5 +1,7 @@
 package hyphence
 
+//go:generate dagnabit export
+
 import "io"
 
 type MetadataWriterTo interface {
