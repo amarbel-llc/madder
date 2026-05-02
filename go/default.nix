@@ -52,11 +52,13 @@ let
   # same parallelism/timeout contract.
   #
   # Used by:
-  #   - mkBatsInstallCheck (consumed by madder + madder-race via
-  #     attrset merge)
-  #   - madder-cli-cover (passed as coverIntegrationCommand to buildGoCover)
-  #   - mkBatsLane (filtered dev-loop lanes built against an existing
-  #     madder derivation)
+  #   - madder-cli-cover (passed as coverIntegrationCommand to buildGoCover,
+  #     which sets its own installCheckPhase)
+  #   - mkBatsLane (filtered standalone derivations that consume an already-
+  #     built `madder` or `madder-race` by store-path reference; this is the
+  #     canonical surface for both dev-loop lanes and CI's bats coverage,
+  #     including `bats-default`/`bats-race` and the per-tag variants from
+  #     `batsLaneOutputs`)
   #
   # jq is referenced inline by cli_contract.bats helpers (parsing
   # `write -check` JSON output to compute "missing" digests).
@@ -84,24 +86,18 @@ let
     cd "$NIX_BUILD_TOP"
   '';
 
-  # Shared bats installCheckPhase: runs the bats suite against the
-  # derivation's `$out/bin/madder` after installPhase. Used by `madder`
-  # (release lane) and `madder-race` (race-instrumented lane).
-  mkBatsInstallCheck = { filter ? "!net_cap" }: {
-    doInstallCheck = batsSrc != null && versionEnv != null;
-    nativeInstallCheckInputs = [ pkgs-master.jq ];
-    installCheckPhase = ''
-      runHook preInstallCheck
-      ${mkBatsRunCommand { inherit filter; }}
-      runHook postInstallCheck
-    '';
-  };
-
   # Sanitize a bats `--filter-tags` expression for use as a derivation
   # name suffix. Replaces shell-unfriendly characters with `_`.
   batsLaneSuffix = filter:
     builtins.replaceStrings [ "!" "," ":" " " ] [ "not_" "_" "_" "_" ] filter;
 
+  # `madder` is a pure binary derivation: Go compile + checkPhase (Go unit
+  # tests) + install. The bats integration suite is intentionally NOT mixed
+  # into installCheckPhase here — it lives as separate `bats-*` lanes
+  # (`batsLaneOutputs`) so downstream consumers (eng, dodder, …) don't pay
+  # the integration-test cost on a from-source rebuild after an `inputs.X.
+  # follows = "..."` cache miss. CI builds the bats lanes explicitly. See
+  # amarbel-llc/eng#62 for the broader follows-vs-cache tension.
   madder = pkgs.buildGoApplication ({
     pname = "madder";
     inherit version commit;
@@ -150,7 +146,7 @@ let
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';
-  } // mkBatsInstallCheck { });
+  });
 
   # madder-race exercises the same package-level test surface as `madder`
   # but with the Go race detector enabled. Concurrent-write paths
@@ -159,9 +155,11 @@ let
   # NOT release-suitable — race-instrumented binaries are slower and
   # not what we ship.
   #
-  # The shared bats installCheckPhase (inherited from `madder` via
-  # overrideAttrs) reruns the suite against the race-instrumented
-  # `$out/bin/madder`, catching races that only surface in real CLI flows.
+  # Like `madder`, this is a pure binary derivation. The bats lane that
+  # exercises the race-instrumented binary lives in `batsLaneOutputs` as
+  # `bats-race` (default `!net_cap` filter). CI invokes it via `just
+  # test-bats-race`. There is no nix-driven race+net_cap lane today —
+  # the net_cap suite needs the devshell-only sftp test harness.
   madder-race = pkgs.buildGoRace {
     base = madder;
     tags = [ "test" ];
@@ -292,6 +290,15 @@ let
             (mkBatsLane { filter = tag; }))
           allFileTags) // {
           bats-default = mkBatsLane { filter = "!net_cap"; };
+          # Race-instrumented bats lane — same suite as `bats-default`
+          # (`!net_cap` filter), run against `madder-race` instead of
+          # `madder`. CI's race-detector job builds this via `just
+          # test-bats-race`. There is intentionally no `bats-race-net_cap`
+          # lane: the net_cap suite needs `madder-test-sftp-server`, a
+          # devshell-only derivation deliberately excluded from the
+          # `packages` output (default.nix below). Plumbing test-only
+          # binaries into nix-driven bats lanes is a separate problem.
+          bats-race = mkBatsLane { filter = "!net_cap"; base = madder-race; };
         };
 
   # Devshell-only test harness for SFTP integration tests (RFC 0001).

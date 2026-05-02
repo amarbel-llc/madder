@@ -148,13 +148,13 @@ test-bats-net-cap: build
 # Run bats integration tests against race-instrumented binaries.
 # Catches data races that the unit-test -race pass won't, since several
 # code paths only execute in the real CLI. Driven by `nix build
-# .#madder-race`, which runs the bats suite as installCheckPhase against
-# the race-instrumented `$out/bin/madder`. net_cap-tagged scenarios are
-# filtered out by the derivation — they need loopback binding the nix
-# sandbox doesn't grant.
+# .#bats-race`, a standalone derivation (`mkBatsLane`) that runs the
+# bats suite against `madder-race`'s `$out/bin/madder`. net_cap-tagged
+# scenarios are filtered out — the SFTP harness those tests need is
+# a devshell-only derivation not exposed to nix-driven bats lanes.
 [group("test")]
 test-bats-race:
-  nix build .#madder-race --print-build-logs
+  nix build .#bats-race --print-build-logs --no-link
 
 # Run bats integration tests against a coverage-instrumented binary.
 # Driven by `nix build .#madder-cli-cover`, which builds the binary
