@@ -28,6 +28,15 @@ bats_load_library bats-island
 
 setup_test_home
 export MADDER_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR"
+
+# pkgs.testers.batsLane (the nix-driven lane builder) only exports one
+# binary env var. Both binaries ship from the same install, so derive
+# CG_BIN from MADDER_BIN's directory when CG_BIN isn't explicitly set
+# (the dev-loop justfile sets both).
+if [ -n "${MADDER_BIN:-}" ] && [ -z "${CG_BIN:-}" ]; then
+  export CG_BIN="$(dirname "$MADDER_BIN")/cutting-garden"
+fi
+
 require_bin MADDER_BIN madder
 require_bin CG_BIN cutting-garden
 
