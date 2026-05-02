@@ -1,0 +1,24 @@
+# RFC 0001 hyphence test vectors.
+#
+# Each non-comment line: name\tinput-b64\toutcome\texpected-b64
+#
+# Outcomes:
+#   parse-ok                          - DecodeFrom must succeed; blob bytes
+#                                       (captured via BlobTeeWriter) must
+#                                       equal the base64-decoded expected
+#                                       field.
+#   parse-error-missing-separator     - DecodeFrom must error with
+#                                       errors.Is(err, errMissingNewline-
+#                                       AfterBoundary).
+#
+# Comment lines start with #. Blank lines are ignored.
+#
+# Plain-text view of each input:
+#   minimal-no-body          : "---\n! toml-type-v1\n---\n"
+#   body-with-separator      : "---\n! md\n---\n\nhello\n" -> blob "hello\n"
+#   body-without-separator   : "---\n! toml-type-v1\n---\nfile-extension = 'png'\n"
+#                              (no blank line after closing ---; strict default rejects)
+
+minimal-no-body	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQo=	parse-ok	
+body-with-separator	LS0tCiEgbWQKLS0tCgpoZWxsbwo=	parse-ok	aGVsbG8K
+body-without-separator	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQpmaWxlLWV4dGVuc2lvbiA9ICdwbmcnCg==	parse-error-missing-separator	-
