@@ -22,10 +22,13 @@
   commit ? "unknown",
 }:
 let
-  pkgs = import nixpkgs {
-    inherit system;
-    overlays = [ nixpkgs.overlays.default ];
-  };
+  # The fork's default.nix shim auto-applies overlays.default at import
+  # time (so buildGoApplication / buildGoRace / buildGoCover / gomod2nix
+  # are present on the returned pkgs set without callers needing to
+  # opt in). Adding `overlays = [ nixpkgs.overlays.default ]` here would
+  # be redundant — the shim composes the overlay twice idempotently, but
+  # it's wasteful eval-time work for no benefit.
+  pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
   # Shared bats invocation: stages the bats sources + version.env into
