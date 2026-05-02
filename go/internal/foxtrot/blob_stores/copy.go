@@ -6,12 +6,11 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
 func CopyBlobIfNecessary(
-	env env_ui.Env,
+	ctx errors.Context,
 	dst domain_interfaces.BlobStore,
 	src domain_interfaces.BlobStore,
 	expectedDigest domain_interfaces.MarklId,
@@ -54,7 +53,7 @@ func CopyBlobIfNecessary(
 		}
 	}
 
-	defer errors.ContextMustClose(env, readCloser)
+	defer errors.ContextMustClose(ctx, readCloser)
 
 	var writeCloser domain_interfaces.BlobWriter
 
@@ -78,7 +77,7 @@ func CopyBlobIfNecessary(
 		}
 	}
 
-	defer errors.ContextMustClose(env, writeCloser)
+	defer errors.ContextMustClose(ctx, writeCloser)
 
 	outputWriter := io.Writer(writeCloser)
 
