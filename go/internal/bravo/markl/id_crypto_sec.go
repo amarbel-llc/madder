@@ -71,8 +71,13 @@ func (id *Id) GeneratePrivateKey(
 	return err
 }
 
+// GetPublicKey derives the public key paired with this private-key Id.
+// The result is stamped with the public-key purpose registered as
+// Related[RelatedRolePublicKey] on privatePurposeId. If that relation
+// is not declared, GetPublicKey errors rather than guessing — callers
+// (or their markl_registrations package) must register the pairing.
 func (id Id) GetPublicKey(
-	purpose string,
+	privatePurposeId string,
 ) (public Id, err error) {
 	var formatSec FormatSec
 
@@ -98,6 +103,17 @@ func (id Id) GetPublicKey(
 		return public, err
 	}
 
+	pubkeyPurposeId, ok := GetPurpose(privatePurposeId).GetRelated(RelatedRolePublicKey)
+	if !ok {
+		err = errors.Errorf(
+			"private-key purpose %q has no paired public-key purpose registered "+
+				"(missing Related[%q]); register the pairing in your markl_registrations",
+			privatePurposeId,
+			RelatedRolePublicKey,
+		)
+		return public, err
+	}
+
 	var bites []byte
 
 	if bites, err = formatSec.GetPublicKey(id); err != nil {
@@ -105,7 +121,7 @@ func (id Id) GetPublicKey(
 		return public, err
 	}
 
-	if err = public.SetPurposeId(PurposeRepoPubKeyV1); err != nil {
+	if err = public.SetPurposeId(pubkeyPurposeId); err != nil {
 		err = errors.Wrap(err)
 		return public, err
 	}

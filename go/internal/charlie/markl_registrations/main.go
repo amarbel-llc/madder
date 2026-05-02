@@ -127,6 +127,9 @@ var (
 			markl.FormatIdEd25519SSH,
 			markl.FormatIdEcdsaP256SSH,
 		},
+		Related: map[string]string{
+			markl.RelatedRolePublicKey: markl.PurposeRepoPubKeyV1,
+		},
 	}
 
 	PurposeRepoPubKeyV1Opts = markl.RegisterPurposeOpts{

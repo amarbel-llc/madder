@@ -55,6 +55,23 @@ func TestAllPurposes_RelatedRoundTrip(t *testing.T) {
 	}
 }
 
+// PurposeRepoPrivateKeyV1's Related[public_key] mapping is what
+// Id.GetPublicKey reads to stamp the result. Pin the canonical pairing
+// so a registration drift in markl_registrations would surface here.
+func TestPurposeRepoPrivateKeyV1_RelatedPublicKey(t *testing.T) {
+	priv := markl.GetPurpose(markl.PurposeRepoPrivateKeyV1)
+
+	got, ok := priv.GetRelated(markl.RelatedRolePublicKey)
+	if !ok {
+		t.Fatalf("GetRelated(RelatedRolePublicKey) on %q: not found",
+			markl.PurposeRepoPrivateKeyV1)
+	}
+
+	if got != markl.PurposeRepoPubKeyV1 {
+		t.Errorf("Related[public_key] = %q, want %q", got, markl.PurposeRepoPubKeyV1)
+	}
+}
+
 // markl.GetDigestTypeForSigType is a thin wrapper over the registered
 // Related["digest"] entry. Verify it returns the canonical mapping for
 // each sig that declares one.

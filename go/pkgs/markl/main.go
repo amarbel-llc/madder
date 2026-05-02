@@ -170,4 +170,5 @@ const (
 	PurposeV5MetadataDigestWithoutTai = internal.PurposeV5MetadataDigestWithoutTai
 	RelatedRoleDigest                 = internal.RelatedRoleDigest
 	RelatedRoleMotherSig              = internal.RelatedRoleMotherSig
+	RelatedRolePublicKey              = internal.RelatedRolePublicKey
 )

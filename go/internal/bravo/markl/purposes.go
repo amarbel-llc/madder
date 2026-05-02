@@ -130,12 +130,15 @@ func (purpose Purpose) GetRelated(role string) (string, bool) {
 	return relatedId, ok
 }
 
-// RelatedRoleDigest and RelatedRoleMotherSig are the role names used by
-// madder's own sig purposes. Other consumers may define their own role
-// constants — markl itself stays role-agnostic per ADR 0006.
+// Role names used by madder's own purposes. Other consumers may define
+// their own role constants — markl itself stays role-agnostic per ADR
+// 0006. RelatedRolePublicKey is consulted by Id.GetPublicKey to find a
+// private-key purpose's paired public-key purpose; without it, the
+// method has no way to stamp the result.
 const (
 	RelatedRoleDigest    = "digest"
 	RelatedRoleMotherSig = "mother_sig"
+	RelatedRolePublicKey = "public_key"
 )
 
 func GetDigestTypeForSigType(sigId string) string {
