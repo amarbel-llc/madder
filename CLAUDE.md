@@ -1,8 +1,25 @@
 # madder
 
 Madder is a content-addressable blob storage CLI. The entry point is
-`go/cmd/madder/`; the build produces a single `madder` binary plus its
-man pages.
+`go/cmd/madder/`; the build also produces sibling binaries
+`madder-cache` and `cutting-garden` (aliased `cg` via a postInstall
+symlink) from the same Go module, plus their man pages.
+
+## Sibling binaries
+
+`cutting-garden` (`go/cmd/cutting-garden/`,
+`go/internal/india/commands_cutting_garden/`) is the filesystem-tree
+capture/restore CLI. It has its own utility identity for CLI/XDG
+purposes but consumes madder's blob-store machinery as a library —
+`command_components.EnvBlobStore`'s `BlobStoreParentUtility = "madder"`
+on its commands resolves blob stores against madder's
+`$XDG_*_HOME/madder/blob_stores/` paths. The wire-format type tag
+`madder-tree_capture-receipt-v1` stays as today's identifier; once
+cutting-garden moves to its own repo, the tag joins the same
+"intentional do not rename" bucket as the dodder constants below.
+
+The extraction plan is recorded at
+`docs/plans/2026-05-02-extract-cutting-garden.md`.
 
 ## History: madder was extracted from dodder
 

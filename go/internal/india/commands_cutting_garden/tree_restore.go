@@ -1,4 +1,4 @@
-package commands
+package commands_cutting_garden
 
 import (
 	"fmt"
@@ -20,10 +20,12 @@ import (
 )
 
 func init() {
-	utility.AddCmd("tree-restore", &TreeRestore{})
+	utility.AddCmd("tree-restore", &TreeRestore{
+		EnvBlobStore: command_components.EnvBlobStore{BlobStoreParentUtility: "madder"},
+	})
 }
 
-// TreeRestore implements `madder tree-restore <receipt-id> <dest>`
+// TreeRestore implements `cutting-garden tree-restore <receipt-id> <dest>`
 // per FDR 0001 (docs/features/0001-tree-restore.md) and RFC 0003
 // §Consumer Rules.
 //
@@ -62,7 +64,7 @@ func (cmd *TreeRestore) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "restore a captured tree from a receipt blob",
 		Long: "Materialize a directory tree previously captured by " +
-			"`madder tree-capture` into <dest>. The receipt is parsed, " +
+			"`cutting-garden tree-capture` into <dest>. The receipt is parsed, " +
 			"each entry's destination path is validated against the " +
 			"sanitization rules in RFC 0003 §Consumer Rules, and per-" +
 			"type materialization writes files (streamed from their " +

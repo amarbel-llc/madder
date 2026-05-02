@@ -23,7 +23,7 @@ tree-capture-receipt - madder filesystem-tree capture manifest format
 # DESCRIPTION
 
 A tree-capture receipt is a hyphence-wrapped NDJSON manifest produced by
-**madder tree-capture** (see **madder**(1)). It enumerates every filesystem
+**cutting-garden tree-capture** (see **cutting-garden**(1)). It enumerates every filesystem
 entry visited under one capture-root or set of capture-roots, recording each
 entry's relative path, type, POSIX permission bits, and either its
 content-addressable blob ID (regular files) or its target string

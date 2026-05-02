@@ -25,7 +25,20 @@ type inventoryLogFlagsReader interface {
 // Set by commands.init before any command runs.
 var DefaultConfig = config_cli.Default()
 
-type EnvBlobStore struct{}
+// EnvBlobStore is the env-construction mixin embedded by every command
+// that operates against a blob store.
+//
+// BlobStoreParentUtility, when non-empty, is the XDG utility name used
+// for blob store discovery instead of req.Utility.GetName(). Set this
+// when the calling utility is a *child* that consumes another utility's
+// blob stores: for example, cutting-garden sets it to "madder" so it
+// reads/writes madder's `$XDG_*_HOME/madder/blob_stores/` rather than
+// carving out a parallel cutting-garden-named namespace that would
+// never be populated. madder and madder-cache leave it empty, since
+// each owns its own namespace.
+type EnvBlobStore struct {
+	BlobStoreParentUtility string
+}
 
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req futility.Request,
@@ -57,9 +70,14 @@ func (cmd EnvBlobStore) makeEnvLocal(
 		envOptions.CustomErr = config.CustomErr
 	}
 
+	xdgUtilityName := cmd.BlobStoreParentUtility
+	if xdgUtilityName == "" {
+		xdgUtilityName = req.Utility.GetName()
+	}
+
 	dir := env_dir.MakeDefault(
 		req,
-		req.Utility.GetName(),
+		xdgUtilityName,
 		debugOptions,
 	)
 

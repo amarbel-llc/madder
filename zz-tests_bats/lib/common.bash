@@ -29,9 +29,15 @@ bats_load_library bats-island
 setup_test_home
 export MADDER_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR"
 require_bin MADDER_BIN madder
+require_bin CG_BIN cutting-garden
 
 run_madder() {
   local bin="${MADDER_BIN:-madder}"
+  run timeout --preserve-status 2s "$bin" "$@"
+}
+
+run_cg() {
+  local bin="${CG_BIN:-cutting-garden}"
   run timeout --preserve-status 2s "$bin" "$@"
 }
 

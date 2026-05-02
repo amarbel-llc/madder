@@ -8,6 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
+	"github.com/amarbel-llc/madder/go/internal/india/commands_cutting_garden"
 )
 
 // Declared so the shared -X main.version / -X main.commit ldflags have
@@ -33,6 +34,7 @@ func main() {
 	utilities := []*futility.Utility{
 		commands.GetUtility(),
 		commands_cache.GetUtility(),
+		commands_cutting_garden.GetUtility(),
 	}
 
 	for _, utility := range utilities {

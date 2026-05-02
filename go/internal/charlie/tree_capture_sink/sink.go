@@ -1,5 +1,5 @@
 // Package tree_capture_sink carries the per-entry result stream for
-// `madder tree-capture`. Each filesystem entry becomes one TAP test
+// `cutting-garden tree-capture`. Each filesystem entry becomes one TAP test
 // point or one NDJSON record; each store group ends with a summary
 // (TAP `ok` test point or NDJSON `store_group_receipt` record). Notices
 // (store switches, shadow warnings) and per-arg failures use the

@@ -39,7 +39,7 @@ function tree_capture_simple_dir { # @test
   echo "beta" >tree/b.txt
   echo "gamma" >tree/sub/c.txt
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   assert_success
 
   # One receipt summary record.
@@ -82,7 +82,7 @@ function tree_capture_records_symlink_target { # @test
   echo "real" >tree/real.txt
   ln -s real.txt tree/link.txt
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   assert_success
 
   local rid
@@ -104,7 +104,7 @@ function tree_capture_includes_dotfiles { # @test
   echo "v" >tree/.hidden
   echo "x" >tree/visible
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   assert_success
 
   local rid
@@ -126,7 +126,7 @@ function tree_capture_zero_args_uses_pwd_into_default { # @test
   echo "x" >tree/x.txt
 
   cd tree
-  run_madder tree-capture -format json
+  run_cg tree-capture -format json
   assert_success
 
   local rid count store
@@ -151,7 +151,7 @@ function tree_capture_one_arg_store_id_uses_pwd { # @test
   echo "y" >tree/y.txt
 
   cd tree
-  run_madder tree-capture -format json alt
+  run_cg tree-capture -format json alt
   assert_success
 
   local rid count store
@@ -174,7 +174,7 @@ function tree_capture_multi_store_group { # @test
   echo "s" >src/s.txt
   echo "d" >docs/d.txt
 
-  run_madder tree-capture -format json .default src .alt docs
+  run_cg tree-capture -format json .default src .alt docs
   assert_success
 
   # Two distinct summaries.
@@ -202,7 +202,7 @@ function tree_capture_trailing_store_with_no_dirs_errors { # @test
   mkdir src
   echo "s" >src/s.txt
 
-  run_madder tree-capture -format json .default src .alt
+  run_cg tree-capture -format json .default src .alt
   assert_failure
 }
 
@@ -215,7 +215,7 @@ function tree_capture_back_to_back_stores_errors { # @test
   mkdir src
   echo "s" >src/s.txt
 
-  run_madder tree-capture -format json .default .alt src
+  run_cg tree-capture -format json .default .alt src
   assert_failure
 }
 
@@ -228,13 +228,13 @@ function tree_capture_is_deterministic { # @test
   echo "beta" >tree/b.txt
   echo "gamma" >tree/sub/c.txt
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   assert_success
   local rid_first
   rid_first="$(receipt_id_of_group "$output")"
   [[ -n $rid_first ]] || fail "first run: no receipt id: $output"
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   assert_success
   local rid_second
   rid_second="$(receipt_id_of_group "$output")"
@@ -251,7 +251,7 @@ function tree_capture_file_arg_is_failure { # @test
   echo "lone" >loose.txt
 
   # tree-capture only takes directories, never files.
-  run_madder tree-capture -format json loose.txt
+  run_cg tree-capture -format json loose.txt
   assert_failure
 }
 
@@ -265,7 +265,7 @@ function tree_capture_refuses_parent_escape_root { # @test
   echo "x" >inner/x.txt
 
   pushd inner >/dev/null
-  run_madder tree-capture -format json ..
+  run_cg tree-capture -format json ..
   popd >/dev/null
 
   assert_failure
@@ -283,7 +283,7 @@ function tree_capture_refuses_absolute_root { # @test
   mkdir -p "$outside"
   echo "x" >"$outside/x.txt"
 
-  run_madder tree-capture -format json "$outside"
+  run_cg tree-capture -format json "$outside"
   assert_failure
   echo "$output" | grep -qF 'outside working directory' ||
     fail "expected absolute-path refusal: $output"
@@ -298,7 +298,7 @@ function tree_capture_refuses_collision_after_clean { # @test
   mkdir src
   echo "s" >src/s.txt
 
-  run_madder tree-capture -format json src ./src
+  run_cg tree-capture -format json src ./src
   assert_failure
   echo "$output" | grep -qF 'roots "src" and "./src" both resolve to "src"' ||
     fail "expected exact RFC 0003 collision diagnostic: $output"
@@ -316,7 +316,7 @@ function tree_capture_emits_store_hint_when_known { # @test
   mkdir src
   echo "x" >src/x.txt
 
-  run_madder tree-capture -format json .work src
+  run_cg tree-capture -format json .work src
   assert_success
 
   local rid
@@ -338,7 +338,7 @@ function tree_capture_default_store_omits_hint { # @test
   mkdir src
   echo "x" >src/x.txt
 
-  run_madder tree-capture -format json src
+  run_cg tree-capture -format json src
   assert_success
 
   local rid
@@ -364,7 +364,7 @@ function tree_capture_warns_when_dir_shadows_store { # @test
   mkdir shadowed
   echo "x" >shadowed/x.txt
 
-  run_madder tree-capture -format json shadowed
+  run_cg tree-capture -format json shadowed
   assert_success
 
   # Receipt is for the default store (the dir won; no store switch).
@@ -397,7 +397,7 @@ function tree_capture_per_entry_failure_continues_walk { # @test
   echo "secret" >tree/secret.txt
   chmod 000 tree/secret.txt
 
-  run_madder tree-capture -format json tree
+  run_cg tree-capture -format json tree
   # Restore perms before any assert_* might exit, so bats can clean up.
   chmod 644 tree/secret.txt
 

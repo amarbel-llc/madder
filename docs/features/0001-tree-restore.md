@@ -12,12 +12,12 @@ promotion-criteria: |
 
 ## Problem Statement
 
-`madder tree-capture` writes a content-addressable receipt that records
+`cutting-garden tree-capture` writes a content-addressable receipt that records
 every entry of a captured directory tree. Today there is no way to
 reconstruct that tree from a receipt: a user with a receipt id has no
 in-tree command that materializes the captured files, directories, and
 symlinks back onto disk. This feature adds the inverse —
-`madder tree-restore <receipt-id> <dest>` — covering the consumer side
+`cutting-garden tree-restore <receipt-id> <dest>` — covering the consumer side
 of the operational contract specified by [RFC 0003] §Consumer Rules.
 
 The absence of a consumer also leaves [RFC 0003]'s store-hint
@@ -31,7 +31,7 @@ Resolution specifies.
 
 ### Synopsis
 
-    madder tree-restore [-store <id>] <receipt-id> <dest>
+    cutting-garden tree-restore [-store <id>] <receipt-id> <dest>
 
 ### Positional arguments
 
@@ -247,11 +247,11 @@ consumer's diagnostics are plain stderr lines. A future
 
 ### Round-trip
 
-    $ madder tree-capture -format json src
+    $ cutting-garden tree-capture -format json src
     ok 1 - capture src
     ok 2 - receipt blake2b256-7g…
 
-    $ madder tree-restore blake2b256-7g… restored
+    $ cutting-garden tree-restore blake2b256-7g… restored
     $ ls restored/src
     main.go
     go.mod
@@ -262,7 +262,7 @@ config-markl-id, no diagnostic.
 ### Refusal: destination exists
 
     $ mkdir out
-    $ madder tree-restore blake2b256-7g… out
+    $ cutting-garden tree-restore blake2b256-7g… out
     error: out: destination already exists
     hint: choose a destination that does not exist, or remove this one
 
@@ -272,7 +272,7 @@ Exit nonzero. `out/` is unchanged.
 
 A hand-crafted receipt with `{"root":"src","path":"../../../etc/passwd",...}`:
 
-    $ madder tree-restore <receipt-id> out/
+    $ cutting-garden tree-restore <receipt-id> out/
     error: entry escapes destination
       root: src
       path: ../../../etc/passwd
@@ -286,21 +286,21 @@ Exit nonzero. `out/` is NOT created.
 The receipt was written against `.work` whose config has since been
 rotated:
 
-    $ madder tree-restore <receipt-id> restored
+    $ cutting-garden tree-restore <receipt-id> restored
     warning: store .work has been re-configured since this receipt was written
       receipt config-hash: blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
       current config-hash: blake2b256-3wp380jqj2zfrm6zevxqx3…
     error: pass -store <id> to override and use the current store
     hint: re-running with -store .work uses the current configuration
 
-    $ madder tree-restore -store .work <receipt-id> restored
+    $ cutting-garden tree-restore -store .work <receipt-id> restored
     (proceeds against the current .work configuration)
 
 ### Symlink preservation
 
 A receipt with a `type:"symlink"` entry whose `target` is `../bar`:
 
-    $ madder tree-restore <receipt-id> restored
+    $ cutting-garden tree-restore <receipt-id> restored
     $ readlink restored/src/link
     ../bar
 

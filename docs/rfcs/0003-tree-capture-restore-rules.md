@@ -7,11 +7,11 @@ date: 2026-04-27
 
 ## Abstract
 
-This document specifies behavioral rules for producers (`madder tree-capture`) and consumers (`madder tree-restore`) of `madder-tree_capture-receipt-v1` blobs. The rules cover root scoping, root collision detection, store-hint metadata, restore-side path sanitization, and the per-type materialization contract. The receipt's record schema (paths, types, modes, blob references) is documented separately in `tree-capture-receipt(7)`; this document layers normative obligations on top of that schema so that a receipt written by any conformant producer is safe to restore by any conformant consumer.
+This document specifies behavioral rules for producers (`cutting-garden tree-capture`) and consumers (`cutting-garden tree-restore`) of `madder-tree_capture-receipt-v1` blobs. The rules cover root scoping, root collision detection, store-hint metadata, restore-side path sanitization, and the per-type materialization contract. The receipt's record schema (paths, types, modes, blob references) is documented separately in `tree-capture-receipt(7)`; this document layers normative obligations on top of that schema so that a receipt written by any conformant producer is safe to restore by any conformant consumer.
 
 ## Introduction
 
-`madder tree-capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`tree-capture-receipt(7)`). The inverse — `madder tree-restore` — is being introduced under [#87](https://github.com/amarbel-llc/madder/issues/87) and consumes a receipt to materialize the captured tree on disk.
+`cutting-garden tree-capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`tree-capture-receipt(7)`). The inverse — `cutting-garden tree-restore` — is being introduced under [#87](https://github.com/amarbel-llc/madder/issues/87) and consumes a receipt to materialize the captured tree on disk.
 
 For the producer/consumer pair to be safe and predictable, several rules need to be normative rather than implicit:
 
@@ -30,8 +30,8 @@ The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "S
 
 ### Roles
 
-- **Producer**: any tool that writes a `madder-tree_capture-receipt-v1` blob. The reference producer is `madder tree-capture`.
-- **Consumer**: any tool that reads a `madder-tree_capture-receipt-v1` blob to materialize the captured tree on disk. The reference consumer is `madder tree-restore`.
+- **Producer**: any tool that writes a `madder-tree_capture-receipt-v1` blob. The reference producer is `cutting-garden tree-capture`.
+- **Consumer**: any tool that reads a `madder-tree_capture-receipt-v1` blob to materialize the captured tree on disk. The reference consumer is `cutting-garden tree-restore`.
 
 A given binary MAY implement only the producer side, only the consumer side, or both.
 
@@ -62,9 +62,9 @@ A producer MUST refuse a capture invocation if two or more positional capture-ro
 
 Examples that MUST be refused at planning time, before any walking begins:
 
-- `madder tree-capture src ./src`
-- `madder tree-capture vendor vendor/`
-- `madder tree-capture ./internal ./internal/.`
+- `cutting-garden tree-capture src ./src`
+- `cutting-garden tree-capture vendor vendor/`
+- `cutting-garden tree-capture ./internal ./internal/.`
 
 The refusal error message MUST identify both colliding arguments and the canonicalized path they share.
 
@@ -84,7 +84,7 @@ When the producer knows the identifier and the configuration-blob digest of the 
 
 Where:
 
-- `<store-id>` is the producer's local identifier for the destination store. For `madder tree-capture` this is the `blob_store_id` (e.g. `default`, `.archive`, `.work`).
+- `<store-id>` is the producer's local identifier for the destination store. For `cutting-garden tree-capture` this is the `blob_store_id` (e.g. `default`, `.archive`, `.work`).
 - `<config-markl-id>` is the markl-id of the destination store's `toml-blob_store_config-vN` blob, in the canonical text form produced by `markl-id(7)`.
 
 The line MUST appear in the receipt's hyphence metadata block, between the opening `---` boundary and the type line `! madder-tree_capture-receipt-v1`.
@@ -180,7 +180,7 @@ User runs `tree-capture` from `/home/sasha/projects/foo` and attempts to capture
 
     $ pwd
     /home/sasha/projects/foo
-    $ madder tree-capture ../bar
+    $ cutting-garden tree-capture ../bar
     error: ../bar: outside working directory at /home/sasha/projects/foo
     hint: cd to a parent directory containing ../bar, then re-run
 
@@ -188,7 +188,7 @@ Exit code is nonzero. No blobs are written. No receipt is produced.
 
 ### Capture-Time Refusal: Root Collision
 
-    $ madder tree-capture src ./src
+    $ cutting-garden tree-capture src ./src
     error: roots "src" and "./src" both resolve to "src" after Clean
     hint: pass each directory only once per store-group
 
@@ -206,7 +206,7 @@ A hand-crafted receipt with a malicious `path` field:
 
 When restored into `out/`:
 
-    $ madder tree-restore <receipt-id> out/
+    $ cutting-garden tree-restore <receipt-id> out/
     error: entry escapes destination
       root: src
       path: ../../../etc/passwd
@@ -221,12 +221,12 @@ Given a receipt with hint `- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
 
 **Auto-use** — `.work` is configured locally and its config-blob hash matches:
 
-    $ madder tree-restore <receipt-id> out/
+    $ cutting-garden tree-restore <receipt-id> out/
     # (no prompt, blobs resolve via .work)
 
 **Mismatch-warn** — `.work` is configured locally but its config-blob hash differs:
 
-    $ madder tree-restore <receipt-id> out/
+    $ cutting-garden tree-restore <receipt-id> out/
     warning: store .work has been re-configured since this receipt was written
       receipt config-hash: blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
       current config-hash: blake2b256-3wp380jqj2zfrm6zevxqx3…
@@ -235,7 +235,7 @@ Given a receipt with hint `- store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp3…
 
 **Missing-fallback** — no `.work` configured locally:
 
-    $ madder tree-restore <receipt-id> out/
+    $ cutting-garden tree-restore <receipt-id> out/
     notice: receipt names store ".work" which is not configured locally
     notice: falling back to active store
     # (proceeds with the active store; -store may override)

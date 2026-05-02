@@ -41,7 +41,7 @@ write_blob_id() {
 # store and echoes the receipt blob-id from the JSON sink record.
 capture_receipt_id() {
   local dir="$1"
-  run_madder tree-capture -format json "$dir"
+  run_cg tree-capture -format json "$dir"
   assert_success
   echo "$output" | grep -F '"type":"store_group_receipt"' |
     sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
@@ -59,7 +59,7 @@ function tree_restore_refuses_existing_destination { # @test
 
   mkdir dest
 
-  run_madder tree-restore "$rid" dest
+  run_cg tree-restore "$rid" dest
   assert_failure
   echo "$output" | grep -qF 'destination already exists' ||
     fail "expected dest-exists refusal: $output"
@@ -89,7 +89,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_failure
   echo "$output" | grep -qF 'entry escapes destination' ||
     fail "expected escape refusal: $output"
@@ -114,7 +114,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_failure
   echo "$output" | grep -qF 'NUL byte' ||
     fail "expected NUL-byte refusal: $output"
@@ -139,7 +139,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_failure
   echo "$output" | grep -qF 'empty root' ||
     fail "expected empty-root refusal: $output"
@@ -163,7 +163,7 @@ function tree_restore_round_trips_file { # @test
   rid="$(capture_receipt_id src)"
   [[ -n $rid ]] || fail "no receipt id"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
 
   [[ -f out/src/greeting.txt ]] ||
@@ -192,7 +192,7 @@ function tree_restore_round_trips_dir { # @test
   rid="$(capture_receipt_id src)"
   [[ -n $rid ]] || fail "no receipt id"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
 
   [[ -d out/src/inner ]] || fail "expected out/src/inner to be a dir"
@@ -227,7 +227,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
   echo "$output" | grep -qF 'skipping entry of type "other"' ||
     fail "expected skip notice for type:other: $output"
@@ -247,7 +247,7 @@ function tree_restore_round_trips_symlink { # @test
   rid="$(capture_receipt_id src)"
   [[ -n $rid ]] || fail "no receipt id"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
 
   [[ -L out/src/link ]] || fail "expected out/src/link to be a symlink"
@@ -275,7 +275,7 @@ function tree_restore_uses_hint_store_when_config_matches { # @test
   mkdir src
   echo "x" >src/x.txt
 
-  run_madder tree-capture -format json .work src
+  run_cg tree-capture -format json .work src
   assert_success
   local rid
   rid="$(echo "$output" | grep -F '"type":"store_group_receipt"' |
@@ -284,7 +284,7 @@ function tree_restore_uses_hint_store_when_config_matches { # @test
 
   # Restore must NOT emit any of the hint-resolution notices when the
   # match path fires.
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
   refute_output --partial 'falling back to active store'
   refute_output --partial 'no store hint'
@@ -314,7 +314,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_failure
   echo "$output" | grep -qF 'has been re-configured since this receipt was written' ||
     fail "expected drift warning: $output"
@@ -344,7 +344,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
   echo "$output" | grep -qF 'is not configured locally' ||
     fail "expected missing-store notice: $output"
@@ -372,7 +372,7 @@ RECEIPT
   rid="$(write_blob_id "$receipt_path")"
   [[ -n $rid ]] || fail "write returned empty hash"
 
-  run_madder tree-restore "$rid" out
+  run_cg tree-restore "$rid" out
   assert_success
   echo "$output" | grep -qF 'no store hint' ||
     fail "expected no-hint notice: $output"
@@ -423,7 +423,7 @@ RECEIPT
   # Without -store, this would trigger branch 3 (drift refusal).
   # With -store, it must succeed silently — no drift warning, no
   # fallback notice.
-  run_madder tree-restore -store .work "$rid" out
+  run_cg tree-restore -store .work "$rid" out
   assert_success
   refute_output --partial 'has been re-configured'
   refute_output --partial 'falling back'

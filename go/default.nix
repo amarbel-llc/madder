@@ -56,6 +56,7 @@ let
   mkBatsRunCommand = {
     filter ? "!net_cap",
     madderBin ? "$out/bin/madder",
+    cgBin ? "$out/bin/cutting-garden",
   }: ''
     mkdir -p stage/zz-tests_bats
     cp -r ${batsSrc}/* stage/zz-tests_bats/
@@ -67,6 +68,7 @@ let
     cp ${versionEnv} stage/version.env
 
     export MADDER_BIN="${madderBin}"
+    export CG_BIN="${cgBin}"
     export BATS_TEST_TIMEOUT=30
 
     cd stage/zz-tests_bats
@@ -95,6 +97,7 @@ let
       "cmd/madder"
       "cmd/madder-cache"
       "cmd/madder-gen_man"
+      "cmd/cutting-garden"
     ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
@@ -125,6 +128,7 @@ let
     postInstall = ''
       $out/bin/madder-gen_man $out
       rm $out/bin/madder-gen_man
+      ln -s cutting-garden $out/bin/cg
     ''
     + pkgs-master.lib.optionalString (man7Src != null) ''
       mkdir -p $out/share/man/man7
@@ -227,6 +231,7 @@ let
       (mkBatsRunCommand {
         inherit filter;
         madderBin = "${base}/bin/madder";
+        cgBin = "${base}/bin/cutting-garden";
       } + ''
         touch $out
       '');

@@ -1,4 +1,4 @@
-package commands
+package commands_cutting_garden
 
 import (
 	"fmt"
@@ -28,7 +28,8 @@ import (
 
 func init() {
 	utility.AddCmd("tree-capture", &TreeCapture{
-		Format: output_format.Default,
+		EnvBlobStore: command_components.EnvBlobStore{BlobStoreParentUtility: "madder"},
+		Format:       output_format.Default,
 	})
 }
 

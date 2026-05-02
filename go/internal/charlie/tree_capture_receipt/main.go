@@ -1,6 +1,6 @@
 // Package tree_capture_receipt encodes and decodes the per-store-group
-// receipt blob produced by `madder tree-capture` (and consumed by
-// `madder tree-restore`).
+// receipt blob produced by `cutting-garden tree-capture` (and consumed by
+// `cutting-garden tree-restore`).
 //
 // The receipt is a hyphence-wrapped NDJSON document: an optional
 // store-hint metadata line plus a single type-tag line, followed by

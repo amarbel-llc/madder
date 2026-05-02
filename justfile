@@ -136,14 +136,18 @@ test-go-cover *flags:
 # binding scenarios) — those run under `test-bats-net-cap`.
 [group("test")]
 test-bats: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test
+  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
+    CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    just zz-tests_bats/test
 
 # Run net_cap-tagged bats tests under sandcastle's --allow-local-binding.
 # Currently covers the SFTP harness; future loopback-binding harnesses
 # (HTTP, CalDAV, etc.) get the same treatment.
 [group("test")]
 test-bats-net-cap: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-net-cap
+  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
+    CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    just zz-tests_bats/test-net-cap
 
 # Run bats integration tests against race-instrumented binaries.
 # Catches data races that the unit-test -race pass won't, since several
@@ -254,7 +258,9 @@ cover-summary: cover-merged
 # Run specific bats test files.
 [group("test")]
 test-bats-targets *targets: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder just zz-tests_bats/test-targets {{targets}}
+  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
+    CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    just zz-tests_bats/test-targets {{targets}}
 
 # Run bats tests filtered by file_tag. Drives the auto-generated
 # `.#bats-${tag}` flake output (one per `# bats file_tags=` directive
