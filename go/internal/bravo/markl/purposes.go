@@ -42,127 +42,12 @@ const (
 	PurposeMadderPrivateKeyV1 = "madder-private_key-v1"
 )
 
-func init() {
-	// purposes that need to be reregistered
-	makePurpose(
-		PurposeBlobDigestV1,
-		PurposeTypeBlobDigest,
-		FormatIdHashSha256,
-		FormatIdHashBlake2b256,
-	)
-
-	makePurpose(
-		PurposeObjectDigestV1,
-		PurposeTypeObjectDigest,
-		FormatIdHashSha256,
-		FormatIdHashBlake2b256,
-	)
-
-	makePurpose(
-		PurposeObjectDigestV2,
-		PurposeTypeObjectDigest,
-		FormatIdHashSha256,
-		FormatIdHashBlake2b256,
-	)
-
-	makePurpose(
-		PurposeV5MetadataDigestWithoutTai,
-		PurposeTypeObjectDigest,
-		FormatIdHashSha256,
-		FormatIdHashBlake2b256,
-	)
-
-	makePurpose(
-		PurposeObjectMotherSigV1,
-		PurposeTypeObjectMotherSig,
-		FormatIdEd25519Sig,
-	)
-
-	makePurpose(
-		PurposeObjectMotherSigV2,
-		PurposeTypeObjectMotherSig,
-		FormatIdEd25519Sig,
-	)
-
-	makePurpose(
-		PurposeObjectSigV0,
-		PurposeTypeObjectSig,
-		FormatIdEd25519Sig,
-	)
-
-	RegisterPurpose(RegisterPurposeOpts{
-		Id:   PurposeObjectSigV1,
-		Type: PurposeTypeObjectSig,
-		FormatIds: []string{
-			FormatIdEd25519Sig,
-			FormatIdEcdsaP256Sig,
-		},
-		Related: map[string]string{
-			RelatedRoleDigest:    PurposeObjectDigestV1,
-			RelatedRoleMotherSig: PurposeObjectMotherSigV1,
-		},
-	})
-
-	RegisterPurpose(RegisterPurposeOpts{
-		Id:   PurposeObjectSigV2,
-		Type: PurposeTypeObjectSig,
-		FormatIds: []string{
-			FormatIdEd25519Sig,
-			FormatIdEcdsaP256Sig,
-		},
-		Related: map[string]string{
-			RelatedRoleDigest:    PurposeObjectDigestV2,
-			RelatedRoleMotherSig: PurposeObjectMotherSigV2,
-		},
-	})
-
-	makePurpose(
-		PurposeRepoPrivateKeyV1,
-		PurposeTypePrivateKey,
-		FormatIdEd25519Sec,
-		FormatIdEd25519SSH,
-		FormatIdEcdsaP256SSH,
-	)
-
-	makePurpose(
-		PurposeRepoPubKeyV1,
-		PurposeTypeRepoPubKey,
-		FormatIdEd25519Pub,
-		FormatIdEcdsaP256Pub,
-	)
-
-	makePurpose(PurposeRequestAuthChallengeV1, PurposeTypeRequestAuth)
-	makePurpose(PurposeRequestAuthResponseV1, PurposeTypeRequestAuth)
-
-	makePurpose(
-		PurposeRequestRepoSigV1,
-		PurposeTypeRequestAuth,
-		FormatIdEd25519Sig,
-		FormatIdEcdsaP256Sig,
-	)
-
-	makePurpose(
-		PurposeMadderPubKeyV1,
-		PurposeTypePubKey,
-		FormatIdEd25519Pub,
-		FormatIdEcdsaP256Pub,
-	)
-
-	makePurpose(
-		PurposeMadderPrivateKeyV0,
-		PurposeTypePrivateKey,
-		FormatIdEd25519Sec,
-		FormatIdAgeX25519Sec,
-	)
-
-	makePurpose(
-		PurposeMadderPrivateKeyV1,
-		PurposeTypePrivateKey,
-		FormatIdEd25519Sec,
-		FormatIdAgeX25519Sec,
-		FormatIdPivyEcdhP256Pub,
-	)
-}
+// Production registrations live in internal/charlie/markl_registrations
+// (or any other consumer-side package). The constants above are the
+// vocabulary; the registrations are the data. Keeping the data outside
+// this framework package is the load-bearing change for #106 — a
+// downstream consumer can install its own purposes via
+// markl.RegisterPurpose without forking this package. See ADR 0006.
 
 var purposes = map[string]Purpose{}
 
@@ -230,17 +115,6 @@ func RegisterPurpose(opts RegisterPurposeOpts) Purpose {
 
 	purposes[opts.Id] = purpose
 	return purpose
-}
-
-// makePurpose is the legacy variadic shim retained so existing init() blocks
-// in this package compile unchanged. New registrations should call
-// RegisterPurpose directly.
-func makePurpose(purposeId string, purposeType PurposeType, formatIds ...string) {
-	RegisterPurpose(RegisterPurposeOpts{
-		Id:        purposeId,
-		Type:      purposeType,
-		FormatIds: formatIds,
-	})
 }
 
 func (purpose Purpose) GetPurposeType() PurposeType {

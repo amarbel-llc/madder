@@ -32,9 +32,13 @@ const (
 	FormatIdNonceSec = "nonce"
 )
 
+// Format registrations are framework infrastructure (the actual crypto
+// primitives), not consumer vocabulary, so they live in this package.
+// Purpose registrations and purpose-id aliases moved out to
+// internal/charlie/markl_registrations as of #106 step 2/3.
 func init() {
 	// Ed22519
-	makeFormat(
+	RegisterFormat(
 		FormatPub{
 			Id:     FormatIdEd25519Pub,
 			Size:   ed25519.PublicKeySize,
@@ -42,7 +46,7 @@ func init() {
 		},
 	)
 
-	makeFormat(
+	RegisterFormat(
 		FormatSec{
 			Id:   FormatIdEd25519Sec,
 			Size: ed25519.PrivateKeySize,
@@ -57,7 +61,7 @@ func init() {
 		},
 	)
 
-	makeFormat(
+	RegisterFormat(
 		Format{
 			Id:   FormatIdEd25519Sig,
 			Size: ed25519.SignatureSize,
@@ -67,14 +71,14 @@ func init() {
 	makeStubSSHFormat()
 
 	// AgeX25519
-	makeFormat(
+	RegisterFormat(
 		Format{
 			Id:   FormatIdAgeX25519Pub,
 			Size: curve25519.ScalarSize,
 		},
 	)
 
-	makeFormat(
+	RegisterFormat(
 		FormatSec{
 			Id:           FormatIdAgeX25519Sec,
 			Size:         curve25519.ScalarSize,
@@ -84,7 +88,7 @@ func init() {
 	)
 
 	// ECDSA P256
-	makeFormat(
+	RegisterFormat(
 		FormatPub{
 			Id:     FormatIdEcdsaP256Pub,
 			Size:   33,
@@ -92,7 +96,7 @@ func init() {
 		},
 	)
 
-	makeFormat(
+	RegisterFormat(
 		Format{
 			Id:   FormatIdEcdsaP256Sig,
 			Size: 64,
@@ -102,7 +106,7 @@ func init() {
 	makeStubEcdsaP256SSHFormat()
 
 	// PivyEcdhP256
-	makeFormat(
+	RegisterFormat(
 		FormatSec{
 			Id:           FormatIdPivyEcdhP256Pub,
 			Size:         33,
@@ -111,19 +115,13 @@ func init() {
 	)
 
 	// Nonce
-	makeFormat(
+	RegisterFormat(
 		FormatSec{
 			Id:       FormatIdNonceSec,
 			Size:     32,
 			Generate: NonceGenerate32,
 		},
 	)
-
-	// Purpose-id → format-id aliases. Legacy on-disk data carries a
-	// purpose-id where a format-id is expected; the registry consults this
-	// map in GetFormatOrError. Move targets in step 2 of #106.
-	RegisterPurposeIdAlias("zit-repo-private_key-v1", FormatIdEd25519Sec)
-	RegisterPurposeIdAlias("dodder-repo-private_key-v1", FormatIdEd25519Sec)
 }
 
 var formats map[string]domain_interfaces.MarklFormat = map[string]domain_interfaces.MarklFormat{}
@@ -253,9 +251,3 @@ func RegisterFormat(format domain_interfaces.MarklFormat) domain_interfaces.Mark
 	return format
 }
 
-// makeFormat is the legacy wrapper kept so existing init() blocks in this
-// package compile unchanged. New registrations should call RegisterFormat
-// directly.
-func makeFormat(format domain_interfaces.MarklFormat) {
-	RegisterFormat(format)
-}

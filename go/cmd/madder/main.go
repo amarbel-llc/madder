@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
 	"github.com/amarbel-llc/madder/go/internal/charlie/cli_main"
+	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
 )
 

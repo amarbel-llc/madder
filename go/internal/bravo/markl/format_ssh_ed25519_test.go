@@ -25,7 +25,7 @@ func TestSSHStubParseWithoutAgent(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := makeTestEd25519Signer().Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
@@ -42,7 +42,7 @@ func TestSSHStubSignReturnsConnectionError(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := makeTestEd25519Signer().Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
@@ -51,7 +51,7 @@ func TestSSHStubSignReturnsConnectionError(t1 *testing.T) {
 		defer repool()
 
 		var sig Id
-		err = sshKey.Sign(message, &sig, PurposeObjectSigV2)
+		err = sshKey.Sign(message, &sig, testPurposeSig)
 		if err == nil {
 			t.Fatal("expected error from stub Sign")
 		}
@@ -68,12 +68,12 @@ func TestSSHStubGetPublicKeyReturnsConnectionError(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := makeTestEd25519Signer().Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
 
-		_, err = sshKey.GetPublicKey(PurposeRepoPrivateKeyV1)
+		_, err = sshKey.GetPublicKey(testPurposeSSHPriv)
 		if err == nil {
 			t.Fatal("expected error from stub GetPublicKey")
 		}
@@ -92,7 +92,7 @@ func TestRegisterSSHEd25519FormatAndSign(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := priv.Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
@@ -101,12 +101,12 @@ func TestRegisterSSHEd25519FormatAndSign(t1 *testing.T) {
 		defer repool()
 
 		var sig Id
-		err = sshKey.Sign(message, &sig, PurposeObjectSigV2)
+		err = sshKey.Sign(message, &sig, testPurposeSig)
 		t.AssertNoError(err)
 		t.AssertNoError(AssertIdIsNotNull(sig))
 
 		var verifyPub Id
-		err = verifyPub.SetPurposeId(PurposeRepoPubKeyV1)
+		err = verifyPub.SetPurposeId(testPurposePub)
 		t.AssertNoError(err)
 		err = verifyPub.SetMarklId(FormatIdEd25519Pub, pubKey)
 		t.AssertNoError(err)
@@ -123,19 +123,19 @@ func TestSSHSignThenVerify(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := priv.Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
 
-		derivedPub, err := sshKey.GetPublicKey(PurposeRepoPrivateKeyV1)
+		derivedPub, err := sshKey.GetPublicKey(testPurposeSSHPriv)
 		t.AssertNoError(err)
 
 		message, repool := FormatHashSha256.GetMarklIdForString("object digest content")
 		defer repool()
 
 		var sig Id
-		err = sshKey.Sign(message, &sig, PurposeObjectSigV2)
+		err = sshKey.Sign(message, &sig, testPurposeSig)
 		t.AssertNoError(err)
 		t.AssertNoError(AssertIdIsNotNull(sig))
 
@@ -143,7 +143,7 @@ func TestSSHSignThenVerify(t1 *testing.T) {
 		t.AssertNoError(err)
 
 		var standalonePub Id
-		err = standalonePub.SetPurposeId(PurposeRepoPubKeyV1)
+		err = standalonePub.SetPurposeId(testPurposePub)
 		t.AssertNoError(err)
 		err = standalonePub.SetMarklId(FormatIdEd25519Pub, pubKey)
 		t.AssertNoError(err)
@@ -164,26 +164,26 @@ func TestSSHSignatureMatchesSoftwareSignature(t1 *testing.T) {
 
 		var sshKey Id
 		pubKey := priv.Public().(ed25519.PublicKey)
-		err := sshKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err := sshKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = sshKey.SetMarklId(FormatIdEd25519SSH, []byte(pubKey))
 		t.AssertNoError(err)
 
 		var sshSig Id
-		err = sshKey.Sign(message, &sshSig, PurposeObjectSigV2)
+		err = sshKey.Sign(message, &sshSig, testPurposeSig)
 		t.AssertNoError(err)
 
 		var softKey Id
-		err = softKey.SetPurposeId(PurposeRepoPrivateKeyV1)
+		err = softKey.SetPurposeId(testPurposeSSHPriv)
 		t.AssertNoError(err)
 		err = softKey.SetMarklId(FormatIdEd25519Sec, []byte(priv))
 		t.AssertNoError(err)
 
 		var softSig Id
-		err = softKey.Sign(message, &softSig, PurposeObjectSigV2)
+		err = softKey.Sign(message, &softSig, testPurposeSig)
 		t.AssertNoError(err)
 
-		softPub, err := softKey.GetPublicKey(PurposeRepoPrivateKeyV1)
+		softPub, err := softKey.GetPublicKey(testPurposeSSHPriv)
 		t.AssertNoError(err)
 
 		t.AssertNoError(softPub.Verify(message, sshSig))

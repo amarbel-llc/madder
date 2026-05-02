@@ -72,33 +72,10 @@ func TestEd25519GetPublicKey_RejectsOtherSizes(t *testing.T) {
 	}
 }
 
-// End-to-end: verify Id.GetPublicKey (which delegates to Ed25519GetPublicKey
-// via the FormatSec registration) still produces the correct public key for
-// a 64-byte private key. This is the path exercised by every internal caller.
-func TestIdGetPublicKey_Ed25519_MatchesStdlib(t *testing.T) {
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var secId Id
-	if err := secId.SetPurposeId(PurposeRepoPrivateKeyV1); err != nil {
-		t.Fatal(err)
-	}
-	if err := secId.SetMarklId(FormatIdEd25519Sec, priv); err != nil {
-		t.Fatal(err)
-	}
-
-	pubId, err := secId.GetPublicKey(PurposeRepoPrivateKeyV1)
-	if err != nil {
-		t.Fatalf("Id.GetPublicKey should succeed, got: %v", err)
-	}
-
-	expected := priv.Public().(ed25519.PublicKey)
-	if !bytes.Equal(pubId.GetBytes(), expected) {
-		t.Errorf("pubkey mismatch: got %x, want %x", pubId.GetBytes(), expected)
-	}
-}
+// End-to-end Id.GetPublicKey coverage lives in
+// internal/charlie/markl_registrations because the implementation in
+// id_crypto_sec.go hardcodes PurposeRepoPubKeyV1 — a dodder vocabulary
+// constant that this package's tests deliberately do not depend on.
 
 // Ed25519Sign: same size-validation contract as Ed25519GetPublicKey (#15).
 // Internal callers reach it through Id.Sign → FormatSec.Sign and can't
