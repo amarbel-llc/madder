@@ -1,5 +1,7 @@
 package fd
 
+//go:generate dagnabit export
+
 import (
 	"io"
 	"os"
