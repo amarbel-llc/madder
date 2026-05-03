@@ -1,14 +1,12 @@
 package commands_hyphence
 
 import (
-	"fmt"
 	"io"
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -50,44 +48,34 @@ func (cmd Validate) Run(req futility.Request) {
 
 	in, source, closer, err := OpenInput(path, os.Stdin)
 	if err != nil {
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "validate", path, err)
 		return
 	}
 	defer closer.Close()
 
+	if err := validateDocument(in); err != nil {
+		bail(req, "validate", source, err)
+		return
+	}
+}
+
+// validateDocument runs the strict-RFC validation pipeline against in
+// and returns the first violation, or nil on success. Shared between
+// Validate.Run (which prints diagnostics and cancels the request) and
+// the test seam in validate_test.go.
+func validateDocument(in io.Reader) error {
 	v := &hyphence.MetadataValidator{}
-	body := &CountingDiscardReaderFrom{}
+	body := &hyphence.CountingDiscardReaderFrom{}
 	reader := hyphence.Reader{
 		RequireMetadata: true,
 		Metadata:        v,
 		Blob:            body,
 	}
-
 	if _, err := reader.ReadFrom(in); err != nil {
-		fmt.Fprintf(os.Stderr, "hyphence: validate: %s: %s\n", source, err)
-		errors.ContextCancelWithBadRequestError(req, err)
-		return
+		return err
 	}
-
 	if v.SawAtLine && body.SawBody {
-		fmt.Fprintf(os.Stderr, "hyphence: validate: %s: %s\n", source, hyphence.ErrInlineBodyWithAtReference)
-		errors.ContextCancelWithBadRequestError(req, hyphence.ErrInlineBodyWithAtReference)
-		return
+		return hyphence.ErrInlineBodyWithAtReference
 	}
-}
-
-// CountingDiscardReaderFrom is the Blob consumer for validate, meta,
-// and any subcommand that wants to drain the body section without
-// preserving it. SawBody is true after ReadFrom if at least one byte
-// followed the body separator.
-type CountingDiscardReaderFrom struct {
-	SawBody bool
-}
-
-func (c *CountingDiscardReaderFrom) ReadFrom(r io.Reader) (int64, error) {
-	n, err := io.Copy(io.Discard, r)
-	if n > 0 {
-		c.SawBody = true
-	}
-	return n, err
+	return nil
 }

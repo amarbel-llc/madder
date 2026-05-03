@@ -36,7 +36,7 @@ func TestMeta_NoBody(t *testing.T) {
 
 func runMeta(in *strings.Reader, out *bytes.Buffer) error {
 	streamer := &hyphence.MetadataStreamer{W: out}
-	body := &CountingDiscardReaderFrom{}
+	body := &hyphence.CountingDiscardReaderFrom{}
 	reader := hyphence.Reader{
 		RequireMetadata: true,
 		Metadata:        streamer,

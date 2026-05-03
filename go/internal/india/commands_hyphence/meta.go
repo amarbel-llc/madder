@@ -1,13 +1,11 @@
 package commands_hyphence
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -49,13 +47,13 @@ func (cmd Meta) Run(req futility.Request) {
 
 	in, source, closer, err := OpenInput(path, os.Stdin)
 	if err != nil {
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "meta", path, err)
 		return
 	}
 	defer closer.Close()
 
 	streamer := &hyphence.MetadataStreamer{W: os.Stdout}
-	body := &CountingDiscardReaderFrom{}
+	body := &hyphence.CountingDiscardReaderFrom{}
 	reader := hyphence.Reader{
 		RequireMetadata: true,
 		Metadata:        streamer,
@@ -63,8 +61,7 @@ func (cmd Meta) Run(req futility.Request) {
 	}
 
 	if _, err := reader.ReadFrom(in); err != nil {
-		fmt.Fprintf(os.Stderr, "hyphence: meta: %s: %s\n", source, err)
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "meta", source, err)
 		return
 	}
 }

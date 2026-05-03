@@ -8,11 +8,13 @@ import (
 )
 
 type (
+	BodyStreamer                                              = internal.BodyStreamer
 	Coder[BLOB any]                                           = internal.Coder[BLOB]
 	CoderToTypedBlob[BLOB any]                                = internal.CoderToTypedBlob[BLOB]
 	CoderTommy[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]]       = internal.CoderTommy[BLOB, BLOB_PTR]
 	CoderTypeMap[BLOB any]                                    = internal.CoderTypeMap[BLOB]
 	CoderTypeMapWithoutType[BLOB any]                         = internal.CoderTypeMapWithoutType[BLOB]
+	CountingDiscardReaderFrom                                 = internal.CountingDiscardReaderFrom
 	Decoder[BLOB any]                                         = internal.Decoder[BLOB]
 	DecoderTypeMapWithoutType[BLOB any]                       = internal.DecoderTypeMapWithoutType[BLOB]
 	Document                                                  = internal.Document

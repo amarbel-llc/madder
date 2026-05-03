@@ -33,10 +33,10 @@ func TestBody_NoBody(t *testing.T) {
 }
 
 func runBody(in *strings.Reader, out *bytes.Buffer) error {
-	body := &writerReaderFrom{W: out}
+	body := &hyphence.BodyStreamer{W: out}
 	reader := hyphence.Reader{
 		RequireMetadata: true,
-		Metadata:        &CountingDiscardReaderFrom{},
+		Metadata:        &hyphence.CountingDiscardReaderFrom{},
 		Blob:            body,
 	}
 	_, err := reader.ReadFrom(in)

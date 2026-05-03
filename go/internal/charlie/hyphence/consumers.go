@@ -224,3 +224,30 @@ func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 	}
 	return n, nil
 }
+
+// CountingDiscardReaderFrom is the Blob consumer for validate, meta,
+// and any subcommand that wants to drain the body section without
+// preserving it. SawBody is true after ReadFrom if at least one byte
+// followed the body separator.
+type CountingDiscardReaderFrom struct {
+	SawBody bool
+}
+
+func (c *CountingDiscardReaderFrom) ReadFrom(r io.Reader) (int64, error) {
+	n, err := io.Copy(io.Discard, r)
+	if n > 0 {
+		c.SawBody = true
+	}
+	return n, err
+}
+
+// BodyStreamer is the Blob consumer for `hyphence body` and any
+// caller that wants to stream the body section verbatim to a
+// writer. Mirrors MetadataStreamer for the metadata side.
+type BodyStreamer struct {
+	W io.Writer
+}
+
+func (b *BodyStreamer) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(b.W, r)
+}

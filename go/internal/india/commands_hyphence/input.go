@@ -1,10 +1,12 @@
 package commands_hyphence
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/amarbel-llc/madder/go/internal/futility"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
 // NoInputError wraps a file-open failure that should map to the
@@ -20,13 +22,6 @@ func (e *NoInputError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Path, e.Err)
 }
 func (e *NoInputError) Unwrap() error { return e.Err }
-func (e *NoInputError) As(target any) bool {
-	if t, ok := target.(**NoInputError); ok {
-		*t = e
-		return true
-	}
-	return false
-}
 
 // OpenInput resolves the positional <path|-> argument for every
 // hyphence subcommand. When path is "-", the supplied stdin reader
@@ -39,7 +34,7 @@ func (e *NoInputError) As(target any) bool {
 func OpenInput(path string, stdin io.Reader) (io.Reader, string, io.Closer, error) {
 	if path == "-" {
 		if stdin == nil {
-			return nil, "", io.NopCloser(nil), errors.New("stdin is nil")
+			return nil, "", io.NopCloser(nil), errors.ErrorWithStackf("stdin is nil")
 		}
 		return stdin, "-", io.NopCloser(stdin), nil
 	}
@@ -48,4 +43,12 @@ func OpenInput(path string, stdin io.Reader) (io.Reader, string, io.Closer, erro
 		return nil, path, io.NopCloser(nil), &NoInputError{Path: path, Err: err}
 	}
 	return f, path, f, nil
+}
+
+// bail prints a gcc-style diagnostic to stderr and cancels the request.
+// Centralizes the "hyphence: <subcommand>: <source>: <err>" format
+// every subcommand uses on its error path.
+func bail(req futility.Request, subcommand, source string, err error) {
+	fmt.Fprintf(os.Stderr, "hyphence: %s: %s: %s\n", subcommand, source, err)
+	errors.ContextCancelWithBadRequestError(req, err)
 }

@@ -52,18 +52,5 @@ func TestValidate_RejectsMissingBodySeparator(t *testing.T) {
 // futility-level cancellation; the validation logic itself is what we
 // test here.
 func runValidate(in *strings.Reader) error {
-	v := &hyphence.MetadataValidator{}
-	body := &CountingDiscardReaderFrom{}
-	reader := hyphence.Reader{
-		RequireMetadata: true,
-		Metadata:        v,
-		Blob:            body,
-	}
-	if _, err := reader.ReadFrom(in); err != nil {
-		return err
-	}
-	if v.SawAtLine && body.SawBody {
-		return hyphence.ErrInlineBodyWithAtReference
-	}
-	return nil
+	return validateDocument(in)
 }

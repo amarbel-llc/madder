@@ -1,13 +1,11 @@
 package commands_hyphence
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -50,7 +48,7 @@ func (cmd Format) Run(req futility.Request) {
 
 	in, source, closer, err := OpenInput(path, os.Stdin)
 	if err != nil {
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "format", path, err)
 		return
 	}
 	defer closer.Close()
@@ -65,8 +63,7 @@ func (cmd Format) Run(req futility.Request) {
 	}
 
 	if _, err := reader.ReadFrom(in); err != nil {
-		fmt.Fprintf(os.Stderr, "hyphence: format: %s: %s\n", source, err)
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "format", source, err)
 		return
 	}
 }

@@ -1,14 +1,11 @@
 package commands_hyphence
 
 import (
-	"fmt"
-	"io"
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -48,29 +45,20 @@ func (cmd Body) Run(req futility.Request) {
 
 	in, source, closer, err := OpenInput(path, os.Stdin)
 	if err != nil {
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "body", path, err)
 		return
 	}
 	defer closer.Close()
 
-	body := &writerReaderFrom{W: os.Stdout}
+	body := &hyphence.BodyStreamer{W: os.Stdout}
 	reader := hyphence.Reader{
 		RequireMetadata: true,
-		Metadata:        &CountingDiscardReaderFrom{},
+		Metadata:        &hyphence.CountingDiscardReaderFrom{},
 		Blob:            body,
 	}
 
 	if _, err := reader.ReadFrom(in); err != nil {
-		fmt.Fprintf(os.Stderr, "hyphence: body: %s: %s\n", source, err)
-		errors.ContextCancelWithBadRequestError(req, err)
+		bail(req, "body", source, err)
 		return
 	}
-}
-
-// writerReaderFrom is the Blob consumer for the body subcommand:
-// stream bytes from r straight to W.
-type writerReaderFrom struct{ W io.Writer }
-
-func (w *writerReaderFrom) ReadFrom(r io.Reader) (int64, error) {
-	return io.Copy(w.W, r)
 }
