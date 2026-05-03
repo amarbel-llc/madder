@@ -19,6 +19,7 @@ type (
 	Encoder[BLOB any]                                         = internal.Encoder[BLOB]
 	EncoderTypeMapWithoutType[BLOB any]                       = internal.EncoderTypeMapWithoutType[BLOB]
 	MetadataLine                                              = internal.MetadataLine
+	MetadataStreamer                                          = internal.MetadataStreamer
 	MetadataWriterTo                                          = internal.MetadataWriterTo
 	Peeker                                                    = internal.Peeker
 	Reader                                                    = internal.Reader
