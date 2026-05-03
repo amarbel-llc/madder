@@ -7,4 +7,5 @@ import (
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/gzip"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/zlib"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/zstd"
 )
