@@ -156,3 +156,53 @@ func TestMetadataBuilder_RejectsInvalidPrefix(t *testing.T) {
 		t.Errorf("expected ErrInvalidPrefix, got %v", err)
 	}
 }
+
+func TestMetadataValidator_ValidInputAcceptsAllPrefixes(t *testing.T) {
+	const input = "# desc\n- tag\n@ blake2b256-abc\n< object/id\n% comment\n! md\n"
+	v := &MetadataValidator{}
+	if _, err := v.ReadFrom(strings.NewReader(input)); err != nil {
+		t.Errorf("expected nil error on valid input, got %v", err)
+	}
+	if !v.SawAtLine {
+		t.Errorf("validator should have observed @ line, SawAtLine=false")
+	}
+}
+
+func TestMetadataValidator_RejectsInvalidPrefix(t *testing.T) {
+	const input = "! md\nX bad\n"
+	v := &MetadataValidator{}
+	_, err := v.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrInvalidPrefix) {
+		t.Errorf("expected ErrInvalidPrefix, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "line 2") {
+		t.Errorf("expected line number 2 in error, got %v", err)
+	}
+}
+
+func TestMetadataValidator_RejectsMissingSpace(t *testing.T) {
+	const input = "!nospace\n"
+	v := &MetadataValidator{}
+	_, err := v.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrMalformedMetadataLine) {
+		t.Errorf("expected ErrMalformedMetadataLine, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "line 1") {
+		t.Errorf("expected line number 1, got %v", err)
+	}
+}
+
+func TestMetadataValidator_RejectsCarriageReturn(t *testing.T) {
+	// Per RFC 0001, embedded \r in a metadata line is malformed
+	// (content is "arbitrary UTF-8 except LF" — \r is allowed by
+	// that rule but the boundary scanner already rejects \r in
+	// boundary lines; for content lines we choose to surface CR
+	// as malformed because tooling round-trips assume LF-only).
+	// If this proves too strict, soften it later.
+	const input = "! md\r\n"
+	v := &MetadataValidator{}
+	_, err := v.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrMalformedMetadataLine) {
+		t.Errorf("expected ErrMalformedMetadataLine for \\r, got %v", err)
+	}
+}

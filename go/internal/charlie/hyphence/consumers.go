@@ -3,6 +3,7 @@ package hyphence
 import (
 	"bufio"
 	"io"
+	"strings"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -99,4 +100,64 @@ func isValidPrefix(b byte) bool {
 	default:
 		return false
 	}
+}
+
+// MetadataValidator is the metadata consumer for `hyphence validate`.
+// It parses each metadata line strictly per RFC 0001 §Metadata Lines.
+// Tracks SawAtLine for the post-ReadFrom inline-body-AND-@ cross-
+// check the validate subcommand performs.
+type MetadataValidator struct {
+	SawAtLine bool
+
+	line int // 1-based, internal
+}
+
+func (m *MetadataValidator) ReadFrom(r io.Reader) (int64, error) {
+	br := bufio.NewReader(r)
+	var n int64
+
+	for {
+		raw, err := br.ReadString('\n')
+		n += int64(len(raw))
+		if err != nil && err != io.EOF {
+			return n, errors.Wrap(err)
+		}
+
+		m.line++
+
+		line := raw
+		if len(line) > 0 && line[len(line)-1] == '\n' {
+			line = line[:len(line)-1]
+		}
+
+		if line == "" {
+			if err == io.EOF {
+				break
+			}
+			return n, errors.Errorf("line %d: %w: empty metadata line", m.line, ErrMalformedMetadataLine)
+		}
+
+		if strings.ContainsRune(line, '\r') {
+			return n, errors.Errorf("line %d: %w: contains carriage return", m.line, ErrMalformedMetadataLine)
+		}
+
+		prefix := line[0]
+		if !isValidPrefix(prefix) {
+			return n, errors.Errorf("line %d: %w: %q (must be one of !@#-<%%)", m.line, ErrInvalidPrefix, string(prefix))
+		}
+
+		if len(line) < 2 || line[1] != ' ' {
+			return n, errors.Errorf("line %d: %w: missing space after prefix", m.line, ErrMalformedMetadataLine)
+		}
+
+		if prefix == '@' {
+			m.SawAtLine = true
+		}
+
+		if err == io.EOF {
+			break
+		}
+	}
+
+	return n, nil
 }

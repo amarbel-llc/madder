@@ -21,6 +21,7 @@ type (
 	MetadataBuilder                                           = internal.MetadataBuilder
 	MetadataLine                                              = internal.MetadataLine
 	MetadataStreamer                                          = internal.MetadataStreamer
+	MetadataValidator                                         = internal.MetadataValidator
 	MetadataWriterTo                                          = internal.MetadataWriterTo
 	Peeker                                                    = internal.Peeker
 	Reader                                                    = internal.Reader
