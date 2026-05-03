@@ -15,8 +15,10 @@ type (
 	CoderTypeMapWithoutType[BLOB any]                         = internal.CoderTypeMapWithoutType[BLOB]
 	Decoder[BLOB any]                                         = internal.Decoder[BLOB]
 	DecoderTypeMapWithoutType[BLOB any]                       = internal.DecoderTypeMapWithoutType[BLOB]
+	Document                                                  = internal.Document
 	Encoder[BLOB any]                                         = internal.Encoder[BLOB]
 	EncoderTypeMapWithoutType[BLOB any]                       = internal.EncoderTypeMapWithoutType[BLOB]
+	MetadataLine                                              = internal.MetadataLine
 	MetadataWriterTo                                          = internal.MetadataWriterTo
 	Peeker                                                    = internal.Peeker
 	Reader                                                    = internal.Reader
@@ -29,10 +31,13 @@ type (
 )
 
 var (
-	BoundaryStringValue        = internal.BoundaryStringValue
-	PeekBoundaryFromPeeker     = internal.PeekBoundaryFromPeeker
-	ReadBoundaryFromPeeker     = internal.ReadBoundaryFromPeeker
-	ReadBoundaryFromRingBuffer = internal.ReadBoundaryFromRingBuffer
+	BoundaryStringValue          = internal.BoundaryStringValue
+	ErrInlineBodyWithAtReference = internal.ErrInlineBodyWithAtReference
+	ErrInvalidPrefix             = internal.ErrInvalidPrefix
+	ErrMalformedMetadataLine     = internal.ErrMalformedMetadataLine
+	PeekBoundaryFromPeeker       = internal.PeekBoundaryFromPeeker
+	ReadBoundaryFromPeeker       = internal.ReadBoundaryFromPeeker
+	ReadBoundaryFromRingBuffer   = internal.ReadBoundaryFromRingBuffer
 )
 
 // Generic function wrappers — Go does not support assigning
