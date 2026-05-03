@@ -40,8 +40,9 @@ Lands the new `bravo/plugins/` package with the registry, the four built-in plug
 ### Task 1.1: Define the registry skeleton
 
 **Files:**
-- Create: `go/internal/bravo/plugins/registry.go`
 - Create: `go/internal/bravo/plugins/main.go`
+- Create: `go/internal/bravo/plugins/errors.go`
+- Create: `go/internal/bravo/plugins/registry.go`
 - Create: `go/internal/bravo/plugins/registry_test.go`
 
 **Step 1: Write the failing test**
@@ -134,7 +135,25 @@ type Factory interface {
 }
 ```
 
-Create `go/internal/bravo/plugins/registry.go`:
+Create `go/internal/bravo/plugins/errors.go` (sentinels — `dewey/bravo/errors` doesn't export `New`, so we use stdlib `errors` here, matching the precedent in `internal/charlie/hyphence/document.go`):
+
+```go
+package plugins
+
+import "errors"
+
+var (
+	// ErrAlreadyRegistered is returned by Registry.Register when the
+	// reference is already registered.
+	ErrAlreadyRegistered = errors.New("plugin already registered")
+
+	// ErrUnknownPlugin is returned by Registry.Resolve when the
+	// reference is not registered.
+	ErrUnknownPlugin = errors.New("unknown plugin reference")
+)
+```
+
+Then create `go/internal/bravo/plugins/registry.go`:
 
 ```go
 package plugins
@@ -144,11 +163,6 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-)
-
-var (
-	ErrAlreadyRegistered = errors.New("plugin already registered")
-	ErrUnknownPlugin     = errors.New("unknown plugin reference")
 )
 
 // registry is the in-process plugin index. The package-level Default
@@ -216,6 +230,7 @@ Expected: `go/pkgs/plugins/main.go` is created with re-exports for `Factory`, `E
 
 ```bash
 git add go/internal/bravo/plugins/main.go \
+    go/internal/bravo/plugins/errors.go \
     go/internal/bravo/plugins/registry.go \
     go/internal/bravo/plugins/registry_test.go \
     go/pkgs/plugins/main.go
