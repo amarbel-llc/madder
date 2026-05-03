@@ -1,8 +1,6 @@
 package env_dir
 
 import (
-	"os"
-
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
@@ -17,6 +15,11 @@ type beforeXDG struct {
 	debugOptions debug.Options
 }
 
+// initialize wires up xdgInitArgs and stashes debug/dry-run state.
+// The binary path stays on env.xdgInitArgs.ExecPath; subprocess
+// plumbing publishes it via MakeCommonEnv / AddToEnvVars and passes
+// it through exec.Cmd.Env explicitly rather than via process-env
+// inheritance.
 func (env *beforeXDG) initialize(
 	debugOptions debug.Options,
 	utilityName string,
@@ -30,14 +33,6 @@ func (env *beforeXDG) initialize(
 	}
 
 	env.dryRun = debugOptions.DryRun
-
-	// TODO switch to useing MakeCommonEnv()
-	{
-		if err = os.Setenv(env.envVarNames.Binary, env.xdgInitArgs.ExecPath); err != nil {
-			err = errors.Wrap(err)
-			return err
-		}
-	}
 
 	return err
 }
