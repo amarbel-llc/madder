@@ -275,7 +275,6 @@ func TestFormatBodyEmitter_EmitsCanonicalizedMetadataThenBody(t *testing.T) {
 			{Prefix: '!', Value: "md"},
 			{Prefix: '#', Value: "desc"},
 		},
-		HasBody: true,
 	}
 	const body = "hello\n"
 	var out bytes.Buffer
@@ -288,12 +287,14 @@ func TestFormatBodyEmitter_EmitsCanonicalizedMetadataThenBody(t *testing.T) {
 	if got := out.String(); got != want {
 		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
 	}
+	if !doc.HasBody {
+		t.Error("Doc.HasBody should be set after emitter saw bytes")
+	}
 }
 
 func TestFormatBodyEmitter_NoBody(t *testing.T) {
 	doc := &Document{
 		Metadata: []MetadataLine{{Prefix: '!', Value: "md"}},
-		HasBody:  false,
 	}
 	var out bytes.Buffer
 	emitter := &FormatBodyEmitter{Doc: doc, Out: &out}
@@ -304,6 +305,9 @@ func TestFormatBodyEmitter_NoBody(t *testing.T) {
 	if got := out.String(); got != want {
 		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
 	}
+	if doc.HasBody {
+		t.Error("Doc.HasBody should be false when no bytes followed")
+	}
 }
 
 func TestFormatBodyEmitter_LeadingAndTrailingComments(t *testing.T) {
@@ -312,7 +316,6 @@ func TestFormatBodyEmitter_LeadingAndTrailingComments(t *testing.T) {
 			{Prefix: '!', Value: "md", LeadingComments: []string{"about-type"}},
 		},
 		TrailingComments: []string{"end note"},
-		HasBody:          false,
 	}
 	var out bytes.Buffer
 	emitter := &FormatBodyEmitter{Doc: doc, Out: &out}

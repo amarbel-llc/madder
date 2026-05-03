@@ -170,6 +170,16 @@ type FormatBodyEmitter struct {
 func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 	Canonicalize(e.Doc)
 
+	// Peek the body reader to determine HasBody. The upstream
+	// hyphence.Reader hands the Blob consumer a *bufio.Reader; if
+	// that contract changes, fall back to wrapping so Peek works.
+	br, ok := r.(*bufio.Reader)
+	if !ok {
+		br = bufio.NewReader(r)
+	}
+	_, peekErr := br.Peek(1)
+	e.Doc.HasBody = peekErr == nil
+
 	bw := bufio.NewWriter(e.Out)
 
 	if _, err := io.WriteString(bw, "---\n"); err != nil {
@@ -194,17 +204,10 @@ func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 		return 0, errors.Wrap(err)
 	}
 
-	// TODO(slice-3): FormatBodyEmitter is being redesigned in
-	// Task 3.4 to peek the body reader and set Doc.HasBody itself.
-	// Today the flag is only set by tests; production callers
-	// (validate/format subcommands) don't set it.
 	if !e.Doc.HasBody {
-		// Drain r so the upstream Reader pipeline reaches EOF
-		// cleanly even when the document has no body section.
 		if err := bw.Flush(); err != nil {
 			return 0, errors.Wrap(err)
 		}
-		_, _ = io.Copy(io.Discard, r)
 		return 0, nil
 	}
 
@@ -215,7 +218,7 @@ func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 		return 0, errors.Wrap(err)
 	}
 
-	n, err := io.Copy(e.Out, r)
+	n, err := io.Copy(e.Out, br)
 	if err != nil {
 		return n, errors.Wrap(err)
 	}
