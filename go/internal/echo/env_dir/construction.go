@@ -120,7 +120,7 @@ func MakeWithDefaultHome(
 	initialize bool,
 ) (env env) {
 	env.Context = context
-	env.envVarNames = cfg.envVarNamesOrDefault()
+	env.envVarNames = cfg.EnvVarNames
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -160,7 +160,7 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 	xdgRootOverride string,
 ) (env env) {
 	env.Context = context
-	env.envVarNames = cfg.envVarNamesOrDefault()
+	env.envVarNames = cfg.EnvVarNames
 	env.xdgInitArgs.Cwd = xdgRootOverride
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
@@ -193,7 +193,7 @@ func MakeWithHomeAndInitialize(
 	home string,
 ) (env env) {
 	env.Context = context
-	env.envVarNames = cfg.envVarNamesOrDefault()
+	env.envVarNames = cfg.EnvVarNames
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -222,7 +222,7 @@ func MakeWithXDG(
 	xdg xdg.XDG,
 ) (env env) {
 	env.Context = context
-	env.envVarNames = cfg.envVarNamesOrDefault()
+	env.envVarNames = cfg.EnvVarNames
 	env.XDG = xdg
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdg.UtilityName); err != nil {

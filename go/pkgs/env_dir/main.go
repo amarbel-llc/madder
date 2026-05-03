@@ -15,7 +15,6 @@ type (
 )
 
 var (
-	DefaultEnvVarNames                       = internal.DefaultEnvVarNames
 	MakeDefault                              = internal.MakeDefault
 	MakeDefaultAndInitialize                 = internal.MakeDefaultAndInitialize
 	MakeDefaultNoInit                        = internal.MakeDefaultNoInit
@@ -25,10 +24,4 @@ var (
 	MakeWithHomeAndInitialize                = internal.MakeWithHomeAndInitialize
 	MakeWithXDG                              = internal.MakeWithXDG
 	MakeWithXDGRootOverrideHomeAndInitialize = internal.MakeWithXDGRootOverrideHomeAndInitialize
-)
-
-const (
-	EnvBin               = internal.EnvBin
-	EnvVerifyOnCollision = internal.EnvVerifyOnCollision
-	OverrideEnvVarName   = internal.OverrideEnvVarName
 )

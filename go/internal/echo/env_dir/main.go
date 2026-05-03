@@ -136,6 +136,9 @@ func (env env) GetPid() int {
 }
 
 func (env env) AddToEnvVars(envVars interfaces.EnvVars) {
+	if env.envVarNames.Binary == "" {
+		return
+	}
 	envVars[env.envVarNames.Binary] = env.GetExecPath()
 }
 
@@ -216,6 +219,9 @@ func (env env) Rel(
 }
 
 func (env env) MakeCommonEnv() map[string]string {
+	if env.envVarNames.Binary == "" {
+		return nil
+	}
 	return map[string]string{
 		env.envVarNames.Binary: env.GetExecPath(),
 	}

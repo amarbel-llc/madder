@@ -4,58 +4,11 @@ package env_dir
 
 import "testing"
 
-// TestEnvVarNames pins the DODDER → MADDER env var rename from #42. All
-// three constants are user-visible contracts.
-func TestEnvVarNames(t *testing.T) {
-	if EnvBin != "BIN_MADDER" {
-		t.Errorf("EnvBin = %q, want %q", EnvBin, "BIN_MADDER")
-	}
-
-	if OverrideEnvVarName != "MADDER_XDG_UTILITY_OVERRIDE" {
-		t.Errorf("OverrideEnvVarName = %q, want %q",
-			OverrideEnvVarName, "MADDER_XDG_UTILITY_OVERRIDE")
-	}
-
-	if EnvVerifyOnCollision != "MADDER_VERIFY_ON_COLLISION" {
-		t.Errorf("EnvVerifyOnCollision = %q, want %q",
-			EnvVerifyOnCollision, "MADDER_VERIFY_ON_COLLISION")
-	}
-}
-
-// TestDefaultEnvVarNames pins the bundle Config falls back to when its
-// EnvVarNames field is the zero value.
-func TestDefaultEnvVarNames(t *testing.T) {
-	if got, want := DefaultEnvVarNames.Binary, EnvBin; got != want {
-		t.Errorf("DefaultEnvVarNames.Binary = %q, want %q", got, want)
-	}
-
-	if got, want := DefaultEnvVarNames.XDGUtilityOverride, OverrideEnvVarName; got != want {
-		t.Errorf("DefaultEnvVarNames.XDGUtilityOverride = %q, want %q", got, want)
-	}
-
-	if got, want := DefaultEnvVarNames.VerifyOnCollision, EnvVerifyOnCollision; got != want {
-		t.Errorf("DefaultEnvVarNames.VerifyOnCollision = %q, want %q", got, want)
-	}
-}
-
-// TestConfig_ZeroValueDefaultsEnvVarNames proves the zero-value Config
-// resolves to DefaultEnvVarNames. Callers that don't need to override
-// the env var prefix can pass Config{} (or Config{DebugOptions: ...})
-// and get madder's BIN_MADDER / MADDER_* contract automatically.
-func TestConfig_ZeroValueDefaultsEnvVarNames(t *testing.T) {
-	cfg := Config{}
-
-	if got := cfg.envVarNamesOrDefault(); got != DefaultEnvVarNames {
-		t.Errorf("Config{}.envVarNamesOrDefault() = %+v, want %+v",
-			got, DefaultEnvVarNames)
-	}
-}
-
-// TestConfig_ExplicitEnvVarNamesPreserved proves that any non-zero
-// EnvVarNames field defeats defaulting: the entire bundle the caller
-// supplied is taken as-is. Matches the prior WithEnvVarNames semantics
-// (whole-bundle replacement; no partial-field merge with defaults).
-func TestConfig_ExplicitEnvVarNamesPreserved(t *testing.T) {
+// TestConfig_EnvVarNamesPassedThrough proves Config.EnvVarNames is
+// taken as-is — no fallback, no merge with library defaults. env_dir
+// is utility-agnostic; the application layer (e.g. madder_env) owns
+// its own EnvVarNames bundle.
+func TestConfig_EnvVarNamesPassedThrough(t *testing.T) {
 	custom := EnvVarNames{
 		Binary:             "X_BIN",
 		XDGUtilityOverride: "X_OVERRIDE",
@@ -63,7 +16,33 @@ func TestConfig_ExplicitEnvVarNamesPreserved(t *testing.T) {
 	}
 	cfg := Config{EnvVarNames: custom}
 
-	if got := cfg.envVarNamesOrDefault(); got != custom {
-		t.Errorf("envVarNamesOrDefault() = %+v, want %+v", got, custom)
+	if cfg.EnvVarNames != custom {
+		t.Errorf("Config.EnvVarNames = %+v, want %+v",
+			cfg.EnvVarNames, custom)
+	}
+}
+
+// TestConfig_ZeroEnvVarNames_TolerableForSubprocessPublish proves the
+// zero-value EnvVarNames opts out of subprocess publishing instead of
+// emitting under an empty key (which would be invalid).
+//
+// Background: an env_dir built from Config{} has EnvVarNames.Binary
+// == "". AddToEnvVars and MakeCommonEnv MUST NOT emit a key-value pair
+// in that state — an empty env-var name is invalid syntax for
+// `exec.Cmd.Env` and would silently corrupt subprocess environments.
+func TestConfig_ZeroEnvVarNames_TolerableForSubprocessPublish(t *testing.T) {
+	env := env{}
+	env.envVarNames = EnvVarNames{}
+
+	if got := env.MakeCommonEnv(); got != nil {
+		t.Errorf("MakeCommonEnv with empty EnvVarNames = %+v, want nil",
+			got)
+	}
+
+	envVars := map[string]string{}
+	env.AddToEnvVars(envVars)
+	if len(envVars) != 0 {
+		t.Errorf("AddToEnvVars with empty EnvVarNames populated %d entries: %+v",
+			len(envVars), envVars)
 	}
 }

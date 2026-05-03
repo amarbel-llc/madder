@@ -8,6 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/echo/madder_env"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -62,7 +63,10 @@ func (cmd Complete) makeEnv(req futility.Request) env_local.Env {
 
 	dir := env_dir.MakeDefault(
 		req,
-		env_dir.Config{DebugOptions: debugOptions},
+		env_dir.Config{
+			EnvVarNames:  madder_env.DefaultEnvVarNames,
+			DebugOptions: debugOptions,
+		},
 		req.Utility.GetName(),
 	)
 
