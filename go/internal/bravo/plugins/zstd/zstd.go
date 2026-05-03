@@ -8,10 +8,8 @@ import (
 	"github.com/DataDog/zstd"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 )
 
-// Reference is the canonical plugin reference for the zstd codec.
 const Reference = "madder-codec-zstd-v1@zstd"
 
 func init() {
@@ -29,5 +27,5 @@ func (wrapper) WrapWriter(w io.Writer) (io.WriteCloser, error) {
 }
 
 func (wrapper) WrapReader(r io.Reader) (io.ReadCloser, error) {
-	return ohio.NopCloser(zstd.NewReader(r)), nil
+	return zstd.NewReader(r), nil
 }

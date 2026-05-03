@@ -39,7 +39,7 @@ func (r *registry) Resolve(reference string) (interfaces.IOWrapper, error) {
 }
 
 // Default is the package-level registry, populated by plugin
-// subpackages at init time. Production callers use this.
+// subpackages at init time.
 var Default = newRegistry()
 
 // MustRegister registers a plugin in the Default registry; panics on

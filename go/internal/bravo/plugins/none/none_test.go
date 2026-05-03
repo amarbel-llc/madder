@@ -47,3 +47,35 @@ func TestNone_RoundTrip(t *testing.T) {
 		t.Errorf("none should be identity; decoded = %q, want %q", got, input)
 	}
 }
+
+func TestNone_IsIdentity_MatchesResolved(t *testing.T) {
+	// IsIdentity is the contract Slice 5 will use to replace
+	// env_dir's compression_type type-assertion. Pin that the
+	// instance returned via the registry IS recognized as the
+	// identity wrapper.
+	w, err := plugins.Resolve("madder-codec-none-v1@none")
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if !IsIdentity(w) {
+		t.Errorf("resolved plugin should be the identity wrapper")
+	}
+}
+
+func TestNone_IsIdentity_RejectsForeign(t *testing.T) {
+	// A non-none wrapper should not match. Use the existing factory
+	// to produce a wrapper of a different type via a stub.
+	other := stubNonIdentity{}
+	if IsIdentity(other) {
+		t.Errorf("foreign wrapper should not be identity")
+	}
+}
+
+type stubNonIdentity struct{}
+
+func (stubNonIdentity) WrapWriter(w io.Writer) (io.WriteCloser, error) {
+	return nil, nil
+}
+func (stubNonIdentity) WrapReader(r io.Reader) (io.ReadCloser, error) {
+	return nil, nil
+}

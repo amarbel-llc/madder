@@ -573,7 +573,6 @@ import (
 	"github.com/DataDog/zstd"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 )
 
 const Reference = "madder-codec-zstd-v1@zstd"
@@ -593,20 +592,21 @@ func (wrapper) WrapWriter(w io.Writer) (io.WriteCloser, error) {
 }
 
 func (wrapper) WrapReader(r io.Reader) (io.ReadCloser, error) {
-	// DataDog zstd's NewReader returns io.ReadCloser already.
-	return ohio.NopCloser(zstd.NewReader(r)), nil
+	// zstd.NewReader's Close releases CGo-owned native zstd context;
+	// don't wrap in NopCloser (the existing dewey-side routing has
+	// the same leak — separate follow-up).
+	return zstd.NewReader(r), nil
 }
 ```
-
-(The `NopCloser` wrap matches the existing dewey behavior in `compression_type.WrapReader` for the zstd case.)
 
 **Commit message:**
 
 ```
 feat(plugins): add zstd plugin
 
-Reference: madder-codec-zstd-v1@zstd. Wraps github.com/DataDog/zstd
-to mirror the existing dewey routing (Closer semantics included).
+Reference: madder-codec-zstd-v1@zstd. Wraps github.com/DataDog/zstd.
+zstd.NewReader's Close releases CGo-owned native zstd context, so
+the returned io.ReadCloser is used directly (no NopCloser wrap).
 
 :clown:
 ```

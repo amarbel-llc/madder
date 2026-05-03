@@ -8,14 +8,13 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 )
 
-// Reference is the canonical plugin reference for the none codec.
 const Reference = "madder-codec-none-v1@none"
 
-// Wrapper is the singleton instance returned by the none plugin's
-// factory. Callers checking for byte-identity behavior can compare
-// against this value (used by env_dir.HasIdentityWrappers in a
-// later slice).
-var Wrapper = ohio.NopeIOWrapper{}
+// wrapper is the singleton instance returned by the none plugin's
+// factory. Comparison against this value is the byte-identity check
+// used by IsIdentity; consumers should call IsIdentity rather than
+// reaching for the singleton directly.
+var wrapper = ohio.NopeIOWrapper{}
 
 func init() {
 	plugins.MustRegister(Reference, factory{})
@@ -23,4 +22,10 @@ func init() {
 
 type factory struct{}
 
-func (factory) New() interfaces.IOWrapper { return Wrapper }
+func (factory) New() interfaces.IOWrapper { return wrapper }
+
+// IsIdentity reports whether w is the none plugin's identity wrapper —
+// the byte-identity check used by env_dir.HasIdentityWrappers.
+func IsIdentity(w interfaces.IOWrapper) bool {
+	return w == wrapper
+}

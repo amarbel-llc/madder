@@ -10,7 +10,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
 
-// Reference is the canonical plugin reference for the gzip codec.
 const Reference = "madder-codec-gzip-v1@gzip"
 
 func init() {
