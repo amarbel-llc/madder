@@ -97,10 +97,16 @@ Each plugin instance is referenced by:
 
 For v0 the right side is treated opaquely: madder's plugin
 registry maps `<type-tag>@<builtin-plugin-id>` strings to
-factories baked in at build time. Any callable convention is fine
-as long as it's stable; opaque strings (e.g. `zstd-v1`) work today
-without changing the surface that future content-addressing fills
-in.
+factories baked in at build time. The convention is **the Go
+package name housing the plugin's factory**, e.g.
+`madder-codec-zstd-v1@zstd`, where the package's leaf name (`zstd`)
+is the opaque id. This gives v0 a stable mechanical rule for
+generating ids without designing the build-orchestration story up
+front; the FDR 0005 explores the eventual content-addressed
+mechanism (nix-store-path digest, source-tree hash, or compiled-
+object hash). When that lands, the on-disk surface becomes
+`madder-codec-zstd-v1@<digest>` without changing this FDR's
+abstractions — only what the right side resolves to.
 
 ### Plugin chain
 
@@ -120,17 +126,19 @@ additive future work.
 Madder's initial plugin registry has four entries, each baked in
 at compile time:
 
-| Type-tag                  | Behavior                                   |
-|---------------------------|--------------------------------------------|
-| `madder-codec-none-v1`    | Identity (passthrough). Used by stores    |
-|                           | that store raw bytes.                      |
-| `madder-codec-gzip-v1`    | gzip via `compress/gzip`.                  |
-| `madder-codec-zlib-v1`    | zlib via `compress/zlib`.                  |
-| `madder-codec-zstd-v1`    | zstd via the current zstd library.         |
+| Type-tag                  | Builtin-plugin-id (v0)   | Behavior                              |
+|---------------------------|--------------------------|---------------------------------------|
+| `madder-codec-none-v1`    | `none`                   | Identity (passthrough). Used by      |
+|                           |                          | stores that store raw bytes.          |
+| `madder-codec-gzip-v1`    | `gzip`                   | gzip via `compress/gzip`.             |
+| `madder-codec-zlib-v1`    | `zlib`                   | zlib via `compress/zlib`.             |
+| `madder-codec-zstd-v1`    | `zstd`                   | zstd via the current zstd library.    |
 
-The registry uses opaque builtin-plugin-id strings (e.g.
-`zstd-v1`) for v0; a follow-up wires up content-addressed ids
-once the build orchestration is in place.
+Each builtin-plugin-id matches the leaf name of the Go package
+housing the plugin's factory. So `madder-codec-zstd-v1@zstd` is
+the v0 reference for the bundled zstd plugin. FDR 0005 explores
+the eventual content-addressed replacement; until then the
+package-name convention is stable enough to ship.
 
 ### V4 store config schema
 
@@ -183,12 +191,12 @@ Inspecting a freshly initialized V4 store:
     [blob-store]
     hash_type-id = "blake2b256"
     hash_buckets = [256, 256]
-    plugin-chain = "madder-codec-zstd-v1@zstd-v1"
+    plugin-chain = "madder-codec-zstd-v1@zstd"
     verify-on-collision = false
 
 Switching to gzip at init time (assuming a flag like `-codec`):
 
-    $ madder init -codec madder-codec-gzip-v1@gzip-v1 .archive
+    $ madder init -codec madder-codec-gzip-v1@gzip .archive
 
 A legacy V3 store reads transparently — no user-visible change:
 
@@ -210,12 +218,13 @@ A legacy V3 store reads transparently — no user-visible change:
   shipped.
 
 - **No content-addressed builtin-plugin-ids in v0.** The
-  builtin-plugin-id field is treated as an opaque stable string
-  (e.g. `zstd-v1`). Wiring up nix-store-path-derived or source-
-  tree-derived digests is build-orchestration work that's out of
-  scope for this FDR. The on-disk and runtime APIs are
-  forward-compatible with content-addressed ids when they
-  arrive.
+  builtin-plugin-id is the Go package leaf name housing the
+  plugin's factory (e.g. `zstd` for the bundled zstd plugin).
+  This is a stop-gap; the eventual mechanism (nix-store-path
+  digest, source-tree hash, or compiled-object hash) is the
+  subject of FDR 0005. The on-disk and runtime APIs are
+  forward-compatible with content-addressed ids — only what the
+  right side resolves to changes.
 
 - **No pipeline plugins in v0.** A store has one plugin. A
   future pipeline plugin can compose multiple transforms; v0
@@ -261,9 +270,14 @@ A legacy V3 store reads transparently — no user-visible change:
   layer; the plugin architecture subsumes that approach by making
   dict-awareness a property of a specific plugin
   (`madder-codec-zstd-with-dict-v1`, deferred to FDR 0005).
-- FDR 0005 (forthcoming) — adds the `zstd-with-dict` plugin and
+- FDR 0005 (forthcoming) — explores the build-orchestration
+  mechanism for content-addressed builtin-plugin-ids. The v0
+  package-name convention is a stop-gap; FDR 0005 picks the
+  eventual replacement.
+- FDR 0006 (forthcoming) — adds the `zstd-with-dict` plugin and
   the `cg capture --zstd-dict` / `madder train-zstd-dict` user-
-  facing surfaces on top of this architecture.
+  facing surfaces on top of this architecture, replacing the
+  superseded FDR 0003 user-surface design.
 - `github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type` —
   the dewey package this architecture displaces. Stays available
   to dewey's own consumers; madder stops depending on it for new
