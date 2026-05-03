@@ -11,7 +11,12 @@ import "errors"
 type Document struct {
 	Metadata         []MetadataLine
 	TrailingComments []string
-	HasBody          bool
+	// HasBody is set when a body section followed the metadata
+	// closing boundary. NOTE: MetadataBuilder does not set this
+	// today; FormatBodyEmitter peeks its body reader to determine
+	// presence at emit time. See Slice 3 Task 3.4 in
+	// docs/plans/2026-05-03-hyphence-utility.md.
+	HasBody bool
 }
 
 // MetadataLine is a single metadata line keyed by its single-character

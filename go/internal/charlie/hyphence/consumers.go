@@ -94,15 +94,6 @@ func (m *MetadataBuilder) ReadFrom(r io.Reader) (int64, error) {
 	return n, nil
 }
 
-func isValidPrefix(b byte) bool {
-	switch b {
-	case '!', '@', '#', '-', '<', '%':
-		return true
-	default:
-		return false
-	}
-}
-
 // MetadataValidator is the metadata consumer for `hyphence validate`.
 // It parses each metadata line strictly per RFC 0001 §Metadata Lines.
 // Tracks SawAtLine for the post-ReadFrom inline-body-AND-@ cross-
@@ -175,36 +166,48 @@ type FormatBodyEmitter struct {
 func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 	Canonicalize(e.Doc)
 
-	if _, err := fmt.Fprint(e.Out, "---\n"); err != nil {
+	bw := bufio.NewWriter(e.Out)
+
+	if _, err := io.WriteString(bw, "---\n"); err != nil {
 		return 0, errors.Wrap(err)
 	}
 	for _, ml := range e.Doc.Metadata {
 		for _, c := range ml.LeadingComments {
-			if _, err := fmt.Fprintf(e.Out, "%% %s\n", c); err != nil {
+			if _, err := fmt.Fprintf(bw, "%% %s\n", c); err != nil {
 				return 0, errors.Wrap(err)
 			}
 		}
-		if _, err := fmt.Fprintf(e.Out, "%c %s\n", ml.Prefix, ml.Value); err != nil {
+		if _, err := fmt.Fprintf(bw, "%c %s\n", ml.Prefix, ml.Value); err != nil {
 			return 0, errors.Wrap(err)
 		}
 	}
 	for _, c := range e.Doc.TrailingComments {
-		if _, err := fmt.Fprintf(e.Out, "%% %s\n", c); err != nil {
+		if _, err := fmt.Fprintf(bw, "%% %s\n", c); err != nil {
 			return 0, errors.Wrap(err)
 		}
 	}
-	if _, err := fmt.Fprint(e.Out, "---\n"); err != nil {
+	if _, err := io.WriteString(bw, "---\n"); err != nil {
 		return 0, errors.Wrap(err)
 	}
 
+	// TODO(slice-3): FormatBodyEmitter is being redesigned in
+	// Task 3.4 to peek the body reader and set Doc.HasBody itself.
+	// Today the flag is only set by tests; production callers
+	// (validate/format subcommands) don't set it.
 	if !e.Doc.HasBody {
-		// Drain r to release any underlying buffer; but no body
-		// separator + body bytes are emitted when there's no body.
+		// Drain r so the upstream Reader pipeline reaches EOF
+		// cleanly even when the document has no body section.
+		if err := bw.Flush(); err != nil {
+			return 0, errors.Wrap(err)
+		}
 		_, _ = io.Copy(io.Discard, r)
 		return 0, nil
 	}
 
-	if _, err := fmt.Fprint(e.Out, "\n"); err != nil {
+	if _, err := io.WriteString(bw, "\n"); err != nil {
+		return 0, errors.Wrap(err)
+	}
+	if err := bw.Flush(); err != nil {
 		return 0, errors.Wrap(err)
 	}
 
