@@ -5,10 +5,10 @@ package env_dir
 import internal "github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 
 type (
+	Config               = internal.Config
 	Env                  = internal.Env
 	EnvVarNames          = internal.EnvVarNames
 	ErrTempAlreadyExists = internal.ErrTempAlreadyExists
-	Option               = internal.Option
 	RelativePath         = internal.RelativePath
 	RepoId               = internal.RepoId
 	TemporaryFS          = internal.TemporaryFS
@@ -25,7 +25,6 @@ var (
 	MakeWithHomeAndInitialize                = internal.MakeWithHomeAndInitialize
 	MakeWithXDG                              = internal.MakeWithXDG
 	MakeWithXDGRootOverrideHomeAndInitialize = internal.MakeWithXDGRootOverrideHomeAndInitialize
-	WithEnvVarNames                          = internal.WithEnvVarNames
 )
 
 const (

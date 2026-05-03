@@ -4,60 +4,46 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
 )
 
 // TODO separate read-only from write
 
-// utilityName names the XDG scope this env reads/writes — the `<scope>`
+// xdgScope names the XDG scope this env reads/writes — the `<scope>`
 // segment in `$XDG_*_HOME/<scope>/`. It is decoupled from any CLI /
 // process-identity notion (which lives in cli_main / futility.Utility);
-// multiple env_dir instances with different utility names can coexist
-// in the same process and address disjoint XDG scopes that don't
-// affect each other. See command_components.EnvBlobStore.BlobStoreXDGScope
-// for one such use: cutting-garden (CLI identity = "cutting-garden")
-// constructs an env_dir with utilityName="madder" so it operates on
-// madder's blob store paths. The deeper struct-state /
-// multi-scope-composition refactor is tracked separately.
+// multiple env_dir instances with different scopes can coexist in the
+// same process and address disjoint XDG paths that don't affect one
+// another. cutting-garden (CLI identity = "cutting-garden") constructs
+// an env_dir with xdgScope="madder" so it operates on madder's blob
+// store paths; if it also wants its own state, it constructs a SECOND
+// env_dir with xdgScope="cutting-garden" using the same Config bundle.
+//
+// MakeWithXDG and MakeFromXDGDotenvPath take an externally-supplied
+// xdg.XDG (or a dotenv that builds one) instead of an xdgScope string;
+// in those constructors the scope is read from xdg.UtilityName, which
+// is single-source-of-truth.
 
 func MakeDefault(
 	context errors.Context,
-	utilityName string,
-	debugOptions debug.Options,
-	opts ...Option,
+	cfg Config,
+	xdgScope string,
 ) env {
-	return MakeWithDefaultHome(
-		context,
-		utilityName,
-		debugOptions,
-		true,
-		true,
-		opts...,
-	)
+	return MakeWithDefaultHome(context, cfg, xdgScope, true, true)
 }
 
 func MakeDefaultNoInit(
 	context errors.Context,
-	utilityName string,
-	debugOptions debug.Options,
-	opts ...Option,
+	cfg Config,
+	xdgScope string,
 ) env {
-	return MakeWithDefaultHome(
-		context,
-		utilityName,
-		debugOptions,
-		true,
-		false,
-		opts...,
-	)
+	return MakeWithDefaultHome(context, cfg, xdgScope, true, false)
 }
 
 func MakeFromXDGDotenvPath(
 	context errors.Context,
-	debugOptions debug.Options,
+	cfg Config,
 	xdgDotenvPath string,
-	opts ...Option,
 ) env {
 	dotenv := xdg.Dotenv{
 		XDG: &xdg.XDG{},
@@ -81,20 +67,14 @@ func MakeFromXDGDotenvPath(
 		context.Cancel(err)
 	}
 
-	return MakeWithXDG(
-		context,
-		debugOptions,
-		*dotenv.XDG,
-		opts...,
-	)
+	return MakeWithXDG(context, cfg, *dotenv.XDG)
 }
 
 func MakeDefaultAndInitialize(
 	context errors.Context,
-	utilityName string,
-	do debug.Options,
+	cfg Config,
+	xdgScope string,
 	repoId RepoId,
-	opts ...Option,
 ) env {
 	if repoId.IsSystem() {
 		panic(errors.WithoutStack(errors.Err501NotImplemented))
@@ -113,10 +93,9 @@ func MakeDefaultAndInitialize(
 
 		return MakeWithXDGRootOverrideHomeAndInitialize(
 			context,
+			cfg,
+			xdgScope,
 			cwd,
-			utilityName,
-			do,
-			opts...,
 		)
 	}
 
@@ -130,28 +109,20 @@ func MakeDefaultAndInitialize(
 		}
 	}
 
-	return MakeWithHomeAndInitialize(
-		context,
-		utilityName,
-		home,
-		do,
-		opts...,
-	)
+	return MakeWithHomeAndInitialize(context, cfg, xdgScope, home)
 }
 
 func MakeWithDefaultHome(
 	context errors.Context,
-	utilityName string,
-	debugOptions debug.Options,
+	cfg Config,
+	xdgScope string,
 	permitCwdXDGOverride bool,
 	initialize bool,
-	opts ...Option,
 ) (env env) {
-	resolved := applyOptions(opts)
 	env.Context = context
-	env.envVarNames = resolved.envVarNames
+	env.envVarNames = cfg.envVarNamesOrDefault()
 
-	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
+	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
 		return env
 	}
@@ -184,17 +155,15 @@ func MakeWithDefaultHome(
 
 func MakeWithXDGRootOverrideHomeAndInitialize(
 	context errors.Context,
+	cfg Config,
+	xdgScope string,
 	xdgRootOverride string,
-	utilityName string,
-	debugOptions debug.Options,
-	opts ...Option,
 ) (env env) {
-	resolved := applyOptions(opts)
 	env.Context = context
-	env.envVarNames = resolved.envVarNames
+	env.envVarNames = cfg.envVarNamesOrDefault()
 	env.xdgInitArgs.Cwd = xdgRootOverride
 
-	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
+	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
 		return env
 	}
@@ -219,16 +188,14 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 
 func MakeWithHomeAndInitialize(
 	context errors.Context,
-	utilityName string,
+	cfg Config,
+	xdgScope string,
 	home string,
-	debugOptions debug.Options,
-	opts ...Option,
 ) (env env) {
-	resolved := applyOptions(opts)
 	env.Context = context
-	env.envVarNames = resolved.envVarNames
+	env.envVarNames = cfg.envVarNamesOrDefault()
 
-	if err := env.beforeXDG.initialize(debugOptions, utilityName); err != nil {
+	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
 	}
 
@@ -247,18 +214,18 @@ func MakeWithHomeAndInitialize(
 	return env
 }
 
+// MakeWithXDG accepts an externally-supplied xdg.XDG; the scope is read
+// from xdg.UtilityName. cfg carries only EnvVarNames and DebugOptions.
 func MakeWithXDG(
 	context errors.Context,
-	debugOptions debug.Options,
+	cfg Config,
 	xdg xdg.XDG,
-	opts ...Option,
 ) (env env) {
-	resolved := applyOptions(opts)
 	env.Context = context
-	env.envVarNames = resolved.envVarNames
+	env.envVarNames = cfg.envVarNamesOrDefault()
 	env.XDG = xdg
 
-	if err := env.beforeXDG.initialize(debugOptions, xdg.UtilityName); err != nil {
+	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdg.UtilityName); err != nil {
 		env.Cancel(err)
 		return env
 	}

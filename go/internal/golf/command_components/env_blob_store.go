@@ -77,8 +77,8 @@ func (cmd EnvBlobStore) makeEnvLocal(
 
 	dir := env_dir.MakeDefault(
 		req,
+		env_dir.Config{DebugOptions: debugOptions},
 		xdgScope,
-		debugOptions,
 	)
 
 	(&dir).SetBlobWriteObserver(makeBlobWriteObserver(req))

@@ -1,5 +1,7 @@
 package env_dir
 
+import "github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
+
 // EnvVarNames bundles the env var names env_dir reads from and writes to,
 // so consumers can supply their own prefix without forking.
 type EnvVarNames struct {
@@ -23,37 +25,37 @@ const (
 	EnvVerifyOnCollision = "MADDER_VERIFY_ON_COLLISION"
 )
 
-// DefaultEnvVarNames is the bundle MakeDefault* uses when no
-// WithEnvVarNames option is supplied.
+// DefaultEnvVarNames is the bundle Make* uses when Config.EnvVarNames is
+// the zero value.
 var DefaultEnvVarNames = EnvVarNames{
 	Binary:             EnvBin,
 	XDGUtilityOverride: OverrideEnvVarName,
 	VerifyOnCollision:  EnvVerifyOnCollision,
 }
 
-type Option func(*makeOpts)
-
-type makeOpts struct {
-	envVarNames EnvVarNames
+// Config bundles the construction inputs that are reusable across XDG
+// scopes. The XDG scope itself is NOT here — it is passed as its own arg
+// to each Make* constructor (or implied by an externally-supplied
+// xdg.XDG / dotenv path) so a single Config value can be applied to
+// multiple env_dir instances with disjoint scopes:
+//
+//	cfg := env_dir.Config{DebugOptions: dbg}
+//	madderEnv := env_dir.MakeDefault(ctx, cfg, "madder")
+//	cgEnv     := env_dir.MakeDefault(ctx, cfg, "cutting-garden")
+//
+// EnvVarNames defaults to DefaultEnvVarNames when zero. Partial-override
+// is not supported: if any field is set, the entire bundle is taken
+// as-is (matches the prior WithEnvVarNames semantics).
+type Config struct {
+	EnvVarNames  EnvVarNames
+	DebugOptions debug.Options
 }
 
-func defaultMakeOpts() makeOpts {
-	return makeOpts{envVarNames: DefaultEnvVarNames}
-}
-
-func applyOptions(opts []Option) makeOpts {
-	resolved := defaultMakeOpts()
-	for _, opt := range opts {
-		opt(&resolved)
+// envVarNamesOrDefault returns cfg.EnvVarNames when any field is non-zero,
+// otherwise DefaultEnvVarNames.
+func (cfg Config) envVarNamesOrDefault() EnvVarNames {
+	if cfg.EnvVarNames == (EnvVarNames{}) {
+		return DefaultEnvVarNames
 	}
-	return resolved
-}
-
-// WithEnvVarNames overrides the env var names env_dir reads from / writes
-// to. When unset, DefaultEnvVarNames applies (madder's BIN_MADDER /
-// MADDER_* contract).
-func WithEnvVarNames(names EnvVarNames) Option {
-	return func(o *makeOpts) {
-		o.envVarNames = names
-	}
+	return cfg.EnvVarNames
 }

@@ -62,8 +62,8 @@ func (cmd Complete) makeEnv(req futility.Request) env_local.Env {
 
 	dir := env_dir.MakeDefault(
 		req,
+		env_dir.Config{DebugOptions: debugOptions},
 		req.Utility.GetName(),
-		debugOptions,
 	)
 
 	return env_local.Make(

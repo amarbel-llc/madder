@@ -22,8 +22,8 @@ func TestEnvVarNames(t *testing.T) {
 	}
 }
 
-// TestDefaultEnvVarNames pins the bundle MakeDefault* uses when no
-// WithEnvVarNames option is supplied.
+// TestDefaultEnvVarNames pins the bundle Config falls back to when its
+// EnvVarNames field is the zero value.
 func TestDefaultEnvVarNames(t *testing.T) {
 	if got, want := DefaultEnvVarNames.Binary, EnvBin; got != want {
 		t.Errorf("DefaultEnvVarNames.Binary = %q, want %q", got, want)
@@ -38,35 +38,32 @@ func TestDefaultEnvVarNames(t *testing.T) {
 	}
 }
 
-// TestApplyOptions_NoOpts must yield DefaultEnvVarNames so callers that
-// pass no options keep madder's BIN_MADDER / MADDER_* contract.
-func TestApplyOptions_NoOpts(t *testing.T) {
-	got := applyOptions(nil)
+// TestConfig_ZeroValueDefaultsEnvVarNames proves the zero-value Config
+// resolves to DefaultEnvVarNames. Callers that don't need to override
+// the env var prefix can pass Config{} (or Config{DebugOptions: ...})
+// and get madder's BIN_MADDER / MADDER_* contract automatically.
+func TestConfig_ZeroValueDefaultsEnvVarNames(t *testing.T) {
+	cfg := Config{}
 
-	if got.envVarNames != DefaultEnvVarNames {
-		t.Errorf("applyOptions(nil).envVarNames = %+v, want %+v",
-			got.envVarNames, DefaultEnvVarNames)
+	if got := cfg.envVarNamesOrDefault(); got != DefaultEnvVarNames {
+		t.Errorf("Config{}.envVarNamesOrDefault() = %+v, want %+v",
+			got, DefaultEnvVarNames)
 	}
 }
 
-// TestWithEnvVarNames_Overrides proves the consumer-facing seam: a
-// custom EnvVarNames bundle passed via WithEnvVarNames replaces the
-// defaults inside the resolved makeOpts. The Make* constructors copy
-// resolved.envVarNames onto the env struct, which subsequent reads
-// (AddToEnvVars, MakeCommonEnv, beforeXDG.initialize, initializeXDG)
-// consult — so this test guards the contract end-to-end without
-// touching the filesystem.
-func TestWithEnvVarNames_Overrides(t *testing.T) {
+// TestConfig_ExplicitEnvVarNamesPreserved proves that any non-zero
+// EnvVarNames field defeats defaulting: the entire bundle the caller
+// supplied is taken as-is. Matches the prior WithEnvVarNames semantics
+// (whole-bundle replacement; no partial-field merge with defaults).
+func TestConfig_ExplicitEnvVarNamesPreserved(t *testing.T) {
 	custom := EnvVarNames{
 		Binary:             "X_BIN",
 		XDGUtilityOverride: "X_OVERRIDE",
 		VerifyOnCollision:  "X_VERIFY",
 	}
+	cfg := Config{EnvVarNames: custom}
 
-	got := applyOptions([]Option{WithEnvVarNames(custom)})
-
-	if got.envVarNames != custom {
-		t.Errorf("applyOptions(WithEnvVarNames(%+v)).envVarNames = %+v, want %+v",
-			custom, got.envVarNames, custom)
+	if got := cfg.envVarNamesOrDefault(); got != custom {
+		t.Errorf("envVarNamesOrDefault() = %+v, want %+v", got, custom)
 	}
 }
