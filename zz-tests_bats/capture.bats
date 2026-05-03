@@ -411,3 +411,51 @@ function capture_per_entry_failure_continues_walk { # @test
   echo "$output" | grep -q '"source":"tree/secret.txt".*"error"' ||
     fail "expected error record for secret.txt: $output"
 }
+
+function capture_writes_log_entry_at_cg_scope { # @test
+  # Multi-scope contract for env_dir #123 (Step 4): a single
+  # `cutting-garden capture` invocation produces side effects in TWO
+  # disjoint XDG scopes — blobs under madder's scope (handled by
+  # EnvBlobStore.MakeEnvBlobStore at the BlobStoreXDGScope="madder"
+  # path) and captures.log under cutting-garden's scope (handled by
+  # command_components.MakeEnvDirForScope at req.Utility.GetName()).
+  # Pins the multi-scope env_dir contract end-to-end and folds in the
+  # plan's Step-5 "pinning test" without a separate Go test rig — the
+  # bats lane is the right level for verifying the on-disk behavior.
+  export XDG_STATE_HOME="$BATS_TEST_TMPDIR/xdg-state"
+
+  init_store
+
+  mkdir -p tree/sub
+  echo "alpha" >tree/a.txt
+  echo "beta" >tree/sub/b.txt
+
+  run_cg capture -format json tree
+  assert_success
+
+  local rid
+  rid="$(receipt_id_of_group "$output")"
+  [[ -n $rid ]] || fail "no receipt id in output: $output"
+
+  # captures.log lands under cg's scope (distinct from madder's data
+  # scope where the blobs themselves live).
+  local log="$XDG_STATE_HOME/cutting-garden/captures.log"
+  [[ -f $log ]] || fail "expected captures.log at $log"
+
+  local n
+  n="$(wc -l <"$log")"
+  [[ $n -eq 1 ]] || fail "expected 1 captures.log line, got $n; contents:"$'\n'"$(cat "$log")"
+
+  local line
+  line="$(head -n 1 "$log")"
+
+  # Schema: ts + receipt_id + store_id + roots
+  echo "$line" | grep -qF "\"receipt_id\":\"$rid\"" ||
+    fail "captures.log line missing or wrong receipt_id; expected $rid; got: $line"
+  echo "$line" | grep -q '"store_id":""' ||
+    fail "captures.log line missing empty store_id (default store): $line"
+  echo "$line" | grep -q '"roots":\["tree"\]' ||
+    fail "captures.log line missing tree root: $line"
+  echo "$line" | grep -qE '"ts":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"' ||
+    fail "captures.log line missing RFC3339 ts: $line"
+}

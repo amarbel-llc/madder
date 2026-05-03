@@ -68,6 +68,16 @@ func init() {
 				"emits inventory-log records the same way. Suppress with " +
 				"--no-inventory-log or MADDER_INVENTORY_LOG=0.",
 		},
+		futility.FilePath{
+			Path: "$XDG_STATE_HOME/cutting-garden/captures.log",
+			Description: "Append-only NDJSON record of every receipt " +
+				"`cutting-garden capture` produces, one line per " +
+				"receipt: {ts, receipt_id, store_id, roots[]}. Lives " +
+				"under cutting-garden's own XDG scope (distinct from " +
+				"madder's blob-store scope) so the audit trail is " +
+				"separable from the data. Best-effort: write errors " +
+				"surface as a stderr notice but never fail the capture.",
+		},
 	)
 
 	utility.EnvVars = append(utility.EnvVars,

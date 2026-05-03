@@ -106,6 +106,15 @@ func (cmd *Capture) SetFlagDefinitions(
 func (cmd Capture) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
+	// cgEnvDir is the cutting-garden-scoped env_dir, distinct from the
+	// madder-scoped env_dir embedded in envBlobStore. The two address
+	// disjoint XDG paths by construction (proven by
+	// env_dir.TestMakeDefault_DistinctScopesAreIndependent). cg uses
+	// this for its own audit log; blob writes still go through
+	// envBlobStore at madder's scope. See #123 for the multi-scope
+	// design.
+	cgEnvDir := command_components.MakeEnvDirForScope(req, req.Utility.GetName())
+
 	args := req.PopArgs()
 	shadowCandidates := command_components.BlobStoreIds(envBlobStore.GetBlobStores())
 
@@ -120,6 +129,12 @@ func (cmd Capture) Run(req futility.Request) {
 	}
 
 	failCount := 0
+
+	// captureLogEntries accumulates one entry per receipt produced.
+	// Flushed to $XDG_STATE_HOME/<scope>/captures.log via
+	// appendCaptureLog after sink.Finalize. Stays empty if nothing
+	// successfully receipted.
+	var captureLogEntries []captureLogEntry
 
 	for _, cf := range classifyFails {
 		sink.Failure(cf.arg, cf.err)
@@ -185,9 +200,18 @@ func (cmd Capture) Run(req futility.Request) {
 		}
 
 		sink.StoreGroupReceipt(receiptID, len(entries))
+
+		captureLogEntries = append(captureLogEntries, captureLogEntry{
+			Ts:        captureLogTimestamp(),
+			ReceiptID: receiptID,
+			StoreID:   storeName,
+			Roots:     rootPaths(group.roots),
+		})
 	}
 
 	sink.Finalize()
+
+	appendCaptureLog(cgEnvDir, sink, captureLogEntries)
 
 	if failCount > 0 {
 		errors.ContextCancelWithBadRequestf(

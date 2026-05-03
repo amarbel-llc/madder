@@ -1,9 +1,37 @@
 # env_dir multi-scope composition + struct-state refactor
 
-Tracks GitHub issue [#123]. This document is *exploration only* — no
-code changes proposed for adoption yet. The user asked for an ordered
-breakdown plus a tracer consumer sketch; everything below is subject
-to confirmation before implementation.
+Tracks GitHub issue [#123]. Originally exploration-only; the multi-step
+breakdown landed across May 2026.
+
+## Status
+
+| Step | Description | Status |
+|------|-------------|--------|
+| 0 | Extract blob-IO from env_dir into `internal/foxtrot/blob_io` (frees the `Config` name) | ✅ commit `871c853` |
+| 1 | Introduce `env_dir.Config`; migrate the 8 `Make*` constructors; retire `Option` / `WithEnvVarNames` | ✅ commit `236bb26` |
+| 2 | Drop `os.Setenv` at construction (rely on `MakeCommonEnv` / `AddToEnvVars` for subprocess plumbing) | ✅ commit `7a38f14` |
+| 3 | `command_components.MakeEnvDirForScope` helper for wrapper-utility commands | ✅ commit `b305037` |
+| 4 | cg `captures.log` tracer consumer + bats pinning test (folds in Step 5) | ✅ this commit |
+
+The bats `capture_writes_log_entry_at_cg_scope` test pins the
+multi-scope contract end-to-end: a single `cutting-garden capture`
+invocation writes blobs under `$XDG_DATA_HOME/madder/blob_stores/`
+AND a captures.log line under `$XDG_STATE_HOME/cutting-garden/`,
+with the two paths disjoint by construction.
+
+## Known limitation flagged by Step 4
+
+`MADDER_XDG_UTILITY_OVERRIDE`, when set, currently redirects BOTH
+madder's and cg's env_dirs (because both use
+`DefaultEnvVarNames.XDGUtilityOverride = "MADDER_XDG_UTILITY_OVERRIDE"`).
+True env-var isolation between scopes would require cg's env_dir to
+use its own `EnvVarNames` bundle (e.g. `CG_XDG_UTILITY_OVERRIDE`).
+That is per-scope `EnvVarNames` plumbing and is not addressed by
+Steps 0–4. Worth tracking as a follow-up if anyone hits the footgun.
+
+---
+
+## Original exploration notes (preserved for context)
 
 ## What the code looks like today (verified by reading)
 
