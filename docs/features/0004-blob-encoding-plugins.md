@@ -2,12 +2,13 @@
 status: proposed
 date: 2026-05-03
 promotion-criteria: |
-  Promote to `experimental` once the plugin registry, V4 config
-  schema, and the four built-in plugins (none, gzip, zlib, zstd)
-  ship and at least one fresh store can be created and round-
-  tripped under V4. Promote to `accepted` after one tagged
-  release with V4 stores in user hands and no surprise
-  correctness reports.
+  Promote to `experimental` once the plugin registry, the four
+  built-in plugins (none, gzip, zlib, zstd), and the legacy-
+  config-translation path ship, AND the existing test/bats
+  suites pass green against madder with the
+  `dewey/delta/compression_type` import dropped. Promote to
+  `accepted` after one tagged release with the refactor in
+  user hands and no surprise correctness reports.
 ---
 
 # Blob encoding plugins
@@ -140,69 +141,85 @@ the v0 reference for the bundled zstd plugin. FDR 0005 explores
 the eventual content-addressed replacement; until then the
 package-name convention is stable enough to ship.
 
-### V4 store config schema
+### Store configs in v0
 
-Existing TOML store configs (V1, V2, V3) carry separate
-`compression-type` and `encryption` fields. V4 replaces both with
-a single `plugin-chain` field:
-
-```toml
-# V4 schema (proposed)
-[blob-store]
-hash_type-id = "blake2b256"
-hash_buckets = [256, 256]
-plugin-chain = "madder-codec-zstd-v1@zstd-v1"
-verify-on-collision = false
-```
-
-The legacy `compression-type` and `encryption` fields are absent
-from V4. V3 and earlier stores remain readable; their
-`compression-type` and `encryption` slots are translated at
-load-time into equivalent plugin references for the duration of
-the process. New stores produced by `madder init` write V4 by
-default.
+**No new on-disk config version.** Existing TOML store configs
+(V1, V2, V3) stay exactly as they are. There's no V4 schema, no
+`madder init` change, no new flags. v0 is a pure under-the-hood
+refactor: the only change is what madder builds in memory when
+it loads any of those configs.
 
 ### Reading legacy stores
 
-V3 store config:
+V1, V2, and V3 store configs keep their on-disk shape
+unchanged:
 
 ```toml
-# V3 (existing)
+# V1/V2/V3 (existing on-disk)
 [blob-store]
 compression-type = "zstd"
 encryption = "..."
 ```
 
-is translated at load-time into the V4 plugin-chain
-`madder-codec-zstd-v1@zstd-v1`. The translation is one-way at
-read time; V3 configs stay V3 on disk unless the user explicitly
-migrates them via a future `madder migrate-blob-store-config`
-command (out of scope for this FDR).
+At load time the legacy `compression-type` string is mapped to
+a plugin reference via a small in-binary table:
+
+| Legacy `compression-type` | Plugin reference                  |
+|---------------------------|-----------------------------------|
+| `""` or `"none"`          | `madder-codec-none-v1@none`       |
+| `"gzip"`                  | `madder-codec-gzip-v1@gzip`       |
+| `"zlib"`                  | `madder-codec-zlib-v1@zlib`       |
+| `"zstd"`                  | `madder-codec-zstd-v1@zstd`       |
+
+The legacy `encryption` field is unchanged — it's a markl-id of
+a key blob, owned by madder, not by dewey. Translation only
+applies to compression.
+
+V1/V2/V3 configs stay V1/V2/V3 on disk; the plugin
+representation is purely in-memory. Migrating an existing
+store's config to V4 is a separate user-facing operation
+(`madder migrate-blob-store-config` or similar; out of scope
+for this FDR). The runtime code path is unified — every store
+flows through the plugin abstraction; the legacy
+`compression-type` field is just an alternate serialization
+that resolves to the same plugin references.
+
+The result is that **madder drops its import of
+`github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type`
+entirely in v0**. The dewey package may stay alive for its
+other consumers; madder simply doesn't depend on it for any
+code path, new or legacy.
 
 ## Examples
 
-Inspecting a freshly initialized V4 store:
+v0 has no user-visible CLI surface — `madder init`, `madder
+write`, `madder cat`, `cg capture` all behave identically to
+before. The only observable difference is internal: madder no
+longer imports `dewey/delta/compression_type`. From the user's
+perspective, an existing store reads and writes exactly as it
+did before:
+
+    $ madder cat <id>@.legacy_v3_store
+    (decoded via the in-memory plugin
+     `madder-codec-zstd-v1@zstd`, which the V3 config's
+     `compression-type = "zstd"` translates to at load time)
+
+Initializing a new store still produces a V3 config:
 
     $ madder init -encryption none .scratch
     $ madder cat blob-store-config@.scratch
     ---
-    ! toml-blob_store_config-v4
+    ! toml-blob_store_config-v3
     ---
     [blob-store]
     hash_type-id = "blake2b256"
     hash_buckets = [256, 256]
-    plugin-chain = "madder-codec-zstd-v1@zstd"
-    verify-on-collision = false
+    compression-type = "zstd"
+    encryption = "..."
 
-Switching to gzip at init time (assuming a flag like `-codec`):
-
-    $ madder init -codec madder-codec-gzip-v1@gzip .archive
-
-A legacy V3 store reads transparently — no user-visible change:
-
-    $ madder cat <id>@.legacy_v3_store
-    (decoded via translated plugin-chain
-     "madder-codec-zstd-v1@zstd-v1")
+Internally, the runtime instantiates `madder-codec-zstd-v1@zstd`
+when this config is loaded; the user never sees a plugin
+reference.
 
 ## Limitations
 
@@ -235,15 +252,25 @@ A legacy V3 store reads transparently — no user-visible change:
 
 - **No per-blob plugin marker.** The wire format on disk does
   not carry a per-blob plugin reference. Reads consult the
-  store's config chain (or its V3 translation) and decode every
-  blob through it. Mixing encodings inside a single store is not
-  possible in v0; "different chain" maps to "different store."
-  This preserves backward compatibility with all existing data.
+  store's config (translated to a plugin reference) and decode
+  every blob through it. Mixing encodings inside a single store
+  is not possible in v0; "different chain" maps to "different
+  store." This preserves backward compatibility with all
+  existing data.
 
-- **Dewey ownership.** Once V4 stores are the norm, dewey's
-  `compression_type` package can be deprecated or thinned. v0
-  doesn't remove anything from dewey — madder simply stops
-  importing the enum where it's been replaced.
+- **No new on-disk config version in v0.** V1/V2/V3 store
+  configs stay on disk exactly as they are. There is no V4
+  schema, no `madder init` flag changes, no migration command.
+  A future FDR may introduce a V4 schema that surfaces the
+  plugin-chain field directly in the TOML, but that's
+  orthogonal to this v0 — the plugin runtime is fully usable
+  without it.
+
+- **Dewey ownership.** Madder drops its import of
+  `dewey/delta/compression_type` entirely in v0 — both new V4
+  stores and legacy V1/V2/V3 stores route through the plugin
+  registry. Dewey's `compression_type` package may stay alive
+  for other consumers; madder no longer depends on it.
 
 ### Out-of-scope dependencies
 
