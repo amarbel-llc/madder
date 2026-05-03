@@ -488,11 +488,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1777764781,
-        "narHash": "sha256-qOfMoGAAeoA/tkuBRFbzeUmeFkBX9p0yy8Lg1n8yYvA=",
+        "lastModified": 1777765487,
+        "narHash": "sha256-neqgsIllDdX1GdG4Yx0Ni6rbYQGgTzAzQbCW4mg5LaI=",
         "owner": "amarbel-llc",
         "repo": "nixpkgs",
-        "rev": "89290d6697a602fe9f7cb9de6ab0e30f0ecb78e6",
+        "rev": "9784f3f865acf131b1bc082fdb966ae7a828c547",
         "type": "github"
       },
       "original": {
