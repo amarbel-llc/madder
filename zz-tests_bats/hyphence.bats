@@ -106,14 +106,11 @@ function format_is_idempotent { # @test
   local out1="$BATS_TEST_TMPDIR/out1.hyphence"
   local out2="$BATS_TEST_TMPDIR/out2.hyphence"
 
-  run_hyphence format "$in"
-  assert_success
-  printf '%s' "$output" >"$out1"
-
-  # Re-run format against out1 via stdin; compare byte-exact.
-  run_hyphence format - <"$out1"
-  assert_success
-  printf '%s' "$output" >"$out2"
+  # Direct redirection (not via `run` + $output) so trailing
+  # newlines are preserved — bats strips them from $output, which
+  # would mask a trailing-newline regression in `format`.
+  timeout --preserve-status 2s "${HYPHENCE_BIN:-hyphence}" format "$in" >"$out1"
+  timeout --preserve-status 2s "${HYPHENCE_BIN:-hyphence}" format - <"$out1" >"$out2"
 
   cmp -s "$out1" "$out2" || fail "format is not idempotent (see diff: diff $out1 $out2)"
 }
