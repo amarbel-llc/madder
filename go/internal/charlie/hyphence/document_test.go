@@ -1,8 +1,12 @@
 package hyphence
 
 import (
+	"bufio"
 	"bytes"
+	"encoding/base64"
 	"errors"
+	"io"
+	"os"
 	"strings"
 	"testing"
 )
@@ -319,4 +323,92 @@ func TestFormatBodyEmitter_LeadingAndTrailingComments(t *testing.T) {
 	if got := out.String(); got != want {
 		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
 	}
+}
+
+func TestDocumentRFCConformance(t *testing.T) {
+	f, err := os.Open("testdata/rfc_vectors.txt")
+	if err != nil {
+		t.Fatalf("open vectors: %v", err)
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := sc.Text()
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
+			t.Errorf("malformed vector line: %q", line)
+			continue
+		}
+		name := fields[0]
+		input, decErr := base64.StdEncoding.DecodeString(fields[1])
+		if decErr != nil {
+			t.Errorf("vector %s: base64 decode: %v", name, decErr)
+			continue
+		}
+		outcome := fields[2]
+
+		t.Run(name, func(t *testing.T) {
+			runDocumentVector(t, name, input, outcome)
+		})
+	}
+	if err := sc.Err(); err != nil {
+		t.Errorf("scan: %v", err)
+	}
+}
+
+func runDocumentVector(t *testing.T, name string, input []byte, outcome string) {
+	switch outcome {
+	case "document/parse-error-invalid-prefix":
+		v := &MetadataValidator{}
+		reader := Reader{RequireMetadata: true, Metadata: v, Blob: discardReaderFrom{}}
+		_, err := reader.ReadFrom(bytes.NewReader(input))
+		if !errors.Is(err, ErrInvalidPrefix) {
+			t.Errorf("expected ErrInvalidPrefix, got %v", err)
+		}
+	case "document/parse-error-malformed-line":
+		v := &MetadataValidator{}
+		reader := Reader{RequireMetadata: true, Metadata: v, Blob: discardReaderFrom{}}
+		_, err := reader.ReadFrom(bytes.NewReader(input))
+		if !errors.Is(err, ErrMalformedMetadataLine) {
+			t.Errorf("expected ErrMalformedMetadataLine, got %v", err)
+		}
+	case "document/parse-error-inline-body-with-at":
+		v := &MetadataValidator{}
+		body := &countingDiscard{}
+		reader := Reader{RequireMetadata: true, Metadata: v, Blob: body}
+		_, err := reader.ReadFrom(bytes.NewReader(input))
+		if err != nil {
+			t.Fatalf("unexpected scan error: %v", err)
+		}
+		if !v.SawAtLine || !body.SawBody {
+			t.Errorf("expected SawAtLine && SawBody, got SawAtLine=%v SawBody=%v", v.SawAtLine, body.SawBody)
+		}
+	default:
+		if !strings.HasPrefix(outcome, "document/") {
+			t.Skipf("outcome %q owned by another harness", outcome)
+		}
+		t.Fatalf("unknown outcome %q in document/ namespace", outcome)
+	}
+}
+
+type discardReaderFrom struct{}
+
+func (discardReaderFrom) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(io.Discard, r)
+}
+
+type countingDiscard struct {
+	SawBody bool
+}
+
+func (c *countingDiscard) ReadFrom(r io.Reader) (int64, error) {
+	n, err := io.Copy(io.Discard, r)
+	if n > 0 {
+		c.SawBody = true
+	}
+	return n, err
 }

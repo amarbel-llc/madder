@@ -2,14 +2,31 @@
 #
 # Each non-comment line: name\tinput-b64\toutcome\texpected-b64
 #
+# Outcomes are namespaced by the owning harness so multiple test
+# harnesses can share this single canonical vector file. An unknown
+# outcome inside a harness's own namespace is a typo and fatals;
+# outcomes in another harness's namespace are skipped.
+#
 # Outcomes:
-#   parse-ok                          - DecodeFrom must succeed; blob bytes
-#                                       (captured via BlobTeeWriter) must
-#                                       equal the base64-decoded expected
-#                                       field.
-#   parse-error-missing-separator     - DecodeFrom must error with
-#                                       errors.Is(err, errMissingNewline-
-#                                       AfterBoundary).
+#   legacy/parse-ok                            - DecodeFrom must succeed; blob bytes
+#                                                (captured via BlobTeeWriter) must
+#                                                equal the base64-decoded expected
+#                                                field.
+#   legacy/parse-error-missing-separator       - DecodeFrom must error with
+#                                                errors.Is(err, errMissingNewline-
+#                                                AfterBoundary).
+#   document/parse-error-invalid-prefix        - MetadataValidator (via Reader) must
+#                                                error with errors.Is(err,
+#                                                ErrInvalidPrefix).
+#   document/parse-error-malformed-line        - MetadataValidator (via Reader) must
+#                                                error with errors.Is(err,
+#                                                ErrMalformedMetadataLine).
+#   document/parse-error-inline-body-with-at   - Reader must succeed; the post-
+#                                                ReadFrom validator state must show
+#                                                an @-line was seen AND a body section
+#                                                followed (the validate subcommand
+#                                                surfaces ErrInlineBodyWithAtReference
+#                                                from this state).
 #
 # Comment lines start with #. Blank lines are ignored.
 #
@@ -19,6 +36,13 @@
 #   body-without-separator   : "---\n! toml-type-v1\n---\nfile-extension = 'png'\n"
 #                              (no blank line after closing ---; strict default rejects)
 
-minimal-no-body	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQo=	parse-ok	
-body-with-separator	LS0tCiEgbWQKLS0tCgpoZWxsbwo=	parse-ok	aGVsbG8K
-body-without-separator	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQpmaWxlLWV4dGVuc2lvbiA9ICdwbmcnCg==	parse-error-missing-separator	-
+minimal-no-body	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQo=	legacy/parse-ok	
+body-with-separator	LS0tCiEgbWQKLS0tCgpoZWxsbwo=	legacy/parse-ok	aGVsbG8K
+body-without-separator	LS0tCiEgdG9tbC10eXBlLXYxCi0tLQpmaWxlLWV4dGVuc2lvbiA9ICdwbmcnCg==	legacy/parse-error-missing-separator	-
+
+# New vectors for the format-only document model (Task 1.6).
+# Scanned by TestDocumentRFCConformance in document_test.go.
+
+invalid-prefix-X	LS0tCiEgbWQKWCBiYWQKLS0tCgo=	document/parse-error-invalid-prefix	-
+malformed-no-space	LS0tCiFub3NwYWNlCi0tLQoK	document/parse-error-malformed-line	-
+inline-body-with-at-ref	LS0tCkAgYmxha2UyYjI1Ni1hYmMKISBtZAotLS0KCmlubGluZQo=	document/parse-error-inline-body-with-at	-
