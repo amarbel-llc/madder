@@ -3,8 +3,8 @@ module github.com/amarbel-llc/madder/go
 go 1.26
 
 require (
-	github.com/amarbel-llc/bob/packages/tap-dancer/go v0.2.0
 	github.com/amarbel-llc/purse-first/libs/dewey v0.0.4
+	github.com/amarbel-llc/tap/go v0.1.2
 	github.com/amarbel-llc/tommy v0.0.0-20260405143331-87255e87bf37
 	github.com/brandondube/tai v0.1.0
 	github.com/charmbracelet/huh v1.0.0

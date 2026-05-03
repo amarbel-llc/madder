@@ -6,7 +6,7 @@ import (
 	"os"
 	"path"
 
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+	tap "github.com/amarbel-llc/tap/go"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"

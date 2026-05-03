@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+	tap "github.com/amarbel-llc/tap/go"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 )

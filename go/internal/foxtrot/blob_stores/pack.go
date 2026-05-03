@@ -1,7 +1,7 @@
 package blob_stores
 
 import (
-	tap "github.com/amarbel-llc/bob/packages/tap-dancer/go"
+	tap "github.com/amarbel-llc/tap/go"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
