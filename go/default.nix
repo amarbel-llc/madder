@@ -28,61 +28,52 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # Shared bats invocation: stages the bats sources + version.env into
-  # a writable scratch dir, exports MADDER_BIN, and runs the suite under
-  # `bats --no-sandbox` (the nix build sandbox is already an isolation
-  # layer; sandcastle/fence on Darwin needs /usr/bin/sandbox-exec which
-  # the nix sandbox doesn't expose).
+  # mkBatsLane wraps pkgs.testers.batsLane with madder's parameter
+  # shape: vanilla bats, bob's bats-libs on BATS_LIB_PATH, MADDER_BIN
+  # and CG_BIN exported via the binaries-map form, version.env staged
+  # sibling-of-bats, jq for cli_contract.bats's JSON helpers,
+  # BATS_TEST_TIMEOUT=30 to mirror zz-tests_bats/justfile.
   #
   # `filter` is forwarded verbatim to `bats --filter-tags`. Default
   # `!net_cap` excludes loopback-binding scenarios the nix sandbox
-  # doesn't grant; mkBatsLane callers override with arbitrary tag
-  # expressions for dev-loop selection.
-  #
-  # `madderBin` is the path string MADDER_BIN should point at. Default
-  # `$out/bin/madder` is a bash literal (the `$` is plain text in nix's
-  # `''` strings) — appropriate for installCheckPhase where bats runs
-  # against the just-installed binary in the same derivation. mkBatsLane
-  # passes a nix-resolved store path (`${base}/bin/madder`) so its
-  # derivation references an existing `madder` build instead of
-  # rebuilding Go per filter.
-  #
-  # `--jobs $NIX_BUILD_CORES` and `BATS_TEST_TIMEOUT=30` mirror
-  # zz-tests_bats/justfile so dev-loop and release lanes share the
-  # same parallelism/timeout contract.
-  #
-  # jq is referenced inline by cli_contract.bats helpers (parsing
-  # `write -check` JSON output to compute "missing" digests).
-  mkBatsRunCommand = {
-    filter ? "!net_cap",
-    madderBin ? "$out/bin/madder",
-    cgBin ? "$out/bin/cutting-garden",
-  }: ''
+  # doesn't grant; callers override for per-tag dev-loop selection.
+  mkBatsLane = { filter ? "!net_cap", base ? madder }:
+    pkgs.testers.batsLane {
+      inherit base filter batsSrc;
+      binaries = {
+        MADDER_BIN = { inherit base; name = "madder"; };
+        CG_BIN     = { inherit base; name = "cutting-garden"; };
+      };
+      batsLibPath = [ bob.packages.${system}.bats-libs.batsLibPath ];
+      extraStagedFiles = [
+        { src = versionEnv; dest = "version.env"; }
+      ];
+      extraEnv = { BATS_TEST_TIMEOUT = "30"; };
+      nativeBuildInputs = [ pkgs-master.jq ];
+    };
+
+  # madder-cli-cover's coverIntegrationCommand is a phase fragment
+  # (shell embedded in buildGoCover's own installCheckPhase), not a
+  # derivation, so pkgs.testers.batsLane can't be substituted directly
+  # here. The shell mirrors what the builder generates internally.
+  cliCoverIntegrationCommand = ''
     mkdir -p stage/zz-tests_bats
     cp -r ${batsSrc}/* stage/zz-tests_bats/
     chmod -R u+w stage
-
-    # version_matches_source_of_truth reads MADDER_VERSION from
-    # version.env at $BATS_TEST_DIRNAME/../version.env. Mirror that
-    # layout: stage/version.env is sibling of stage/zz-tests_bats/.
     cp ${versionEnv} stage/version.env
 
-    export MADDER_BIN="${madderBin}"
-    export CG_BIN="${cgBin}"
+    export MADDER_BIN="$out/bin/madder"
+    export CG_BIN="$out/bin/cutting-garden"
+    export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${bob.packages.${system}.bats-libs.batsLibPath}"
     export BATS_TEST_TIMEOUT=30
 
     cd stage/zz-tests_bats
-    ${bob.packages.${system}.batman}/bin/bats --no-sandbox \
+    ${pkgs.bats}/bin/bats \
       --jobs $NIX_BUILD_CORES \
-      --filter-tags '${filter}' \
+      --filter-tags '!net_cap' \
       *.bats
     cd "$NIX_BUILD_TOP"
   '';
-
-  # Sanitize a bats `--filter-tags` expression for use as a derivation
-  # name suffix. Replaces shell-unfriendly characters with `_`.
-  batsLaneSuffix = filter:
-    builtins.replaceStrings [ "!" "," ":" " " ] [ "not_" "_" "_" "_" ] filter;
 
   # The bats integration suite is intentionally NOT in installCheckPhase
   # — it lives as separate `bats-*` lanes (`batsLaneOutputs`) so
@@ -201,40 +192,9 @@ let
   # picture.
   madder-cli-cover = pkgs.buildGoCover {
     base = madder;
-    extraNativeInstallCheckInputs = [ pkgs-master.jq ];
-    coverIntegrationCommand = mkBatsRunCommand { };
+    extraNativeInstallCheckInputs = [ pkgs-master.jq pkgs.parallel ];
+    coverIntegrationCommand = cliCoverIntegrationCommand;
   };
-
-  # mkBatsLane: standalone derivation that runs the bats suite against
-  # an existing `madder` build (referenced by store path), filtered by
-  # tag expression. The auto-generated `bats-${tag}` flake outputs (see
-  # `batsLaneOutputs` below) are the canonical entry points; this
-  # function is kept internal so the same shape can be reused for the
-  # `bats-default` lane and any future hand-rolled lanes.
-  #
-  # Crucially this does NOT rebuild Go — the bats lane references
-  # `${base}/bin/madder` from an upstream `madder` derivation that's
-  # already in the cache. Per-filter cache miss only re-runs the bats
-  # suite, never the compile. Going through the standard flake-eval
-  # path (named output, no `--impure --expr` workaround) means the
-  # consumed `madder` derivation is bit-identical to `.#madder`'s,
-  # so dev-loop and release share a single cache lane.
-  #
-  # Output is a stamp file (touched on success); the derivation exists
-  # to stand for "the bats suite passed under this filter for this base."
-  mkBatsLane = { filter ? "!net_cap", base ? madder }:
-    pkgs.runCommand
-      "${base.pname}-bats-${batsLaneSuffix filter}"
-      {
-        nativeBuildInputs = [ pkgs-master.jq ];
-      }
-      (mkBatsRunCommand {
-        inherit filter;
-        madderBin = "${base}/bin/madder";
-        cgBin = "${base}/bin/cutting-garden";
-      } + ''
-        touch $out
-      '');
 
   # Auto-discover bats `file_tags` directives at flake-eval time and
   # produce one `bats-${tag}` derivation per unique tag, plus a
