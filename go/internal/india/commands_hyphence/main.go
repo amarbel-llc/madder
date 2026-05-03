@@ -25,7 +25,7 @@ func init() {
 			&globalFlags.NoInventoryLog,
 			"no-inventory-log",
 			false,
-			"Suppress the per-blob audit inventory-log. No-op for hyphence.",
+			"Suppress the per-blob audit inventory-log under $XDG_LOG_HOME/madder/inventory_log/. No-op for hyphence (which performs no blob writes); kept for cross-utility flag-set consistency.",
 		)
 	}
 
@@ -45,13 +45,6 @@ func init() {
 		futility.Example{
 			Description: "Canonicalize an old document.",
 			Command:     "hyphence format old.hyphence > canonical.hyphence",
-		},
-	)
-
-	utility.Files = append(utility.Files,
-		futility.FilePath{
-			Path:        "<any hyphence document>",
-			Description: "Plain-text RFC 0001 document on disk. hyphence reads from a file path or stdin (use '-' for stdin).",
 		},
 	)
 }
