@@ -90,6 +90,7 @@ let
       "cmd/madder-gen_man"
       "cmd/cutting-garden"
       "cmd/cg"
+      "cmd/hyphence"
     ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
