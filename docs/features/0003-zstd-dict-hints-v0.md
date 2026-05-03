@@ -1,13 +1,14 @@
 ---
-status: proposed
+status: superseded by FDR-0004
 date: 2026-05-03
 promotion-criteria: |
-  Promote to `experimental` once `cg capture --zstd-dict` and
-  `madder train-zstd-dict` ship behind a real-corpus measurement
-  (capture-receipt blobs compressed with vs. without a trained
-  dict) demonstrating a meaningful size win. Promote to `accepted`
-  after one tagged release with the feature in user hands and no
-  surprise correctness reports.
+  Superseded before promotion. The architectural plumbing this
+  FDR proposed (IOWrapperPrototype + IOWrapperWithSideData) is
+  replaced by FDR 0004's plugin architecture, which subsumes the
+  dict-hint use case as a particular plugin. The user-facing
+  `cg capture --zstd-dict` / `madder train-zstd-dict` surfaces
+  are preserved and re-homed in FDR 0005, which builds on FDR
+  0004.
 ---
 
 # zstd dictionary hints (v0)
