@@ -412,3 +412,18 @@ func (c *countingDiscard) ReadFrom(r io.Reader) (int64, error) {
 	}
 	return n, err
 }
+
+func TestMetadataBuilder_RejectsCarriageReturn(t *testing.T) {
+	// MetadataBuilder must reject embedded \r the same way
+	// MetadataValidator does — otherwise CRLF input round-trips
+	// \r-contaminated MetadataLine values, and a format ->
+	// validate pipeline disagrees about whether the document is
+	// well-formed.
+	const input = "! md\r\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	_, err := builder.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrMalformedMetadataLine) {
+		t.Errorf("expected ErrMalformedMetadataLine for \\r, got %v", err)
+	}
+}

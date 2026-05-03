@@ -60,6 +60,10 @@ func (m *MetadataBuilder) ReadFrom(r io.Reader) (int64, error) {
 			return n, errors.Errorf("%w: empty metadata line", ErrMalformedMetadataLine)
 		}
 
+		if strings.ContainsRune(line, '\r') {
+			return n, errors.Errorf("%w: contains carriage return", ErrMalformedMetadataLine)
+		}
+
 		prefix := line[0]
 		if !isValidPrefix(prefix) {
 			return n, errors.Errorf("%w: %q", ErrInvalidPrefix, string(prefix))
