@@ -170,9 +170,6 @@ type FormatBodyEmitter struct {
 func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 	Canonicalize(e.Doc)
 
-	// Peek the body reader to determine HasBody. The upstream
-	// hyphence.Reader hands the Blob consumer a *bufio.Reader; if
-	// that contract changes, fall back to wrapping so Peek works.
 	br, ok := r.(*bufio.Reader)
 	if !ok {
 		br = bufio.NewReader(r)
@@ -181,44 +178,57 @@ func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
 	e.Doc.HasBody = peekErr == nil
 
 	bw := bufio.NewWriter(e.Out)
+	var n int64
 
-	if _, err := io.WriteString(bw, "---\n"); err != nil {
-		return 0, errors.Wrap(err)
+	write := func(s string) error {
+		nn, err := io.WriteString(bw, s)
+		n += int64(nn)
+		return err
+	}
+	writef := func(format string, args ...any) error {
+		nn, err := fmt.Fprintf(bw, format, args...)
+		n += int64(nn)
+		return err
+	}
+
+	if err := write("---\n"); err != nil {
+		return n, errors.Wrap(err)
 	}
 	for _, ml := range e.Doc.Metadata {
 		for _, c := range ml.LeadingComments {
-			if _, err := fmt.Fprintf(bw, "%% %s\n", c); err != nil {
-				return 0, errors.Wrap(err)
+			if err := writef("%% %s\n", c); err != nil {
+				return n, errors.Wrap(err)
 			}
 		}
-		if _, err := fmt.Fprintf(bw, "%c %s\n", ml.Prefix, ml.Value); err != nil {
-			return 0, errors.Wrap(err)
+		if err := writef("%c %s\n", ml.Prefix, ml.Value); err != nil {
+			return n, errors.Wrap(err)
 		}
 	}
 	for _, c := range e.Doc.TrailingComments {
-		if _, err := fmt.Fprintf(bw, "%% %s\n", c); err != nil {
-			return 0, errors.Wrap(err)
+		if err := writef("%% %s\n", c); err != nil {
+			return n, errors.Wrap(err)
 		}
 	}
-	if _, err := io.WriteString(bw, "---\n"); err != nil {
-		return 0, errors.Wrap(err)
+	if err := write("---\n"); err != nil {
+		return n, errors.Wrap(err)
 	}
 
 	if !e.Doc.HasBody {
 		if err := bw.Flush(); err != nil {
-			return 0, errors.Wrap(err)
+			return n, errors.Wrap(err)
 		}
-		return 0, nil
+		return n, nil
 	}
 
-	if _, err := io.WriteString(bw, "\n"); err != nil {
-		return 0, errors.Wrap(err)
+	if err := write("\n"); err != nil {
+		return n, errors.Wrap(err)
 	}
 	if err := bw.Flush(); err != nil {
-		return 0, errors.Wrap(err)
+		return n, errors.Wrap(err)
 	}
 
-	n, err := io.Copy(e.Out, br)
+	bodyN, err := io.Copy(e.Out, br)
+	n += bodyN
 	if err != nil {
 		return n, errors.Wrap(err)
 	}

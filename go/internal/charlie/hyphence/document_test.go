@@ -381,7 +381,7 @@ func runDocumentVector(t *testing.T, name string, input []byte, outcome string) 
 		}
 	case "document/parse-error-inline-body-with-at":
 		v := &MetadataValidator{}
-		body := &countingDiscard{}
+		body := &CountingDiscardReaderFrom{}
 		reader := Reader{RequireMetadata: true, Metadata: v, Blob: body}
 		_, err := reader.ReadFrom(bytes.NewReader(input))
 		if err != nil {
@@ -402,18 +402,6 @@ type discardReaderFrom struct{}
 
 func (discardReaderFrom) ReadFrom(r io.Reader) (int64, error) {
 	return io.Copy(io.Discard, r)
-}
-
-type countingDiscard struct {
-	SawBody bool
-}
-
-func (c *countingDiscard) ReadFrom(r io.Reader) (int64, error) {
-	n, err := io.Copy(io.Discard, r)
-	if n > 0 {
-		c.SawBody = true
-	}
-	return n, err
 }
 
 func TestMetadataBuilder_RejectsCarriageReturn(t *testing.T) {
