@@ -643,15 +643,22 @@ Maps the existing on-disk `compression-type` strings (`""`, `"none"`, `"gzip"`, 
 
 **Step 1: Write the failing test**
 
-Create `go/internal/bravo/plugins/legacy_test.go`:
+Create `go/internal/bravo/plugins/legacy_test.go`. Note: this test
+lives in the **external test package** `plugins_test` rather than
+in-package. Why: it blank-imports `plugins/builtins` to populate the
+default registry, and `builtins` transitively imports `plugins` — an
+in-package test (`package plugins`) would create an import cycle. The
+external test package compiles into a separate test binary so the
+cycle doesn't form.
 
 ```go
-package plugins
+package plugins_test
 
 import (
 	"errors"
 	"testing"
 
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 )
 
@@ -667,7 +674,7 @@ func TestLegacyCompressionRef(t *testing.T) {
 		{"zstd", "madder-codec-zstd-v1@zstd"},
 	}
 	for _, tc := range cases {
-		got, err := LegacyCompressionRef(tc.legacy)
+		got, err := plugins.LegacyCompressionRef(tc.legacy)
 		if err != nil {
 			t.Errorf("legacy %q: unexpected error %v", tc.legacy, err)
 			continue
@@ -679,19 +686,19 @@ func TestLegacyCompressionRef(t *testing.T) {
 }
 
 func TestLegacyCompressionRef_Unknown(t *testing.T) {
-	_, err := LegacyCompressionRef("brotli")
-	if !errors.Is(err, ErrUnknownLegacyCompression) {
+	_, err := plugins.LegacyCompressionRef("brotli")
+	if !errors.Is(err, plugins.ErrUnknownLegacyCompression) {
 		t.Errorf("expected ErrUnknownLegacyCompression, got %v", err)
 	}
 }
 
 func TestLegacyCompression_ResolvesViaDefault(t *testing.T) {
 	for _, legacy := range []string{"", "none", "gzip", "zlib", "zstd"} {
-		ref, err := LegacyCompressionRef(legacy)
+		ref, err := plugins.LegacyCompressionRef(legacy)
 		if err != nil {
 			t.Fatalf("ref %q: %v", legacy, err)
 		}
-		if _, err := Resolve(ref); err != nil {
+		if _, err := plugins.Resolve(ref); err != nil {
 			t.Errorf("legacy %q -> %q failed Resolve: %v", legacy, ref, err)
 		}
 	}

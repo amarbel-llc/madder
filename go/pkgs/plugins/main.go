@@ -9,9 +9,11 @@ type (
 )
 
 var (
-	Default              = internal.Default
-	ErrAlreadyRegistered = internal.ErrAlreadyRegistered
-	ErrUnknownPlugin     = internal.ErrUnknownPlugin
-	MustRegister         = internal.MustRegister
-	Resolve              = internal.Resolve
+	Default                     = internal.Default
+	ErrAlreadyRegistered        = internal.ErrAlreadyRegistered
+	ErrUnknownLegacyCompression = internal.ErrUnknownLegacyCompression
+	ErrUnknownPlugin            = internal.ErrUnknownPlugin
+	LegacyCompressionRef        = internal.LegacyCompressionRef
+	MustRegister                = internal.MustRegister
+	Resolve                     = internal.Resolve
 )

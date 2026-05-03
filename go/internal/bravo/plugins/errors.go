@@ -10,4 +10,9 @@ var (
 	// ErrUnknownPlugin is returned by Registry.Resolve when the
 	// reference is not registered.
 	ErrUnknownPlugin = errors.New("unknown plugin reference")
+
+	// ErrUnknownLegacyCompression is returned by LegacyCompressionRef
+	// when the input string is not one of the known on-disk values
+	// (`""`, `"none"`, `"gzip"`, `"zlib"`, `"zstd"`).
+	ErrUnknownLegacyCompression = errors.New("unknown legacy compression-type")
 )
