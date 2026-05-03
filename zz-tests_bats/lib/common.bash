@@ -30,6 +30,7 @@ setup_test_home
 export MADDER_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR"
 require_bin MADDER_BIN madder
 require_bin CG_BIN cutting-garden
+require_bin HYPHENCE_BIN hyphence
 
 run_madder() {
   local bin="${MADDER_BIN:-madder}"
@@ -38,6 +39,11 @@ run_madder() {
 
 run_cg() {
   local bin="${CG_BIN:-cutting-garden}"
+  run timeout --preserve-status 2s "$bin" "$@"
+}
+
+run_hyphence() {
+  local bin="${HYPHENCE_BIN:-hyphence}"
   run timeout --preserve-status 2s "$bin" "$@"
 }
 

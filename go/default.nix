@@ -41,8 +41,9 @@ let
     pkgs.testers.batsLane {
       inherit base filter batsSrc;
       binaries = {
-        MADDER_BIN = { inherit base; name = "madder"; };
-        CG_BIN     = { inherit base; name = "cutting-garden"; };
+        MADDER_BIN   = { inherit base; name = "madder"; };
+        CG_BIN       = { inherit base; name = "cutting-garden"; };
+        HYPHENCE_BIN = { inherit base; name = "hyphence"; };
       };
       batsLibPath = [ bob.packages.${system}.bats-libs.batsLibPath ];
       extraStagedFiles = [
@@ -64,6 +65,7 @@ let
 
     export MADDER_BIN="$out/bin/madder"
     export CG_BIN="$out/bin/cutting-garden"
+    export HYPHENCE_BIN="$out/bin/hyphence"
     export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${bob.packages.${system}.bats-libs.batsLibPath}"
     export BATS_TEST_TIMEOUT=30
 

@@ -1,21 +1,9 @@
 setup() {
   load "$(dirname "$BATS_TEST_FILE")/lib/common.bash"
   export output
-
-  HYPHENCE_BIN="$(dirname "${MADDER_BIN:-madder}")/hyphence"
-  if [[ ! -x $HYPHENCE_BIN ]]; then
-    skip "hyphence binary not found at $HYPHENCE_BIN"
-  fi
 }
 
 # bats file_tags=hyphence
-
-# run_hyphence wraps `run timeout` the same way run_madder /
-# run_cg do in lib/common.bash, so individual tests don't have to
-# spell out the binary path or the 2s deadline.
-run_hyphence() {
-  run timeout --preserve-status 2s "$HYPHENCE_BIN" "$@"
-}
 
 # --- validate ---
 
@@ -54,11 +42,9 @@ function validate_rejects_inline_body_with_at { # @test
 }
 
 function validate_reads_stdin_with_dash { # @test
-  # Reading stdin from a file via `<` is more reliable than a
-  # `printf | run ...` pipeline given the run_hyphence wrapper.
   local f="$BATS_TEST_TMPDIR/in.hyphence"
   printf -- '---\n! md\n---\n' >"$f"
-  run timeout --preserve-status 2s "$HYPHENCE_BIN" validate - <"$f"
+  run_hyphence validate - <"$f"
   assert_success
 }
 
@@ -114,14 +100,22 @@ function format_canonicalizes { # @test
 }
 
 function format_is_idempotent { # @test
-  local f="$BATS_TEST_TMPDIR/f.hyphence"
-  printf -- '---\n! md\n# desc\n- tag\n---\n\nbody\n' >"$f"
-  local out1 out2
-  out1="$(timeout --preserve-status 2s "$HYPHENCE_BIN" format "$f")"
-  out2="$(printf '%s' "$out1" | timeout --preserve-status 2s "$HYPHENCE_BIN" format -)"
-  [[ $out1 == "$out2" ]] || fail "format is not idempotent:
-first:  $out1
-second: $out2"
+  local in="$BATS_TEST_TMPDIR/f.hyphence"
+  printf -- '---\n! md\n# desc\n- tag\n---\n\nbody\n' >"$in"
+
+  local out1="$BATS_TEST_TMPDIR/out1.hyphence"
+  local out2="$BATS_TEST_TMPDIR/out2.hyphence"
+
+  run_hyphence format "$in"
+  assert_success
+  printf '%s' "$output" >"$out1"
+
+  # Re-run format against out1 via stdin; compare byte-exact.
+  run_hyphence format - <"$out1"
+  assert_success
+  printf '%s' "$output" >"$out2"
+
+  cmp -s "$out1" "$out2" || fail "format is not idempotent (see diff: diff $out1 $out2)"
 }
 
 # --- exit-code policy ---
@@ -129,4 +123,27 @@ second: $out2"
 function unknown_subcommand_fails { # @test
   run_hyphence frobnicate
   assert_failure
+  assert_output --partial 'unknown command'
+}
+
+function validate_rejects_crlf_in_metadata { # @test
+  # MetadataValidator rejects \r in metadata lines per RFC 0001
+  # (Slice 1 fix in fix(hyphence): reject \r in MetadataBuilder...).
+  # Diagnostic surfaces the actual offending line bytes so the user
+  # can see the \r — assert on that suffix.
+  local f="$BATS_TEST_TMPDIR/crlf.hyphence"
+  printf -- '---\r\n! md\r\n---\n' >"$f"
+  run_hyphence validate "$f"
+  assert_failure
+  assert_output --partial 'expected "---" but got "---\r"'
+}
+
+function format_anchors_leading_comment { # @test
+  # Comments preceding a non-comment metadata line travel with that
+  # line through canonicalization.
+  local f="$BATS_TEST_TMPDIR/comment.hyphence"
+  printf -- '---\n%% about-type\n! md\n---\n' >"$f"
+  run_hyphence format "$f"
+  assert_success
+  assert_output "$(printf -- '---\n%% about-type\n! md\n---')"
 }

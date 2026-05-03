@@ -138,6 +138,7 @@ test-go-cover *flags:
 test-bats: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test
 
 # Run net_cap-tagged bats tests under sandcastle's --allow-local-binding.
@@ -147,6 +148,7 @@ test-bats: build
 test-bats-net-cap: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test-net-cap
 
 # Run bats integration tests against race-instrumented binaries.
@@ -260,6 +262,7 @@ cover-summary: cover-merged
 test-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
+    HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test-targets {{targets}}
 
 # Run bats tests filtered by file_tag. Drives the auto-generated
