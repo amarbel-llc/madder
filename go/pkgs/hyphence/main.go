@@ -18,6 +18,7 @@ type (
 	Document                                                  = internal.Document
 	Encoder[BLOB any]                                         = internal.Encoder[BLOB]
 	EncoderTypeMapWithoutType[BLOB any]                       = internal.EncoderTypeMapWithoutType[BLOB]
+	MetadataBuilder                                           = internal.MetadataBuilder
 	MetadataLine                                              = internal.MetadataLine
 	MetadataStreamer                                          = internal.MetadataStreamer
 	MetadataWriterTo                                          = internal.MetadataWriterTo

@@ -74,3 +74,85 @@ func TestMetadataStreamer_EmptyInput(t *testing.T) {
 		t.Errorf("output should be empty, got %q", out.String())
 	}
 }
+
+func TestMetadataBuilder_PopulatesAllPrefixes(t *testing.T) {
+	const input = "# desc one\n# desc two\n- tag\n@ blake2b256-abc\n! md\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	if _, err := builder.ReadFrom(strings.NewReader(input)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := []MetadataLine{
+		{Prefix: '#', Value: "desc one"},
+		{Prefix: '#', Value: "desc two"},
+		{Prefix: '-', Value: "tag"},
+		{Prefix: '@', Value: "blake2b256-abc"},
+		{Prefix: '!', Value: "md"},
+	}
+	if len(doc.Metadata) != len(want) {
+		t.Fatalf("got %d lines, want %d: %+v", len(doc.Metadata), len(want), doc.Metadata)
+	}
+	for i, w := range want {
+		got := doc.Metadata[i]
+		if got.Prefix != w.Prefix || got.Value != w.Value {
+			t.Errorf("line %d: got %+v, want %+v", i, got, w)
+		}
+	}
+}
+
+func TestMetadataBuilder_AnchorsLeadingComments(t *testing.T) {
+	const input = "% comment one\n% comment two\n- tag\n! md\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	if _, err := builder.ReadFrom(strings.NewReader(input)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(doc.Metadata) != 2 {
+		t.Fatalf("expected 2 non-comment lines, got %d", len(doc.Metadata))
+	}
+	tagLine := doc.Metadata[0]
+	if tagLine.Prefix != '-' {
+		t.Fatalf("first non-comment line should be '-', got %q", tagLine.Prefix)
+	}
+	if got := tagLine.LeadingComments; len(got) != 2 || got[0] != "comment one" || got[1] != "comment two" {
+		t.Errorf("LeadingComments mismatch: %+v", got)
+	}
+}
+
+func TestMetadataBuilder_TrailingComments(t *testing.T) {
+	const input = "! md\n% trailing one\n% trailing two\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	if _, err := builder.ReadFrom(strings.NewReader(input)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(doc.Metadata) != 1 {
+		t.Fatalf("expected 1 non-comment line, got %d", len(doc.Metadata))
+	}
+	if got := doc.TrailingComments; len(got) != 2 || got[0] != "trailing one" || got[1] != "trailing two" {
+		t.Errorf("TrailingComments mismatch: %+v", got)
+	}
+}
+
+func TestMetadataBuilder_RejectsMalformedLine(t *testing.T) {
+	// Per RFC 0001 §Metadata Lines, every line must be `<prefix> <content>`.
+	// A line with no space after the prefix is malformed.
+	const input = "!nospace\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	_, err := builder.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrMalformedMetadataLine) {
+		t.Errorf("expected ErrMalformedMetadataLine, got %v", err)
+	}
+}
+
+func TestMetadataBuilder_RejectsInvalidPrefix(t *testing.T) {
+	const input = "X bad\n"
+	doc := &Document{}
+	builder := &MetadataBuilder{Doc: doc}
+	_, err := builder.ReadFrom(strings.NewReader(input))
+	if !errors.Is(err, ErrInvalidPrefix) {
+		t.Errorf("expected ErrInvalidPrefix, got %v", err)
+	}
+}
