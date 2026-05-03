@@ -5,13 +5,9 @@ package env_dir
 import internal "github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 
 type (
-	Config               = internal.Config
 	Env                  = internal.Env
 	EnvVarNames          = internal.EnvVarNames
-	ErrBlobAlreadyExists = internal.ErrBlobAlreadyExists
-	ErrBlobMissing       = internal.ErrBlobMissing
 	ErrTempAlreadyExists = internal.ErrTempAlreadyExists
-	MoveOptions          = internal.MoveOptions
 	Option               = internal.Option
 	RelativePath         = internal.RelativePath
 	RepoId               = internal.RepoId
@@ -19,33 +15,17 @@ type (
 )
 
 var (
-	DefaultConfig                                = internal.DefaultConfig
-	DefaultEnvVarNames                           = internal.DefaultEnvVarNames
-	ErrCollisionContentMismatch                  = internal.ErrCollisionContentMismatch
-	IsErrBlobAlreadyExists                       = internal.IsErrBlobAlreadyExists
-	IsErrBlobMissing                             = internal.IsErrBlobMissing
-	MakeConfig                                   = internal.MakeConfig
-	MakeDefault                                  = internal.MakeDefault
-	MakeDefaultAndInitialize                     = internal.MakeDefaultAndInitialize
-	MakeDefaultNoInit                            = internal.MakeDefaultNoInit
-	MakeDirIfNecessary                           = internal.MakeDirIfNecessary
-	MakeDirIfNecessaryForStringerWithHeadAndTail = internal.MakeDirIfNecessaryForStringerWithHeadAndTail
-	MakeErrTempAlreadyExists                     = internal.MakeErrTempAlreadyExists
-	MakeFromXDGDotenvPath                        = internal.MakeFromXDGDotenvPath
-	MakeHashBucketPath                           = internal.MakeHashBucketPath
-	MakeHashBucketPathFromMerkleId               = internal.MakeHashBucketPathFromMerkleId
-	MakeHashBucketPathJoinFunc                   = internal.MakeHashBucketPathJoinFunc
-	MakeWithDefaultHome                          = internal.MakeWithDefaultHome
-	MakeWithHomeAndInitialize                    = internal.MakeWithHomeAndInitialize
-	MakeWithXDG                                  = internal.MakeWithXDG
-	MakeWithXDGRootOverrideHomeAndInitialize     = internal.MakeWithXDGRootOverrideHomeAndInitialize
-	NewFileReaderOrErrNotExist                   = internal.NewFileReaderOrErrNotExist
-	NewMover                                     = internal.NewMover
-	NewNopReader                                 = internal.NewNopReader
-	NewReader                                    = internal.NewReader
-	NewWriter                                    = internal.NewWriter
-	PathFromHeadAndTail                          = internal.PathFromHeadAndTail
-	WithEnvVarNames                              = internal.WithEnvVarNames
+	DefaultEnvVarNames                       = internal.DefaultEnvVarNames
+	MakeDefault                              = internal.MakeDefault
+	MakeDefaultAndInitialize                 = internal.MakeDefaultAndInitialize
+	MakeDefaultNoInit                        = internal.MakeDefaultNoInit
+	MakeErrTempAlreadyExists                 = internal.MakeErrTempAlreadyExists
+	MakeFromXDGDotenvPath                    = internal.MakeFromXDGDotenvPath
+	MakeWithDefaultHome                      = internal.MakeWithDefaultHome
+	MakeWithHomeAndInitialize                = internal.MakeWithHomeAndInitialize
+	MakeWithXDG                              = internal.MakeWithXDG
+	MakeWithXDGRootOverrideHomeAndInitialize = internal.MakeWithXDGRootOverrideHomeAndInitialize
+	WithEnvVarNames                          = internal.WithEnvVarNames
 )
 
 const (

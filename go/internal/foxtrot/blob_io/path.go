@@ -1,10 +1,16 @@
-package env_dir
+package blob_io
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 )
+
+// TemporaryFS is the temp-fs handle MoveOptions embeds. Aliased
+// from dewey/delta/files so callers may pass an env_dir.TemporaryFS
+// (also a files.TemporaryFS alias) directly into a blob_io.MoveOptions
+// without conversion.
+type TemporaryFS = files.TemporaryFS
 
 func MakeHashBucketPathFromMerkleId(
 	id domain_interfaces.MarklId,

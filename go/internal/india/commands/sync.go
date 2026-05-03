@@ -11,7 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -338,7 +338,7 @@ func (cmd Sync) runStore(
 		}
 
 		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
-			if env_dir.IsErrBlobAlreadyExists(err) {
+			if blob_io.IsErrBlobAlreadyExists(err) {
 				sink.transferred(blobId, lastBytesWritten)
 			} else {
 				sink.failed(blobId, lastBytesWritten, err)

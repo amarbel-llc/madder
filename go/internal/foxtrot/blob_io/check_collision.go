@@ -1,4 +1,4 @@
-package env_dir
+package blob_io
 
 import (
 	"bytes"
@@ -69,8 +69,8 @@ func checkCollision(a, b io.Reader) error {
 
 // verifyExistingBlobMatches is the callsite helper for the blob-mover's
 // EEXIST branch. It opens both paths as BlobReaders under the given
-// env_dir Config (so compression/encryption are unwrapped symmetrically)
-// and delegates byte-compare to checkCollision.
+// Config (so compression/encryption are unwrapped symmetrically) and
+// delegates byte-compare to checkCollision.
 //
 // The caller (blob_mover.Close) invokes this only when the store's
 // VerifyOnCollision flag is set; see ADR 0003 and issue #31.

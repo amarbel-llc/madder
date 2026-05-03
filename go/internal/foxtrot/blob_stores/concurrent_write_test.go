@@ -16,6 +16,7 @@ import (
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
@@ -171,7 +172,7 @@ func TestConcurrentBlobWritesSameContent(t *testing.T) {
 
 	// ADR 0003: published blobs are chmod 0o444 before link, so the inode
 	// is read-only from birth regardless of which writer won the race.
-	blobPath := env_dir.MakeHashBucketPathFromMerkleId(
+	blobPath := blob_io.MakeHashBucketPathFromMerkleId(
 		digests[0],
 		store.buckets,
 		store.multiHash,

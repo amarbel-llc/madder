@@ -1,4 +1,4 @@
-package env_dir
+package blob_io
 
 import (
 	"bufio"
@@ -10,8 +10,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
-
-// TODO move into own package
 
 type writer struct {
 	repoolBufferedWriter  interfaces.FuncRepool

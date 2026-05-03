@@ -22,7 +22,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
@@ -314,10 +314,10 @@ func (blobStore *remoteSftp) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
 }
 
-func (blobStore *remoteSftp) makeEnvDirConfig() env_dir.Config {
-	return env_dir.MakeConfig(
+func (blobStore *remoteSftp) makeEnvDirConfig() blob_io.Config {
+	return blob_io.MakeConfig(
 		blobStore.defaultHashType,
-		env_dir.MakeHashBucketPathJoinFunc(blobStore.buckets),
+		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
 		blobStore.blobIOWrapper.GetBlobCompression(),
 		blobStore.blobIOWrapper.GetBlobEncryption(),
 	)
@@ -326,7 +326,7 @@ func (blobStore *remoteSftp) makeEnvDirConfig() env_dir.Config {
 func (blobStore *remoteSftp) remotePathForMerkleId(
 	merkleId domain_interfaces.MarklId,
 ) string {
-	return env_dir.MakeHashBucketPathFromMerkleId(
+	return blob_io.MakeHashBucketPathFromMerkleId(
 		merkleId,
 		blobStore.buckets,
 		blobStore.multiHash,
@@ -520,7 +520,7 @@ func (blobStore *remoteSftp) MakeBlobReader(
 	if remoteFile, err = blobStore.sftpClient.Open(remotePath); err != nil {
 		if os.IsNotExist(err) {
 			clonedDigest, _ := markl.Clone(digest) //repool:owned
-			err = env_dir.ErrBlobMissing{
+			err = blob_io.ErrBlobMissing{
 				BlobId: clonedDigest,
 				Path:   remotePath,
 			}
@@ -555,11 +555,11 @@ func (blobStore *remoteSftp) MakeBlobReader(
 }
 
 // sftpMover implements interfaces.Mover and interfaces.ShaWriteCloser
-// TODO explore using env_dir.Mover generically instead of this
+// TODO explore using blob_io.Mover generically instead of this
 type sftpMover struct {
 	hash     domain_interfaces.Hash
 	store    *remoteSftp
-	config   env_dir.Config
+	config   blob_io.Config
 	tempFile *sftp.File
 	tempPath string
 	writer   *sftpWriter
@@ -770,7 +770,7 @@ type sftpWriter struct {
 }
 
 func newSftpWriter(
-	config env_dir.Config,
+	config blob_io.Config,
 	ioWriter io.Writer,
 	hash domain_interfaces.Hash,
 ) (writer *sftpWriter, err error) {
@@ -842,7 +842,7 @@ func (writer *sftpWriter) GetDigest() domain_interfaces.MarklId {
 // TODO combine with sftpReader
 type sftpStreamingReader struct {
 	file   *sftp.File
-	config env_dir.Config
+	config blob_io.Config
 }
 
 func (reader *sftpStreamingReader) createReader(
@@ -867,7 +867,7 @@ func (reader *sftpStreamingReader) createReader(
 // sftpReader implements streaming decompression/decryption for SFTP
 type sftpReader struct {
 	file      *sftp.File
-	config    env_dir.Config
+	config    blob_io.Config
 	hash      domain_interfaces.Hash
 	decrypter io.Reader
 	expander  io.ReadCloser

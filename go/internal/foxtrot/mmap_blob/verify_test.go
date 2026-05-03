@@ -10,10 +10,10 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 )
 
-// writeBlobAndDigest materializes payload through env_dir.NewWriter so the
+// writeBlobAndDigest materializes payload through blob_io.NewWriter so the
 // on-disk file bytes match payload byte-for-byte (DefaultConfig is identity
 // wrappers) and returns the MarklId the writer computed.
 func writeBlobAndDigest(t *testing.T, path string, payload []byte) domain_interfaces.MarklId {
@@ -22,7 +22,7 @@ func writeBlobAndDigest(t *testing.T, path string, payload []byte) domain_interf
 	if err != nil {
 		t.Fatal(err)
 	}
-	w, err := env_dir.NewWriter(env_dir.DefaultConfig, f)
+	w, err := blob_io.NewWriter(blob_io.DefaultConfig, f)
 	if err != nil {
 		f.Close()
 		t.Fatal(err)

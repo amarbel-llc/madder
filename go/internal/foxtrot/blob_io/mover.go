@@ -1,4 +1,4 @@
-package env_dir
+package blob_io
 
 import (
 	"io/fs"
@@ -10,8 +10,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
-
-// TODO move into own package
 
 type MoveOptions struct {
 	TemporaryFS
@@ -43,10 +41,10 @@ type localFileMover struct {
 	blobPath          string
 	verifyOnCollision bool
 
-	// envDirConfig is retained from construction so the EEXIST branch
-	// can build a BlobReader over the existing blob with the same
-	// decoding config (compression/encryption) the writer used.
-	envDirConfig Config
+	// config is retained from construction so the EEXIST branch can
+	// build a BlobReader over the existing blob with the same decoding
+	// config (compression/encryption) the writer used.
+	config Config
 
 	observer domain_interfaces.BlobWriteObserver
 	storeId  string
@@ -70,7 +68,7 @@ func newMover(
 	mover = &localFileMover{
 		funcJoin:          config.funcJoin,
 		verifyOnCollision: moveOptions.VerifyOnCollision,
-		envDirConfig:      config,
+		config:            config,
 		observer:          moveOptions.Observer,
 		storeId:           moveOptions.StoreId,
 	}
@@ -212,7 +210,7 @@ func (mover *localFileMover) Close() (err error) {
 		// streams match.
 		if mover.verifyOnCollision {
 			if verifyErr := verifyExistingBlobMatches(
-				mover.envDirConfig,
+				mover.config,
 				tempPath,
 				mover.blobPath,
 			); verifyErr != nil {

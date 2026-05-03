@@ -6,7 +6,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 )
 
 type CopyResult struct {
@@ -48,11 +48,11 @@ func (copyResult *CopyResult) SetError(err error) {
 func (copyResult *CopyResult) setErrorAfterCopy(n int64, err error) {
 	copyResult.bytesWritten = n
 
-	if env_dir.IsErrBlobAlreadyExists(err) {
+	if blob_io.IsErrBlobAlreadyExists(err) {
 		copyResult.SetBlobExistsLocallyAndRemotely()
 	} else if markl.IsErrNull(err) {
 		copyResult.SetBlobExistsLocallyAndRemotely()
-	} else if env_dir.IsErrBlobMissing(err) {
+	} else if blob_io.IsErrBlobMissing(err) {
 		copyResult.SetBlobMissingLocally()
 	} else if err != nil {
 		copyResult.state = CopyResultStateError

@@ -48,7 +48,7 @@ type Env interface {
 	// GetBlobWriteObserver returns the observer wired at env-construction
 	// time by the command layer (based on the --no-inventory-log global
 	// flag and the MADDER_INVENTORY_LOG env var). Concrete blob stores fetch it
-	// from here and plumb it into env_dir.MoveOptions. Nil means no
+	// from here and plumb it into blob_io.MoveOptions. Nil means no
 	// observer is attached — the mover then skips its call sites. See
 	// ADR 0004.
 	//

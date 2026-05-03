@@ -5,7 +5,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -38,7 +38,7 @@ func (parentStore Multi) MakeBlobReader(
 
 	clonedId, _ := markl.Clone(id) //repool:owned
 
-	return nil, env_dir.ErrBlobMissing{
+	return nil, blob_io.ErrBlobMissing{
 		BlobId: clonedId,
 	}
 }

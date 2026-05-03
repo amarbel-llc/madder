@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 )
 
 func TestMakeMmapBlob_LocalFileIdentity(t *testing.T) {
@@ -19,7 +19,7 @@ func TestMakeMmapBlob_LocalFileIdentity(t *testing.T) {
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	br, err := env_dir.NewFileReaderOrErrNotExist(env_dir.DefaultConfig, path)
+	br, err := blob_io.NewFileReaderOrErrNotExist(blob_io.DefaultConfig, path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestMakeMmapBlob_LocalFileIdentity(t *testing.T) {
 }
 
 func TestMakeMmapBlob_BytesReader(t *testing.T) {
-	br, err := env_dir.NewReader(env_dir.DefaultConfig, bytes.NewReader([]byte("hi")))
+	br, err := blob_io.NewReader(blob_io.DefaultConfig, bytes.NewReader([]byte("hi")))
 	if err != nil {
 		t.Fatal(err)
 	}

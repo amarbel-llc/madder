@@ -11,6 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
@@ -35,7 +36,7 @@ type localHashBucketed struct {
 	verifyOnCollision bool
 
 	// observer is captured from the ambient env at store construction
-	// and forwarded into env_dir.MoveOptions on every MakeBlobWriter.
+	// and forwarded into blob_io.MoveOptions on every MakeBlobWriter.
 	// Nil means no audit logging for this store's writes. See ADR 0004.
 	observer domain_interfaces.BlobWriteObserver
 }
@@ -102,14 +103,14 @@ func (blobStore localHashBucketed) GetDefaultHashType() domain_interfaces.Format
 
 func (blobStore localHashBucketed) makeEnvDirConfig(
 	hashFormat domain_interfaces.FormatHash,
-) env_dir.Config {
+) blob_io.Config {
 	if hashFormat == nil {
 		hashFormat = blobStore.defaultHashFormat
 	}
 
-	return env_dir.MakeConfig(
+	return blob_io.MakeConfig(
 		hashFormat,
-		env_dir.MakeHashBucketPathJoinFunc(blobStore.buckets),
+		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
 		blobStore.config.GetBlobCompression(),
 		blobStore.config.GetBlobEncryption(),
 	)
@@ -123,7 +124,7 @@ func (blobStore localHashBucketed) HasBlob(
 		return ok
 	}
 
-	path := env_dir.MakeHashBucketPathFromMerkleId(
+	path := blob_io.MakeHashBucketPathFromMerkleId(
 		merkleId,
 		blobStore.buckets,
 		blobStore.multiHash,
@@ -159,7 +160,7 @@ func (blobStore localHashBucketed) MakeBlobReader(
 		digest,
 		blobStore.basePath,
 	); err != nil {
-		if !env_dir.IsErrBlobMissing(err) {
+		if !blob_io.IsErrBlobMissing(err) {
 			err = errors.Wrap(err)
 		}
 
@@ -198,9 +199,9 @@ func (blobStore localHashBucketed) blobWriterTo(
 		)
 	}
 
-	if mover, err = env_dir.NewMover(
+	if mover, err = blob_io.NewMover(
 		blobStore.makeEnvDirConfig(hashFormat),
-		env_dir.MoveOptions{
+		blob_io.MoveOptions{
 			FinalPathOrDir:              path,
 			GenerateFinalPathFromDigest: true,
 			TemporaryFS:                 blobStore.tempFS,
@@ -241,7 +242,7 @@ func (blobStore localHashBucketed) blobReaderFrom(
 		return readCloser, err
 	}
 
-	basePath = env_dir.MakeHashBucketPathFromMerkleId(
+	basePath = blob_io.MakeHashBucketPathFromMerkleId(
 		digest,
 		blobStore.buckets,
 		blobStore.multiHash,
@@ -257,12 +258,12 @@ func (blobStore localHashBucketed) blobReaderFrom(
 		return readCloser, err
 	}
 
-	if readCloser, err = env_dir.NewFileReaderOrErrNotExist(
+	if readCloser, err = blob_io.NewFileReaderOrErrNotExist(
 		blobStore.makeEnvDirConfig(hashFormat),
 		basePath,
 	); err != nil {
 		if errors.IsNotExist(err) {
-			err = env_dir.ErrBlobMissing{
+			err = blob_io.ErrBlobMissing{
 				BlobId: func() domain_interfaces.MarklId { id, _ := markl.Clone(digest); return id }(), //repool:owned
 				Path:   basePath,
 			}
@@ -284,7 +285,7 @@ func (blobStore localHashBucketed) blobReaderFrom(
 func (blobStore localHashBucketed) DeleteBlob(
 	id domain_interfaces.MarklId,
 ) (err error) {
-	path := env_dir.MakeHashBucketPathFromMerkleId(
+	path := blob_io.MakeHashBucketPathFromMerkleId(
 		id,
 		blobStore.buckets,
 		blobStore.multiHash,
@@ -310,14 +311,14 @@ func (blobStore localHashBucketed) AddForeignBlobDigestForNativeDigest(
 		return err
 	}
 
-	nativePath := env_dir.MakeHashBucketPathFromMerkleId(
+	nativePath := blob_io.MakeHashBucketPathFromMerkleId(
 		native,
 		blobStore.buckets,
 		blobStore.multiHash,
 		blobStore.basePath,
 	)
 
-	foreignPath := env_dir.MakeHashBucketPathFromMerkleId(
+	foreignPath := blob_io.MakeHashBucketPathFromMerkleId(
 		foreign,
 		blobStore.buckets,
 		blobStore.multiHash,

@@ -34,7 +34,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -84,8 +84,8 @@ func Resolve(arg string, mode Mode) Resolved {
 	}
 
 	if mode&ModeFile != 0 {
-		reader, err := env_dir.NewFileReaderOrErrNotExist(
-			env_dir.DefaultConfig,
+		reader, err := blob_io.NewFileReaderOrErrNotExist(
+			blob_io.DefaultConfig,
 			arg,
 		)
 		if err == nil {

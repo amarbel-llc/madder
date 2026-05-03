@@ -1,4 +1,6 @@
-package env_dir
+package blob_io
+
+//go:generate dagnabit export
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -8,8 +10,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
-
-// TODO move into own package
 
 func MakeConfig(
 	hashFormat domain_interfaces.FormatHash,

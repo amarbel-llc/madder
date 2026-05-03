@@ -1,6 +1,6 @@
 //go:build test
 
-package env_dir
+package blob_io
 
 import (
 	"bytes"
@@ -172,8 +172,8 @@ var _ io.Reader = (*alwaysErrReader)(nil)
 
 // TestVerifyExistingBlobMatches_Identical is the happy path for the
 // callsite helper used from blob_mover.Close's EEXIST branch: two files
-// with identical bytes produce a nil error under the default env_dir
-// config (no compression, no encryption).
+// with identical bytes produce a nil error under DefaultConfig (no
+// compression, no encryption).
 func TestVerifyExistingBlobMatches_Identical(t *testing.T) {
 	dir := t.TempDir()
 	payload := []byte("identical content for EEXIST verify helper")

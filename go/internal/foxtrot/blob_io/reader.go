@@ -1,4 +1,4 @@
-package env_dir
+package blob_io
 
 import (
 	"bytes"
@@ -12,8 +12,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"
 )
-
-// TODO move into own package
 
 type blobReader struct {
 	config     Config

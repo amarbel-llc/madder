@@ -1,6 +1,6 @@
 //go:build test
 
-package env_dir
+package blob_io
 
 import (
 	"testing"
