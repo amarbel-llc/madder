@@ -17,8 +17,8 @@ schema = 3
     goVersion = '1.14'
 
   [mod.'github.com/amarbel-llc/bob/packages/tap-dancer/go']
-    version = 'v0.1.0'
-    hash = 'sha256-pC95VLeYUZwmcosmo2mtzh1Ggk7N9rlUtXPmf7eGDpE='
+    version = 'v0.2.0'
+    hash = 'sha256-SXBynDyZr8xT1nSfDynjewNU0DxvNoXCfwtByB1hI8g='
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/purse-first/libs/dewey']

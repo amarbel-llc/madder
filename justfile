@@ -540,3 +540,56 @@ debug-init-repro storeid="default":
 
   echo "(tmp workdir: $workdir)"
   echo "(tmp home:    $home)"
+
+# Exercise tap-dancer-backed TAP emitters and assert no `# Output` comment
+# directives appear in the output. Catches regressions where a writer
+# falls back to legacy bats-style `# Output: ...` lines instead of the
+# tap-dancer YAMLish diagnostic block. Drives `cg capture` (capture_sink),
+# `madder write` (blob_write_sink), and `madder fsck` (blob_verify_sink)
+# in -format tap mode against an isolated tmp home, so a real TTY is not
+# required.
+[group("debug")]
+debug-tap-output:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+  just build >/dev/null
+  madder_bin="{{justfile_directory()}}/result/bin/madder"
+  cg_bin="{{justfile_directory()}}/result/bin/cutting-garden"
+
+  home=$(mktemp -d)
+  workdir=$(mktemp -d)
+  trap 'rm -rf "$home" "$workdir"' EXIT
+  cd "$workdir"
+
+  unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_LOG_HOME
+  export HOME="$home"
+  export MADDER_CEILING_DIRECTORIES="$workdir"
+
+  "$madder_bin" init -encryption none .default >/dev/null
+
+  mkdir -p tree/sub
+  echo alpha >tree/a.txt
+  echo beta  >tree/b.txt
+  echo gamma >tree/sub/c.txt
+
+  combined=$(mktemp)
+  trap 'rm -rf "$home" "$workdir" "$combined"' EXIT
+
+  run_case() {
+    local label="$1"; shift
+    echo "=== $label ===" | tee -a "$combined"
+    "$@" 2>&1 | tee -a "$combined"
+    echo | tee -a "$combined"
+  }
+
+  run_case "cg capture -format tap tree" "$cg_bin" capture -format tap tree
+  run_case "madder write -format tap tree/a.txt" "$madder_bin" write -format tap tree/a.txt
+  run_case "madder fsck -format tap .default" "$madder_bin" fsck -format tap .default
+
+  echo "--- assertion: no '# Output' comment directive lines ---"
+  if grep -nE '^[[:space:]]*# Output' "$combined"; then
+    echo "FAIL: '# Output' directive appeared above" >&2
+    exit 1
+  fi
+  echo "OK: '# Output' directive absent across $(wc -l <"$combined") lines"
