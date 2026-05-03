@@ -206,3 +206,117 @@ func TestMetadataValidator_RejectsCarriageReturn(t *testing.T) {
 		t.Errorf("expected ErrMalformedMetadataLine for \\r, got %v", err)
 	}
 }
+
+func TestCanonicalize_PrefixOrder(t *testing.T) {
+	// RFC §Canonical Line Order: # → < (locked refs in source order
+	// — we don't yet model the lock distinction, see #128, so all <
+	// stays in source order) → - → @ → !.
+	doc := &Document{
+		Metadata: []MetadataLine{
+			{Prefix: '!', Value: "md"},
+			{Prefix: '@', Value: "blake2b256-abc"},
+			{Prefix: '-', Value: "tag-one"},
+			{Prefix: '#', Value: "desc"},
+			{Prefix: '<', Value: "object/id"},
+			{Prefix: '-', Value: "tag-two"},
+		},
+	}
+
+	Canonicalize(doc)
+
+	wantOrder := []byte{'#', '<', '-', '-', '@', '!'}
+	got := make([]byte, len(doc.Metadata))
+	for i, ml := range doc.Metadata {
+		got[i] = ml.Prefix
+	}
+	if string(got) != string(wantOrder) {
+		t.Errorf("prefix order: got %q, want %q", got, wantOrder)
+	}
+
+	// Within the `-` bucket, source order preserved (stable sort).
+	var dashValues []string
+	for _, ml := range doc.Metadata {
+		if ml.Prefix == '-' {
+			dashValues = append(dashValues, ml.Value)
+		}
+	}
+	if len(dashValues) != 2 || dashValues[0] != "tag-one" || dashValues[1] != "tag-two" {
+		t.Errorf("dash bucket should preserve source order, got %v", dashValues)
+	}
+}
+
+func TestCanonicalize_PreservesLeadingComments(t *testing.T) {
+	doc := &Document{
+		Metadata: []MetadataLine{
+			{Prefix: '!', Value: "md", LeadingComments: []string{"about-type"}},
+			{Prefix: '#', Value: "desc"},
+		},
+	}
+	Canonicalize(doc)
+
+	if doc.Metadata[0].Prefix != '#' {
+		t.Fatalf("# should sort first, got %q", doc.Metadata[0].Prefix)
+	}
+	if doc.Metadata[1].Prefix != '!' {
+		t.Fatalf("! should sort last, got %q", doc.Metadata[1].Prefix)
+	}
+	if got := doc.Metadata[1].LeadingComments; len(got) != 1 || got[0] != "about-type" {
+		t.Errorf("LeadingComments should travel with their line: %+v", got)
+	}
+}
+
+func TestFormatBodyEmitter_EmitsCanonicalizedMetadataThenBody(t *testing.T) {
+	doc := &Document{
+		Metadata: []MetadataLine{
+			{Prefix: '!', Value: "md"},
+			{Prefix: '#', Value: "desc"},
+		},
+		HasBody: true,
+	}
+	const body = "hello\n"
+	var out bytes.Buffer
+	emitter := &FormatBodyEmitter{Doc: doc, Out: &out}
+	if _, err := emitter.ReadFrom(strings.NewReader(body)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	const want = "---\n# desc\n! md\n---\n\nhello\n"
+	if got := out.String(); got != want {
+		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestFormatBodyEmitter_NoBody(t *testing.T) {
+	doc := &Document{
+		Metadata: []MetadataLine{{Prefix: '!', Value: "md"}},
+		HasBody:  false,
+	}
+	var out bytes.Buffer
+	emitter := &FormatBodyEmitter{Doc: doc, Out: &out}
+	if _, err := emitter.ReadFrom(strings.NewReader("")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	const want = "---\n! md\n---\n"
+	if got := out.String(); got != want {
+		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestFormatBodyEmitter_LeadingAndTrailingComments(t *testing.T) {
+	doc := &Document{
+		Metadata: []MetadataLine{
+			{Prefix: '!', Value: "md", LeadingComments: []string{"about-type"}},
+		},
+		TrailingComments: []string{"end note"},
+		HasBody:          false,
+	}
+	var out bytes.Buffer
+	emitter := &FormatBodyEmitter{Doc: doc, Out: &out}
+	if _, err := emitter.ReadFrom(strings.NewReader("")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	const want = "---\n% about-type\n! md\n% end note\n---\n"
+	if got := out.String(); got != want {
+		t.Errorf("output mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}

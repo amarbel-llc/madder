@@ -18,6 +18,7 @@ type (
 	Document                                                  = internal.Document
 	Encoder[BLOB any]                                         = internal.Encoder[BLOB]
 	EncoderTypeMapWithoutType[BLOB any]                       = internal.EncoderTypeMapWithoutType[BLOB]
+	FormatBodyEmitter                                         = internal.FormatBodyEmitter
 	MetadataBuilder                                           = internal.MetadataBuilder
 	MetadataLine                                              = internal.MetadataLine
 	MetadataStreamer                                          = internal.MetadataStreamer
@@ -35,6 +36,7 @@ type (
 
 var (
 	BoundaryStringValue          = internal.BoundaryStringValue
+	Canonicalize                 = internal.Canonicalize
 	ErrInlineBodyWithAtReference = internal.ErrInlineBodyWithAtReference
 	ErrInvalidPrefix             = internal.ErrInvalidPrefix
 	ErrMalformedMetadataLine     = internal.ErrMalformedMetadataLine

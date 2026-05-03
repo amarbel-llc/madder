@@ -2,6 +2,7 @@ package hyphence
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strings"
 
@@ -159,5 +160,57 @@ func (m *MetadataValidator) ReadFrom(r io.Reader) (int64, error) {
 		}
 	}
 
+	return n, nil
+}
+
+// FormatBodyEmitter is the Blob consumer for `hyphence format`. By
+// the time ReadFrom fires, MetadataBuilder has populated Doc; this
+// emits the canonicalized metadata section to Out, then streams the
+// body bytes from r to Out.
+type FormatBodyEmitter struct {
+	Doc *Document
+	Out io.Writer
+}
+
+func (e *FormatBodyEmitter) ReadFrom(r io.Reader) (int64, error) {
+	Canonicalize(e.Doc)
+
+	if _, err := fmt.Fprint(e.Out, "---\n"); err != nil {
+		return 0, errors.Wrap(err)
+	}
+	for _, ml := range e.Doc.Metadata {
+		for _, c := range ml.LeadingComments {
+			if _, err := fmt.Fprintf(e.Out, "%% %s\n", c); err != nil {
+				return 0, errors.Wrap(err)
+			}
+		}
+		if _, err := fmt.Fprintf(e.Out, "%c %s\n", ml.Prefix, ml.Value); err != nil {
+			return 0, errors.Wrap(err)
+		}
+	}
+	for _, c := range e.Doc.TrailingComments {
+		if _, err := fmt.Fprintf(e.Out, "%% %s\n", c); err != nil {
+			return 0, errors.Wrap(err)
+		}
+	}
+	if _, err := fmt.Fprint(e.Out, "---\n"); err != nil {
+		return 0, errors.Wrap(err)
+	}
+
+	if !e.Doc.HasBody {
+		// Drain r to release any underlying buffer; but no body
+		// separator + body bytes are emitted when there's no body.
+		_, _ = io.Copy(io.Discard, r)
+		return 0, nil
+	}
+
+	if _, err := fmt.Fprint(e.Out, "\n"); err != nil {
+		return 0, errors.Wrap(err)
+	}
+
+	n, err := io.Copy(e.Out, r)
+	if err != nil {
+		return n, errors.Wrap(err)
+	}
 	return n, nil
 }
