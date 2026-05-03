@@ -208,6 +208,44 @@ func TestInvariant_ResetWith(t *testing.T) {
 	}
 }
 
+func TestInvariant_ResetWith_EmptySrcClearsStaleData(t *testing.T) {
+	for formatId, fh := range formatHashes {
+		fh := fh
+		t.Run(formatId, func(t *testing.T) {
+			hash, repool := fh.Get()
+			defer repool()
+
+			if _, err := hash.Write([]byte("seed")); err != nil {
+				t.Fatal(err)
+			}
+
+			populated, populatedRepool := hash.GetMarklId()
+			defer populatedRepool()
+
+			dst, ok := populated.(*Id)
+			if !ok {
+				t.Fatalf("expected *Id, got %T", populated)
+			}
+
+			var empty Id
+			dst.ResetWith(empty)
+
+			assertInvariant(t, "ResetWith empty src", dst)
+
+			if !dst.IsEmpty() {
+				t.Errorf("expected IsEmpty after ResetWith(empty), got data=%d bytes format=%v",
+					len(dst.GetBytes()), dst.GetMarklFormat())
+			}
+			if got := len(dst.GetBytes()); got != 0 {
+				t.Errorf("expected GetBytes len 0, got %d", got)
+			}
+			if got := dst.GetMarklFormat(); got != nil {
+				t.Errorf("expected nil format, got %v", got)
+			}
+		})
+	}
+}
+
 func TestInvariant_AfterReset(t *testing.T) {
 	for formatId, fh := range formatHashes {
 		fh := fh

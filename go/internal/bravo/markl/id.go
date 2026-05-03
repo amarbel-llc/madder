@@ -308,6 +308,10 @@ func (id *Id) ResetWithPurpose(purpose string) {
 func (id *Id) ResetWith(src Id) {
 	id.purposeId = src.purposeId
 	id.format = src.format
+	if len(src.data) == 0 {
+		id.data = id.data[:0]
+		return
+	}
 	errors.PanicIfError(id.setData(src.data))
 }
 
