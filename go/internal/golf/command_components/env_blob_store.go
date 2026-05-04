@@ -5,6 +5,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/echo/madder_env"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_store_env"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
@@ -44,7 +45,7 @@ type EnvBlobStore struct {
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req futility.Request,
 ) BlobStoreEnv {
-	return MakeBlobStoreEnv(cmd.makeEnvLocal(req))
+	return blob_store_env.MakeBlobStoreEnv(cmd.makeEnvLocal(req))
 }
 
 // MakeEnvBlobStoreWithoutStores returns a BlobStoreEnv with the directory
@@ -54,7 +55,7 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 func (cmd EnvBlobStore) MakeEnvBlobStoreWithoutStores(
 	req futility.Request,
 ) BlobStoreEnv {
-	return MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req))
+	return blob_store_env.MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req))
 }
 
 func (cmd EnvBlobStore) makeEnvLocal(

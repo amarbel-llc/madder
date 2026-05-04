@@ -1,5 +1,7 @@
 package env_ui
 
+//go:generate dagnabit export
+
 import (
 	"io"
 	"os"

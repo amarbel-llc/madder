@@ -1,5 +1,7 @@
 package env_local
 
+//go:generate dagnabit export
+
 import (
 	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
