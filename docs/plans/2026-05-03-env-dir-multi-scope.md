@@ -11,7 +11,10 @@ breakdown landed across May 2026.
 | 1 | Introduce `env_dir.Config`; migrate the 8 `Make*` constructors; retire `Option` / `WithEnvVarNames` | ✅ commit `236bb26` |
 | 2 | Drop `os.Setenv` at construction (rely on `MakeCommonEnv` / `AddToEnvVars` for subprocess plumbing) | ✅ commit `7a38f14` |
 | 3 | `command_components.MakeEnvDirForScope` helper for wrapper-utility commands | ✅ commit `b305037` |
-| 4 | cg `captures.log` tracer consumer + bats pinning test (folds in Step 5) | ✅ this commit |
+| 4 | cg `captures.log` tracer consumer + bats pinning test (folds in Step 5) | ✅ commit `9ad5d17` |
+| 6 | De-madder `env_dir`; introduce `madder_env` package | ✅ commit `f943f1d` |
+| 7 | Extract `BlobStoreEnv` to its own package; expose `env_local` + `env_ui` (dodder-driven) | ✅ commit `6308c57` |
+| 8 | Drop madder's vestigial `MADDER_XDG_UTILITY_OVERRIDE` default (resolves the per-scope-isolation gap originally noted as a known limitation) | ✅ this commit |
 
 The bats `capture_writes_log_entry_at_cg_scope` test pins the
 multi-scope contract end-to-end: a single `cutting-garden capture`
@@ -19,15 +22,24 @@ invocation writes blobs under `$XDG_DATA_HOME/madder/blob_stores/`
 AND a captures.log line under `$XDG_STATE_HOME/cutting-garden/`,
 with the two paths disjoint by construction.
 
-## Known limitation flagged by Step 4
+## Resolved: per-scope env-var isolation
 
-`MADDER_XDG_UTILITY_OVERRIDE`, when set, currently redirects BOTH
-madder's and cg's env_dirs (because both use
-`DefaultEnvVarNames.XDGUtilityOverride = "MADDER_XDG_UTILITY_OVERRIDE"`).
-True env-var isolation between scopes would require cg's env_dir to
-use its own `EnvVarNames` bundle (e.g. `CG_XDG_UTILITY_OVERRIDE`).
-That is per-scope `EnvVarNames` plumbing and is not addressed by
-Steps 0–4. Worth tracking as a follow-up if anyone hits the footgun.
+Steps 4 left a known limitation: `MADDER_XDG_UTILITY_OVERRIDE`, when
+set in the user's environment, redirected BOTH madder's and cg's
+env_dirs because both used the same EnvVarNames bundle. The fix in
+Step 8 was to recognize that `MADDER_XDG_UTILITY_OVERRIDE` was a
+vestigial inheritance from the dodder→madder rename (#42) — never
+documented, never tested, never wired into a man page or `EnvVar{}`
+block. Removing it from `madder_env.DefaultEnvVarNames` (with
+`XDGUtilityOverride: ""`) makes madder commands no longer honor any
+XDG-scope-override env var. The "two scopes share an override env
+var" footgun evaporates because madder commands now define no
+override env var at all.
+
+The `XDGUtilityOverride` field on `env_dir.EnvVarNames` is preserved
+for utilities that DO want runtime XDG-scope override semantics
+(dodder uses `DODDER_XDG_UTILITY_OVERRIDE` via their own bundle).
+env_dir's contract is unchanged; only madder's defaults shrunk.
 
 ---
 
@@ -213,12 +225,18 @@ Add a test that asserts:
 1. `cutting-garden capture` writes a blob into a madder-scoped
    blob store *and* a line into a cg-scoped captures.log — proving
    both env_dir instances are addressing disjoint XDG scopes.
-2. Setting `MADDER_XDG_UTILITY_OVERRIDE` does *not* redirect
-   cg's captures.log (cg's env_dir uses its own override env var,
-   which Step 1's Config makes per-instance).
 
-This is the load-bearing test for "scopes cannot affect one
-another," which is the architectural intent the issue states.
+The original Step-5 sketch also called for asserting that
+`MADDER_XDG_UTILITY_OVERRIDE` does NOT redirect cg's captures.log,
+which was an artifact of the original Config-with-XDGScope design
+sketch. The implementation took a different shape (XDGScope as a
+constructor arg, not a Config field) and the override env var itself
+turned out to be vestigial — see Step 8 in the Status table. The
+single end-to-end assertion in (1) is the load-bearing test for
+"scopes cannot affect one another."
+
+This step folded into Step 4's `capture_writes_log_entry_at_cg_scope`
+bats test.
 
 ## What I deliberately did not do
 

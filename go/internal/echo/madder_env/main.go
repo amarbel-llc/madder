@@ -14,6 +14,19 @@
 // today; other wrapper utilities tomorrow) can opt into madder's
 // env-var contract when they want to interoperate with madder's
 // blob-store ops at madder's scope.
+//
+// What madder DOES NOT define: an XDG-utility-override env-var
+// name. The `env_dir.EnvVarNames.XDGUtilityOverride` field exists
+// for utilities that want runtime XDG-scope override semantics, but
+// madder commands do not honor any such override — `madder` always
+// resolves to `$XDG_*_HOME/madder/`. (Historical: a vestigial
+// `MADDER_XDG_UTILITY_OVERRIDE` was inherited from the dodder→madder
+// rename in #42; never documented, never tested. Removed under #123
+// because madder commands sharing it caused a per-scope-isolation
+// gap when a single process held multiple env_dirs at different
+// scopes — see the env_dir multi-scope plan.) Wrapper utilities that
+// want override semantics define their own bundle (e.g. dodder uses
+// `DODDER_XDG_UTILITY_OVERRIDE`).
 package madder_env
 
 //go:generate dagnabit export
@@ -24,15 +37,6 @@ import "github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 // they can locate the binary that spawned them. Read by external
 // scripts that wrap madder; never read by madder itself.
 const EnvBin = "BIN_MADDER"
-
-// OverrideEnvVarName is the env-var name the dewey XDG stack
-// consults to override the utilityName a call site passed in.
-// Setting this redirects every env_dir built with the madder
-// EnvVarNames bundle to a different XDG scope. (Note: today this
-// affects every env_dir that uses the madder bundle, including
-// cutting-garden's; full per-scope isolation requires per-scope
-// EnvVarNames bundles — tracked in #123.)
-const OverrideEnvVarName = "MADDER_XDG_UTILITY_OVERRIDE"
 
 // EnvVerifyOnCollision is the env-var name that, when truthy, flips
 // `env_dir.Env.GetVerifyOnCollisionOverride()` to true. See ADR
@@ -52,8 +56,10 @@ const EnvVerifyOnCollision = "MADDER_VERIFY_ON_COLLISION"
 // Wrapper utilities that want their OWN env-var contract for their
 // OWN scope define their own `EnvVarNames` bundle in their own
 // application layer.
+//
+// XDGUtilityOverride is intentionally empty — see the package
+// doc-comment for why madder doesn't honor any such env var.
 var DefaultEnvVarNames = env_dir.EnvVarNames{
-	Binary:             EnvBin,
-	XDGUtilityOverride: OverrideEnvVarName,
-	VerifyOnCollision:  EnvVerifyOnCollision,
+	Binary:            EnvBin,
+	VerifyOnCollision: EnvVerifyOnCollision,
 }

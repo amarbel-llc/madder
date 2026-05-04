@@ -17,16 +17,6 @@ func TestEnvBin(t *testing.T) {
 	}
 }
 
-// TestOverrideEnvVarName pins the override env-var name. User-visible:
-// `MADDER_XDG_UTILITY_OVERRIDE=alt madder ...` redirects madder's
-// XDG scope.
-func TestOverrideEnvVarName(t *testing.T) {
-	if OverrideEnvVarName != "MADDER_XDG_UTILITY_OVERRIDE" {
-		t.Errorf("OverrideEnvVarName = %q, want %q",
-			OverrideEnvVarName, "MADDER_XDG_UTILITY_OVERRIDE")
-	}
-}
-
 // TestEnvVerifyOnCollision pins the verify-on-collision env-var name.
 // See ADR 0003 / #38.
 func TestEnvVerifyOnCollision(t *testing.T) {
@@ -38,17 +28,24 @@ func TestEnvVerifyOnCollision(t *testing.T) {
 
 // TestDefaultEnvVarNames pins the bundle madder commands pass into
 // env_dir.Config.EnvVarNames. The constants alone are easy to mis-
-// wire (assigning OverrideEnvVarName to Binary, etc.); this test
-// confirms the bundle's three fields point at the right constants.
+// wire; this test confirms the bundle's fields point at the right
+// constants AND that XDGUtilityOverride is intentionally empty
+// (madder does not honor any XDG-scope-override env var; see
+// package doc-comment).
 func TestDefaultEnvVarNames(t *testing.T) {
 	want := env_dir.EnvVarNames{
-		Binary:             EnvBin,
-		XDGUtilityOverride: OverrideEnvVarName,
-		VerifyOnCollision:  EnvVerifyOnCollision,
+		Binary:            EnvBin,
+		VerifyOnCollision: EnvVerifyOnCollision,
+		// XDGUtilityOverride: "" — madder defines no override env var
 	}
 
 	if DefaultEnvVarNames != want {
 		t.Errorf("DefaultEnvVarNames = %+v, want %+v",
 			DefaultEnvVarNames, want)
+	}
+
+	if DefaultEnvVarNames.XDGUtilityOverride != "" {
+		t.Errorf("madder must not define an XDG-utility-override env var; "+
+			"got XDGUtilityOverride = %q", DefaultEnvVarNames.XDGUtilityOverride)
 	}
 }

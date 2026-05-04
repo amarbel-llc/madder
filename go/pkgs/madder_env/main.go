@@ -11,5 +11,4 @@ var (
 const (
 	EnvBin               = internal.EnvBin
 	EnvVerifyOnCollision = internal.EnvVerifyOnCollision
-	OverrideEnvVarName   = internal.OverrideEnvVarName
 )
