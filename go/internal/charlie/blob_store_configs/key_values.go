@@ -25,9 +25,10 @@ func ConfigKeyValues(config Config) map[string]string {
 	if blobIOWrapper, ok := config.(domain_interfaces.BlobIOWrapper); ok {
 		keyValues["encryption"] = blobIOWrapper.GetBlobEncryption().
 			StringWithFormat()
-		keyValues["compression-type"] = fmt.Sprint(
-			blobIOWrapper.GetBlobCompression(),
-		)
+	}
+
+	if configCompressionType, ok := config.(ConfigCompressionType); ok {
+		keyValues["compression-type"] = configCompressionType.GetCompressionType()
 	}
 
 	if configLocal, ok := config.(ConfigLocalHashBucketed); ok {

@@ -32,6 +32,15 @@ type (
 		GetDefaultHashTypeId() string
 	}
 
+	ConfigCompressionType interface {
+		// GetCompressionType returns the raw on-disk compression-type
+		// string field (e.g. "zstd", "gzip", "" for the v1/v2 default).
+		// For info-repo's `compression-type` key rendering and any other
+		// consumer that needs the on-disk form rather than the resolved
+		// plugin instance.
+		GetCompressionType() string
+	}
+
 	configLocal interface {
 		Config
 		getBasePath() string

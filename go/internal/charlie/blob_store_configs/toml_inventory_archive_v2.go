@@ -61,6 +61,10 @@ func (config TomlInventoryArchiveV2) GetDefaultHashTypeId() string {
 	return string(config.HashTypeId)
 }
 
+func (config TomlInventoryArchiveV2) GetCompressionType() string {
+	return config.CompressionType
+}
+
 func (config TomlInventoryArchiveV2) GetBlobCompression() interfaces.IOWrapper {
 	ref, err := plugins.LegacyCompressionRef(config.CompressionType)
 	if err != nil {

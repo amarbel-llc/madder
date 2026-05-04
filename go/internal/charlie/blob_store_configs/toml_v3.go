@@ -73,6 +73,10 @@ func (blobStoreConfig TomlV3) GetHashBuckets() []int {
 	return blobStoreConfig.HashBuckets
 }
 
+func (blobStoreConfig TomlV3) GetCompressionType() string {
+	return blobStoreConfig.CompressionType
+}
+
 func (blobStoreConfig TomlV3) GetBlobCompression() interfaces.IOWrapper {
 	ref, err := plugins.LegacyCompressionRef(blobStoreConfig.CompressionType)
 	if err != nil {

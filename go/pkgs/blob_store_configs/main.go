@@ -6,6 +6,7 @@ import internal "github.com/amarbel-llc/madder/go/internal/delta/blob_store_conf
 
 type (
 	Config                      = internal.Config
+	ConfigCompressionType       = internal.ConfigCompressionType
 	ConfigHashType              = internal.ConfigHashType
 	ConfigInventoryArchive      = internal.ConfigInventoryArchive
 	ConfigInventoryArchiveDelta = internal.ConfigInventoryArchiveDelta

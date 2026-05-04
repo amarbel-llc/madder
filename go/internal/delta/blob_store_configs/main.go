@@ -16,6 +16,7 @@ type (
 	ConfigUpgradeable           = charlie_bsc.ConfigUpgradeable
 	ConfigMutable               = charlie_bsc.ConfigMutable
 	ConfigHashType              = charlie_bsc.ConfigHashType
+	ConfigCompressionType       = charlie_bsc.ConfigCompressionType
 	ConfigLocalMutable          = charlie_bsc.ConfigLocalMutable
 	ConfigLocalHashBucketed     = charlie_bsc.ConfigLocalHashBucketed
 	ConfigInventoryArchive      = charlie_bsc.ConfigInventoryArchive
