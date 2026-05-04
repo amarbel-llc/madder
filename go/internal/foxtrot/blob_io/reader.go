@@ -8,7 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"
 )
@@ -47,7 +47,7 @@ func NewReader(
 			return reader, err
 		}
 
-		if reader.expander, err = compression_type.CompressionTypeNone.WrapReader(
+		if reader.expander, err = (ohio.NopeIOWrapper{}).WrapReader(
 			reader.readSeeker,
 		); err != nil {
 			err = errors.Wrap(err)

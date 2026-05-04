@@ -5,7 +5,8 @@ package blob_io
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 )
 
 func TestHasIdentityWrappers_Default(t *testing.T) {
@@ -15,18 +16,24 @@ func TestHasIdentityWrappers_Default(t *testing.T) {
 }
 
 func TestHasIdentityWrappers_Zstd(t *testing.T) {
-	zstd := compression_type.CompressionTypeZstd
+	zstd, err := plugins.Resolve("madder-codec-zstd-v1@zstd")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := DefaultConfig
-	cfg.compression = &zstd
+	cfg.compression = zstd
 	if cfg.HasIdentityWrappers() {
 		t.Fatal("zstd compression must not be identity")
 	}
 }
 
 func TestHasIdentityWrappers_Gzip(t *testing.T) {
-	gzip := compression_type.CompressionTypeGzip
+	gzip, err := plugins.Resolve("madder-codec-gzip-v1@gzip")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := DefaultConfig
-	cfg.compression = &gzip
+	cfg.compression = gzip
 	if cfg.HasIdentityWrappers() {
 		t.Fatal("gzip compression must not be identity")
 	}

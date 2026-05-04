@@ -9,7 +9,8 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 )
 
 func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {
@@ -72,9 +73,12 @@ func TestMmapSource_ZstdCompression(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	zstd := compression_type.CompressionTypeZstd
+	zstd, err := plugins.Resolve("madder-codec-zstd-v1@zstd")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cfg := DefaultConfig
-	cfg.compression = &zstd
+	cfg.compression = zstd
 
 	f, err := os.Open(path)
 	if err != nil {
