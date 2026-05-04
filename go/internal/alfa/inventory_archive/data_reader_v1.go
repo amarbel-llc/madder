@@ -5,19 +5,19 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 type DataReaderV1 struct {
-	reader          io.ReadSeeker
-	hashFormatId    string
-	compressionType compression_type.CompressionType
-	encryption      interfaces.IOWrapper
-	hashSize        int
-	flags           uint16
-	dataStart       int64
+	reader         io.ReadSeeker
+	hashFormatId   string
+	compressionRef string
+	encryption     interfaces.IOWrapper
+	hashSize       int
+	flags          uint16
+	dataStart      int64
 }
 
 func NewDataReaderV1(
@@ -108,7 +108,7 @@ func (dr *DataReaderV1) readHeader() (err error) {
 		return err
 	}
 
-	dr.compressionType, err = ByteToCompression(compressionByte[0])
+	dr.compressionRef, err = ByteToCompressionRef(compressionByte[0])
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -140,8 +140,8 @@ func (dr *DataReaderV1) HashFormatId() string {
 	return dr.hashFormatId
 }
 
-func (dr *DataReaderV1) CompressionType() compression_type.CompressionType {
-	return dr.compressionType
+func (dr *DataReaderV1) CompressionRef() string {
+	return dr.compressionRef
 }
 
 func (dr *DataReaderV1) Flags() uint16 {
@@ -189,7 +189,7 @@ func (dr *DataReaderV1) ReadEntry() (entry DataEntryV1, err error) {
 
 	entry.Encoding = encodingByte[0]
 
-	entryCompression, err := ByteToCompression(entry.Encoding)
+	entryCompressionRef, err := ByteToCompressionRef(entry.Encoding)
 	if err != nil {
 		err = errors.Wrap(err)
 		return entry, err
@@ -197,10 +197,10 @@ func (dr *DataReaderV1) ReadEntry() (entry DataEntryV1, err error) {
 
 	switch entry.EntryType {
 	case EntryTypeFull:
-		err = dr.readFullEntryBody(&entry, entryCompression)
+		err = dr.readFullEntryBody(&entry, entryCompressionRef)
 
 	case EntryTypeDelta:
-		err = dr.readDeltaEntryBody(&entry, entryCompression)
+		err = dr.readDeltaEntryBody(&entry, entryCompressionRef)
 
 	default:
 		err = errors.Errorf("unknown entry type: %d", entry.EntryType)
@@ -215,7 +215,7 @@ func (dr *DataReaderV1) ReadEntry() (entry DataEntryV1, err error) {
 
 func (dr *DataReaderV1) readFullEntryBody(
 	entry *DataEntryV1,
-	entryCompression compression_type.CompressionType,
+	entryCompressionRef string,
 ) (err error) {
 	// logical_size
 	if err = binary.Read(
@@ -265,7 +265,13 @@ func (dr *DataReaderV1) readFullEntryBody(
 	}
 
 	// Decompress
-	decompressReader, err := entryCompression.WrapReader(
+	plugin, err := plugins.Resolve(entryCompressionRef)
+	if err != nil {
+		err = errors.Wrapf(err, "resolving compression plugin")
+		return err
+	}
+
+	decompressReader, err := plugin.WrapReader(
 		bytes.NewReader(dataToDecompress),
 	)
 	if err != nil {
@@ -289,7 +295,7 @@ func (dr *DataReaderV1) readFullEntryBody(
 
 func (dr *DataReaderV1) readDeltaEntryBody(
 	entry *DataEntryV1,
-	entryCompression compression_type.CompressionType,
+	entryCompressionRef string,
 ) (err error) {
 	// delta_algorithm
 	var deltaAlgByte [1]byte
@@ -357,7 +363,13 @@ func (dr *DataReaderV1) readDeltaEntryBody(
 	}
 
 	// Decompress delta payload
-	decompressReader, err := entryCompression.WrapReader(
+	plugin, err := plugins.Resolve(entryCompressionRef)
+	if err != nil {
+		err = errors.Wrapf(err, "resolving compression plugin for delta")
+		return err
+	}
+
+	decompressReader, err := plugin.WrapReader(
 		bytes.NewReader(dataToDecompress),
 	)
 	if err != nil {

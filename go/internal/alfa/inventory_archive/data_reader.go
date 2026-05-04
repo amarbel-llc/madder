@@ -5,18 +5,18 @@ import (
 	"encoding/binary"
 	"io"
 
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 type DataReader struct {
-	reader          io.ReadSeeker
-	hashFormatId    string
-	compressionType compression_type.CompressionType
-	encryption      interfaces.IOWrapper
-	hashSize        int
-	dataStart       int64
+	reader         io.ReadSeeker
+	hashFormatId   string
+	compressionRef string
+	encryption     interfaces.IOWrapper
+	hashSize       int
+	dataStart      int64
 }
 
 func NewDataReader(
@@ -107,7 +107,7 @@ func (dr *DataReader) readHeader() (err error) {
 		return err
 	}
 
-	dr.compressionType, err = ByteToCompression(compressionByte[0])
+	dr.compressionRef, err = ByteToCompressionRef(compressionByte[0])
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -136,8 +136,8 @@ func (dr *DataReader) HashFormatId() string {
 	return dr.hashFormatId
 }
 
-func (dr *DataReader) CompressionType() compression_type.CompressionType {
-	return dr.compressionType
+func (dr *DataReader) CompressionRef() string {
+	return dr.compressionRef
 }
 
 func (dr *DataReader) ReadEntry() (entry DataEntry, err error) {
@@ -211,7 +211,13 @@ func (dr *DataReader) ReadEntry() (entry DataEntry, err error) {
 	}
 
 	// Decompress data
-	decompressReader, err := dr.compressionType.WrapReader(
+	plugin, err := plugins.Resolve(dr.compressionRef)
+	if err != nil {
+		err = errors.Wrapf(err, "resolving compression plugin")
+		return entry, err
+	}
+
+	decompressReader, err := plugin.WrapReader(
 		bytes.NewReader(dataToDecompress),
 	)
 	if err != nil {

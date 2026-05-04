@@ -15,6 +15,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -368,7 +370,13 @@ func (store inventoryArchiveV1) packChunkArchiveV1(
 		isDelta[blobIdx] = true
 	}
 
-	ct := store.config.GetCompressionType()
+	compressionRef, err := plugins.LegacyCompressionRef(
+		store.config.GetCompressionType().String(),
+	)
+	if err != nil {
+		err = errors.Wrap(err)
+		return dataPath, 0, 0, err
+	}
 
 	// The hasDeltas flag will be set based on whether any deltas were
 	// actually written (some may fall back to full during trial-and-discard).
@@ -405,7 +413,7 @@ func (store inventoryArchiveV1) packChunkArchiveV1(
 	dataWriter, err := inventory_archive.NewDataWriterV1(
 		tmpFile,
 		hashFormatId,
-		ct,
+		compressionRef,
 		flags,
 		store.encryption,
 	)

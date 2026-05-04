@@ -18,6 +18,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
@@ -755,7 +756,7 @@ func TestMakeBlobReaderV1_ChainedDeltaIsError(t *testing.T) {
 	writer, err := inventory_archive.NewDataWriterV1(
 		&archiveBuf,
 		markl.FormatIdHashSha256,
-		compression_type.CompressionTypeNone,
+		"madder-codec-none-v1@none",
 		inventory_archive.FlagHasDeltas,
 		nil,
 	)

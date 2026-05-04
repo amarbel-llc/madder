@@ -10,8 +10,8 @@ import (
 	"encoding/binary"
 	"testing"
 
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/age"
 )
@@ -19,7 +19,7 @@ import (
 func TestV1RoundTripFullEntriesOnly(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriterV1(&buf, hashFormatId, ct, 0, nil)
 	if err != nil {
@@ -166,7 +166,7 @@ func TestV1RoundTripFullEntriesOnly(t *testing.T) {
 func TestV1RoundTripWithDelta(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriterV1(&buf, hashFormatId, ct, FlagHasDeltas, nil)
 	if err != nil {
@@ -292,7 +292,7 @@ func TestV1HeaderFlags(t *testing.T) {
 	// Test 1: full entries only, flags = 0 => no FlagHasDeltas
 	var buf1 bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer1, err := NewDataWriterV1(&buf1, hashFormatId, ct, 0, nil)
 	if err != nil {
@@ -372,7 +372,7 @@ func TestV1HeaderFlags(t *testing.T) {
 func TestV1EncryptedRoundTrip(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeZstd
+	ct := "madder-codec-zstd-v1@zstd"
 
 	var ageIdentity age.Identity
 	if err := ageIdentity.GenerateIfNecessary(); err != nil {
@@ -455,7 +455,7 @@ func TestV1EncryptedRoundTrip(t *testing.T) {
 func TestV1PivyEncryptedRoundTrip(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeZstd
+	ct := "madder-codec-zstd-v1@zstd"
 
 	privKey, err := ecdh.P256().GenerateKey(rand.Reader)
 	if err != nil {

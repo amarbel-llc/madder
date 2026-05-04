@@ -7,15 +7,15 @@ import (
 	"crypto/sha256"
 	"testing"
 
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/echo/age"
 )
 
 func TestRoundTripNoCompression(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriter(&buf, hashFormatId, ct, nil)
 	if err != nil {
@@ -91,10 +91,10 @@ func TestRoundTripNoCompression(t *testing.T) {
 		)
 	}
 
-	if reader.CompressionType() != ct {
+	if reader.CompressionRef() != ct {
 		t.Fatalf(
-			"compression type: got %q, want %q",
-			reader.CompressionType(),
+			"compression ref: got %q, want %q",
+			reader.CompressionRef(),
 			ct,
 		)
 	}
@@ -161,7 +161,7 @@ func TestRoundTripNoCompression(t *testing.T) {
 func TestRoundTripZstd(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeZstd
+	ct := "madder-codec-zstd-v1@zstd"
 
 	writer, err := NewDataWriter(&buf, hashFormatId, ct, nil)
 	if err != nil {
@@ -206,10 +206,10 @@ func TestRoundTripZstd(t *testing.T) {
 		t.Fatalf("NewDataReader: %v", err)
 	}
 
-	if reader.CompressionType() != ct {
+	if reader.CompressionRef() != ct {
 		t.Fatalf(
-			"compression type: got %q, want %q",
-			reader.CompressionType(),
+			"compression ref: got %q, want %q",
+			reader.CompressionRef(),
 			ct,
 		)
 	}
@@ -255,7 +255,7 @@ func TestRoundTripZstd(t *testing.T) {
 func TestValidateSucceeds(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriter(&buf, hashFormatId, ct, nil)
 	if err != nil {
@@ -286,7 +286,7 @@ func TestValidateSucceeds(t *testing.T) {
 func TestValidateDetectsCorruption(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriter(&buf, hashFormatId, ct, nil)
 	if err != nil {
@@ -325,7 +325,7 @@ func TestValidateDetectsCorruption(t *testing.T) {
 func TestEmptyArchiveRoundTrip(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeNone
+	ct := "madder-codec-none-v1@none"
 
 	writer, err := NewDataWriter(&buf, hashFormatId, ct, nil)
 	if err != nil {
@@ -371,7 +371,7 @@ func TestEmptyArchiveRoundTrip(t *testing.T) {
 func TestEncryptedRoundTrip(t *testing.T) {
 	var buf bytes.Buffer
 	hashFormatId := "sha256"
-	ct := compression_type.CompressionTypeZstd
+	ct := "madder-codec-zstd-v1@zstd"
 
 	// Use age X25519 for encryption
 	var ageIdentity age.Identity

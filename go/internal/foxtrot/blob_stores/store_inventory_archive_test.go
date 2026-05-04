@@ -16,6 +16,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
@@ -26,7 +27,6 @@ func TestMakeBlobReaderFromArchive(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	hashFormatId := markl.FormatIdHashSha256
-	ct := compression_type.CompressionTypeNone
 
 	testData := []byte("hello from the archive")
 	rawHash := sha256.Sum256(testData)
@@ -37,7 +37,7 @@ func TestMakeBlobReaderFromArchive(t *testing.T) {
 	writer, err := inventory_archive.NewDataWriter(
 		&archiveBuf,
 		hashFormatId,
-		ct,
+		"madder-codec-none-v1@none",
 		nil,
 	)
 	if err != nil {
@@ -251,7 +251,6 @@ func TestMakeBlobReaderFromArchiveZstd(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	hashFormatId := markl.FormatIdHashSha256
-	ct := compression_type.CompressionTypeZstd
 
 	testData := []byte("compressed archive data that repeats repeats repeats")
 	rawHash := sha256.Sum256(testData)
@@ -261,7 +260,7 @@ func TestMakeBlobReaderFromArchiveZstd(t *testing.T) {
 	writer, err := inventory_archive.NewDataWriter(
 		&archiveBuf,
 		hashFormatId,
-		ct,
+		"madder-codec-zstd-v1@zstd",
 		nil,
 	)
 	if err != nil {
@@ -332,7 +331,6 @@ func TestLoadIndexRebuildsFromIndexFiles(t *testing.T) {
 
 	hashFormatId := markl.FormatIdHashSha256
 	hashFormat := markl.FormatHashSha256
-	ct := compression_type.CompressionTypeNone
 
 	testData := []byte("blob for index loading test")
 	rawHash := sha256.Sum256(testData)
@@ -343,7 +341,7 @@ func TestLoadIndexRebuildsFromIndexFiles(t *testing.T) {
 	dataWriter, err := inventory_archive.NewDataWriter(
 		&archiveBuf,
 		hashFormatId,
-		ct,
+		"madder-codec-none-v1@none",
 		nil,
 	)
 	if err != nil {

@@ -6,28 +6,28 @@ import (
 	"hash"
 	"io"
 
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 type DataWriterV1 struct {
-	writer          io.Writer
-	hasher          hash.Hash
-	multiWriter     io.Writer
-	hashFormatId    string
-	compressionType compression_type.CompressionType
-	encryption      interfaces.IOWrapper
-	hashSize        int
-	flags           uint16
-	entries         []DataEntryV1
-	offset          uint64
+	writer         io.Writer
+	hasher         hash.Hash
+	multiWriter    io.Writer
+	hashFormatId   string
+	compressionRef string
+	encryption     interfaces.IOWrapper
+	hashSize       int
+	flags          uint16
+	entries        []DataEntryV1
+	offset         uint64
 }
 
 func NewDataWriterV1(
 	w io.Writer,
 	hashFormatId string,
-	ct compression_type.CompressionType,
+	compressionRef string,
 	flags uint16,
 	encryption interfaces.IOWrapper,
 ) (dw *DataWriterV1, err error) {
@@ -50,14 +50,14 @@ func NewDataWriterV1(
 	multiWriter := io.MultiWriter(w, hasher)
 
 	dw = &DataWriterV1{
-		writer:          w,
-		hasher:          hasher,
-		multiWriter:     multiWriter,
-		hashFormatId:    hashFormatId,
-		compressionType: ct,
-		encryption:      encryption,
-		hashSize:        hashSize,
-		flags:           flags,
+		writer:         w,
+		hasher:         hasher,
+		multiWriter:    multiWriter,
+		hashFormatId:   hashFormatId,
+		compressionRef: compressionRef,
+		encryption:     encryption,
+		hashSize:       hashSize,
+		flags:          flags,
 	}
 
 	if err = dw.writeHeader(); err != nil {
@@ -110,7 +110,7 @@ func (dw *DataWriterV1) writeHeader() (err error) {
 	}
 
 	// default_encoding: 1 byte
-	compressionByte, err := CompressionToByte(dw.compressionType)
+	compressionByte, err := CompressionRefToByte(dw.compressionRef)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -149,7 +149,7 @@ func (dw *DataWriterV1) WriteFullEntry(
 ) (err error) {
 	entryOffset := dw.offset
 
-	encodingByte, err := CompressionToByte(dw.compressionType)
+	encodingByte, err := CompressionRefToByte(dw.compressionRef)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -178,7 +178,13 @@ func (dw *DataWriterV1) WriteFullEntry(
 
 	var compressedBuf bytes.Buffer
 
-	compressWriter, err := dw.compressionType.WrapWriter(&compressedBuf)
+	plugin, err := plugins.Resolve(dw.compressionRef)
+	if err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	compressWriter, err := plugin.WrapWriter(&compressedBuf)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -276,7 +282,7 @@ func (dw *DataWriterV1) WriteDeltaEntry(
 ) (err error) {
 	entryOffset := dw.offset
 
-	encodingByte, err := CompressionToByte(dw.compressionType)
+	encodingByte, err := CompressionRefToByte(dw.compressionRef)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err
@@ -315,7 +321,13 @@ func (dw *DataWriterV1) WriteDeltaEntry(
 	// Compress delta payload
 	var compressedBuf bytes.Buffer
 
-	compressWriter, err := dw.compressionType.WrapWriter(&compressedBuf)
+	plugin, err := plugins.Resolve(dw.compressionRef)
+	if err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	compressWriter, err := plugin.WrapWriter(&compressedBuf)
 	if err != nil {
 		err = errors.Wrap(err)
 		return err

@@ -8,7 +8,6 @@ import (
 	"hash"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -101,43 +100,41 @@ type CacheEntryV1 struct {
 	BaseOffset      uint64
 }
 
-var compressionToByteMap = map[compression_type.CompressionType]byte{
-	compression_type.CompressionTypeNone:  CompressionByteNone,
-	compression_type.CompressionTypeEmpty: CompressionByteNone,
-	compression_type.CompressionTypeGzip:  CompressionByteGzip,
-	compression_type.CompressionTypeZlib:  CompressionByteZlib,
-	compression_type.CompressionTypeZstd:  CompressionByteZstd,
+var compressionRefToByteMap = map[string]byte{
+	"madder-codec-none-v1@none": CompressionByteNone,
+	"madder-codec-gzip-v1@gzip": CompressionByteGzip,
+	"madder-codec-zlib-v1@zlib": CompressionByteZlib,
+	"madder-codec-zstd-v1@zstd": CompressionByteZstd,
 }
 
-var byteToCompressionMap = map[byte]compression_type.CompressionType{
-	CompressionByteNone: compression_type.CompressionTypeNone,
-	CompressionByteGzip: compression_type.CompressionTypeGzip,
-	CompressionByteZlib: compression_type.CompressionTypeZlib,
-	CompressionByteZstd: compression_type.CompressionTypeZstd,
+var byteToCompressionRefMap = map[byte]string{
+	CompressionByteNone: "madder-codec-none-v1@none",
+	CompressionByteGzip: "madder-codec-gzip-v1@gzip",
+	CompressionByteZlib: "madder-codec-zlib-v1@zlib",
+	CompressionByteZstd: "madder-codec-zstd-v1@zstd",
 }
 
-func CompressionToByte(
-	ct compression_type.CompressionType,
-) (b byte, err error) {
-	var ok bool
-
-	if b, ok = compressionToByteMap[ct]; !ok {
-		err = errors.Errorf("unsupported compression type: %q", ct)
+// CompressionRefToByte maps a plugin reference to the on-disk
+// compression byte used in inventory_archive entries. Returns an
+// error for plugin references this archive format doesn't know
+// about (e.g. parametric variants like zstd-with-dict).
+func CompressionRefToByte(ref string) (byte, error) {
+	b, ok := compressionRefToByteMap[ref]
+	if !ok {
+		return 0, errors.Errorf("unsupported compression for inventory_archive: %q", ref)
 	}
-
-	return b, err
+	return b, nil
 }
 
-func ByteToCompression(
-	b byte,
-) (ct compression_type.CompressionType, err error) {
-	var ok bool
-
-	if ct, ok = byteToCompressionMap[b]; !ok {
-		err = errors.Errorf("unsupported compression byte: %d", b)
+// ByteToCompressionRef maps an on-disk inventory_archive compression
+// byte back to a plugin reference. Used by data_reader to instantiate
+// the correct decoder for each entry.
+func ByteToCompressionRef(b byte) (string, error) {
+	ref, ok := byteToCompressionRefMap[b]
+	if !ok {
+		return "", errors.Errorf("unknown compression byte: 0x%02x", b)
 	}
-
-	return ct, err
+	return ref, nil
 }
 
 type hashConstructor func() hash.Hash

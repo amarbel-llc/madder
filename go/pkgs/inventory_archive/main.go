@@ -35,8 +35,8 @@ type (
 
 var (
 	BaseSelectorForName       = internal.BaseSelectorForName
-	ByteToCompression         = internal.ByteToCompression
-	CompressionToByte         = internal.CompressionToByte
+	ByteToCompressionRef      = internal.ByteToCompressionRef
+	CompressionRefToByte      = internal.CompressionRefToByte
 	DeltaAlgorithmByteForName = internal.DeltaAlgorithmByteForName
 	DeltaAlgorithmForByte     = internal.DeltaAlgorithmForByte
 	GearCDCChunks             = internal.GearCDCChunks
