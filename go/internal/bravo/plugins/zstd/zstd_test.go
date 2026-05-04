@@ -43,6 +43,12 @@ func TestZstd_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read: %v", err)
 	}
+	// Close releases DataDog/zstd's CGo-owned native context. Wrapping the
+	// reader in io.NopCloser would silently drop this; the test exercises
+	// the real Close path to keep that regression visible.
+	if err := rc.Close(); err != nil {
+		t.Fatalf("rc.Close: %v", err)
+	}
 	if string(got) != input {
 		t.Errorf("decode mismatch:\n got: %q\nwant: %q", got, input)
 	}
