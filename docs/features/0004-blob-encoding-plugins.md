@@ -1,14 +1,15 @@
 ---
-status: proposed
+status: experimental
 date: 2026-05-03
 promotion-criteria: |
-  Promote to `experimental` once the plugin registry, the four
-  built-in plugins (none, gzip, zlib, zstd), and the legacy-
-  config-translation path ship, AND the existing test/bats
-  suites pass green against madder with the
-  `dewey/delta/compression_type` import dropped. Promote to
-  `accepted` after one tagged release with the refactor in
-  user hands and no surprise correctness reports.
+  Promote to `accepted` after one tagged release with the refactor
+  in user hands and no surprise correctness reports.
+
+  Promotion to `experimental` (this status) was reached on 2026-05-04
+  when the plugin registry, the four built-in plugins (none, gzip,
+  zlib, zstd), and the legacy-config-translation path shipped, and
+  the existing test/bats suites passed green against madder with the
+  `dewey/delta/compression_type` import dropped.
 ---
 
 # Blob encoding plugins
@@ -223,7 +224,7 @@ reference.
 
 ## Limitations
 
-- **No dict support.** zstd-with-dict is a separate FDR (0005)
+- **No dict support.** zstd-with-dict is a separate future FDR
   built on top of this architecture. v0 ships plain zstd only.
 
 - **No out-of-tree plugins.** All plugins are compiled into
@@ -292,11 +293,19 @@ reference.
 
 ## More Information
 
+- `README.md` §Philosophy — frames blob self-containedness as an
+  external API contract (`MakeBlobReader(id)` returns fully decoded
+  bytes; the consumer never names a sidecar) rather than a
+  byte-layout claim. Plugins MAY use sidecar data inside the store
+  to deliver that surface. v0's four plugins are stateless and
+  don't exercise this latitude; future plugins (notably zstd-with-
+  dict) will, and the abstraction here is forward-compatible with
+  that.
 - `docs/features/0003-zstd-dict-hints-v0.md` — superseded by
   this FDR. The v0 dict-hint design lived above the IOWrapper
   layer; the plugin architecture subsumes that approach by making
   dict-awareness a property of a specific plugin
-  (`madder-codec-zstd-with-dict-v1`, deferred to FDR 0005).
+  (`madder-codec-zstd-with-dict-v1`, deferred to a future FDR).
 - FDR 0005 (forthcoming) — explores the build-orchestration
   mechanism for content-addressed builtin-plugin-ids. The v0
   package-name convention is a stop-gap; FDR 0005 picks the
