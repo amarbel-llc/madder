@@ -4,27 +4,27 @@ Content-addressable blob storage CLI.
 
 ## Philosophy
 
-**Madder is not a graph.** Its blobs are opaque, self-contained, and
-content-addressed. Each blob can be read on its own — the bytes on
-disk plus a hash format are sufficient to verify and decode the
-content. There is no inter-blob reference, no link to resolve, no
-sidecar required.
+Madder is not a graph. From outside the store, every blob is atomic
+and fully resolved: `MakeBlobReader(id)` returns the decoded bytes,
+the consumer never names a sidecar, and the markl-id is the only
+handle a caller ever needs.
 
-This is a deliberate constraint, not a gap. Tools built on top of
-madder — dodder, cutting-garden, and others — are free to compose
-blobs into graphs, define wire formats with embedded references,
-trained-dictionary chains, or schema registries. Madder itself
-stays out of that layer.
+Inside the store, plugins MAY use sidecar data (trained dicts,
+encryption keys, compression state) to deliver that surface — and
+they own the mechanics of fetching, sync-transfer, and lifecycle for
+their own data. Self-containedness is an API contract, not a
+byte-layout claim.
 
-Concretely:
+What madder still doesn't do:
 
-- **No cross-blob references at the storage layer.** A blob never
-  needs another blob to be readable. Compression is per-blob;
-  encoding chains are per-store, not per-graph.
-- **No metadata graph.** Madder doesn't track which blob "uses"
-  another. If a higher-level utility wants that, it owns the index.
-- **No coupled lifecycles.** Deleting one blob never silently breaks
-  another.
+- Expose a graph or relationship layer at the API surface. Tools
+  like dodder and cutting-garden compose blobs into graphs above
+  madder; the store itself doesn't know about those edges.
+- Allow consumers to assemble blobs from foreign references. Every
+  decode must be resolvable inside the store the blob lives in,
+  using only that store's plugin layer. Cross-store reads require
+  sync, not link-following.
 
-When a feature would require madder to track relationships between
-blobs to function, that feature belongs in a layer above madder.
+When a feature would surface relationships between blobs to
+external consumers — references, joins, queries — that feature
+belongs in a layer above madder.
