@@ -47,9 +47,7 @@ func DecodeTomlInventoryArchiveV0(input []byte) (*TomlInventoryArchiveV0Document
 			}
 		case "compression-type":
 			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.CompressionType.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("compression-type: %w", err)
-				}
+				d.data.CompressionType = v
 				d.consumed["compression-type"] = true
 			}
 		case "loose-blob-store-id":
@@ -83,12 +81,8 @@ func (d *TomlInventoryArchiveV0Document) Encode() ([]byte, error) {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
-	{
-		v, err := d.data.CompressionType.MarshalText()
-		if err != nil {
-			return nil, fmt.Errorf("compression-type: %w", err)
-		}
-		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", string(v)); err != nil {
+	if d.data.CompressionType != "" || cst.HasValue(d.cstDoc.Root(), "compression-type") {
+		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", d.data.CompressionType); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
@@ -142,9 +136,7 @@ func DecodeTomlInventoryArchiveV0Into(data *TomlInventoryArchiveV0, doc *documen
 			}
 		case "compression-type":
 			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.CompressionType.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("compression-type: %w", err)
-				}
+				data.CompressionType = v
 				consumed[keyPrefix+"compression-type"] = true
 			}
 		case "loose-blob-store-id":
@@ -175,12 +167,8 @@ func EncodeTomlInventoryArchiveV0From(data *TomlInventoryArchiveV0, doc *documen
 			return fmt.Errorf("%w", err)
 		}
 	}
-	{
-		v, err := data.CompressionType.MarshalText()
-		if err != nil {
-			return fmt.Errorf("compression-type: %w", err)
-		}
-		if err := cst.SetAny(container, "compression-type", string(v)); err != nil {
+	if data.CompressionType != "" || cst.HasValue(container, "compression-type") {
+		if err := cst.SetAny(container, "compression-type", data.CompressionType); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 	}

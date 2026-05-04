@@ -20,7 +20,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestMakeBlobReaderFromArchive(t *testing.T) {
@@ -550,7 +549,7 @@ func TestPack(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV0{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 	}
 
 	store := inventoryArchiveV0{
@@ -665,7 +664,7 @@ func TestPackSkipsAlreadyArchivedBlobs(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV0{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 	}
 
 	store := inventoryArchiveV0{
@@ -735,7 +734,7 @@ func TestPackDeleteLoose(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV0{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 	}
 
 	store := inventoryArchiveV0{
@@ -822,7 +821,7 @@ func TestPackDeleteLooseNotCalledWithoutFlag(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV0{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 	}
 
 	store := inventoryArchiveV0{

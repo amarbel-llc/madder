@@ -258,7 +258,7 @@ func MakeBlobStore(
 			embeddedConfig := &blob_store_configs.DefaultType{
 				HashTypeId:      blob_store_configs.HashType(config.GetDefaultHashTypeId()),
 				HashBuckets:     blob_store_configs.DefaultHashBuckets,
-				CompressionType: string(config.GetCompressionType()),
+				CompressionType: config.GetCompressionRef(),
 			}
 
 			if looseBlobStore, err = makeLocalHashBucketed(

@@ -21,7 +21,6 @@ import (
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestPackV1WithDelta(t *testing.T) {
@@ -67,7 +66,7 @@ func TestPackV1WithDelta(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV1{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 		Delta: blob_store_configs.DeltaConfig{
 			Enabled:     true,
 			Algorithm:   "bsdiff",
@@ -218,7 +217,7 @@ func TestPackV1WithoutDelta(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV1{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 		Delta: blob_store_configs.DeltaConfig{
 			Enabled:     false,
 			Algorithm:   "bsdiff",
@@ -328,7 +327,7 @@ func TestPackV1DeltaFallsBackToFullWhenLarger(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV1{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 		Delta: blob_store_configs.DeltaConfig{
 			Enabled:     true,
 			Algorithm:   "bsdiff",
@@ -433,7 +432,7 @@ func TestPackV1SplitsWhenExceedingMaxPackSize(t *testing.T) {
 
 	config := blob_store_configs.TomlInventoryArchiveV1{
 		HashTypeId:      markl.FormatIdHashSha256,
-		CompressionType: compression_type.CompressionTypeNone,
+		CompressionType: "none",
 		MaxPackSize:     250,
 		Delta: blob_store_configs.DeltaConfig{
 			Enabled:     false,
@@ -540,7 +539,7 @@ func TestPackV1_BlobFilterRestrictsToSubset(t *testing.T) {
 		index:          make(map[string]archiveEntryV1),
 		config: blob_store_configs.TomlInventoryArchiveV1{
 			HashTypeId:      markl.FormatIdHashSha256,
-			CompressionType: compression_type.CompressionTypeNone,
+			CompressionType: "none",
 			Delta: blob_store_configs.DeltaConfig{
 				Enabled:     false,
 				Algorithm:   "bsdiff",
@@ -620,7 +619,7 @@ func TestPackV1_SkipMissingBlobsContinuesOnUnreadable(t *testing.T) {
 		index:          make(map[string]archiveEntryV1),
 		config: blob_store_configs.TomlInventoryArchiveV1{
 			HashTypeId:      markl.FormatIdHashSha256,
-			CompressionType: compression_type.CompressionTypeNone,
+			CompressionType: "none",
 			Delta: blob_store_configs.DeltaConfig{
 				Enabled:     false,
 				Algorithm:   "bsdiff",
@@ -682,7 +681,7 @@ func TestPackV1_ContextCancellationAborts(t *testing.T) {
 		index:          make(map[string]archiveEntryV1),
 		config: blob_store_configs.TomlInventoryArchiveV1{
 			HashTypeId:      markl.FormatIdHashSha256,
-			CompressionType: compression_type.CompressionTypeNone,
+			CompressionType: "none",
 			Delta: blob_store_configs.DeltaConfig{
 				Enabled:     false,
 				Algorithm:   "bsdiff",

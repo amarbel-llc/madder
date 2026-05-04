@@ -11,7 +11,6 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -231,13 +230,7 @@ func (store inventoryArchiveV0) packChunkArchive(
 	blobs []packedBlob,
 ) (dataPath string, entryCount int, err error) {
 	hashFormatId := store.defaultHash.GetMarklFormatId()
-	compressionRef, err := plugins.LegacyCompressionRef(
-		store.config.GetCompressionType().String(),
-	)
-	if err != nil {
-		err = errors.Wrap(err)
-		return dataPath, 0, err
-	}
+	compressionRef := store.config.GetCompressionRef()
 
 	if mkdirErr := os.MkdirAll(store.archivesPath(), 0o755); mkdirErr != nil {
 		err = errors.Wrapf(mkdirErr, "creating archive directory %s", store.archivesPath())

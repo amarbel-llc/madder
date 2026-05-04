@@ -4,17 +4,17 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 //go:generate tommy generate
 type TomlInventoryArchiveV2 struct {
-	HashTypeId      HashType                         `toml:"hash_type-id"`
-	CompressionType compression_type.CompressionType `toml:"compression-type"`
-	Encryption      markl.Id                         `toml:"encryption"`
-	Delta           DeltaConfig                      `toml:"delta"`
-	MaxPackSize     uint64                           `toml:"max-pack-size"`
+	HashTypeId      HashType    `toml:"hash_type-id"`
+	CompressionType string      `toml:"compression-type"`
+	Encryption      markl.Id    `toml:"encryption"`
+	Delta           DeltaConfig `toml:"delta"`
+	MaxPackSize     uint64      `toml:"max-pack-size"`
 }
 
 func (TomlInventoryArchiveV2) GetBlobStoreType() string {
@@ -24,7 +24,12 @@ func (TomlInventoryArchiveV2) GetBlobStoreType() string {
 func (config *TomlInventoryArchiveV2) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
-	config.CompressionType.SetFlagDefinitions(flagSet)
+	flagSet.StringVar(
+		&config.CompressionType,
+		"compression-type",
+		config.CompressionType,
+		"",
+	)
 
 	config.HashTypeId = HashTypeDefault
 
@@ -57,7 +62,15 @@ func (config TomlInventoryArchiveV2) GetDefaultHashTypeId() string {
 }
 
 func (config TomlInventoryArchiveV2) GetBlobCompression() interfaces.IOWrapper {
-	return &config.CompressionType
+	ref, err := plugins.LegacyCompressionRef(config.CompressionType)
+	if err != nil {
+		ref = "madder-codec-none-v1@none"
+	}
+	plugin, err := plugins.Resolve(ref)
+	if err != nil {
+		panic(err) // Programming error: registry should always have these.
+	}
+	return plugin
 }
 
 func (config TomlInventoryArchiveV2) GetBlobEncryption() domain_interfaces.MarklId {
@@ -69,8 +82,12 @@ func (config TomlInventoryArchiveV2) GetLooseBlobStoreId() blob_store_id.Id {
 	return zero
 }
 
-func (config TomlInventoryArchiveV2) GetCompressionType() compression_type.CompressionType {
-	return config.CompressionType
+func (config TomlInventoryArchiveV2) GetCompressionRef() string {
+	ref, err := plugins.LegacyCompressionRef(config.CompressionType)
+	if err != nil {
+		return "madder-codec-none-v1@none"
+	}
+	return ref
 }
 
 // DeltaConfigImmutable implementation

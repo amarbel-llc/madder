@@ -5,16 +5,16 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 //go:generate tommy generate
 type TomlInventoryArchiveV0 struct {
-	HashTypeId       HashType                         `toml:"hash_type-id"`
-	CompressionType  compression_type.CompressionType `toml:"compression-type"`
-	LooseBlobStoreId blob_store_id.Id                 `toml:"loose-blob-store-id"`
-	Encryption       markl.Id                         `toml:"encryption"`
+	HashTypeId       HashType         `toml:"hash_type-id"`
+	CompressionType  string           `toml:"compression-type"`
+	LooseBlobStoreId blob_store_id.Id `toml:"loose-blob-store-id"`
+	Encryption       markl.Id         `toml:"encryption"`
 }
 
 func (TomlInventoryArchiveV0) GetBlobStoreType() string {
@@ -24,7 +24,12 @@ func (TomlInventoryArchiveV0) GetBlobStoreType() string {
 func (config *TomlInventoryArchiveV0) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
-	config.CompressionType.SetFlagDefinitions(flagSet)
+	flagSet.StringVar(
+		&config.CompressionType,
+		"compression-type",
+		config.CompressionType,
+		"",
+	)
 
 	config.HashTypeId = HashTypeDefault
 
@@ -54,7 +59,15 @@ func (config TomlInventoryArchiveV0) GetDefaultHashTypeId() string {
 }
 
 func (config TomlInventoryArchiveV0) GetBlobCompression() interfaces.IOWrapper {
-	return &config.CompressionType
+	ref, err := plugins.LegacyCompressionRef(config.CompressionType)
+	if err != nil {
+		ref = "madder-codec-none-v1@none"
+	}
+	plugin, err := plugins.Resolve(ref)
+	if err != nil {
+		panic(err) // Programming error: registry should always have these.
+	}
+	return plugin
 }
 
 func (config TomlInventoryArchiveV0) GetBlobEncryption() domain_interfaces.MarklId {
@@ -65,8 +78,12 @@ func (config TomlInventoryArchiveV0) GetLooseBlobStoreId() blob_store_id.Id {
 	return config.LooseBlobStoreId
 }
 
-func (config TomlInventoryArchiveV0) GetCompressionType() compression_type.CompressionType {
-	return config.CompressionType
+func (config TomlInventoryArchiveV0) GetCompressionRef() string {
+	ref, err := plugins.LegacyCompressionRef(config.CompressionType)
+	if err != nil {
+		return "madder-codec-none-v1@none"
+	}
+	return ref
 }
 
 func (config TomlInventoryArchiveV0) GetMaxPackSize() uint64 {
