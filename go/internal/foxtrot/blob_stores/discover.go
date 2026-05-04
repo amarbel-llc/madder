@@ -14,7 +14,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 type DiscoveredConfig struct {
@@ -193,7 +192,7 @@ func WriteRemoteConfig(
 	config := &blob_store_configs.DefaultType{
 		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
 		HashBuckets:     discovered.Buckets,
-		CompressionType: compression_type.CompressionTypeDefault,
+		CompressionType: "zstd",
 		Encryption:      discovered.Encryption,
 	}
 

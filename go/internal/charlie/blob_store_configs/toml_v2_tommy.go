@@ -65,9 +65,7 @@ func DecodeTomlLocalHashBucketedV2(input []byte) (*TomlLocalHashBucketedV2Docume
 			}
 		case "compression-type":
 			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.CompressionType.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("compression-type: %w", err)
-				}
+				d.data.CompressionType = v
 				d.consumed["compression-type"] = true
 			}
 		}
@@ -108,12 +106,8 @@ func (d *TomlLocalHashBucketedV2Document) Encode() ([]byte, error) {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
-	{
-		v, err := d.data.CompressionType.MarshalText()
-		if err != nil {
-			return nil, fmt.Errorf("compression-type: %w", err)
-		}
-		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", string(v)); err != nil {
+	if d.data.CompressionType != "" || cst.HasValue(d.cstDoc.Root(), "compression-type") {
+		if err := cst.SetAny(d.cstDoc.Root(), "compression-type", d.data.CompressionType); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
 	}
@@ -166,9 +160,7 @@ func DecodeTomlLocalHashBucketedV2Into(data *TomlLocalHashBucketedV2, doc *docum
 			}
 		case "compression-type":
 			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.CompressionType.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("compression-type: %w", err)
-				}
+				data.CompressionType = v
 				consumed[keyPrefix+"compression-type"] = true
 			}
 		}
@@ -206,12 +198,8 @@ func EncodeTomlLocalHashBucketedV2From(data *TomlLocalHashBucketedV2, doc *docum
 			return fmt.Errorf("%w", err)
 		}
 	}
-	{
-		v, err := data.CompressionType.MarshalText()
-		if err != nil {
-			return fmt.Errorf("compression-type: %w", err)
-		}
-		if err := cst.SetAny(container, "compression-type", string(v)); err != nil {
+	if data.CompressionType != "" || cst.HasValue(container, "compression-type") {
+		if err := cst.SetAny(container, "compression-type", data.CompressionType); err != nil {
 			return fmt.Errorf("%w", err)
 		}
 	}

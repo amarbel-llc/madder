@@ -19,7 +19,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -30,7 +29,7 @@ func init() {
 		blobStoreConfig: &blob_store_configs.DefaultType{
 			HashTypeId:      blob_store_configs.HashTypeDefault,
 			HashBuckets:     blob_store_configs.DefaultHashBuckets,
-			CompressionType: compression_type.CompressionTypeDefault,
+			CompressionType: "zstd",
 		},
 		desc: futility.Description{
 			Short: "initialize a local blob store",

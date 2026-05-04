@@ -18,7 +18,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 // makeTestStore constructs a localHashBucketed backed by t.TempDir() paths.
@@ -42,7 +41,7 @@ func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBuck
 	config := &blob_store_configs.DefaultType{
 		HashBuckets:       blob_store_configs.DefaultHashBuckets,
 		HashTypeId:        charlie_bsc.HashTypeSha256,
-		CompressionType:   compression_type.CompressionTypeNone,
+		CompressionType:   "none",
 		VerifyOnCollision: verifyOnCollision,
 	}
 

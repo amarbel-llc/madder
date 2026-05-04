@@ -13,7 +13,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 func init() {
@@ -22,7 +21,7 @@ func init() {
 		blobStoreConfig: &blob_store_configs.DefaultType{
 			HashTypeId:      blob_store_configs.HashTypeDefault,
 			HashBuckets:     blob_store_configs.DefaultHashBuckets,
-			CompressionType: compression_type.CompressionTypeDefault,
+			CompressionType: "zstd",
 		},
 	})
 }

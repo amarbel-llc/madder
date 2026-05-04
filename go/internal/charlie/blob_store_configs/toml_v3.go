@@ -3,9 +3,9 @@ package blob_store_configs
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 //go:generate tommy generate
@@ -16,7 +16,7 @@ type TomlV3 struct {
 
 	Encryption []markl.Id `toml:"encryption"`
 
-	CompressionType compression_type.CompressionType `toml:"compression-type"`
+	CompressionType string `toml:"compression-type"`
 
 	// VerifyOnCollision opts this store into git-style byte-level
 	// collision verification: on EEXIST from the blob-mover's link(2)
@@ -32,7 +32,12 @@ func (TomlV3) GetBlobStoreType() string {
 func (blobStoreConfig *TomlV3) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
-	blobStoreConfig.CompressionType.SetFlagDefinitions(flagSet)
+	flagSet.StringVar(
+		&blobStoreConfig.CompressionType,
+		"compression-type",
+		blobStoreConfig.CompressionType,
+		"",
+	)
 
 	blobStoreConfig.HashBuckets = DefaultHashBuckets
 
@@ -69,7 +74,19 @@ func (blobStoreConfig TomlV3) GetHashBuckets() []int {
 }
 
 func (blobStoreConfig TomlV3) GetBlobCompression() interfaces.IOWrapper {
-	return &blobStoreConfig.CompressionType
+	ref, err := plugins.LegacyCompressionRef(blobStoreConfig.CompressionType)
+	if err != nil {
+		// Hand-edited TOML with an unknown compression-type value;
+		// fall back to none so the rest of the pipeline reports the
+		// misuse via a downstream decode error rather than panicking
+		// at config load.
+		ref = "madder-codec-none-v1@none"
+	}
+	plugin, err := plugins.Resolve(ref)
+	if err != nil {
+		panic(err) // Programming error: registry should always have these.
+	}
+	return plugin
 }
 
 func (blobStoreConfig TomlV3) GetBlobEncryption() domain_interfaces.MarklId {

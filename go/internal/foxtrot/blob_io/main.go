@@ -4,11 +4,11 @@ package blob_io
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
 func MakeConfig(
@@ -34,11 +34,11 @@ func MakeConfig(
 }
 
 var (
-	defaultCompressionTypeValue = compression_type.CompressionTypeNone
-	defaultEncryptionIOWrapper  = ohio.NopeIOWrapper{}
-	DefaultConfig               = Config{
+	defaultCompressionWrapper  interfaces.IOWrapper = ohio.NopeIOWrapper{}
+	defaultEncryptionIOWrapper                      = ohio.NopeIOWrapper{}
+	DefaultConfig                                   = Config{
 		hashFormat:  blob_store_configs.DefaultHashType,
-		compression: &defaultCompressionTypeValue,
+		compression: defaultCompressionWrapper,
 		encryption:  &defaultEncryptionIOWrapper,
 	}
 )
@@ -53,7 +53,7 @@ type Config struct {
 
 func (config Config) GetBlobCompression() interfaces.IOWrapper {
 	if config.compression == nil {
-		return &defaultCompressionTypeValue
+		return defaultCompressionWrapper
 	} else {
 		return config.compression
 	}
@@ -72,12 +72,7 @@ func (config Config) GetBlobEncryption() interfaces.IOWrapper {
 // on-disk file bytes equal the logical blob bytes — a precondition
 // for direct file mmap.
 func (config Config) HasIdentityWrappers() bool {
-	compType, ok := config.GetBlobCompression().(*compression_type.CompressionType)
-	if !ok {
-		return false
-	}
-	if *compType != compression_type.CompressionTypeNone &&
-		*compType != compression_type.CompressionTypeEmpty {
+	if !none.IsIdentity(config.GetBlobCompression()) {
 		return false
 	}
 	// NopeIOWrapper has value-receiver methods, so both ohio.NopeIOWrapper
