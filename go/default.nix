@@ -90,6 +90,7 @@ let
       "cmd/madder"
       "cmd/madder-cache"
       "cmd/madder-gen_man"
+      "cmd/madder-mcp"
       "cmd/cutting-garden"
       "cmd/cg"
       "cmd/hyphence"
@@ -133,6 +134,25 @@ let
       done
     '';
   });
+
+  # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)
+  # / clown-json(5)) that exposes madder blobs as MCP resources at
+  # `madder://blobs/<digest>`. The clown plugin protocol disallows
+  # ${...} expansion in stdioServers.command, so the binary path is
+  # baked in at build time via Nix substitution: the source-controlled
+  # `clown.json.in` template uses an `@madder-mcp@` placeholder which is
+  # rewritten to `${madder}/bin/madder-mcp` here. Consumers wire the
+  # plugin into clown by pointing `--plugin-dir` at
+  # `${madder-clown-plugin}/share/clown-plugins/madder/`.
+  madder-clown-plugin = pkgs.runCommand "madder-clown-plugin" { } ''
+    mkdir -p $out/share/clown-plugins/madder/.claude-plugin
+    cp ${../plugins/madder/.claude-plugin/plugin.json} \
+       $out/share/clown-plugins/madder/.claude-plugin/plugin.json
+    substitute \
+      ${../plugins/madder/clown.json.in} \
+      $out/share/clown-plugins/madder/clown.json \
+      --replace-fail '@madder-mcp@' '${madder}/bin/madder-mcp'
+  '';
 
   # madder-race exercises the same package-level test surface as `madder`
   # but with the Go race detector enabled. Concurrent-write paths
@@ -265,7 +285,7 @@ let
 in
 {
   packages = {
-    inherit madder madder-race madder-cover madder-cli-cover;
+    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin;
     default = madder;
   } // batsLaneOutputs;
 

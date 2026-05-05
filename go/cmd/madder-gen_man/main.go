@@ -10,6 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cutting_garden"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_hyphence"
+	"github.com/amarbel-llc/madder/go/internal/india/commands_mcp"
 )
 
 // Declared so the shared -X main.version / -X main.commit ldflags have
@@ -37,6 +38,7 @@ func main() {
 		commands_cache.GetUtility(),
 		commands_cutting_garden.GetUtility(),
 		commands_hyphence.GetUtility(),
+		commands_mcp.GetUtility(),
 	}
 
 	for _, utility := range utilities {

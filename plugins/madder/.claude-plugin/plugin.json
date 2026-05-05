@@ -1,0 +1,5 @@
+{
+  "name": "madder",
+  "version": "0.1.0",
+  "description": "Expose madder blobs as MCP resources at madder://blobs/<digest>"
+}

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "stdioServers": {
+    "blobs": {
+      "command": "@madder-mcp@",
+      "args": ["serve"]
+    }
+  }
+}
