@@ -651,6 +651,17 @@ debug-mcp-resources:
   jq -nc '{jsonrpc:"2.0", id:5, method:"resources/read", params:{uri:"madder://blobs?limit=5"}}' >>"$requests"
   jq -nc '{jsonrpc:"2.0", id:6, method:"resources/read", params:{uri:"madder://stores/.default/blobs?limit=5"}}' >>"$requests"
   jq -nc --arg uri "madder://blobs/$digest" '{jsonrpc:"2.0", id:7, method:"resources/read", params:{uri:$uri}}' >>"$requests"
+  # Request 8 manufactures the openBlob → SFTP-panic → tryOpenInStore
+  # skip path: this digest is intentionally absent from every store,
+  # so openBlob walks default + remaining (which includes the
+  # unreachable SFTP store). With step-2 of #134 the SFTP HasBlob
+  # panic is converted to a per-store skip; without it, the panic
+  # would escape openBlob and crash the server goroutine. Expected
+  # response: a JSON-RPC error wrapping "blob not found" (or, if the
+  # request-boundary recover fires, "...panicked..."), but in all
+  # cases NOT a process crash.
+  missing_digest="blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"
+  jq -nc --arg uri "madder://blobs/$missing_digest" '{jsonrpc:"2.0", id:8, method:"resources/read", params:{uri:$uri}}' >>"$requests"
 
   echo "=== requests ==="
   cat "$requests"
@@ -683,7 +694,7 @@ debug-mcp-resources:
   fi
 
   # Sanity-check that every request id received exactly one response.
-  expected_ids="1 2 3 4 5 6 7"
+  expected_ids="1 2 3 4 5 6 7 8"
   for id in $expected_ids; do
     if ! jq -e --argjson id "$id" 'select(.id == $id)' "$responses" >/dev/null; then
       echo "FAIL: no response with id=$id" >&2

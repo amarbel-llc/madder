@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"net/url"
@@ -151,7 +152,27 @@ func (p *resourceProvider) ListResourceTemplates(_ context.Context) ([]protocol.
 	}, nil
 }
 
-func (p *resourceProvider) ReadResource(_ context.Context, uri string) (*protocol.ResourceReadResult, error) {
+func (p *resourceProvider) ReadResource(ctx context.Context, uri string) (result *protocol.ResourceReadResult, err error) {
+	// Request-boundary recover: BlobStore methods without context
+	// arguments (HasBlob, GetBlobIOWrapper, GetDefaultHashType, ...)
+	// surface backend errors via panic — see issue #134 and the
+	// SFTP store's initializeOnce. CLI commands wrap that
+	// convention in dewey's Run frame; an MCP server's per-request
+	// handlers do not, so we catch here and convert to a JSON-RPC
+	// error rather than crashing the server goroutine. Inner
+	// recovers (e.g. iterStoreDigests, openBlobAcrossStores) can
+	// still convert per-store panics into partial-success payloads;
+	// this outer net only fires for panics they didn't expect.
+	defer func() {
+		if r := recover(); r != nil {
+			err = panicToError(r, "reading "+uri)
+		}
+	}()
+
+	return p.dispatchReadResource(ctx, uri)
+}
+
+func (p *resourceProvider) dispatchReadResource(_ context.Context, uri string) (*protocol.ResourceReadResult, error) {
 	base, query, err := splitURIQuery(uri)
 	if err != nil {
 		return nil, err
@@ -180,6 +201,20 @@ func (p *resourceProvider) ReadResource(_ context.Context, uri string) (*protoco
 	}
 
 	return nil, errors.Errorf("unknown resource: %q", uri)
+}
+
+// panicToError converts a recovered panic value into a wrapped error
+// suitable for returning to a caller that expects an error result.
+// Use at request boundaries where panics should not escape into the
+// surrounding server loop. fmt.Errorf is used (rather than dewey's
+// errors.Wrapf) so the formatted prefix surfaces in .Error() —
+// dewey's wrapper attaches stack frames but does not splice the
+// format into the rendered message.
+func panicToError(r any, context string) error {
+	if e, ok := r.(error); ok {
+		return fmt.Errorf("%s panicked: %w", context, e)
+	}
+	return fmt.Errorf("%s panicked: %v", context, r)
 }
 
 // splitURIQuery splits a URI into the part before the first `?` and the
@@ -434,21 +469,54 @@ func jsonResourceResult(uri string, payload any) (*protocol.ResourceReadResult, 
 
 // openBlob walks the default blob store first, then any remaining
 // configured stores, returning a reader for the first store that
-// reports HasBlob. Returns a not-found error if no store has it.
+// reports HasBlob. Returns a not-found error if no store has it. A
+// store backend that panics during HasBlob (e.g. an unreachable SFTP
+// store, see #134) is treated as "couldn't ask this store" — we skip
+// it and try the next. The semantic matches openBlob's job ("find the
+// first store with this blob"), and means a single broken backend
+// can't fail reads of blobs that other backends can serve.
 func openBlob(
 	env command_components.BlobStoreEnv,
 	id domain_interfaces.MarklId,
 ) (domain_interfaces.BlobReader, error) {
 	def, remaining := env.GetDefaultBlobStoreAndRemaining()
-	if def.HasBlob(id) {
-		return def.MakeBlobReader(id)
+
+	if reader, ok, err := tryOpenInStore(def, id); ok {
+		return reader, err
 	}
+
 	for _, s := range remaining {
-		if s.HasBlob(id) {
-			return s.MakeBlobReader(id)
+		if reader, ok, err := tryOpenInStore(s, id); ok {
+			return reader, err
 		}
 	}
+
 	return nil, errors.MakeErrNotFoundString(
 		"blob not found in any blob store: " + id.String(),
 	)
+}
+
+// tryOpenInStore checks whether one store has the blob and returns a
+// reader if it does. Per-store panics (treated as "couldn't ask this
+// store") are caught and converted to a skip — ok=false, no error —
+// so openBlob's caller sees a clean per-store iteration regardless of
+// which backend is misbehaving.
+func tryOpenInStore(
+	store blob_stores.BlobStoreInitialized,
+	id domain_interfaces.MarklId,
+) (reader domain_interfaces.BlobReader, ok bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+			reader = nil
+			err = nil
+		}
+	}()
+
+	if !store.HasBlob(id) {
+		return nil, false, nil
+	}
+
+	reader, err = store.MakeBlobReader(id)
+	return reader, true, err
 }

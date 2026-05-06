@@ -3,6 +3,7 @@
 package commands_mcp
 
 import (
+	"errors"
 	"net/url"
 	"strings"
 	"testing"
@@ -131,6 +132,61 @@ func TestReadResource_RejectsUnknownURI(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown resource") {
 		t.Errorf("error %q does not mention 'unknown resource'", err.Error())
+	}
+}
+
+func TestPanicToError_WrapsErrorPayload(t *testing.T) {
+	underlying := errors.New("ssh dial blew up")
+	got := panicToError(underlying, "openBlob in store .default")
+
+	if got == nil {
+		t.Fatal("panicToError returned nil")
+	}
+	msg := got.Error()
+	if !strings.Contains(msg, "ssh dial blew up") {
+		t.Errorf("error %q does not preserve the underlying message", msg)
+	}
+	if !strings.Contains(msg, "openBlob in store .default") {
+		t.Errorf("error %q does not include the context label", msg)
+	}
+}
+
+func TestPanicToError_WrapsNonErrorPayload(t *testing.T) {
+	got := panicToError("something weird", "request boundary")
+
+	if got == nil {
+		t.Fatal("panicToError returned nil")
+	}
+	msg := got.Error()
+	if !strings.Contains(msg, "something weird") {
+		t.Errorf("error %q does not include the panic value", msg)
+	}
+	if !strings.Contains(msg, "request boundary") {
+		t.Errorf("error %q does not include the context label", msg)
+	}
+}
+
+// TestReadResource_ConvertsPanicToError pins the request-boundary
+// recover added in step 2 of the #134 cleanup. A
+// resourceProvider built with a zero-value env panics in
+// readBlob → openBlob → GetDefaultBlobStoreAndRemaining (no
+// configured stores). Without the deferred recover at ReadResource,
+// the panic would crash dewey's MCP server goroutine; with the
+// recover, the request returns a JSON-RPC error and the server
+// keeps serving subsequent requests.
+func TestReadResource_ConvertsPanicToError(t *testing.T) {
+	p := &resourceProvider{}
+
+	uri := prefixBlob + validBlobDigest
+	_, err := p.ReadResource(t.Context(), uri)
+	if err == nil {
+		t.Fatal("expected error from request-boundary recover, got nil")
+	}
+	if !strings.Contains(err.Error(), "panicked") {
+		t.Errorf("error %q does not look like a request-boundary panic conversion", err.Error())
+	}
+	if !strings.Contains(err.Error(), uri) {
+		t.Errorf("error %q does not include the offending URI", err.Error())
 	}
 }
 
