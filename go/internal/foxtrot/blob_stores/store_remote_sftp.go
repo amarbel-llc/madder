@@ -58,6 +58,19 @@ type remoteSftp struct {
 	sshClient            *ssh.Client
 	sftpClient           *sftp.Client
 
+	// initErr is the sticky error captured by initializeOnce when
+	// initialize() fails. Cached here so that subsequent
+	// initializeOnce calls (sync.Once does not re-run f after a
+	// panic) can re-panic the same error rather than silently
+	// proceeding against a half-initialized struct. Pre-#134 the
+	// store called ctx.Cancel(err) to surface init failures, which
+	// throws via dewey's Run-frame machinery; that pattern broke
+	// long-lived embeddings (e.g. madder-mcp serve) because Cancel
+	// closes the shared context's Done channel as a side effect.
+	// Panicking directly defers the catch to the caller's Run frame
+	// without poisoning the env's context.
+	initErr error
+
 	// observer receives one BlobWriteEvent per successful upload. Set
 	// at store-construction time from envDir.GetBlobWriteObserver().
 	// Nil means no audit logging; the mover's emitWriteEvent handles
@@ -137,13 +150,23 @@ func (blobStore *remoteSftp) close() (err error) {
 	return nil
 }
 
+// initializeOnce lazily connects to the remote SFTP server and reads
+// the remote blob-store-properties config. On failure it panics with
+// the wrapped error, expecting the caller to be inside a dewey Run
+// frame (the convention for BlobStore methods that return without an
+// error — see HasBlob, GetBlobIOWrapper, etc.). Errors are cached on
+// the struct because sync.Once.Do does not re-run f after a prior
+// call's f panicked; subsequent callers re-panic the cached error
+// rather than proceeding with sftpClient = nil.
 func (blobStore *remoteSftp) initializeOnce() {
 	blobStore.once.Do(func() {
 		if err := blobStore.initialize(); err != nil {
-			err = errors.Wrap(err)
-			blobStore.ctx.Cancel(err)
+			blobStore.initErr = errors.Wrap(err)
 		}
 	})
+	if blobStore.initErr != nil {
+		panic(blobStore.initErr)
+	}
 }
 
 func (blobStore *remoteSftp) readRemoteConfig() (err error) {

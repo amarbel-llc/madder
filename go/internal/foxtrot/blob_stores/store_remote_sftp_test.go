@@ -3,10 +3,17 @@
 package blob_stores
 
 import (
+	"context"
+	"strings"
 	"testing"
+	"time"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
 // recordingObserver captures every event handed to OnBlobPublished so
@@ -81,3 +88,148 @@ func TestSftpMoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
 	// success condition.
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, 0)
 }
+
+// recoverPanic runs f and returns the panic value, or nil if f did not
+// panic. Used by the initializeOnce panic-semantics tests below where
+// each case asserts both that a panic happened and what its payload
+// is.
+func recoverPanic(f func()) (r any) {
+	defer func() { r = recover() }()
+	f()
+	return r
+}
+
+// TestSftpInitializeOnce_PanicsOnInitFailure pins issue #134's first
+// failure mode: when sshClientInitializer returns an error, the
+// caller of HasBlob/AllBlobs/etc. should see a panic carrying the
+// wrapped underlying error rather than the dewey
+// ContextStateSucceeded sentinel that the pre-fix Cancel(err) path
+// produced.
+func TestSftpInitializeOnce_PanicsOnInitFailure(t *testing.T) {
+	sentinelErr := errors.Errorf("ssh dial blew up")
+
+	store := &remoteSftp{
+		sshClientInitializer: func() (*ssh.Client, error) {
+			return nil, sentinelErr
+		},
+	}
+
+	r := recoverPanic(func() { store.initializeOnce() })
+	if r == nil {
+		t.Fatal("initializeOnce did not panic on init failure")
+	}
+
+	err, ok := r.(error)
+	if !ok {
+		t.Fatalf("panic value is not an error: %T %v", r, r)
+	}
+	if !strings.Contains(err.Error(), "ssh dial blew up") {
+		t.Errorf(
+			"panic error %q does not contain the underlying ssh "+
+				"failure message",
+			err.Error(),
+		)
+	}
+}
+
+// TestSftpInitializeOnce_RepanicsAcrossCalls pins issue #134's second
+// failure mode: sync.Once.Do does not re-run f after a panic, so
+// without an initErr field the second call would silently no-op and
+// downstream usage would NPE on sftpClient = nil. The fix caches the
+// init error and re-panics it on every subsequent call.
+func TestSftpInitializeOnce_RepanicsAcrossCalls(t *testing.T) {
+	calls := 0
+	sentinelErr := errors.Errorf("ssh dial blew up")
+
+	store := &remoteSftp{
+		sshClientInitializer: func() (*ssh.Client, error) {
+			calls++
+			return nil, sentinelErr
+		},
+	}
+
+	for i := 0; i < 3; i++ {
+		r := recoverPanic(func() { store.initializeOnce() })
+		if r == nil {
+			t.Fatalf("call %d did not panic", i+1)
+		}
+		err, ok := r.(error)
+		if !ok {
+			t.Fatalf("call %d: panic value is not an error: %T %v", i+1, r, r)
+		}
+		if !strings.Contains(err.Error(), "ssh dial blew up") {
+			t.Errorf(
+				"call %d: panic error %q does not contain the "+
+					"underlying ssh failure message",
+				i+1, err.Error(),
+			)
+		}
+	}
+
+	// sync.Once.Do contract: f runs exactly once, even if it
+	// panicked. The retry-each-call panic path must not re-enter
+	// initialize() and re-dial; reading initErr is the cheap path.
+	if calls != 1 {
+		t.Errorf(
+			"sshClientInitializer was called %d times; "+
+				"sync.Once.Do should run f exactly once even "+
+				"after panics",
+			calls,
+		)
+	}
+}
+
+// TestSftpInitializeOnce_DoesNotPoisonContext pins the structural
+// reason this fix matters for long-lived servers (madder-mcp serve):
+// the pre-fix path called ctx.Cancel(err), which closes the shared
+// context's Done channel as a side effect. With the fix, init failure
+// must not touch the context at all — only panic. We assert this by
+// constructing the store with a ctx that records calls; the fix means
+// ctx is reachable through the field but never invoked from
+// initializeOnce on the failure path.
+func TestSftpInitializeOnce_DoesNotPoisonContext(t *testing.T) {
+	tracker := &spyActiveContext{}
+
+	store := &remoteSftp{
+		ctx: tracker,
+		sshClientInitializer: func() (*ssh.Client, error) {
+			return nil, errors.Errorf("ssh dial blew up")
+		},
+	}
+
+	_ = recoverPanic(func() { store.initializeOnce() })
+
+	if tracker.cancelCalls != 0 {
+		t.Errorf(
+			"ctx.Cancel was called %d times during init failure; "+
+				"the fix should never touch the captured "+
+				"context on the failure path",
+			tracker.cancelCalls,
+		)
+	}
+}
+
+// spyActiveContext is a minimal interfaces.ActiveContext stub used by
+// TestSftpInitializeOnce_DoesNotPoisonContext to assert that the
+// failure path does not invoke Cancel on the captured context.
+// Methods not exercised by the test return zero values.
+type spyActiveContext struct {
+	cancelCalls int
+}
+
+var _ interfaces.ActiveContext = (*spyActiveContext)(nil)
+
+func (c *spyActiveContext) Deadline() (time.Time, bool)            { return time.Time{}, false }
+func (c *spyActiveContext) Done() <-chan struct{}                  { return nil }
+func (c *spyActiveContext) Err() error                             { return nil }
+func (c *spyActiveContext) Value(_ any) any                        { return nil }
+func (c *spyActiveContext) Cause() error                           { return nil }
+func (c *spyActiveContext) GetState() interfaces.ContextState      { return interfaces.ContextStateStarted }
+func (c *spyActiveContext) Cancel(_ error)                         { c.cancelCalls++ }
+func (c *spyActiveContext) After(_ interfaces.FuncActiveContext)   {}
+func (c *spyActiveContext) Must(_ interfaces.FuncActiveContext)    {}
+
+// Compile-time guard for the "context" stdlib import the spy uses
+// only as type evidence; the methods above implement the interface
+// without delegating to a real context.Context.
+var _ context.Context = (*spyActiveContext)(nil)
