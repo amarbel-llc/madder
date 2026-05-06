@@ -51,6 +51,15 @@ type Diff struct {
 	// receipt's store-hint resolution per FDR 0001 §Store-Hint
 	// Resolution branch 1.
 	Store string
+
+	// VerifyBlobsExist toggles the receipt-vs-store check on top of
+	// the default tree-vs-receipt comparison. When true, every
+	// receipt entry with a non-empty BlobId is probed via
+	// sourceStore.HasBlob; missing blobs surface as `B` lines and
+	// count toward the differences total. Default false: a clean
+	// diff exit only proves the tree matches the receipt's records,
+	// not that the receipt is fully restorable.
+	VerifyBlobsExist bool
 }
 
 var (
@@ -105,6 +114,18 @@ func (cmd *Diff) SetFlagDefinitions(
 		"",
 		"explicit blob-store-id to resolve the receipt against "+
 			"(overrides the receipt's store-hint resolution)",
+	)
+	flagSet.BoolVar(
+		&cmd.VerifyBlobsExist,
+		"verify-blobs-exist",
+		false,
+		"in addition to the tree-vs-receipt comparison, probe the "+
+			"resolved source store for every file entry's blob and "+
+			"emit a B line when a referenced blob is missing. "+
+			"Catches receipts whose referenced blobs have been gc'd "+
+			"or that were hand-crafted with bogus ids. Off by default "+
+			"because it adds one HasBlob round-trip per file entry, "+
+			"which is meaningful on remote (e.g. SFTP) stores.",
 	)
 }
 
@@ -173,7 +194,16 @@ func (cmd *Diff) runDiff(
 		return walkErr
 	}
 
-	differences := compareEntries(v1.Entries, diskEntries)
+	var missingBlobs map[string]string
+	if cmd.VerifyBlobsExist {
+		var probeErr error
+		missingBlobs, probeErr = probeMissingBlobs(sourceStore, v1.Entries)
+		if probeErr != nil {
+			return probeErr
+		}
+	}
+
+	differences := compareEntries(v1.Entries, diskEntries, missingBlobs)
 
 	for _, line := range differences {
 		fmt.Fprintln(os.Stdout, line)
@@ -188,6 +218,42 @@ func (cmd *Diff) runDiff(
 	}
 
 	return nil
+}
+
+// probeMissingBlobs is the receipt-vs-store check gated by
+// -verify-blobs-exist. For every file entry with a non-empty BlobId,
+// it parses the id and probes the source store via HasBlob. Returns
+// a map keyed by the rel-to-<dir> materialization path (matching the
+// key compareEntries uses) → the missing blob-id string. An entry
+// whose BlobId fails to parse is treated as missing — that's the
+// honest answer when the receipt names something the source store
+// cannot address.
+func probeMissingBlobs(
+	sourceStore blob_stores.BlobStoreInitialized,
+	entries []capture_receipt.EntryV1,
+) (map[string]string, error) {
+	missing := map[string]string{}
+
+	for i := range entries {
+		e := entries[i]
+		if e.Type != capture_receipt.TypeFile || e.BlobId == "" {
+			continue
+		}
+
+		key := filepath.ToSlash(filepath.Clean(filepath.Join(e.Root, e.Path)))
+
+		var blobId markl.Id
+		if err := blobId.Set(e.BlobId); err != nil {
+			missing[key] = e.BlobId
+			continue
+		}
+
+		if !sourceStore.HasBlob(&blobId) {
+			missing[key] = e.BlobId
+		}
+	}
+
+	return missing, nil
 }
 
 func assertDirectoryExists(dir string) error {
@@ -344,10 +410,22 @@ func hashFileViaStore(
 // rel-to-<dir> materialization path (filepath.Clean(filepath.Join(
 // e.Root, e.Path)) for receipt entries; filepath.Clean(e.Path) for
 // disk entries since walkForDiff already records Path as rel-to-<dir>).
-// Output lines are sorted by path.
+//
+// missingBlobs is the receipt-vs-store result from probeMissingBlobs;
+// it is keyed identically and may be nil when -verify-blobs-exist
+// was not set. Each entry in it produces a `B` line. A path can
+// produce both an `M  ... blob` (disk content drifted from receipt)
+// AND a `B  ... blob` (receipt's blob is missing in the store);
+// they describe orthogonal failures and both are emitted.
+//
+// Output lines are sorted by line text, which keeps per-path
+// groups contiguous (markers sort B < D < M < T alphabetically when
+// they share the same path, and "A " sorts on its own since A paths
+// have no other lines).
 func compareEntries(
 	receipt []capture_receipt.EntryV1,
 	disk []capture_receipt.EntryV1,
+	missingBlobs map[string]string,
 ) []string {
 	receiptByPath := make(map[string]capture_receipt.EntryV1, len(receipt))
 	for _, e := range receipt {
@@ -399,6 +477,13 @@ func compareEntries(
 				k, recv.Type, dsk.Type))
 		default:
 			lines = append(lines, perTypeDiffs(k, recv, dsk)...)
+		}
+
+		if missingId, missing := missingBlobs[k]; missing {
+			lines = append(lines, fmt.Sprintf(
+				"B  %s\tblob %s missing in source store",
+				k, missingId,
+			))
 		}
 	}
 

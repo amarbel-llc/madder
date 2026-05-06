@@ -285,6 +285,99 @@ function diff_detects_symlink_target_change { # @test
     fail "expected 'M  src/link  target ...' line: $output"
 }
 
+# Phase D: -verify-blobs-exist (receipt-vs-store check).
+#
+# Default diff is tree-vs-receipt: the on-disk content is hashed and
+# compared to the receipt's records. -verify-blobs-exist adds the
+# orthogonal probe — does the source store actually hold the blobs
+# the receipt references? Catches receipts with gc'd blobs or
+# hand-crafted bogus ids.
+
+function diff_verify_blobs_exist_clean_round_trip { # @test
+  # Round-trip with the flag: every receipt blob was just written to
+  # the store, so HasBlob is true for all of them; no B lines.
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+  mkdir -p src/sub
+  echo "y" >src/sub/y.txt
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg restore "$rid" out
+  assert_success
+
+  run_cg diff -verify-blobs-exist "$rid" out
+  assert_success
+  local diff_lines
+  diff_lines="$(echo "$output" | grep -E '^[BMADT]  ' || true)"
+  [[ -z $diff_lines ]] ||
+    fail "expected zero diff entries with flag, got: $diff_lines"
+}
+
+function diff_verify_blobs_exist_detects_missing_blob { # @test
+  # Hand-craft a receipt referencing a blob no store holds. With
+  # the flag set, diff emits a B line for the missing blob (in
+  # addition to the D lines for the absent on-disk paths).
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/missing-blob-receipt"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	! cutting_garden-capture_receipt-fs-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+	{"path":"file.txt","root":"src","type":"file","mode":"0644","size":5,"blob_id":"blake2b256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  mkdir target
+
+  run_cg diff -verify-blobs-exist "$rid" target
+  assert_failure
+  echo "$output" | grep -qE '^B  src/file.txt.*blob .* missing in source store' ||
+    fail "expected 'B  src/file.txt blob ... missing' line: $output"
+}
+
+function diff_without_flag_does_not_emit_B_lines { # @test
+  # Same hand-crafted receipt as above. Without the flag, the
+  # missing blob goes unreported — only the D lines for absent
+  # on-disk paths surface.
+  init_store
+
+  local receipt_path
+  receipt_path="$BATS_TEST_TMPDIR/missing-blob-receipt-2"
+  cat >"$receipt_path" <<-'RECEIPT'
+	---
+	! cutting_garden-capture_receipt-fs-v1
+	---
+
+	{"path":".","root":"src","type":"dir","mode":"0755"}
+	{"path":"file.txt","root":"src","type":"file","mode":"0644","size":5,"blob_id":"blake2b256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"}
+RECEIPT
+
+  local rid
+  rid="$(write_blob_id "$receipt_path")"
+  [[ -n $rid ]] || fail "write returned empty hash"
+
+  mkdir target
+
+  run_cg diff "$rid" target
+  assert_failure
+  echo "$output" | grep -qE '^B  ' &&
+    fail "expected no B lines without flag, got: $output"
+  echo "$output" | grep -qE '^D  src/file.txt' ||
+    fail "expected D lines for absent paths: $output"
+}
+
 function diff_reports_multiple_differences_sorted_by_path { # @test
   # Combination test: every difference type at once. Output must be
   # sorted by path so test assertions can rely on ordering.
