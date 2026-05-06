@@ -596,3 +596,98 @@ debug-tap-output:
     exit 1
   fi
   echo "OK: '# Output' directive absent across $(wc -l <"$combined") lines"
+
+# Smoke-test the madder MCP server's resources against the per-worktree
+# spinclass `.default` blob store. Writes a known throwaway blob into
+# .default, then drives `madder-mcp serve` over stdio with a sequence of
+# JSON-RPC requests covering initialize, resources/list,
+# resources/templates/list, and resources/read for madder://stores,
+# madder://blobs (paginated), madder://stores/.default/blobs, and
+# madder://blobs/<test-digest>. Each response is pretty-printed so the
+# pagination and resource_link round-trips can be eyeballed. Requires
+# `result/` to be populated (run `just build` first if it isn't).
+[group("debug")]
+debug-mcp-resources:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+
+  worktree="{{justfile_directory()}}"
+  bin_madder="$worktree/result/bin/madder"
+  bin_mcp="$worktree/result/bin/madder-mcp"
+
+  for bin in "$bin_madder" "$bin_mcp"; do
+    if [ ! -x "$bin" ]; then
+      echo "missing $bin — run \`just build\` first" >&2
+      exit 1
+    fi
+  done
+
+  # Write a fresh throwaway blob to .default. The body includes a
+  # timestamp so reruns produce distinct digests instead of resolving
+  # to the same blob from a previous invocation.
+  payload="madder MCP smoke test $(date -u +%Y-%m-%dT%H:%M:%SZ) $$"
+  digest=$(printf '%s' "$payload" \
+    | env MADDER_CEILING_DIRECTORIES="$worktree" \
+        "$bin_madder" write -format json .default - \
+    | head -n 1 \
+    | jq -r '.id')
+  echo "=== seeded blob ==="
+  echo "  digest: $digest"
+  echo "  body:   $payload"
+  echo
+
+  # Build the JSON-RPC request stream. Each line is one message; the
+  # server processes them in order and exits when stdin closes. Each
+  # request is built via jq -nc to dodge justfile interpolation and
+  # quoting headaches.
+  requests=$(mktemp)
+  trap 'rm -f "$requests"' EXIT
+  jq -nc '{jsonrpc:"2.0", id:1, method:"initialize", params:{protocolVersion:"2024-11-05", capabilities:{}, clientInfo:{name:"madder-mcp-smoke", version:"0"}}}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", method:"notifications/initialized", params:{}}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", id:2, method:"resources/list"}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", id:3, method:"resources/templates/list"}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", id:4, method:"resources/read", params:{uri:"madder://stores"}}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", id:5, method:"resources/read", params:{uri:"madder://blobs?limit=5"}}' >>"$requests"
+  jq -nc '{jsonrpc:"2.0", id:6, method:"resources/read", params:{uri:"madder://stores/.default/blobs?limit=5"}}' >>"$requests"
+  jq -nc --arg uri "madder://blobs/$digest" '{jsonrpc:"2.0", id:7, method:"resources/read", params:{uri:$uri}}' >>"$requests"
+
+  echo "=== requests ==="
+  cat "$requests"
+  echo
+
+  responses=$(mktemp)
+  stderr_log=$(mktemp)
+  trap 'rm -f "$requests" "$responses" "$stderr_log"' EXIT
+
+  # Capture stdout/stderr separately. madder-mcp can exit nonzero after
+  # all responses have been emitted (e.g. when an SFTP store's
+  # initializeOnce poisons the dewey context); tolerate that here so
+  # the recipe exit code reflects whether the JSON-RPC responses
+  # themselves are well-formed, not the server's shutdown status.
+  set +e
+  env MADDER_CEILING_DIRECTORIES="$worktree" "$bin_mcp" serve \
+    <"$requests" >"$responses" 2>"$stderr_log"
+  rc=$?
+  set -e
+
+  echo "=== responses ==="
+  while IFS= read -r line; do
+    printf '%s\n' "$line" | jq -C .
+    echo
+  done <"$responses"
+
+  if [ -s "$stderr_log" ]; then
+    echo "=== madder-mcp stderr (rc=$rc) ==="
+    cat "$stderr_log"
+  fi
+
+  # Sanity-check that every request id received exactly one response.
+  expected_ids="1 2 3 4 5 6 7"
+  for id in $expected_ids; do
+    if ! jq -e --argjson id "$id" 'select(.id == $id)' "$responses" >/dev/null; then
+      echo "FAIL: no response with id=$id" >&2
+      exit 1
+    fi
+  done
+  echo "OK: received responses for ids $expected_ids"
