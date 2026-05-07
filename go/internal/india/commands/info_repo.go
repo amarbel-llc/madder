@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -45,10 +46,14 @@ func (cmd InfoRepo) GetDescription() futility.Description {
 	return futility.Description{
 		Short: "display blob store configuration",
 		Long: "Show the configuration of a blob store in hyphence format. " +
-			"With no arguments, shows the default store's immutable config. " +
-			"Accepts a blob-store-id and one or more config keys: " +
-			"config-immutable (default), config-path, dir-blob_stores, " +
-			"xdg, or any key from the store's typed config.",
+			"With no arguments, shows the default store's immutable " +
+			"config. With one argument, the value is tried as a " +
+			"blob-store-id first; if no store matches, it is treated as " +
+			"a config key against the default store. With two or more, " +
+			"the first is the blob-store-id and the rest are config " +
+			"keys: config-immutable (default), config-path, " +
+			"dir-blob_stores, xdg, or any key from the store's typed " +
+			"config.",
 	}
 }
 
@@ -64,8 +69,15 @@ func (cmd InfoRepo) Run(req futility.Request) {
 		keys = []string{"config-immutable"}
 
 	case 1:
-		blobStore = env.GetDefaultBlobStore()
-		keys = []string{req.PopArg("blob store config key")}
+		arg := req.PopArg("blob store index or config key")
+
+		if matched, ok := lookupBlobStoreById(env, arg); ok {
+			blobStore = matched
+			keys = []string{"config-immutable"}
+		} else {
+			blobStore = env.GetDefaultBlobStore()
+			keys = []string{arg}
+		}
 
 	case 2:
 		blobStoreIndex := req.PopArg("blob store index")
@@ -171,6 +183,27 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			return
 		}
 	}
+}
+
+// lookupBlobStoreById probes the configured blob-store map for an
+// id-shaped string without cancelling the env on a miss. Used by the
+// 1-arg path where the same positional could be a store-id or a
+// config key — Cancel-on-miss is wrong because the caller will fall
+// back to interpreting the arg as a key.
+func lookupBlobStoreById(
+	env command_components.BlobStoreEnv,
+	arg string,
+) (blob_stores.BlobStoreInitialized, bool) {
+	var id blob_store_id.Id
+
+	if err := id.Set(arg); err != nil {
+		return blob_stores.BlobStoreInitialized{}, false
+	}
+
+	stores := env.GetBlobStores()
+	bs, ok := stores[id.String()]
+
+	return bs, ok
 }
 
 // mergeKeyNames returns the deduplicated, sorted union of two

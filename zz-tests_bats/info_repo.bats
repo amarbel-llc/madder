@@ -27,3 +27,14 @@ function unknown_key_fails { # @test
   run_madder info-repo nonexistent-key
   assert_failure
 }
+
+function single_arg_resolves_as_store_id { # @test
+
+  init_store
+  run_madder info-repo .default
+  assert_success
+  # The immutable config is multi-line hyphence; pinning one
+  # well-known key proves the immutable config (not a single key
+  # value) was emitted.
+  assert_output --partial 'compression-type'
+}
