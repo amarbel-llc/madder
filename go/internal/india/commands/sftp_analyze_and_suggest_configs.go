@@ -13,17 +13,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mattn/go-isatty"
 	"github.com/pkg/sftp"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	delta_blob_store_configs "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/sftp_probe"
 	"github.com/amarbel-llc/madder/go/internal/futility"
+	huhwrap "github.com/amarbel-llc/madder/go/internal/futility/huh"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
@@ -142,6 +146,16 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 
 	candidates := sftp_probe.EnumerateCandidates(layout, keys)
 
+	// Existing-config validation: if the remote already has a
+	// blob_store-config, decode it and prepend as candidate-01.
+	// Validates the existing config in addition to the synthesized
+	// candidates — a wrong existing config will fail verification
+	// alongside.
+	existingHas, existingCandidate := cmd.tryReadExistingConfig(env, sftpClient)
+	if existingHas {
+		candidates = append([]sftp_probe.Candidate{existingCandidate}, candidates...)
+	}
+
 	aggregates := make([]sftp_probe.Aggregate, len(candidates))
 	for i := range candidates {
 		aggregates[i].Candidate = candidates[i]
@@ -158,6 +172,11 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 	}
 
 	ranked := sftp_probe.Rank(aggregates)
+	// If the existing candidate is present, pin it to position #1
+	// so the user always sees their current state first.
+	if existingHas {
+		ranked = pinExistingFirst(ranked)
+	}
 
 	runDir, err := cmd.makeRunDir()
 	if err != nil {
@@ -165,7 +184,38 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 		return
 	}
 
-	cmd.emitTAP(env, ranked, runDir)
+	cmd.emitTAP(env, ranked, runDir, existingHas)
+
+	// Phase C.7-C.9: interactive deep-verify + bootstrap. Skipped
+	// when existing already verifies fully (no remediation needed)
+	// or when no candidate fully verified.
+	cmd.runInteractiveFlow(env, sftpClient, ranked, existingHas)
+}
+
+// pinExistingFirst keeps the "existing" candidate (if present) at
+// position 0 regardless of Rank's verified-desc + diversity
+// tiebreak. The user must always see "what's on the remote right
+// now" first, even if a synthesized candidate verifies higher.
+func pinExistingFirst(ranked []sftp_probe.Aggregate) []sftp_probe.Aggregate {
+	for i, agg := range ranked {
+		if agg.Candidate.Label == "existing" {
+			if i == 0 {
+				return ranked
+			}
+			out := make([]sftp_probe.Aggregate, len(ranked))
+			out[0] = agg
+			j := 1
+			for k, other := range ranked {
+				if k == i {
+					continue
+				}
+				out[j] = other
+				j++
+			}
+			return out
+		}
+	}
+	return ranked
 }
 
 // sample is one buffered blob with its expected digest.
@@ -424,12 +474,10 @@ func (cmd SftpAnalyzeAndSuggestConfigs) emitTAP(
 	env command_components.BlobStoreEnv,
 	ranked []sftp_probe.Aggregate,
 	runDir string,
+	existingHas bool,
 ) {
 	out := env.GetUIFile()
 
-	// Bound the emitted candidates by emit-top, but only count
-	// those that fully verified.
-	emitted := 0
 	fmt.Fprintln(out, "TAP version 14")
 	fmt.Fprintf(out, "1..%d\n", min(cmd.emitTop, len(ranked)))
 
@@ -437,26 +485,27 @@ func (cmd SftpAnalyzeAndSuggestConfigs) emitTAP(
 		if i >= cmd.emitTop {
 			break
 		}
-		emitted++
 		ok := agg.Verified == agg.Total && agg.Total > 0
+		isExisting := agg.Candidate.Label == "existing"
 		status := "ok"
 		if !ok {
 			status = "not ok"
 		}
 
-		filename := fmt.Sprintf("candidate-%02d-%s.hyphence",
-			i+1, strings.ReplaceAll(agg.Candidate.Label, "/", "-"))
-		filePath := filepath.Join(runDir, filename)
-
-		// Only emit a file for candidates that fully verified —
-		// non-verifying candidates would just clutter $TMPDIR.
-		if ok {
+		// Existing candidate is the on-remote config; never emit a
+		// file for it (the user doesn't need a copy of what's
+		// already there). Synthesized candidates that verify get a
+		// file emitted. Non-verifying synthesized candidates get
+		// no file (clutter avoidance).
+		filePath := ""
+		if ok && !isExisting {
+			filename := fmt.Sprintf("candidate-%02d-%s.hyphence",
+				i+1, strings.ReplaceAll(agg.Candidate.Label, "/", "-"))
+			filePath = filepath.Join(runDir, filename)
 			if err := writeCandidateFile(filePath, agg.Candidate); err != nil {
 				env.GetUI().Printf("write candidate %s failed: %v", filename, err)
 				filePath = ""
 			}
-		} else {
-			filePath = ""
 		}
 
 		fmt.Fprintf(out, "%s %d - %s verified=%d/%d\n",
@@ -471,6 +520,11 @@ func (cmd SftpAnalyzeAndSuggestConfigs) emitTAP(
 		fmt.Fprintln(out, "  stages:")
 		for stage, count := range agg.Stages {
 			fmt.Fprintf(out, "    %s: %d\n", stage, count)
+		}
+		if isExisting {
+			fmt.Fprintf(out,
+				"  note: this is the config currently on the remote at %s/blob_store-config\n",
+				cmd.remotePath)
 		}
 		if filePath != "" {
 			fmt.Fprintln(out, "  bootstrap:")
@@ -487,6 +541,309 @@ func (cmd SftpAnalyzeAndSuggestConfigs) emitTAP(
 		}
 		fmt.Fprintln(out, "  ...")
 	}
+	_ = existingHas // reserved for header banner in a future iteration
+}
+
+// tryReadExistingConfig opens <remote>/blob_store-config and
+// decodes it into a Candidate labeled "existing". Returns
+// (false, _) when the file is absent, decode-error'd, or when
+// the decoded config doesn't expose the IO-wrapper interface
+// VerifySample needs. Errors are logged via env.GetUI but never
+// fatal — a missing/corrupt remote config is fine; the
+// synthesized candidates still run.
+func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
+	env command_components.BlobStoreEnv,
+	sftpClient *sftp.Client,
+) (bool, sftp_probe.Candidate) {
+	configPath := path.Join(cmd.remotePath, directory_layout.FileNameBlobStoreConfig)
+
+	configFile, err := sftpClient.Open(configPath)
+	if err != nil {
+		// Most legacy stores have no blob_store-config — that's
+		// the whole reason this command exists. Silent skip.
+		return false, sftp_probe.Candidate{}
+	}
+	defer configFile.Close()
+
+	var typedConfig hyphence.TypedBlob[delta_blob_store_configs.Config]
+	if _, err := delta_blob_store_configs.Coder.DecodeFrom(
+		&typedConfig, configFile,
+	); err != nil {
+		env.GetUI().Printf(
+			"existing remote config at %s did not decode: %v",
+			configPath, err)
+		return false, sftp_probe.Candidate{}
+	}
+
+	wrapper, ok := typedConfig.Blob.(domain_interfaces.BlobIOWrapper)
+	if !ok {
+		env.GetUI().Printf(
+			"existing remote config at %s does not provide an IOWrapper",
+			configPath)
+		return false, sftp_probe.Candidate{}
+	}
+
+	hashFmt := blob_store_configs.DefaultHashType
+	ioCfg := blob_io.MakeConfig(
+		hashFmt,
+		nil,
+		wrapper.GetBlobCompression(),
+		wrapper.GetBlobEncryption(),
+	)
+
+	return true, sftp_probe.Candidate{
+		StoreConfig: typedConfig.Blob,
+		IOConfig:    ioCfg,
+		Label:       "existing",
+	}
+}
+
+// runInteractiveFlow drives the post-emit huh prompts: deep-verify
+// the top candidate, then bootstrap it. Skipped silently when no
+// candidate fully verifies, when the top candidate is "existing"
+// and verifies (no remediation needed), or when stdin is non-tty
+// and -yes-to-all wasn't set.
+//
+// Exit-code 2 (consented bootstrap-with-deep-verify-failures)
+// would require modifying cli_main; today, both happy and
+// consented-failure paths exit 0, and a real failure exits 1 via
+// errors.ContextCancel*. The TAP `not ok` lines plus the
+// diagnostic make the residual state legible without an exit-code
+// distinction.
+func (cmd SftpAnalyzeAndSuggestConfigs) runInteractiveFlow(
+	env command_components.BlobStoreEnv,
+	sftpClient *sftp.Client,
+	ranked []sftp_probe.Aggregate,
+	existingHas bool,
+) {
+	if len(ranked) == 0 {
+		return
+	}
+
+	// Pick the top *synthesized* candidate (skip existing) for
+	// the deep-verify + bootstrap path. If existing already
+	// verifies, no synthesized bootstrap is wanted — the user's
+	// current config works.
+	var top sftp_probe.Aggregate
+	var topIdx int = -1
+	if existingHas && ranked[0].Candidate.Label == "existing" &&
+		ranked[0].Verified == ranked[0].Total {
+		// Existing verifies fully. Skip the prompts.
+		return
+	}
+	for i, agg := range ranked {
+		if agg.Candidate.Label == "existing" {
+			continue
+		}
+		if agg.Verified == agg.Total && agg.Total > 0 {
+			top = agg
+			topIdx = i
+			break
+		}
+	}
+	if topIdx < 0 {
+		return
+	}
+
+	// Deep-verify prompt.
+	wantDeep, err := cmd.confirm(fmt.Sprintf(
+		"Deep-verify %s against the full store?", top.Candidate.Label))
+	if err != nil {
+		env.GetUI().Printf("deep-verify prompt: %v", err)
+		return
+	}
+
+	deepFailed := 0
+	deepWalked := 0
+	if wantDeep {
+		deepWalked, deepFailed = cmd.runDeepVerify(env, sftpClient, top.Candidate)
+		fmt.Fprintf(env.GetUIFile(),
+			"# deep-verify: candidate=%s walked=%d failed=%d\n",
+			top.Candidate.Label, deepWalked, deepFailed)
+
+		if deepFailed > 0 {
+			wantAnyway, err := cmd.confirm(fmt.Sprintf(
+				"Deep-verify found %d failures of %d. Bootstrap anyway?",
+				deepFailed, deepWalked))
+			if err != nil {
+				env.GetUI().Printf("bootstrap-anyway prompt: %v", err)
+				return
+			}
+			if !wantAnyway {
+				return
+			}
+		}
+	}
+
+	// Bootstrap prompt.
+	wantBootstrap, err := cmd.confirm(fmt.Sprintf(
+		"Bootstrap %s to %s:%s?",
+		top.Candidate.Label, cmd.sshHost, cmd.remotePath))
+	if err != nil {
+		env.GetUI().Printf("bootstrap prompt: %v", err)
+		return
+	}
+	if !wantBootstrap {
+		return
+	}
+
+	if err := cmd.runBootstrap(env, sftpClient, top.Candidate, existingHas); err != nil {
+		env.GetUI().Printf("bootstrap failed: %v", err)
+		errors.ContextCancelWithBadRequestError(env, err)
+		return
+	}
+}
+
+// confirm dispatches a yes/no prompt to huh when stdin is a tty,
+// returns cmd.yesToAll otherwise.
+func (cmd SftpAnalyzeAndSuggestConfigs) confirm(msg string) (bool, error) {
+	if cmd.yesToAll {
+		return true, nil
+	}
+	if !isatty.IsTerminal(os.Stdin.Fd()) {
+		return false, nil
+	}
+	return huhwrap.Prompter{}.Confirm(msg)
+}
+
+// runDeepVerify walks the entire bucket tree under cmd.remotePath
+// and runs VerifySample against `cand` for every blob. Returns
+// (walked, failed). Streams progress to stderr every 100 blobs.
+func (cmd SftpAnalyzeAndSuggestConfigs) runDeepVerify(
+	env command_components.BlobStoreEnv,
+	sftpClient *sftp.Client,
+	cand sftp_probe.Candidate,
+) (walked, failed int) {
+	walker := sftpClient.Walk(cmd.remotePath)
+	for walker.Step() {
+		if err := walker.Err(); err != nil {
+			continue
+		}
+		if walker.Stat().IsDir() {
+			continue
+		}
+		// Skip the blob_store-config itself if present.
+		if walker.Path() == path.Join(
+			cmd.remotePath, directory_layout.FileNameBlobStoreConfig) {
+			continue
+		}
+
+		relPath, err := filepath.Rel(cmd.remotePath, walker.Path())
+		if err != nil {
+			continue
+		}
+		hexConcat := strings.ReplaceAll(relPath, "/", "")
+		if _, err := hex.DecodeString(hexConcat); err != nil {
+			continue
+		}
+
+		f, err := sftpClient.Open(walker.Path())
+		if err != nil {
+			continue
+		}
+		buf, err := io.ReadAll(io.LimitReader(f, int64(cmd.maxSampleBytes)+1))
+		_ = f.Close()
+		if err != nil || len(buf) > cmd.maxSampleBytes {
+			continue
+		}
+
+		walked++
+		r := sftp_probe.VerifySample(bytes.NewReader(buf), hexConcat, cand)
+		if !r.Ok {
+			failed++
+		}
+		if walked%100 == 0 {
+			env.GetUI().Printf(
+				"deep-verify progress: walked=%d failed=%d", walked, failed)
+		}
+	}
+	return walked, failed
+}
+
+// runBootstrap writes the chosen candidate's StoreConfig to the
+// remote at <remote>/blob_store-config (mode 0444 per ADR 0005).
+// When existingHas is true, the existing config is overwritten
+// via a chmod-0644 -> write -> chmod-0444 sequence; otherwise the
+// stock WriteRemoteConfig path is used (which refuses to
+// overwrite).
+func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
+	env command_components.BlobStoreEnv,
+	sftpClient *sftp.Client,
+	cand sftp_probe.Candidate,
+	existingHas bool,
+) error {
+	configPath := path.Join(cmd.remotePath, directory_layout.FileNameBlobStoreConfig)
+
+	if existingHas {
+		// Make existing writable, write the new config, restore
+		// 0444. fileMode 0644 is enough to truncate-overwrite.
+		if err := sftpClient.Chmod(configPath, 0o644); err != nil {
+			return errors.Wrapf(err, "chmod 0644 %q", configPath)
+		}
+		// Overwrite via os.Create-equivalent: open with O_TRUNC
+		// semantics. sftp.Create truncates if the path exists.
+		f, err := sftpClient.Create(configPath)
+		if err != nil {
+			return errors.Wrapf(err, "create %q", configPath)
+		}
+		typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
+			Blob: cand.StoreConfig,
+		}
+		if _, err := delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
+			_ = f.Close()
+			return errors.Wrapf(err, "encode to %q", configPath)
+		}
+		if err := f.Close(); err != nil {
+			return errors.Wrap(err)
+		}
+		if err := sftpClient.Chmod(configPath, 0o444); err != nil {
+			return errors.Wrapf(err, "chmod 0444 %q", configPath)
+		}
+		env.GetUI().Printf("overwrote %s (mode 0444)", configPath)
+		return nil
+	}
+
+	// Fresh write — uses the existing helper that does a
+	// tmp-write + atomic rename + chmod 0444 + refuse-on-existing.
+	discovered := blob_stores.DiscoveredConfig{
+		HashTypeId: string(blob_store_configs.HashTypeSha256),
+		Buckets:    blob_store_configs.DefaultHashBuckets,
+	}
+	// WriteRemoteConfig builds its own DefaultType from
+	// `discovered`; for a candidate-driven write we want the
+	// candidate's config to land instead. So we replicate
+	// WriteRemoteConfig's atomic-write dance with our typed
+	// blob.
+	typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
+		Blob: cand.StoreConfig,
+	}
+	tmpPath := configPath + ".tmp"
+	f, err := sftpClient.Create(tmpPath)
+	if err != nil {
+		return errors.Wrapf(err, "create %q", tmpPath)
+	}
+	if _, err := delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
+		_ = f.Close()
+		_ = sftpClient.Remove(tmpPath)
+		return errors.Wrapf(err, "encode to %q", tmpPath)
+	}
+	if err := f.Close(); err != nil {
+		_ = sftpClient.Remove(tmpPath)
+		return errors.Wrap(err)
+	}
+	if err := sftpClient.Chmod(tmpPath, 0o444); err != nil {
+		_ = sftpClient.Remove(tmpPath)
+		return errors.Wrapf(err, "chmod %q", tmpPath)
+	}
+	if err := sftpClient.Rename(tmpPath, configPath); err != nil {
+		_ = sftpClient.Remove(tmpPath)
+		return errors.Wrapf(err, "rename %q -> %q", tmpPath, configPath)
+	}
+	env.GetUI().Printf("wrote %s (mode 0444)", configPath)
+	_ = discovered
+	return nil
 }
 
 func writeCandidateFile(filePath string, c sftp_probe.Candidate) error {
