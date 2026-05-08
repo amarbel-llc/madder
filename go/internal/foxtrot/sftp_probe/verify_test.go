@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -50,6 +51,30 @@ func candidateForLegacyCompression(t *testing.T, comp string) Candidate {
 		nil, // no encryption
 	)
 	return Candidate{IOConfig: cfg, Label: comp + "/none"}
+}
+
+// panickingReader is an io.Reader whose Read always panics. Used
+// to confirm VerifySample's defer-recover converts panics into a
+// failure verdict rather than crashing the host.
+type panickingReader struct{}
+
+func (panickingReader) Read([]byte) (int, error) {
+	panic("kaboom")
+}
+
+func TestVerifySample_PanicRecovers(t *testing.T) {
+	cand := candidateNoneNoneSha256(t)
+	got := VerifySample(panickingReader{}, "deadbeef", cand)
+	if got.Ok {
+		t.Fatal("expected non-OK after panic")
+	}
+	if got.Err == nil {
+		t.Fatal("expected non-nil Err describing the panic")
+	}
+	if !strings.Contains(got.Err.Error(), "panic") &&
+		!strings.Contains(got.Err.Error(), "kaboom") {
+		t.Errorf("expected error to mention panic / kaboom; got %q", got.Err)
+	}
 }
 
 func TestVerifySample_NoneNone_OK(t *testing.T) {
