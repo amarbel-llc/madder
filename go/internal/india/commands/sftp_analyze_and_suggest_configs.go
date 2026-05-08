@@ -267,11 +267,29 @@ func loadAgeKeys(paths []string) ([]markl.Id, error) {
 // dialSFTP connects via ssh_config-style transport. Constructs a
 // throwaway TomlSFTPViaSSHConfigV0 from the cmd's flags so we can
 // reuse blob_stores.MakeSSHClientFromSSHConfig directly.
+//
+// Note: blob_stores.MakeSSHClientFromSSHConfig does not actually
+// parse ~/.ssh/config; it dials url.Hostname():url.Port() directly.
+// Aliases that resolve via ssh_config Host blocks will only work
+// if the user manually expands them or DNS happens to know about
+// them. Tests pass a literal "host:port" via -ssh-host as a
+// workaround. Real ssh_config parsing is a follow-up.
 func (cmd SftpAnalyzeAndSuggestConfigs) dialSFTP(
 	env command_components.BlobStoreEnv,
 ) (*sftp.Client, func(), error) {
+	host := cmd.sshHost
+	// If -ssh-host doesn't carry a "user@" prefix, default to
+	// $USER so the URL parser produces a non-empty url.User.
+	if !strings.Contains(host, "@") {
+		user := os.Getenv("USER")
+		if user == "" {
+			user = "ssh"
+		}
+		host = user + "@" + host
+	}
+
 	uriStr := fmt.Sprintf("sftp://%s/%s",
-		cmd.sshHost, strings.TrimPrefix(cmd.remotePath, "/"))
+		host, strings.TrimPrefix(cmd.remotePath, "/"))
 
 	var uri values.Uri
 	if err := uri.Set(uriStr); err != nil {

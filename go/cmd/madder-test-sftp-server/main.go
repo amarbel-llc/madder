@@ -126,9 +126,24 @@ func writeKnownHosts(publicKey ssh.PublicKey, port int) (string, error) {
 
 func serve(listener net.Listener, hostSigner ssh.Signer) {
 	config := &ssh.ServerConfig{
+		// Accept any password. Mirrors the test SFTP server's
+		// existing "any auth wins" stance — this is a fixture, not
+		// a real server.
 		PasswordCallback: func(
 			conn ssh.ConnMetadata,
 			password []byte,
+		) (*ssh.Permissions, error) {
+			return nil, nil
+		},
+		// Accept any public key. The
+		// sftp-analyze-and-suggest-configs bats tests use SSH
+		// agent-based auth (since the production code path is
+		// ssh_config-only and uses pubkey-via-agent), and the agent
+		// presents a per-test ephemeral key that the SFTP server
+		// has no reason to validate.
+		PublicKeyCallback: func(
+			conn ssh.ConnMetadata,
+			key ssh.PublicKey,
 		) (*ssh.Permissions, error) {
 			return nil, nil
 		},

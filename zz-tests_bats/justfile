@@ -23,8 +23,10 @@ test:
     bats --jobs {{num_cpus()}} --filter-tags '!net_cap' *.bats
 
 # Run net_cap-tagged tests with --allow-local-binding so sandcastle
-# permits 127.0.0.1 binds. Used for SFTP harness tests today.
+# permits 127.0.0.1 binds, and --allow-unix-sockets so the
+# sftp-analyze harness's per-test ssh-agent can listen on a
+# tmpdir-relative Unix socket. Used for the SFTP test family.
 [group("test")]
 test-net-cap:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
-    bats --allow-local-binding --jobs {{num_cpus()}} --filter-tags net_cap *.bats
+    bats --allow-local-binding --allow-unix-sockets --jobs {{num_cpus()}} --filter-tags net_cap *.bats
