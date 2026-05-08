@@ -2,25 +2,24 @@ package commands_cutting_garden
 
 import (
 	"fmt"
-	"io"
-	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_sink"
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
+	_ "github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugin_file"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -170,8 +169,14 @@ func (cmd Capture) Run(req futility.Request) {
 			if root.shadowNotice != "" {
 				sink.Notice(root.shadowNotice)
 			}
-			fails := walkRoot(blobStore, root.path, &entries, sink)
-			failCount += fails
+			result := root.plugin.CaptureRoot(cutting_garden_plugins.CaptureRootRequest{
+				Source:    root.sourceURL,
+				RawArg:    root.path,
+				BlobStore: blobStore,
+				Sink:      sink,
+			})
+			entries = append(entries, result.Entries...)
+			failCount += result.FailCount
 		}
 
 		if len(entries) == 0 {
@@ -224,7 +229,14 @@ func (cmd Capture) Run(req futility.Request) {
 }
 
 type captureRoot struct {
+	// path is the original CLI argument as the user typed it. Used
+	// for the audit log, sink labels, and shadow detection. The
+	// EntryV1.Root field in receipts is set by the plugin from the
+	// parsed sourceURL, not from path — so schemeless `./foo` and
+	// `file:./foo` produce byte-identical receipts.
 	path         string
+	plugin       cutting_garden_plugins.CapturePlugin
+	sourceURL    *url.URL
 	shadowNotice string
 }
 
@@ -254,8 +266,13 @@ func planCapture(
 	shadowCandidates []blob_store_id.Id,
 ) (groups []captureGroup, classifyFails []classifyFailure, err error) {
 	if len(args) == 0 {
+		plugin, _ := cutting_garden_plugins.ResolveCapture("")
 		return []captureGroup{{
-			roots: []captureRoot{{path: "."}},
+			roots: []captureRoot{{
+				path:      ".",
+				plugin:    plugin,
+				sourceURL: &url.URL{Path: "."},
+			}},
 		}}, nil, nil
 	}
 
@@ -263,22 +280,29 @@ func planCapture(
 		k := classifyArg(args[0])
 		switch k.kind {
 		case argKindStoreId:
+			plugin, _ := cutting_garden_plugins.ResolveCapture("")
 			return []captureGroup{{
 				storeID:      k.storeID,
 				switchNotice: arg_resolver.FormatStoreSwitchNotice(k.storeID),
-				roots:        []captureRoot{{path: "."}},
+				roots: []captureRoot{{
+					path:      ".",
+					plugin:    plugin,
+					sourceURL: &url.URL{Path: "."},
+				}},
 			}}, nil, nil
-		case argKindDir:
-			if scopeErr := checkRootScope(args[0]); scopeErr != nil {
-				// Match the multi-arg loop: scope failures route to
-				// classifyFails and surface via the sink. The post-classify
-				// "failCount > 0" path in Run produces the cancel message;
-				// no synthetic planErr is needed.
+		case argKindCapture:
+			if scopeErr := k.plugin.ValidateSource(k.sourceURL, args[0]); scopeErr != nil {
+				// Match the multi-arg loop: validation failures route
+				// to classifyFails and surface via the sink. The
+				// post-classify "failCount > 0" path in Run produces
+				// the cancel message; no synthetic planErr is needed.
 				return nil, []classifyFailure{{arg: args[0], err: scopeErr}}, nil
 			}
 			return []captureGroup{{
 				roots: []captureRoot{{
 					path:         args[0],
+					plugin:       k.plugin,
+					sourceURL:    k.sourceURL,
 					shadowNotice: shadowNoticeFor(args[0], shadowCandidates),
 				}},
 			}}, nil, nil
@@ -326,8 +350,8 @@ func planCapture(
 				switchNotice: arg_resolver.FormatStoreSwitchNotice(k.storeID),
 			}
 
-		case argKindDir:
-			if scopeErr := checkRootScope(arg); scopeErr != nil {
+		case argKindCapture:
+			if scopeErr := k.plugin.ValidateSource(k.sourceURL, arg); scopeErr != nil {
 				classifyFails = append(classifyFails, classifyFailure{
 					arg: arg,
 					err: scopeErr,
@@ -336,6 +360,8 @@ func planCapture(
 			}
 			current.roots = append(current.roots, captureRoot{
 				path:         arg,
+				plugin:       k.plugin,
+				sourceURL:    k.sourceURL,
 				shadowNotice: shadowNoticeFor(arg, shadowCandidates),
 			})
 		}
@@ -375,27 +401,56 @@ type argKind int
 
 const (
 	argKindError argKind = iota
-	argKindDir
+	argKindCapture
 	argKindStoreId
 )
 
 type classifiedArg struct {
-	kind    argKind
-	storeID blob_store_id.Id
-	err     error
+	kind      argKind
+	storeID   blob_store_id.Id
+	plugin    cutting_garden_plugins.CapturePlugin
+	sourceURL *url.URL
+	err       error
 }
 
-// classifyArg decides whether arg names a directory in CWD or a
-// blob-store-id. Uses Lstat (not Stat) so a symlink-to-directory does
-// not classify as a directory: filepath.WalkDir would refuse to descend
-// it anyway, and the resulting one-entry "type=symlink" receipt would
-// surprise a user who expected the linked tree's contents. Users who
-// want that should resolve the symlink before passing it in.
+// classifyArg decides whether arg names a capture-source URI, a
+// blob-store-id, or is unparseable. The schemeless heuristic mirrors
+// the pre-plugin behavior: try Lstat first (so a symlink-to-directory
+// is rejected — filepath.WalkDir would refuse to descend it anyway,
+// and the resulting one-entry "type=symlink" receipt would surprise
+// a user who expected the linked tree's contents); on ENOENT, fall
+// back to blob-store-id parsing. Users who want symlink-to-dir
+// behavior should resolve the symlink with realpath before passing
+// it in.
+//
+// URI args (anything with a scheme that resolves to a registered
+// capture plugin) skip the Lstat dance entirely. Args with an
+// unrecognized scheme fall through to the schemeless heuristic so
+// filenames containing colons (e.g. `myfile:txt`) keep working —
+// at the cost of a real edge case: a directory literally named
+// `file:foo` is interpreted as the file plugin pointing at `foo`,
+// not as the local directory.
 func classifyArg(arg string) classifiedArg {
+	if u, err := url.Parse(arg); err == nil && u.Scheme != "" {
+		if plugin, perr := cutting_garden_plugins.ResolveCapture(u.Scheme); perr == nil {
+			return classifiedArg{
+				kind:      argKindCapture,
+				plugin:    plugin,
+				sourceURL: u,
+			}
+		}
+		// Unknown scheme — fall through to the schemeless heuristic.
+	}
+
 	info, err := os.Lstat(arg)
 	switch {
 	case err == nil && info.IsDir():
-		return classifiedArg{kind: argKindDir}
+		plugin, _ := cutting_garden_plugins.ResolveCapture("")
+		return classifiedArg{
+			kind:      argKindCapture,
+			plugin:    plugin,
+			sourceURL: &url.URL{Path: arg},
+		}
 	case err == nil:
 		return classifiedArg{
 			kind: argKindError,
@@ -418,35 +473,10 @@ func classifyArg(arg string) classifiedArg {
 	return classifiedArg{
 		kind: argKindError,
 		err: errors.ErrorWithStackf(
-			"%q is neither an existing directory nor a valid blob-store-id",
+			"%q is neither a recognized URI, an existing directory, nor a valid blob-store-id",
 			arg,
 		),
 	}
-}
-
-// checkRootScope refuses dir args that resolve outside PWD per RFC
-// 0003 §Producer Rules §Root Scoping. Mirrors git's "outside
-// repository" diagnostic; PWD is the implicit work tree.
-func checkRootScope(arg string) error {
-	pwd, err := os.Getwd()
-	if err != nil {
-		return errors.Wrap(err)
-	}
-
-	abs, err := filepath.Abs(arg)
-	if err != nil {
-		return errors.Wrap(err)
-	}
-
-	rel, err := filepath.Rel(pwd, abs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return errors.ErrorWithStackf(
-			"%s: outside working directory at %s\nhint: cd to a parent directory containing %s, then re-run",
-			arg, pwd, arg,
-		)
-	}
-
-	return nil
 }
 
 // checkRootCollisions refuses two roots within a single store-group
@@ -467,123 +497,6 @@ func checkRootCollisions(roots []captureRoot) error {
 	}
 
 	return nil
-}
-
-// walkRoot walks rootArg with filepath.WalkDir (which does not follow
-// symlinks), writes every regular file as a blob into store, appends a
-// capture_receipt.EntryV1 for every entry it visited, and emits live
-// per-entry events on the sink. Returns the count of per-entry
-// failures encountered during the walk.
-func walkRoot(
-	store blob_stores.BlobStoreInitialized,
-	rootArg string,
-	accum *[]capture_receipt.EntryV1,
-	sink capture_sink.Sink,
-) int {
-	var failCount int
-
-	walkErr := filepath.WalkDir(rootArg, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			sink.Failure(p, walkErr)
-			failCount++
-			if d != nil && d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		info, err := d.Info()
-		if err != nil {
-			sink.Failure(p, errors.Wrap(err))
-			failCount++
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		rel, err := filepath.Rel(rootArg, p)
-		if err != nil {
-			sink.Failure(p, errors.Wrap(err))
-			failCount++
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-
-		mode := info.Mode()
-		entry := capture_receipt.EntryV1{
-			Path: rel,
-			Root: rootArg,
-			Mode: mode,
-		}
-
-		switch {
-		case mode&fs.ModeSymlink != 0:
-			target, err := os.Readlink(p)
-			if err != nil {
-				sink.Failure(p, errors.Wrap(err))
-				failCount++
-				return nil
-			}
-			entry.Type = capture_receipt.TypeSymlink
-			entry.Target = target
-
-		case mode.IsDir():
-			entry.Type = capture_receipt.TypeDir
-
-		case mode.IsRegular():
-			id, size, err := writeFileBlob(store, p)
-			if err != nil {
-				sink.Failure(p, errors.Wrap(err))
-				failCount++
-				return nil
-			}
-			entry.Type = capture_receipt.TypeFile
-			entry.Size = size
-			entry.BlobId = id.String()
-
-		default:
-			entry.Type = capture_receipt.TypeOther
-		}
-
-		*accum = append(*accum, entry)
-		sink.Entry(entry)
-		return nil
-	})
-
-	if walkErr != nil {
-		sink.Failure(rootArg, errors.Wrap(walkErr))
-		failCount++
-	}
-
-	return failCount
-}
-
-func writeFileBlob(
-	blobStore blob_stores.BlobStoreInitialized,
-	srcPath string,
-) (id domain_interfaces.MarklId, size int64, err error) {
-	src, err := os.Open(srcPath)
-	if err != nil {
-		err = errors.Wrap(err)
-		return
-	}
-	defer errors.DeferredCloser(&err, src)
-
-	wc, err := blobStore.MakeBlobWriter(nil)
-	if err != nil {
-		err = errors.Wrap(err)
-		return
-	}
-	defer errors.DeferredCloser(&err, wc)
-
-	if size, err = io.Copy(wc, src); err != nil {
-		err = errors.Wrap(err)
-		return
-	}
-
-	id = wc.GetMarklId()
-	return
 }
 
 // writeReceiptBlob serializes entries via capture_receipt.Write

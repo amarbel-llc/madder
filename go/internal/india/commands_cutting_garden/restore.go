@@ -2,11 +2,10 @@ package commands_cutting_garden
 
 import (
 	"fmt"
-	"io"
+	"net/url"
 	"os"
-	"path/filepath"
-	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
@@ -14,6 +13,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -108,21 +108,27 @@ func (cmd *Restore) Run(req futility.Request) {
 	}
 }
 
-// runRestore validates preconditions, parses the receipt, runs path
-// sanitization across every entry, then materializes per-type. Returns
-// the first refusal or write failure as an error.
+// runRestore validates preconditions, parses the receipt, dispatches
+// to the restore plugin keyed by dest's URI scheme. Returns the first
+// refusal or write failure as an error.
 //
 // Sanitization runs before any disk write per FDR §Sanitization: the
 // entire receipt is refused atomically if any entry would escape.
 // Materialization MUST NOT recover from a mid-stream blob read failure
 // (FDR §Limitations: no rollback) — the destination is left partial
-// in that case and the diagnostic names the failed entry.
+// in that case and the diagnostic names the failed entry. Both rules
+// are enforced inside the plugin's Restore method.
 func (cmd *Restore) runRestore(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
-	dest string,
+	destStr string,
 ) error {
-	if err := assertDestinationDoesNotExist(dest); err != nil {
+	destURL, plugin, err := resolveRestorePlugin(destStr)
+	if err != nil {
+		return err
+	}
+
+	if err := plugin.ValidateDest(destURL, destStr); err != nil {
 		return err
 	}
 
@@ -131,7 +137,7 @@ func (cmd *Restore) runRestore(
 		return errors.Wrapf(err, "parse receipt-id %q", receiptIdStr)
 	}
 
-	blob, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
+	blob, typeTag, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
 	if err != nil {
 		return err
 	}
@@ -143,8 +149,19 @@ func (cmd *Restore) runRestore(
 			&receiptId, blob)
 	}
 
-	if err := validateEntries(v1.Entries, dest); err != nil {
-		return err
+	// TODO(#NNN) cross-scheme restores. Today the receipt's
+	// type-tag must match the dest plugin's TypeTag(): the file
+	// plugin can only restore `cutting_garden-capture_receipt-fs-v1`
+	// receipts. As more plugins arrive there will be legitimate
+	// cross-scheme cases (e.g. mirroring an fs receipt into an s3
+	// prefix). Revisit this guard then — likely as an explicit
+	// `--allow-cross-scheme` flag or by letting RestorePlugin
+	// declare which receipt tags it accepts.
+	if typeTag.StringSansOp() != plugin.TypeTag() {
+		return errors.ErrorWithStackf(
+			"receipt %s: type-tag %q cannot be restored to scheme %q (plugin tag %q); cross-scheme restore is not supported",
+			&receiptId, typeTag.StringSansOp(), destURL.Scheme, plugin.TypeTag(),
+		)
 	}
 
 	materializationStore, err := resolveMaterializationStore(
@@ -154,7 +171,29 @@ func (cmd *Restore) runRestore(
 		return err
 	}
 
-	return materializeEntries(materializationStore, v1.Entries, dest)
+	return plugin.Restore(cutting_garden_plugins.RestoreRequest{
+		Entries:   v1.Entries,
+		BlobStore: materializationStore,
+		Dest:      destURL,
+		RawDest:   destStr,
+	})
+}
+
+// resolveRestorePlugin parses destStr as a URL and looks up the
+// restore plugin registered for its scheme. Schemeless dests resolve
+// to the file plugin's `""` registration.
+func resolveRestorePlugin(
+	destStr string,
+) (*url.URL, cutting_garden_plugins.RestorePlugin, error) {
+	u, err := url.Parse(destStr)
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "parse dest %q", destStr)
+	}
+	plugin, err := cutting_garden_plugins.ResolveRestore(u.Scheme)
+	if err != nil {
+		return nil, nil, err
+	}
+	return u, plugin, nil
 }
 
 // readReceiptBlob fetches and parses the receipt blob.
@@ -169,31 +208,31 @@ func readReceiptBlob(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptId *markl.Id,
 	storeOverride string,
-) (capture_receipt.Blob, error) {
+) (capture_receipt.Blob, ids.TypeStruct, error) {
 	if storeOverride != "" {
 		store, err := resolveStoreById(envBlobStore, storeOverride)
 		if err != nil {
-			return nil, err
+			return nil, ids.TypeStruct{}, err
 		}
-		blob, _, err := capture_receipt.Read(store, receiptId)
+		blob, typeTag, err := capture_receipt.Read(store, receiptId)
 		if err != nil {
-			return nil, errors.Wrapf(err, "read receipt %s", receiptId)
+			return nil, typeTag, errors.Wrapf(err, "read receipt %s", receiptId)
 		}
-		return blob, nil
+		return blob, typeTag, nil
 	}
 
 	for _, store := range envBlobStore.GetBlobStoresSorted() {
 		if !store.HasBlob(receiptId) {
 			continue
 		}
-		blob, _, err := capture_receipt.Read(store, receiptId)
+		blob, typeTag, err := capture_receipt.Read(store, receiptId)
 		if err != nil {
-			return nil, errors.Wrapf(err, "read receipt %s", receiptId)
+			return nil, typeTag, errors.Wrapf(err, "read receipt %s", receiptId)
 		}
-		return blob, nil
+		return blob, typeTag, nil
 	}
 
-	return nil, errors.ErrorWithStackf(
+	return nil, ids.TypeStruct{}, errors.ErrorWithStackf(
 		"receipt %s not found in any configured store", receiptId)
 }
 
@@ -287,188 +326,3 @@ func resolveStoreById(
 	return store, nil
 }
 
-func assertDestinationDoesNotExist(dest string) error {
-	if _, err := os.Lstat(dest); err == nil {
-		return errors.ErrorWithStackf(
-			"%s: destination already exists\n"+
-				"hint: choose a destination that does not exist, or remove this one",
-			dest,
-		)
-	} else if !os.IsNotExist(err) {
-		return errors.Wrapf(err, "stat %q", dest)
-	}
-	return nil
-}
-
-// validateEntries runs the RFC 0003 §Consumer Rules §Path Sanitization
-// checks across every entry. Returns the first failure as a refusal
-// error — atomic per the FDR: any refusal aborts phase A before any
-// disk write.
-//
-// The materialized path used for the boundary check is
-// `filepath.Clean(filepath.Join(dest, e.root, e.path))`. The
-// destination boundary is `filepath.Clean(dest)`.
-//
-// The `error: ` prefix in the FDR-quoted diagnostics is added by the
-// framework via ContextCancelWithBadRequestError; the strings here
-// start at the noun.
-func validateEntries(entries []capture_receipt.EntryV1, dest string) error {
-	cleanDest := filepath.Clean(dest)
-
-	for i := range entries {
-		e := entries[i]
-
-		if e.Root == "" {
-			return errors.ErrorWithStackf(
-				"entry has empty root\n"+
-					"  path: %s",
-				e.Path,
-			)
-		}
-
-		if strings.ContainsRune(e.Root, 0) || strings.ContainsRune(e.Path, 0) {
-			return errors.ErrorWithStackf(
-				"entry contains NUL byte\n"+
-					"  root: %q\n"+
-					"  path: %q",
-				e.Root, e.Path,
-			)
-		}
-
-		materialized := filepath.Clean(filepath.Join(cleanDest, e.Root, e.Path))
-
-		if !pathConfinedTo(materialized, cleanDest) {
-			return errors.ErrorWithStackf(
-				"entry escapes destination\n"+
-					"  root: %s\n"+
-					"  path: %s\n"+
-					"  materialized: %s\n"+
-					"  destination: %s",
-				e.Root, e.Path, materialized, cleanDest,
-			)
-		}
-	}
-
-	return nil
-}
-
-// pathConfinedTo reports whether materialized is equal to or a strict
-// descendant of dest. Both inputs MUST already be filepath.Clean'd.
-//
-// Per FDR §Sanitization, the test is:
-//
-//	materialized == dest || strings.HasPrefix(materialized, dest + os.PathSeparator)
-//
-// Equality covers the case of a `{root: ".", path: "."}` dir entry
-// (the captured tree's root); the prefix test confines everything
-// else to under dest.
-func pathConfinedTo(materialized, dest string) bool {
-	if materialized == dest {
-		return true
-	}
-	return strings.HasPrefix(materialized, dest+string(os.PathSeparator))
-}
-
-// materializeEntries iterates entries in receipt order and writes each
-// to disk per its type. Per FDR §Per-Type Materialization:
-//
-//	file    → create-only open + io.Copy + chmod
-//	dir     → MkdirAll
-//	symlink → os.Symlink with literal target; mode ignored
-//	other   → skip with stderr notice
-//
-// <dest> itself is never an entry path — entries materialize *under*
-// <dest> via filepath.Join — so the consumer creates it explicitly
-// (MkdirAll, mode 0o755) before iterating.
-//
-// Per FDR §Limitations §No mid-stream rollback: a blob-read or write
-// failure mid-stream leaves the destination partial; cleanup is the
-// operator's job. The diagnostic names the entry that failed.
-func materializeEntries(
-	blobStore blob_stores.BlobStoreInitialized,
-	entries []capture_receipt.EntryV1,
-	dest string,
-) error {
-	cleanDest := filepath.Clean(dest)
-
-	if err := os.MkdirAll(cleanDest, 0o755); err != nil {
-		return errors.Wrapf(err, "create destination %q", cleanDest)
-	}
-
-	for i := range entries {
-		e := entries[i]
-		materialized := filepath.Clean(filepath.Join(cleanDest, e.Root, e.Path))
-
-		switch e.Type {
-		case capture_receipt.TypeFile:
-			if err := materializeFile(blobStore, e, materialized); err != nil {
-				return err
-			}
-
-		case capture_receipt.TypeDir:
-			if err := os.MkdirAll(materialized, e.Mode.Perm()); err != nil {
-				return errors.Wrapf(err, "mkdir %q", materialized)
-			}
-
-		case capture_receipt.TypeSymlink:
-			if err := os.Symlink(e.Target, materialized); err != nil {
-				return errors.Wrapf(err, "symlink %q -> %q", materialized, e.Target)
-			}
-
-		case capture_receipt.TypeOther:
-			fmt.Fprintf(os.Stderr,
-				"notice: skipping entry of type %q: %s\n",
-				e.Type, materialized)
-
-		default:
-			return errors.ErrorWithStackf(
-				"%s: unknown entry type %q", materialized, e.Type)
-		}
-	}
-
-	return nil
-}
-
-// materializeFile opens the materialized path create-only, streams the
-// blob into it via io.Copy, then applies the captured POSIX
-// permissions. domain_interfaces.BlobReader satisfies io.WriterTo, so
-// io.Copy uses the WriteTo fast path and the file content is never
-// buffered in memory.
-func materializeFile(
-	blobStore blob_stores.BlobStoreInitialized,
-	e capture_receipt.EntryV1,
-	materialized string,
-) (err error) {
-	var blobId markl.Id
-	if err = blobId.Set(e.BlobId); err != nil {
-		return errors.Wrapf(err, "%s: parse blob_id %q", materialized, e.BlobId)
-	}
-
-	reader, err := blobStore.MakeBlobReader(&blobId)
-	if err != nil {
-		return errors.Wrapf(err, "%s: open blob %s", materialized, &blobId)
-	}
-	defer errors.DeferredCloser(&err, reader)
-
-	file, err := os.OpenFile(
-		materialized,
-		os.O_WRONLY|os.O_CREATE|os.O_EXCL,
-		0o666,
-	)
-	if err != nil {
-		return errors.Wrapf(err, "create %q", materialized)
-	}
-	defer errors.DeferredCloser(&err, file)
-
-	if _, err = io.Copy(file, reader); err != nil {
-		return errors.Wrapf(err,
-			"%s: blob read failed\n  blob_id: %s",
-			materialized, &blobId)
-	}
-
-	if err = os.Chmod(materialized, e.Mode.Perm()); err != nil {
-		return errors.Wrapf(err, "chmod %q", materialized)
-	}
-
-	return nil
-}

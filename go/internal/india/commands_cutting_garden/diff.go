@@ -15,6 +15,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugin_file"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -162,7 +163,7 @@ func (cmd *Diff) runDiff(
 		)
 	}
 
-	blob, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
+	blob, _, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
 	if err != nil {
 		return err
 	}
@@ -174,7 +175,7 @@ func (cmd *Diff) runDiff(
 			&receiptId, blob)
 	}
 
-	if err := validateEntries(v1.Entries, dir); err != nil {
+	if err := cutting_garden_plugin_file.ValidateEntries(v1.Entries, dir); err != nil {
 		return err
 	}
 
