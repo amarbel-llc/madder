@@ -6,8 +6,11 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 )
@@ -64,6 +67,88 @@ func TestVerifySample_NoneNone_OK(t *testing.T) {
 	}
 	if got.Stage != StageOK {
 		t.Errorf("Stage = %s, want %s", got.Stage, StageOK)
+	}
+}
+
+// generateAgeKeyForTest produces a fresh age-x25519 private key as
+// a markl.Id. Returned by value because markl.Id is a value type;
+// callers take its address when an interface receiver is needed.
+func generateAgeKeyForTest(t *testing.T) markl.Id {
+	t.Helper()
+	var key markl.Id
+	if err := key.GeneratePrivateKey(
+		nil,
+		markl.FormatIdAgeX25519Sec,
+		markl.PurposeMadderPrivateKeyV1,
+	); err != nil {
+		t.Fatalf("GeneratePrivateKey: %v", err)
+	}
+	return key
+}
+
+// candidateForCompressionAndKey builds a Candidate combining a
+// legacy compression name with an optional age key. When key is
+// nil, the candidate has no encryption.
+func candidateForCompressionAndKey(
+	t *testing.T,
+	comp string,
+	key *markl.Id,
+) Candidate {
+	t.Helper()
+	ref, err := plugins.LegacyCompressionRef(comp)
+	if err != nil {
+		t.Fatalf("LegacyCompressionRef(%q): %v", comp, err)
+	}
+	wrapper, err := plugins.Resolve(ref)
+	if err != nil {
+		t.Fatalf("plugins.Resolve(%q): %v", ref, err)
+	}
+
+	// MakeConfig accepts a typed nil interface for "no encryption";
+	// passing a nil *markl.Id wrapped as an interface would not
+	// satisfy the != nil check inside MakeConfig.
+	var enc domain_interfaces.MarklId
+	if key != nil {
+		enc = key
+	}
+
+	cfg := blob_io.MakeConfig(
+		blob_store_configs.DefaultHashType,
+		nil,
+		wrapper,
+		enc,
+	)
+
+	label := comp + "/none"
+	if key != nil {
+		label = comp + "/age"
+	}
+	return Candidate{IOConfig: cfg, Label: label}
+}
+
+func TestVerifySample_AgeRoundTrip(t *testing.T) {
+	cleartext := []byte("hello age — encrypted blob bytes round-tripping through the pipeline")
+	digest := sha256.Sum256(cleartext)
+	expectedHex := hex.EncodeToString(digest[:])
+
+	key := generateAgeKeyForTest(t)
+	cand := candidateForCompressionAndKey(t, "zstd", &key)
+
+	var encoded bytes.Buffer
+	w, err := blob_io.NewWriter(cand.IOConfig, &encoded)
+	if err != nil {
+		t.Fatalf("NewWriter: %v", err)
+	}
+	if _, err := w.Write(cleartext); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err := w.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	got := VerifySample(bytes.NewReader(encoded.Bytes()), expectedHex, cand)
+	if !got.Ok {
+		t.Fatalf("Ok=false; Stage=%s Err=%v", got.Stage, got.Err)
 	}
 }
 
