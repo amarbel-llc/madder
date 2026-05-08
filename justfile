@@ -394,27 +394,6 @@ release version:
 gomod2nix:
   cd go && gomod2nix
 
-# Run a bats subset against go-built binaries instead of the nix-built
-# `result/bin/...`. Useful when iterating on capture/restore plumbing
-# where the nix-build cycle is too slow. Builds binaries into .tmp/
-# first. Usage: just debug-bats-go-bins capture.bats restore.bats
-[group("debug")]
-debug-bats-go-bins *targets="*.bats":
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd {{justfile_directory()}}
-  mkdir -p .tmp
-  cd go
-  go build -o ../.tmp/madder ./cmd/madder
-  go build -o ../.tmp/madder-cache ./cmd/madder-cache
-  go build -o ../.tmp/cutting-garden ./cmd/cutting-garden
-  go build -o ../.tmp/hyphence ./cmd/hyphence
-  cd ..
-  MADDER_BIN={{justfile_directory()}}/.tmp/madder \
-    CG_BIN={{justfile_directory()}}/.tmp/cutting-garden \
-    HYPHENCE_BIN={{justfile_directory()}}/.tmp/hyphence \
-    just zz-tests_bats/test-targets {{targets}}
-
 # Print the version subcommand output from the nix-built binaries.
 # Used to verify -ldflags injection (see go/internal/0/buildinfo).
 [group("debug")]
