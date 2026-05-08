@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -15,6 +16,57 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+// sshConfigResolution holds the subset of ssh_config fields we care
+// about. Fields are populated by resolveSSHConfig from `ssh -G`
+// output; empty strings mean "use the URI's value".
+type sshConfigResolution struct {
+	Hostname           string
+	Port               string
+	User               string
+	UserKnownHostsFile string
+}
+
+// resolveSSHConfig shells out to `ssh -G <host>` to expand
+// ssh_config Host blocks (Match, Include, ProxyJump and friends
+// included). Real ssh's resolver is the source of truth; we just
+// consume its output. Returns an empty resolution when ssh isn't
+// on PATH or the call errors — caller falls back to URI-literal
+// dialing.
+//
+// Closes amarbel-llc/madder#142.
+func resolveSSHConfig(host string) (sshConfigResolution, error) {
+	if host == "" {
+		return sshConfigResolution{}, nil
+	}
+	cmd := exec.Command("ssh", "-G", host)
+	out, err := cmd.Output()
+	if err != nil {
+		return sshConfigResolution{}, err
+	}
+
+	var r sshConfigResolution
+	for _, line := range strings.Split(string(out), "\n") {
+		key, val, ok := strings.Cut(line, " ")
+		if !ok {
+			continue
+		}
+		switch key {
+		case "hostname":
+			r.Hostname = val
+		case "port":
+			r.Port = val
+		case "user":
+			r.User = val
+		case "userknownhostsfile":
+			// `ssh -G` may emit a space-separated list; we use
+			// the first entry (which is the highest-priority
+			// match per ssh's own precedence rules).
+			r.UserKnownHostsFile = strings.SplitN(val, " ", 2)[0]
+		}
+	}
+	return r, nil
+}
 
 func MakeSSHAgent(
 	ctx interfaces.ActiveContext,
@@ -228,34 +280,55 @@ func MakeSSHClientFromSSHConfig(
 		return
 	}
 
+	uri := config.GetUri()
+	url := uri.GetUrl()
+
+	// Resolve via `ssh -G <host>` so ssh_config Host blocks are
+	// honored. Best-effort: empty resolution means we fall back to
+	// the URI's literal values. URI-explicit fields always
+	// override resolved values.
+	resolved, _ := resolveSSHConfig(url.Hostname())
+
+	hostname := url.Hostname()
+	if resolved.Hostname != "" {
+		hostname = resolved.Hostname
+	}
+	port := url.Port()
+	if port == "" {
+		port = resolved.Port
+	}
+	if port == "" {
+		port = "22"
+	}
+	user := url.User.Username()
+	if user == "" {
+		user = resolved.User
+	}
+
+	knownHostsPath := config.GetKnownHostsFile()
+	if knownHostsPath == "" {
+		knownHostsPath = resolved.UserKnownHostsFile
+	}
+
 	var hostKeyCallback ssh.HostKeyCallback
 	var knownHostsFiles []string
 
 	if hostKeyCallback, knownHostsFiles, err = makeHostKeyCallback(
-		config.GetKnownHostsFile(),
+		knownHostsPath,
 	); err != nil {
 		err = errors.Wrap(err)
 		return
 	}
 
-	uri := config.GetUri()
-	url := uri.GetUrl()
-
 	clientConfig := &ssh.ClientConfig{
-		User: url.User.Username(),
+		User: user,
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeysCallback(clientAgent.Signers),
 		},
 		HostKeyCallback: hostKeyCallback,
 	}
 
-	port := url.Port()
-
-	if port == "" {
-		port = "22"
-	}
-
-	addr := fmt.Sprintf("%s:%s", url.Hostname(), port)
+	addr := fmt.Sprintf("%s:%s", hostname, port)
 
 	clientConfig.HostKeyAlgorithms = hostKeyAlgorithmsForKnownHosts(
 		hostKeyCallback,
