@@ -13,13 +13,20 @@ URI scheme name "file".
 
 - `walkRoot` / `writeFileBlob` — capture-side filesystem walk.
 - `materializeEntries` / `materializeFile` — restore-side write loop.
+- `walkForDiff` / `hashFileViaStore` — diff-side filesystem walk
+  (read-only analogue of `walkRoot` over a discard-store).
 - `checkRootScope` — RFC 0003 §Producer Rules §Root Scoping.
 - `assertDestinationDoesNotExist` — FDR 0001 §Preconditions.
-- `validateEntries` / `pathConfinedTo` — RFC 0003 §Consumer Rules
+- `assertDirectoryExists` — diff-side precondition: `<dir>` must
+  exist and be a directory (FDR 0006).
+- `ValidateEntries` / `pathConfinedTo` — RFC 0003 §Consumer Rules
   §Path Sanitization.
 - `pathFromURL` — URL → filesystem path coercion (`url.go`).
+- `joinDiffFailures` — error-aggregation helper used by
+  `walkForDiff`.
 
 These were extracted from `india/commands_cutting_garden/{capture,
-restore}.go` when the plugin system was introduced; the receipt-blob
-write itself (and its store-hint) still lives in the command because
-it coordinates across roots that share a store group.
+restore,diff}.go` when the plugin system was introduced; the
+receipt-blob write itself (and its store-hint) still lives in the
+command because it coordinates across roots that share a store
+group.
