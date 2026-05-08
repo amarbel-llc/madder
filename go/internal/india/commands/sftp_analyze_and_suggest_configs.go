@@ -68,9 +68,58 @@ func (cmd SftpAnalyzeAndSuggestConfigs) GetDescription() futility.Description {
 			"blob_store-config file. Samples blobs, generates candidate " +
 			"configs, sample-verifies them through the existing reader " +
 			"pipeline, and offers an interactive deep-verify and bootstrap " +
-			"flow. Emits candidate files to $TMPDIR. " +
-			"See sftp-analyze-and-suggest-configs(1) for the full contract " +
-			"and exit-code policy.",
+			"flow. Emits candidate files to $TMPDIR/madder-suggest-<runid>/ " +
+			"that the user can scp into place. " +
+			"\n\n" +
+			"Sample-verifies blobs against a cross-product of compression " +
+			"types {none, gzip, zlib, zstd} and any user-supplied age keys " +
+			"({none} \\u222a {age+keyi}). When the remote already has a " +
+			"blob_store-config, the existing config is treated as " +
+			"candidate-01 and validated alongside; a verified existing " +
+			"config skips the bootstrap flow. " +
+			"\n\n" +
+			"Exit codes: 0 on clean success, 1 on a real failure " +
+			"(connect, no-candidate-verifies, bootstrap-step-errored). " +
+			"Exit code 2 (bootstrapped with consented deep-verify failures) " +
+			"is reserved for a follow-up cli_main change.",
+	}
+}
+
+// GetExamples surfaces a few sample invocations in the man page's
+// EXAMPLES section.
+func (cmd SftpAnalyzeAndSuggestConfigs) GetExamples() []futility.Example {
+	return []futility.Example{
+		{
+			Description: "Probe a legacy store and emit candidate configs to $TMPDIR.",
+			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
+				"  -ssh-host pihole-zz-inbox \\\n" +
+				"  -remote-path blob_store",
+		},
+		{
+			Description: "Probe an age-encrypted store with a known private key.",
+			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
+				"  -ssh-host rsync.net \\\n" +
+				"  -remote-path Library/Madder \\\n" +
+				"  -key ~/.config/madder/keys/legacy.txt",
+		},
+		{
+			Description: "Auto-confirm every prompt for scripted runs (cron, CI).",
+			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
+				"  -ssh-host pihole-zz-inbox \\\n" +
+				"  -remote-path blob_store \\\n" +
+				"  -yes-to-all",
+		},
+	}
+}
+
+// GetSeeAlso wires the man-page SEE ALSO section.
+func (cmd SftpAnalyzeAndSuggestConfigs) GetSeeAlso() []string {
+	return []string{
+		"madder-init-sftp-explicit",
+		"madder-init-sftp-ssh_config",
+		"madder-info-repo",
+		"madder-fsck",
+		"blob-store",
 	}
 }
 
