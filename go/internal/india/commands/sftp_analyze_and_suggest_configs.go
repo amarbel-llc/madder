@@ -92,20 +92,20 @@ func (cmd SftpAnalyzeAndSuggestConfigs) GetExamples() []futility.Example {
 		{
 			Description: "Probe a legacy store and emit candidate configs to $TMPDIR.",
 			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
-				"  -ssh-host pihole-zz-inbox \\\n" +
+				"  -ssh-host my-host \\\n" +
 				"  -remote-path blob_store",
 		},
 		{
 			Description: "Probe an age-encrypted store with a known private key.",
 			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
-				"  -ssh-host rsync.net \\\n" +
+				"  -ssh-host my-host \\\n" +
 				"  -remote-path Library/Madder \\\n" +
 				"  -key ~/.config/madder/keys/legacy.txt",
 		},
 		{
 			Description: "Auto-confirm every prompt for scripted runs (cron, CI).",
 			Command: "madder sftp-analyze-and-suggest-configs \\\n" +
-				"  -ssh-host pihole-zz-inbox \\\n" +
+				"  -ssh-host my-host \\\n" +
 				"  -remote-path blob_store \\\n" +
 				"  -yes-to-all",
 		},

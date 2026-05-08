@@ -16,8 +16,7 @@ implementation issue will be filed when writing-plans runs)
 
 ## Problem
 
-The user has legacy SFTP blob stores (`pihole-zz-inbox:blob_store`,
-`rsync.net:Library/Madder`) created before the
+The user has legacy SFTP blob stores created before the
 `blob_store-config`-on-remote requirement landed. They follow the old
 single-hash directory layout (no `sha256/` or `blake2b256/` parent
 dirs) and may or may not be encrypted. The user has no surviving

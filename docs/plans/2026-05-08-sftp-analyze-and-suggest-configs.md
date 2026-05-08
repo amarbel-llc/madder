@@ -2324,21 +2324,20 @@ just test-bats-targets sftp_analyze_and_suggest_configs.bats
 All must pass. If any test fails, file the failure as a TODO and
 fix before merging.
 
-### Task F2: Smoke-test against the user's real legacy stores
+### Task F2: Smoke-test against real legacy stores
 
-NOTE: this step is optional — the user's real legacy stores live
-on remote infrastructure and may not be safe to probe from CI. If
-the user is around, ask them to run the command against
-`pihole-zz-inbox` and `rsync.net` themselves and confirm:
+NOTE: this step is optional — real legacy stores live on remote
+infrastructure and may not be safe to probe from CI. If the user
+is around, ask them to run the command against their hosts
+themselves and confirm:
 
 - Read-only invariant holds (no `blob_store-config` magically
   appears on either remote).
 - A candidate file is emitted that the user could plausibly
   bootstrap.
 
-Document the actual real-store outcomes in a follow-up
-`docs/plans/2026-05-08-sftp-analyze-and-suggest-configs-real-store-results.md`
-if the user wants a record.
+Document the actual real-store outcomes in a follow-up plan
+document if the user wants a record.
 
 ### Task F3: Merge
 
