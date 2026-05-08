@@ -454,9 +454,17 @@ function sftp_fsck_tap14_output { # @test
 }
 
 function sftp_fsck_json_reports_missing { # @test
-  # Mirrors fsck_json_reports_missing (fsck.bats) for SFTP. Delete
-  # the remote blob files (re-rooted under $BATS_TEST_TMPDIR by the
-  # test SFTP server) so AllBlobs sees the IDs but HasBlob fails.
+  # Mirrors fsck_json_reports_missing (fsck.bats) for SFTP. Truncate
+  # remote blob files so the on-disk path still exists (AllBlobs
+  # emits a per-blob JSON record) but read-and-verify yields a
+  # digest mismatch.
+  #
+  # Pre-#140 the test used find -delete; it passed for the wrong
+  # reason because the path-handling asymmetry meant the find ran
+  # against an absolute path while writes went to a
+  # relative-resolved path. find found nothing, the blobs stayed
+  # intact, and fsck verified them — the "store" substring matched
+  # the verified-success JSON shape too.
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -464,7 +472,8 @@ function sftp_fsck_json_reports_missing { # @test
   run_madder write .sftp-test "$blob"
   assert_success
 
-  find "$BATS_TEST_TMPDIR/sftp-remote" -type f -path '*/blake2b256/*' -delete 2>/dev/null || true
+  find "$BATS_TEST_TMPDIR/sftp-remote" -type f -path '*/blake2b256/*' \
+    -exec truncate -s 0 {} \; 2>/dev/null || true
 
   run_madder fsck -format json .sftp-test
   assert_output --partial '"store":'

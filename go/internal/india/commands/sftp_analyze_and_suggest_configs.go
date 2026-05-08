@@ -395,6 +395,10 @@ func (cmd SftpAnalyzeAndSuggestConfigs) validateRemotePath(
 // prefixes and returning up to cmd.limit blob samples buffered in
 // memory. Stops when limit is reached or 2*limit attempts have
 // failed (to bound work on sparse stores).
+//
+// For multi-hash stores the bucket tree lives under
+// <root>/<HashTypeId>/; basePath is adjusted accordingly and
+// relPath digest reconstruction strips the hash-type segment.
 func (cmd SftpAnalyzeAndSuggestConfigs) scatterSample(
 	sftpClient *sftp.Client,
 	root string,
@@ -402,9 +406,14 @@ func (cmd SftpAnalyzeAndSuggestConfigs) scatterSample(
 ) ([]sample, error) {
 	rng := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
 
-	topEntries, err := sftpClient.ReadDir(root)
+	basePath := root
+	if layout.MultiHash {
+		basePath = path.Join(root, layout.HashTypeId)
+	}
+
+	topEntries, err := sftpClient.ReadDir(basePath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "ReadDir %q", root)
+		return nil, errors.Wrapf(err, "ReadDir %q", basePath)
 	}
 
 	// Filter the top level to bucket-shaped directory entries.
@@ -421,13 +430,13 @@ func (cmd SftpAnalyzeAndSuggestConfigs) scatterSample(
 	}
 	if len(topBuckets) == 0 {
 		return nil, errors.Errorf(
-			"no bucket-shaped entries at %q; not a blob store?", root)
+			"no bucket-shaped entries at %q; not a blob store?", basePath)
 	}
 
 	out := make([]sample, 0, cmd.limit)
 	maxAttempts := 2 * cmd.limit
 	for attempts := 0; attempts < maxAttempts && len(out) < cmd.limit; attempts++ {
-		s, ok := cmd.tryOneSample(sftpClient, root, topBuckets, layout, rng)
+		s, ok := cmd.tryOneSample(sftpClient, basePath, topBuckets, layout, rng)
 		if !ok {
 			continue
 		}
@@ -650,7 +659,18 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 		return false, sftp_probe.Candidate{}
 	}
 
+	// Honor the existing config's hash type (sha256 vs blake2b256)
+	// rather than hardcoding sha256 — verification needs to compute
+	// the same hash the on-disk path was bucketed under.
 	hashFmt := blob_store_configs.DefaultHashType
+	if hashTyper, ok := typedConfig.Blob.(blob_store_configs.ConfigHashType); ok {
+		if got, err := markl.GetFormatHashOrError(
+			hashTyper.GetDefaultHashTypeId(),
+		); err == nil {
+			hashFmt = got
+		}
+	}
+
 	ioCfg := blob_io.MakeConfig(
 		hashFmt,
 		nil,

@@ -279,20 +279,24 @@ func (blobStore *remoteSftp) initialize() (err error) {
 
 	remotePath := blobStore.config.GetRemotePath()
 
-	// Create directory tree if it doesn't exist
+	// Create directory tree if it doesn't exist. Seed currentPath
+	// with "/" when the remote path is absolute so the walk
+	// preserves the leading slash (path.Join("", "tmp") drops it,
+	// which used to produce a relative-resolved location distinct
+	// from where blob_store-config and ReadDir/Stat-by-absolute
+	// look — see #140).
 	parts := strings.Split(remotePath, "/")
-	var currentPath string
+	currentPath := ""
+	if strings.HasPrefix(remotePath, "/") {
+		currentPath = "/"
+	}
 
 	for _, part := range parts {
 		if part == "" {
 			continue
 		}
 
-		if currentPath == "" && !strings.HasPrefix(remotePath, "/") {
-			currentPath = part
-		} else {
-			currentPath = path.Join(currentPath, part)
-		}
+		currentPath = path.Join(currentPath, part)
 
 		blobStore.uiPrinter.Printf("checking directory %q...", currentPath)
 		_, err = blobStore.sftpClient.Stat(currentPath)
@@ -353,7 +357,7 @@ func (blobStore *remoteSftp) remotePathForMerkleId(
 		merkleId,
 		blobStore.buckets,
 		blobStore.multiHash,
-		strings.TrimPrefix(blobStore.config.GetRemotePath(), "/"),
+		blobStore.config.GetRemotePath(),
 	)
 }
 
@@ -395,7 +399,7 @@ func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.Ma
 		return blobStore.allBlobsMultiHash()
 	}
 	return blobStore.allBlobsForBase(
-		strings.TrimPrefix(blobStore.config.GetRemotePath(), "/"),
+		blobStore.config.GetRemotePath(),
 		blobStore.defaultHashType,
 	)
 }
@@ -409,7 +413,7 @@ func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.Ma
 // fsck regression).
 func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_interfaces.MarklId] {
 	return func(yield func(domain_interfaces.MarklId, error) bool) {
-		basePath := strings.TrimPrefix(blobStore.config.GetRemotePath(), "/")
+		basePath := blobStore.config.GetRemotePath()
 
 		entries, err := blobStore.sftpClient.ReadDir(basePath)
 		if err != nil {
