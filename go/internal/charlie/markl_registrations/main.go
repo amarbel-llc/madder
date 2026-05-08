@@ -140,13 +140,18 @@ var (
 	}
 
 	PurposeRequestAuthChallengeV1Opts = markl.RegisterPurposeOpts{
-		Id:   markl.PurposeRequestAuthChallengeV1,
-		Type: markl.PurposeTypeRequestAuth,
+		Id:        markl.PurposeRequestAuthChallengeV1,
+		Type:      markl.PurposeTypeRequestAuth,
+		FormatIds: []string{markl.FormatIdNonceSec},
 	}
 
 	PurposeRequestAuthResponseV1Opts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeRequestAuthResponseV1,
 		Type: markl.PurposeTypeRequestAuth,
+		FormatIds: []string{
+			markl.FormatIdEd25519Sig,
+			markl.FormatIdEcdsaP256Sig,
+		},
 	}
 
 	PurposeRequestRepoSigV1Opts = markl.RegisterPurposeOpts{
