@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"io"
+	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	markl_io_alfa "github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -21,19 +22,25 @@ type SampleResult struct {
 	Err   error
 }
 
-// VerifySample feeds blobReader through candidate.IOConfig's reader
-// pipeline (decrypt → decompress → digest), compares the produced
-// hex digest to expectedDigestHex, and reports the verdict.
+// VerifySample feeds blobReader through candidate.IOConfig's
+// decrypt → decompress → digest pipeline and compares the produced
+// hex digest to expectedDigestHex.
 //
 // The function is pure: no SFTP, no filesystem, no global state.
 // The caller is responsible for buffering the reader if it needs
 // to be replayed against another candidate.
 //
-// Panics from any decode layer are recovered and converted to a
-// failure result with Stage=StageDecrypt — the deepest pipeline
-// layer that could plausibly panic on adversarial input. The
-// intent is robustness, not classification accuracy on malformed
-// blobs.
+// We compose the decrypter and decompressor directly rather than
+// going through blob_io.NewReader. NewReader has a defensive
+// identity-fallback when compression WrapReader errors; that
+// fallback masks wrong-compression failures as hash_mismatch and
+// would corrupt our failure-stage classification. The probe needs
+// strict pipeline behavior: a wrong compression candidate must
+// surface as StageDecompress, not as StageHashMismatch.
+//
+// Panics from any decode layer are recovered into a failure
+// result. Stage is StageDecrypt by default (the deepest layer
+// that could plausibly panic on adversarial input).
 func VerifySample(
 	blobReader io.Reader,
 	expectedDigestHex string,
@@ -49,31 +56,64 @@ func VerifySample(
 		}
 	}()
 
-	// blob_io.NewReader requires an io.ReadSeeker (the encryption
-	// fallback in newFileReaderFromReadSeeker uses Seek). Buffer
-	// the reader once so the pipeline can rewind if it needs to.
 	buf, err := io.ReadAll(blobReader)
 	if err != nil {
 		return SampleResult{Stage: StageDecrypt, Err: errors.Wrap(err)}
 	}
 
-	reader, err := blob_io.NewReader(candidate.IOConfig, bytes.NewReader(buf))
+	decrypter, err := candidate.IOConfig.GetBlobEncryption().WrapReader(
+		bytes.NewReader(buf),
+	)
 	if err != nil {
-		// Errors from NewReader come from the encryption WrapReader
-		// stage (decrypter init) or the compression WrapReader.
-		// Classification refines later as more cases land.
 		return SampleResult{Stage: StageDecrypt, Err: errors.Wrap(err)}
 	}
-	defer reader.Close()
 
-	if _, err := io.Copy(io.Discard, reader); err != nil {
+	expander, err := candidate.IOConfig.GetBlobCompression().WrapReader(decrypter)
+	if err != nil {
 		return SampleResult{Stage: StageDecompress, Err: errors.Wrap(err)}
 	}
 
-	gotHex := hex.EncodeToString(reader.GetMarklId().GetBytes())
+	hashFmt := candidate.IOConfig.GetHashFormat()
+	hash, repool := hashFmt.GetHash()
+	defer repool()
+
+	digester := markl_io_alfa.MakeWriter(hash, nil)
+
+	if _, err := io.Copy(digester, expander); err != nil {
+		// Distinguish "encryption layer wrong, ciphertext fed into
+		// decompressor" from "compression layer wrong on
+		// cleartext." age error chains mention "age" or "no
+		// identity matched"; everything else we treat as a
+		// decompression-stage failure.
+		if isAgeError(err) {
+			return SampleResult{Stage: StageDecrypt, Err: errors.Wrap(err)}
+		}
+		return SampleResult{Stage: StageDecompress, Err: errors.Wrap(err)}
+	}
+
+	id, repoolId := hash.GetMarklId()
+	defer repoolId()
+
+	gotHex := hex.EncodeToString(id.GetBytes())
 	if gotHex != expectedDigestHex {
 		return SampleResult{Stage: StageHashMismatch}
 	}
 
 	return SampleResult{Ok: true, Stage: StageOK}
+}
+
+// isAgeError walks the error chain looking for the age package's
+// signature error strings. The age library does not export a
+// stable error type for "no identity matched" — the markl
+// wrapper rewraps these and the easiest stable identifier is
+// substring matching on the message. Brittle but bounded: only
+// affects classification, not correctness.
+func isAgeError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "age") ||
+		strings.Contains(msg, "no identity matched") ||
+		strings.Contains(msg, "no identities")
 }

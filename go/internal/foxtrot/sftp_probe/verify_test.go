@@ -126,6 +126,87 @@ func candidateForCompressionAndKey(
 	return Candidate{IOConfig: cfg, Label: label}
 }
 
+// TestVerifySample_FailureClassification exercises rows 7-12 of
+// the design's failure table. Each row encodes via one (forward)
+// candidate and verifies via a different (mismatched) candidate;
+// the test asserts the verdict's Stage matches the expected
+// classification.
+//
+// Row 12 (forward zstd+age → verify none/none) is HashMismatch:
+// both wrappers in the verify candidate are identity, so the
+// age-encrypted bytes pass through unchanged and the digest
+// differs from the plaintext sha256. This is the same shape as
+// row 8 with extra forward layers — the verify candidate doesn't
+// actively try to decode, so no decode error fires.
+func TestVerifySample_FailureClassification(t *testing.T) {
+	plaintext := []byte("hello probe — non-trivial content for compression to do work")
+	digest := sha256.Sum256(plaintext)
+	expectedHex := hex.EncodeToString(digest[:])
+
+	keyA := generateAgeKeyForTest(t)
+	keyB := generateAgeKeyForTest(t)
+
+	type combo struct {
+		comp string
+		key  *markl.Id
+	}
+
+	cases := []struct {
+		name      string
+		forward   combo
+		candidate combo
+		wantStage Stage
+	}{
+		{"row7-zstd-as-gzip",
+			combo{"zstd", nil}, combo{"gzip", nil},
+			StageDecompress},
+		{"row8-zstd-as-none",
+			combo{"zstd", nil}, combo{"none", nil},
+			StageHashMismatch},
+		{"row9-ageK1-as-ageK2",
+			combo{"none", &keyA}, combo{"none", &keyB},
+			StageDecrypt},
+		{"row10-zstd-ageK1-as-zstd-ageK2",
+			combo{"zstd", &keyA}, combo{"zstd", &keyB},
+			StageDecrypt},
+		{"row11-plain-as-ageK1",
+			combo{"none", nil}, combo{"none", &keyA},
+			StageDecrypt},
+		{"row12-zstd-ageK1-as-none-none",
+			combo{"zstd", &keyA}, combo{"none", nil},
+			StageHashMismatch},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fwd := candidateForCompressionAndKey(t, tc.forward.comp, tc.forward.key)
+			c := candidateForCompressionAndKey(t, tc.candidate.comp, tc.candidate.key)
+
+			var encoded bytes.Buffer
+			w, err := blob_io.NewWriter(fwd.IOConfig, &encoded)
+			if err != nil {
+				t.Fatalf("NewWriter (forward): %v", err)
+			}
+			if _, err := w.Write(plaintext); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+			if err := w.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+
+			got := VerifySample(bytes.NewReader(encoded.Bytes()), expectedHex, c)
+			if got.Ok {
+				t.Fatalf("expected Ok=false; got %+v", got)
+			}
+
+			if got.Stage != tc.wantStage {
+				t.Errorf("Stage = %s, want %s (Err=%v)",
+					got.Stage, tc.wantStage, got.Err)
+			}
+		})
+	}
+}
+
 func TestVerifySample_AgeRoundTrip(t *testing.T) {
 	cleartext := []byte("hello age — encrypted blob bytes round-tripping through the pipeline")
 	digest := sha256.Sum256(cleartext)

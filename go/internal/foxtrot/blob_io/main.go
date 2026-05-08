@@ -51,6 +51,19 @@ type Config struct {
 	encryption  interfaces.IOWrapper
 }
 
+// GetHashFormat exposes the hash format Config was built with.
+// Used by sftp_probe.VerifySample to plug a digester into a
+// manually-composed reader chain that bypasses NewReader's
+// identity-fallback (which would mask wrong-compression failures
+// as hash mismatches and corrupt the probe's stage
+// classification).
+func (config Config) GetHashFormat() domain_interfaces.FormatHash {
+	if config.hashFormat == nil {
+		return blob_store_configs.DefaultHashType
+	}
+	return config.hashFormat
+}
+
 func (config Config) GetBlobCompression() interfaces.IOWrapper {
 	if config.compression == nil {
 		return defaultCompressionWrapper
