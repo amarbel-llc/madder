@@ -8,4 +8,5 @@ func init() {
 	p := Plugin{}
 	cutting_garden_plugins.MustRegisterCapture(p)
 	cutting_garden_plugins.MustRegisterRestore(p)
+	cutting_garden_plugins.MustRegisterDiff(p)
 }

@@ -18,12 +18,21 @@ type restoreRegistry struct {
 	plugins map[string]RestorePlugin
 }
 
+type diffRegistry struct {
+	mu      sync.RWMutex
+	plugins map[string]DiffPlugin
+}
+
 func newCaptureRegistry() *captureRegistry {
 	return &captureRegistry{plugins: map[string]CapturePlugin{}}
 }
 
 func newRestoreRegistry() *restoreRegistry {
 	return &restoreRegistry{plugins: map[string]RestorePlugin{}}
+}
+
+func newDiffRegistry() *diffRegistry {
+	return &diffRegistry{plugins: map[string]DiffPlugin{}}
 }
 
 func (r *captureRegistry) register(scheme string, p CapturePlugin) error {
@@ -66,9 +75,30 @@ func (r *restoreRegistry) resolve(scheme string) (RestorePlugin, error) {
 	return p, nil
 }
 
+func (r *diffRegistry) register(scheme string, p DiffPlugin) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.plugins[scheme]; ok {
+		return errors.Errorf("%w: diff %q", ErrAlreadyRegistered, scheme)
+	}
+	r.plugins[scheme] = p
+	return nil
+}
+
+func (r *diffRegistry) resolve(scheme string) (DiffPlugin, error) {
+	r.mu.RLock()
+	p, ok := r.plugins[scheme]
+	r.mu.RUnlock()
+	if !ok {
+		return nil, errors.Errorf("%w: diff %q", ErrUnknownScheme, scheme)
+	}
+	return p, nil
+}
+
 var (
 	defaultCaptureRegistry = newCaptureRegistry()
 	defaultRestoreRegistry = newRestoreRegistry()
+	defaultDiffRegistry    = newDiffRegistry()
 )
 
 // MustRegisterCapture installs p in the default capture registry
@@ -103,4 +133,19 @@ func ResolveCapture(scheme string) (CapturePlugin, error) {
 // ResolveCapture.
 func ResolveRestore(scheme string) (RestorePlugin, error) {
 	return defaultRestoreRegistry.resolve(scheme)
+}
+
+// MustRegisterDiff is the diff-direction analogue of
+// MustRegisterCapture.
+func MustRegisterDiff(p DiffPlugin) {
+	for _, s := range p.Schemes() {
+		if err := defaultDiffRegistry.register(s, p); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// ResolveDiff is the diff-direction analogue of ResolveCapture.
+func ResolveDiff(scheme string) (DiffPlugin, error) {
+	return defaultDiffRegistry.resolve(scheme)
 }

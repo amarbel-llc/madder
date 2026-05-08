@@ -2,20 +2,18 @@ package commands_cutting_garden
 
 import (
 	"fmt"
-	"io"
-	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugin_file"
+	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -150,9 +148,14 @@ func (cmd *Diff) Run(req futility.Request) {
 func (cmd *Diff) runDiff(
 	envBlobStore command_components.BlobStoreEnv,
 	receiptIdStr string,
-	dir string,
+	dirStr string,
 ) error {
-	if err := assertDirectoryExists(dir); err != nil {
+	dirURL, plugin, err := resolveDiffPlugin(dirStr)
+	if err != nil {
+		return err
+	}
+
+	if err := plugin.ValidateDiffDir(dirURL, dirStr); err != nil {
 		return err
 	}
 
@@ -163,7 +166,7 @@ func (cmd *Diff) runDiff(
 		)
 	}
 
-	blob, _, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
+	blob, typeTag, err := readReceiptBlob(envBlobStore, &receiptId, cmd.Store)
 	if err != nil {
 		return err
 	}
@@ -175,8 +178,15 @@ func (cmd *Diff) runDiff(
 			&receiptId, blob)
 	}
 
-	if err := cutting_garden_plugin_file.ValidateEntries(v1.Entries, dir); err != nil {
-		return err
+	// TODO(#144) cross-scheme diffs. Same constraint as restore:
+	// today the receipt's type-tag must match the dir plugin's
+	// TypeTag(). When cross-scheme restore is allowed, diff should
+	// follow the same rule.
+	if typeTag.StringSansOp() != plugin.TypeTag() {
+		return errors.ErrorWithStackf(
+			"receipt %s: type-tag %q cannot be diffed against scheme %q (plugin tag %q); cross-scheme diff is not supported",
+			&receiptId, typeTag.StringSansOp(), dirURL.Scheme, plugin.TypeTag(),
+		)
 	}
 
 	sourceStore, err := resolveMaterializationStore(
@@ -190,7 +200,12 @@ func (cmd *Diff) runDiff(
 		sourceStore.GetDefaultHashType(),
 	)
 
-	diskEntries, walkErr := walkForDiff(discardStore, dir)
+	diskEntries, walkErr := plugin.ScanForDiff(cutting_garden_plugins.DiffScanRequest{
+		Dir:            dirURL,
+		RawDir:         dirStr,
+		BlobStore:      discardStore,
+		ReceiptEntries: v1.Entries,
+	})
 	if walkErr != nil {
 		return walkErr
 	}
@@ -257,153 +272,21 @@ func probeMissingBlobs(
 	return missing, nil
 }
 
-func assertDirectoryExists(dir string) error {
-	info, err := os.Lstat(dir)
+// resolveDiffPlugin parses dirStr as a URL and looks up the diff
+// plugin registered for its scheme. Schemeless dirs resolve to the
+// file plugin's `""` registration.
+func resolveDiffPlugin(
+	dirStr string,
+) (*url.URL, cutting_garden_plugins.DiffPlugin, error) {
+	u, err := url.Parse(dirStr)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return errors.ErrorWithStackf(
-				"%s: directory does not exist\n"+
-					"hint: pass an existing directory; diff does not " +
-					"materialize anything",
-				dir,
-			)
-		}
-		return errors.Wrapf(err, "stat %q", dir)
+		return nil, nil, errors.Wrapf(err, "parse dir %q", dirStr)
 	}
-	if !info.IsDir() {
-		return errors.ErrorWithStackf(
-			"%s: not a directory (mode %s)", dir, info.Mode(),
-		)
-	}
-	return nil
-}
-
-// walkForDiff walks dir with filepath.WalkDir (lstat-based, no symlink
-// follow — same rule as capture.walkRoot at capture.go:485) and emits
-// one EntryV1 per visited path. Regular files are streamed through
-// store.MakeBlobWriter so their blob-ids are computed under the
-// store's hash family. Returns an aggregate error when the walk itself
-// fails or when one or more per-entry failures occur. Per-entry
-// failures are appended to the error message; this matches diff's
-// "first reportable problem aborts" semantics — diff is read-only, so
-// a partial walk has no recovery story.
-func walkForDiff(
-	store blob_stores.BlobStoreInitialized,
-	dir string,
-) (entries []capture_receipt.EntryV1, err error) {
-	var perEntryFailures []string
-
-	walkErr := filepath.WalkDir(dir, func(p string, d fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			perEntryFailures = append(perEntryFailures,
-				fmt.Sprintf("%s: %v", p, walkErr))
-			if d != nil && d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		info, err := d.Info()
-		if err != nil {
-			perEntryFailures = append(perEntryFailures,
-				fmt.Sprintf("%s: %v", p, err))
-			if d.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		rel, err := filepath.Rel(dir, p)
-		if err != nil {
-			perEntryFailures = append(perEntryFailures,
-				fmt.Sprintf("%s: %v", p, err))
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-
-		mode := info.Mode()
-		entry := capture_receipt.EntryV1{
-			Path: rel,
-			Root: dir,
-			Mode: mode,
-		}
-
-		switch {
-		case mode&fs.ModeSymlink != 0:
-			target, err := os.Readlink(p)
-			if err != nil {
-				perEntryFailures = append(perEntryFailures,
-					fmt.Sprintf("%s: %v", p, err))
-				return nil
-			}
-			entry.Type = capture_receipt.TypeSymlink
-			entry.Target = target
-
-		case mode.IsDir():
-			entry.Type = capture_receipt.TypeDir
-
-		case mode.IsRegular():
-			id, size, err := hashFileViaStore(store, p)
-			if err != nil {
-				perEntryFailures = append(perEntryFailures,
-					fmt.Sprintf("%s: %v", p, err))
-				return nil
-			}
-			entry.Type = capture_receipt.TypeFile
-			entry.Size = size
-			entry.BlobId = id.String()
-
-		default:
-			entry.Type = capture_receipt.TypeOther
-		}
-
-		entries = append(entries, entry)
-		return nil
-	})
-
-	if walkErr != nil {
-		return nil, errors.Wrapf(walkErr, "walk %q", dir)
-	}
-	if len(perEntryFailures) > 0 {
-		return nil, errors.ErrorWithStackf(
-			"%d entry walk failures:\n  %s",
-			len(perEntryFailures),
-			joinLines(perEntryFailures),
-		)
-	}
-
-	return entries, nil
-}
-
-// hashFileViaStore is the discard-store analogue of capture.go's
-// writeFileBlob — same shape, same MakeBlobWriter call, but the
-// underlying store sends bytes to io.Discard. Only the digester half
-// of the chain matters for diff.
-func hashFileViaStore(
-	store blob_stores.BlobStoreInitialized,
-	srcPath string,
-) (id domain_interfaces.MarklId, size int64, err error) {
-	src, err := os.Open(srcPath)
+	plugin, err := cutting_garden_plugins.ResolveDiff(u.Scheme)
 	if err != nil {
-		err = errors.Wrap(err)
-		return
+		return nil, nil, err
 	}
-	defer errors.DeferredCloser(&err, src)
-
-	wc, err := store.MakeBlobWriter(nil)
-	if err != nil {
-		err = errors.Wrap(err)
-		return
-	}
-	defer errors.DeferredCloser(&err, wc)
-
-	if size, err = io.Copy(wc, src); err != nil {
-		err = errors.Wrap(err)
-		return
-	}
-
-	id = wc.GetMarklId()
-	return
+	return u, plugin, nil
 }
 
 // compareEntries computes the per-path symmetric difference between
@@ -531,17 +414,6 @@ func perTypeDiffs(
 		// honest answer.
 	}
 
-	return out
-}
-
-func joinLines(lines []string) string {
-	out := ""
-	for i, l := range lines {
-		if i > 0 {
-			out += "\n  "
-		}
-		out += l
-	}
 	return out
 }
 

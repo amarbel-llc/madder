@@ -28,6 +28,7 @@ type Plugin struct{}
 var (
 	_ cutting_garden_plugins.CapturePlugin = (*Plugin)(nil)
 	_ cutting_garden_plugins.RestorePlugin = (*Plugin)(nil)
+	_ cutting_garden_plugins.DiffPlugin    = (*Plugin)(nil)
 )
 
 // Schemes returns "" (schemeless default) and "file" (explicit
@@ -102,6 +103,33 @@ func (Plugin) Restore(
 	}
 
 	return materializeEntries(req.BlobStore, req.Entries, path)
+}
+
+// ValidateDiffDir enforces that the diff dir resolves to an existing
+// directory on disk.
+func (Plugin) ValidateDiffDir(dir *url.URL, raw string) error {
+	path, err := pathFromURL(dir)
+	if err != nil {
+		return err
+	}
+	return assertDirectoryExists(path)
+}
+
+// ScanForDiff validates the receipt's entries against the diff dir
+// boundary, then walks the dir with filepath.WalkDir and returns
+// EntryV1 records with computed blob-ids. Per-entry failures
+// aggregate into the returned error — diff is read-only and atomic.
+func (Plugin) ScanForDiff(
+	req cutting_garden_plugins.DiffScanRequest,
+) ([]capture_receipt.EntryV1, error) {
+	path, err := pathFromURL(req.Dir)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateEntries(req.ReceiptEntries, path); err != nil {
+		return nil, err
+	}
+	return walkForDiff(req.BlobStore, path)
 }
 
 // walkRoot, writeFileBlob: previously inline in
@@ -354,6 +382,165 @@ func materializeEntries(
 	}
 
 	return nil
+}
+
+// assertDirectoryExists is the diff-side precondition: the dir must
+// already exist on disk and be a directory. Diff is read-only — it
+// does not materialize anything — so a missing directory is the
+// caller's mistake, not a step diff should perform.
+func assertDirectoryExists(dir string) error {
+	info, err := os.Lstat(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return errors.ErrorWithStackf(
+				"%s: directory does not exist\n"+
+					"hint: pass an existing directory; diff does not "+
+					"materialize anything",
+				dir,
+			)
+		}
+		return errors.Wrapf(err, "stat %q", dir)
+	}
+	if !info.IsDir() {
+		return errors.ErrorWithStackf(
+			"%s: not a directory (mode %s)", dir, info.Mode(),
+		)
+	}
+	return nil
+}
+
+// walkForDiff is the read-only analogue of walkRoot: same WalkDir
+// loop, same per-type entry shaping, but errors aggregate into a
+// single error (no streaming sink) and blobs are computed via the
+// caller's discard-store wrapper rather than written for real.
+func walkForDiff(
+	store blob_stores.BlobStoreInitialized,
+	dir string,
+) (entries []capture_receipt.EntryV1, err error) {
+	var perEntryFailures []string
+
+	walkErr := filepath.WalkDir(dir, func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			perEntryFailures = append(perEntryFailures,
+				fmt.Sprintf("%s: %v", p, walkErr))
+			if d != nil && d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			perEntryFailures = append(perEntryFailures,
+				fmt.Sprintf("%s: %v", p, err))
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		rel, err := filepath.Rel(dir, p)
+		if err != nil {
+			perEntryFailures = append(perEntryFailures,
+				fmt.Sprintf("%s: %v", p, err))
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+
+		mode := info.Mode()
+		entry := capture_receipt.EntryV1{
+			Path: rel,
+			Root: dir,
+			Mode: mode,
+		}
+
+		switch {
+		case mode&fs.ModeSymlink != 0:
+			target, err := os.Readlink(p)
+			if err != nil {
+				perEntryFailures = append(perEntryFailures,
+					fmt.Sprintf("%s: %v", p, err))
+				return nil
+			}
+			entry.Type = capture_receipt.TypeSymlink
+			entry.Target = target
+
+		case mode.IsDir():
+			entry.Type = capture_receipt.TypeDir
+
+		case mode.IsRegular():
+			id, size, err := hashFileViaStore(store, p)
+			if err != nil {
+				perEntryFailures = append(perEntryFailures,
+					fmt.Sprintf("%s: %v", p, err))
+				return nil
+			}
+			entry.Type = capture_receipt.TypeFile
+			entry.Size = size
+			entry.BlobId = id.String()
+
+		default:
+			entry.Type = capture_receipt.TypeOther
+		}
+
+		entries = append(entries, entry)
+		return nil
+	})
+
+	if walkErr != nil {
+		return nil, errors.Wrapf(walkErr, "walk %q", dir)
+	}
+	if len(perEntryFailures) > 0 {
+		return nil, errors.ErrorWithStackf(
+			"%d entry walk failures:\n  %s",
+			len(perEntryFailures),
+			joinDiffFailures(perEntryFailures),
+		)
+	}
+
+	return entries, nil
+}
+
+// hashFileViaStore is the discard-store analogue of writeFileBlob —
+// same shape, same MakeBlobWriter call, but the underlying store
+// sends bytes to io.Discard. Only the digester half of the chain
+// matters for diff.
+func hashFileViaStore(
+	store blob_stores.BlobStoreInitialized,
+	srcPath string,
+) (id domain_interfaces.MarklId, size int64, err error) {
+	src, err := os.Open(srcPath)
+	if err != nil {
+		err = errors.Wrap(err)
+		return
+	}
+	defer errors.DeferredCloser(&err, src)
+
+	wc, err := store.MakeBlobWriter(nil)
+	if err != nil {
+		err = errors.Wrap(err)
+		return
+	}
+	defer errors.DeferredCloser(&err, wc)
+
+	if size, err = io.Copy(wc, src); err != nil {
+		err = errors.Wrap(err)
+		return
+	}
+
+	id = wc.GetMarklId()
+	return
+}
+
+func joinDiffFailures(lines []string) string {
+	out := ""
+	for i, l := range lines {
+		if i > 0 {
+			out += "\n  "
+		}
+		out += l
+	}
+	return out
 }
 
 func materializeFile(

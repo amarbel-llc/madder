@@ -88,3 +88,38 @@ type RestorePlugin interface {
 
 	Restore(req RestoreRequest) error
 }
+
+// DiffScanRequest is what a DiffPlugin needs to enumerate the
+// current state at Dir and return entries that can be compared
+// against ReceiptEntries. The plugin computes blob-ids using
+// BlobStore (typically a discard-store wrapping the receipt's
+// source store, so only the hash family matters). ReceiptEntries
+// is provided so the plugin can run its own pre-walk validation
+// (path sanitization etc.) before any I/O — diff is read-only and
+// atomic.
+type DiffScanRequest struct {
+	Dir            *url.URL
+	RawDir         string
+	BlobStore      blob_stores.BlobStoreInitialized
+	ReceiptEntries []capture_receipt.EntryV1
+}
+
+// DiffPlugin enumerates the current state at a location and returns
+// entries in the same shape a CapturePlugin would produce, suitable
+// for comparison against a receipt. Plugins MAY support diff without
+// supporting capture or restore (e.g. a read-only HTTP listing
+// plugin) or vice versa.
+type DiffPlugin interface {
+	Plugin
+
+	// ValidateDiffDir is called before any I/O. Returns nil if dir
+	// is acceptable, or an error to surface to the caller. raw is
+	// the original CLI argument.
+	ValidateDiffDir(dir *url.URL, raw string) error
+
+	// ScanForDiff walks/lists the location and returns entries with
+	// computed blob-ids. Per-entry failures aggregate into the
+	// returned error (diff is read-only and atomic — no streaming
+	// sink).
+	ScanForDiff(req DiffScanRequest) ([]capture_receipt.EntryV1, error)
+}
