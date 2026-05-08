@@ -282,6 +282,21 @@ let
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
   };
+
+  # Devshell-only fixture binary used by bats to materialize
+  # legacy-shaped blob bytes for sftp-analyze-and-suggest-configs
+  # tests. Same NOT-shipped policy as madder-test-sftp-server: the
+  # binary is purely a test fixture.
+  madder-test-craft-legacy-blob = pkgs.buildGoApplication {
+    pname = "madder-test-craft-legacy-blob";
+    version = "0.0.0";
+    src = ./.;
+    pwd = ./.;
+    subPackages = [ "cmd/madder-test-craft-legacy-blob" ];
+    modules = ./gomod2nix.toml;
+    go = pkgs-master.go_1_26;
+    GOTOOLCHAIN = "local";
+  };
 in
 {
   packages = {
@@ -296,6 +311,7 @@ in
       bob.packages.${system}.batman
       purse-first.packages.${system}.dagnabit
       madder-test-sftp-server
+      madder-test-craft-legacy-blob
     ]
     ++ (with pkgs-master; [
       delve
