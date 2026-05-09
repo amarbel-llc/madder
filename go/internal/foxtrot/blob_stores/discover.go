@@ -167,6 +167,26 @@ func discoverBucketDepth(
 	}
 }
 
+// configFromDiscoveredConfig translates a DiscoveredConfig into a
+// DefaultType ready for hyphence-encoding to the remote. Pure
+// function so it's directly unit-testable.
+//
+// SingleHash propagates as the inverse of MultiHash. Without this,
+// init-sftp-explicit -discover writes a multi-hash=true config for
+// legacy single-hash stores and downstream reads (fsck, info-repo,
+// sync) walk the wrong shape and fail. See #149.
+func configFromDiscoveredConfig(
+	discovered DiscoveredConfig,
+) *blob_store_configs.DefaultType {
+	return &blob_store_configs.DefaultType{
+		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
+		HashBuckets:     discovered.Buckets,
+		CompressionType: "zstd",
+		Encryption:      discovered.Encryption,
+		SingleHash:      !discovered.MultiHash,
+	}
+}
+
 func WriteRemoteConfig(
 	sftpClient *sftp.Client,
 	remotePath string,
@@ -189,12 +209,7 @@ func WriteRemoteConfig(
 		return err
 	}
 
-	config := &blob_store_configs.DefaultType{
-		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
-		HashBuckets:     discovered.Buckets,
-		CompressionType: "zstd",
-		Encryption:      discovered.Encryption,
-	}
+	config := configFromDiscoveredConfig(discovered)
 
 	typedConfig := &hyphence.TypedBlob[blob_store_configs.Config]{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
