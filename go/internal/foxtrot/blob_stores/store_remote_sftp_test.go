@@ -233,3 +233,37 @@ func (c *spyActiveContext) Must(_ interfaces.FuncActiveContext)    {}
 // only as type evidence; the methods above implement the interface
 // without delegating to a real context.Context.
 var _ context.Context = (*spyActiveContext)(nil)
+
+// TestShouldSkipBlobWalkEntry pins #148: the blob walker must skip
+// blob_store-config and tmp_* entries so they're not yielded as
+// fake blobs and parsed as hex digests. The bug surfaced for
+// single-hash stores where the walker iterates <root> directly and
+// the config file is a sibling of bucket dirs.
+func TestShouldSkipBlobWalkEntry(t *testing.T) {
+	cases := []struct {
+		name string
+		want bool
+	}{
+		{"blob_store-config", true},
+		{"tmp_abcdef", true},
+		{"tmp_", true},
+		// Real blob filenames (62 hex chars after a 2-char bucket;
+		// trailing 62 chars are the leaf in a buckets=[2] layout)
+		// must NOT be skipped.
+		{"abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", false},
+		{"00", false},
+		// Edge cases that look adjacent but are not the targeted
+		// names.
+		{"blob_store-config.bak", false},
+		{"tmp", false}, // no trailing _
+		{"", false},
+	}
+
+	for _, tc := range cases {
+		got := shouldSkipBlobWalkEntry(tc.name)
+		if got != tc.want {
+			t.Errorf("shouldSkipBlobWalkEntry(%q) = %v, want %v",
+				tc.name, got, tc.want)
+		}
+	}
+}

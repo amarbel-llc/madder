@@ -451,6 +451,17 @@ func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_inte
 
 // allBlobsForBase walks `basePath` and yields a markl id reconstructed
 // from each leaf path, using `hashType` as the format. Caller is
+// shouldSkipBlobWalkEntry returns true when the named entry is not a
+// blob file and the bucket-tree walker should ignore it. Filters
+// out the `blob_store-config` sibling and `tmp_*` upload artifacts
+// the walker would otherwise yield as fake blobs and try to parse
+// as hex digests. The bug surfaced for single-hash stores where the
+// walker iterates `<root>` directly. Closes #148.
+func shouldSkipBlobWalkEntry(name string) bool {
+	return name == directory_layout.FileNameBlobStoreConfig ||
+		strings.HasPrefix(name, "tmp_")
+}
+
 // responsible for choosing a basePath that does NOT contain the
 // format-id segment — see allBlobsMultiHash. The walker yields paths
 // relative to the SFTP server root (no leading `/`), so we re-base
@@ -474,6 +485,10 @@ func (blobStore *remoteSftp) allBlobsForBase(
 			}
 
 			if walker.Stat().IsDir() {
+				continue
+			}
+
+			if shouldSkipBlobWalkEntry(filepath.Base(walker.Path())) {
 				continue
 			}
 
