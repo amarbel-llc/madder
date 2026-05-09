@@ -469,6 +469,12 @@ func (cmd *Init) ensureRemoteConfigExists(
 			HashTypeId: string(blob_store_configs.HashTypeDefault),
 			Buckets:    blob_store_configs.DefaultHashBuckets,
 			Encryption: cmd.encryption,
+			// Fresh stores created by init-sftp-explicit are modern
+			// multi-hash stores. Without this, #149's WriteRemoteConfig
+			// fix would translate the zero-value MultiHash=false into
+			// SingleHash=true and fresh stores would be stamped as
+			// legacy single-hash.
+			MultiHash: true,
 		},
 		printer,
 	); err != nil {
