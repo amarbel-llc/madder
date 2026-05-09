@@ -29,6 +29,7 @@ var (
 	MakeSSHAgent                   = internal.MakeSSHAgent
 	MakeSSHClientForExplicitConfig = internal.MakeSSHClientForExplicitConfig
 	MakeSSHClientFromSSHConfig     = internal.MakeSSHClientFromSSHConfig
+	NewDiscardBlobStore            = internal.NewDiscardBlobStore
 	NopDeletionPrecondition        = internal.NopDeletionPrecondition
 	VerifyBlob                     = internal.VerifyBlob
 	WriteRemoteConfig              = internal.WriteRemoteConfig
