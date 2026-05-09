@@ -68,9 +68,9 @@ function capture_simple_dir { # @test
   echo "$output" | grep -q '"path":"a.txt"' || fail "missing a.txt: $output"
   echo "$output" | grep -q '"path":"b.txt"' || fail "missing b.txt: $output"
   echo "$output" | grep -q '"path":"sub/c.txt"' || fail "missing sub/c.txt: $output"
-  echo "$output" | grep -q '"path":"sub","root":"tree","type":"dir"' ||
+  echo "$output" | grep -q '"path":"sub","root":".","type":"dir"' ||
     fail "missing sub dir entry: $output"
-  echo "$output" | grep -q '"path":".","root":"tree","type":"dir"' ||
+  echo "$output" | grep -q '"path":".","root":".","type":"dir"' ||
     fail "missing root dir entry: $output"
 }
 
@@ -92,7 +92,7 @@ function capture_records_symlink_target { # @test
   run_madder cat "$rid"
   assert_success
 
-  echo "$output" | grep -q '"path":"link.txt","root":"tree","type":"symlink".*"target":"real.txt"' ||
+  echo "$output" | grep -q '"path":"link.txt","root":".","type":"symlink".*"target":"real.txt"' ||
     fail "symlink entry missing or wrong shape: $output"
 }
 

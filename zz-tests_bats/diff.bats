@@ -189,12 +189,12 @@ function diff_detects_deleted_file { # @test
   run_cg restore "$rid" out
   assert_success
 
-  rm out/src/b.txt
+  rm out/b.txt
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^D  src/b.txt' ||
-    fail "expected 'D  src/b.txt' line: $output"
+  echo "$output" | grep -qE '^D  b.txt' ||
+    fail "expected 'D  b.txt' line: $output"
 }
 
 function diff_detects_modified_file_content { # @test
@@ -209,12 +209,12 @@ function diff_detects_modified_file_content { # @test
   run_cg restore "$rid" out
   assert_success
 
-  echo "modified" >out/src/file.txt
+  echo "modified" >out/file.txt
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  src/file.txt.*blob ' ||
-    fail "expected 'M  src/file.txt  blob ...' line: $output"
+  echo "$output" | grep -qE '^M  file.txt.*blob ' ||
+    fail "expected 'M  file.txt  blob ...' line: $output"
 }
 
 function diff_detects_modified_file_mode { # @test
@@ -230,12 +230,12 @@ function diff_detects_modified_file_mode { # @test
   run_cg restore "$rid" out
   assert_success
 
-  chmod 0600 out/src/file.txt
+  chmod 0600 out/file.txt
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  src/file.txt.*mode ' ||
-    fail "expected 'M  src/file.txt  mode ...' line: $output"
+  echo "$output" | grep -qE '^M  file.txt.*mode ' ||
+    fail "expected 'M  file.txt  mode ...' line: $output"
 }
 
 function diff_detects_type_change { # @test
@@ -253,13 +253,13 @@ function diff_detects_type_change { # @test
   run_cg restore "$rid" out
   assert_success
 
-  rm out/src/file
-  ln -s other out/src/file
+  rm out/file
+  ln -s other out/file
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^T  src/file.*file -> symlink' ||
-    fail "expected 'T  src/file  file -> symlink' line: $output"
+  echo "$output" | grep -qE '^T  file.*file -> symlink' ||
+    fail "expected 'T  file  file -> symlink' line: $output"
 }
 
 function diff_detects_symlink_target_change { # @test
@@ -276,13 +276,13 @@ function diff_detects_symlink_target_change { # @test
   run_cg restore "$rid" out
   assert_success
 
-  rm out/src/link
-  ln -s b.txt out/src/link
+  rm out/link
+  ln -s b.txt out/link
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  src/link.*target.*a.txt.*->.*b.txt' ||
-    fail "expected 'M  src/link  target ...' line: $output"
+  echo "$output" | grep -qE '^M  link.*target.*a.txt.*->.*b.txt' ||
+    fail "expected 'M  link  target ...' line: $output"
 }
 
 # Phase D: -verify-blobs-exist (receipt-vs-store check).
@@ -394,18 +394,70 @@ function diff_reports_multiple_differences_sorted_by_path { # @test
   run_cg restore "$rid" out
   assert_success
 
-  echo "modified" >out/src/a.txt   # M  src/a.txt
-  rm out/src/b.txt                 # D  src/b.txt
+  echo "modified" >out/a.txt       # M  a.txt
+  rm out/b.txt                     # D  b.txt
   echo "extra" >out/extra.txt      # A  extra.txt
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  src/a.txt.*blob ' ||
-    fail "expected M src/a.txt: $output"
-  echo "$output" | grep -qE '^D  src/b.txt' ||
-    fail "expected D src/b.txt: $output"
+  echo "$output" | grep -qE '^M  a.txt.*blob ' ||
+    fail "expected M a.txt: $output"
+  echo "$output" | grep -qE '^D  b.txt' ||
+    fail "expected D b.txt: $output"
   echo "$output" | grep -qE '^A  extra.txt' ||
     fail "expected A extra.txt: $output"
   echo "$output" | grep -qF 'tree differs from receipt: 3 entries' ||
     fail "expected '3 entries' summary: $output"
+}
+
+# Phase E: capture-diff symmetry.
+#
+# `cg capture <dir>` and `cg diff <rid> <dir>` should be symmetric:
+# the same <dir> argument that produced the receipt should diff
+# clean against it. Today this is not the case — the receipt records
+# entries with Root=<dir> and Path=<rel-to-dir>, so diff keys via
+# filepath.Join(Root, Path) end up one level deeper than the disk
+# walk of <dir> produces. These tests pin the desired symmetric
+# behavior; they currently fail.
+
+function diff_is_clean_against_originally_captured_dir { # @test
+  # capture src → diff $rid src → expected: no differences, exit 0.
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+  mkdir -p src/inner
+  echo "nested" >src/inner/n.txt
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg diff "$rid" src
+  assert_success
+  refute_line --regexp '^[MADT]  '
+}
+
+function diff_is_clean_when_run_from_captured_dir_with_dot { # @test
+  # capture src; cd src; diff $rid . → expected: no differences, exit 0.
+  # Blocked on amarbel-llc/madder#145 (CWD-relative blob_stores
+  # discovery doesn't walk up to ancestor `.madder/`). Re-enable
+  # once #145 lands.
+  skip "blocked on #145 (subdir store discovery)"
+
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+  mkdir -p src/inner
+  echo "nested" >src/inner/n.txt
+
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  cd src
+  run_cg diff "$rid" .
+  assert_success
+  refute_line --regexp '^[MADT]  '
 }

@@ -99,6 +99,15 @@ The body's NDJSON schema is unchanged from `capture-receipt(7)`. Producers MUST 
 
 A producer that needs to record fields not specified in the v1 schema (for example, mtime or owner/group) MUST allocate a new type (`cutting_garden-capture_receipt-fs-v2`, etc.) rather than extending v1.
 
+#### Root Encoding
+
+The `root` field in each entry serves two purposes: disambiguating top-level subtrees in multi-root receipts (see Multi-Root Receipts) and offsetting the materialization layout under `dest`. A producer SHOULD encode `root` according to the cardinality of capture-roots in the same store-group:
+
+- **Single-root group** (one positional capture-root in the group): the producer SHOULD set `root` to `"."` on every entry. The materialization rule `filepath.Clean(filepath.Join(dest, ".", e.path))` then collapses to `dest/<path>` without an extra prefix component, and `cutting-garden diff <rid> <dir>` becomes symmetric with the original `cutting-garden capture <dir>` argument: pointing diff at the originally-captured directory matches the receipt cleanly without an intermediate `restore`.
+- **Multi-root group** (two or more positional capture-roots in the group): the producer MUST set `root` to a distinct, `filepath.Clean`-normalized form of each capture-root argument, per Multi-Root Receipts. There is no symmetric single-`<dir>` form for multi-root diffs against any individual root; the symmetric `<dir>` is the capture-time PWD that contained all roots.
+
+This SHOULD applies to new captures only. Existing receipts on disk may carry `root=<rootArg>` for single-root captures (the pre-symmetry convention) and remain valid V1 receipts: their materialization rule still produces a well-defined layout (`dest/<rootArg>/<path>`), and consumers MUST NOT reject them. The wire format is unchanged.
+
 ### Consumer Rules
 
 #### Destination Preconditions
@@ -153,26 +162,26 @@ The intent is that a single-machine restore from the same store the receipt was 
 
 ### Multi-Root Receipts
 
-A receipt MAY contain entries from multiple positional roots when a single store-group capture has multiple top-level directory arguments. Each distinct value of `e.root` materializes as a top-level subdirectory under `dest`, after Path Sanitization.
+A receipt MAY contain entries from multiple positional roots when a single store-group capture has multiple top-level directory arguments. Each distinct value of `e.root` materializes as a top-level subdirectory under `dest`, after Path Sanitization. This is the multi-root case of Root Encoding; the single-root case collapses `root` to `"."` and produces no per-root prefix.
 
 Consumers MUST NOT re-canonicalize `e.root` beyond what `filepath.Clean(filepath.Join(dest, e.root, e.path))` provides. Producer-side Root Collision Detection guarantees that no two distinct values of `e.root` within a single receipt resolve to the same path under `filepath.Clean`, so consumers can rely on root-distinctness as a structural invariant.
 
 ## Examples
 
-### Valid Receipt with Store Hint
+### Valid Receipt with Store Hint (single-root)
 
-A receipt for two files under `src/` captured into store `.work` (whose `toml-blob_store_config-v3` blob has markl-id `blake2b256-9ft3m74l5t2ppwjrvfg3wp3…`):
+A receipt for two files captured by `cutting-garden capture src` into store `.work` (whose `toml-blob_store_config-v3` blob has markl-id `blake2b256-9ft3m74l5t2ppwjrvfg3wp3…`). Per Root Encoding, `root` is `"."` because the capture group has one positional root:
 
     ---
     - store/.work < blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd
     ! cutting_garden-capture_receipt-fs-v1
     ---
 
-    {"path":".","root":"src","type":"dir","mode":"0755"}
-    {"path":"main.go","root":"src","type":"file","mode":"0644","size":482,"blob_id":"blake2b256-9ft3m74l5t2ppwjrvfg3wp3…"}
-    {"path":"go.mod","root":"src","type":"file","mode":"0644","size":92,"blob_id":"blake2b256-pwjrvfg3wp380jqj2zfrm6z…"}
+    {"path":".","root":".","type":"dir","mode":"0755"}
+    {"path":"go.mod","root":".","type":"file","mode":"0644","size":92,"blob_id":"blake2b256-pwjrvfg3wp380jqj2zfrm6z…"}
+    {"path":"main.go","root":".","type":"file","mode":"0644","size":482,"blob_id":"blake2b256-9ft3m74l5t2ppwjrvfg3wp3…"}
 
-The `blob_id` values in the body are abbreviated for readability; real receipts carry the full `format-data` form specified in `markl-id(7)`. The store-hint lock is shown in full.
+The `blob_id` values in the body are abbreviated for readability; real receipts carry the full `format-data` form specified in `markl-id(7)`. The store-hint lock is shown in full. Restoring this receipt with `cutting-garden restore <rid> out` materializes `out/go.mod` and `out/main.go`. Diffing the original tree with `cutting-garden diff <rid> src` reports no differences.
 
 ### Capture-Time Refusal: Non-Descendant Root
 

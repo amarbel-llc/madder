@@ -166,14 +166,14 @@ function restore_round_trips_file { # @test
   run_cg restore "$rid" out
   assert_success
 
-  [[ -f out/src/greeting.txt ]] ||
-    fail "expected out/src/greeting.txt to exist"
+  [[ -f out/greeting.txt ]] ||
+    fail "expected out/greeting.txt to exist"
 
-  diff src/greeting.txt out/src/greeting.txt ||
+  diff src/greeting.txt out/greeting.txt ||
     fail "restored content differs from captured"
 
   local mode
-  mode="$(file_mode out/src/greeting.txt)"
+  mode="$(file_mode out/greeting.txt)"
   [[ $mode == '644' ]] || fail "expected mode 644 on restored file; got $mode"
 }
 
@@ -195,12 +195,12 @@ function restore_round_trips_dir { # @test
   run_cg restore "$rid" out
   assert_success
 
-  [[ -d out/src/inner ]] || fail "expected out/src/inner to be a dir"
-  [[ -d out/src/inner/deeper ]] || fail "expected out/src/inner/deeper to be a dir"
-  [[ -f out/src/inner/deeper/x.txt ]] || fail "expected nested file to exist"
+  [[ -d out/inner ]] || fail "expected out/inner to be a dir"
+  [[ -d out/inner/deeper ]] || fail "expected out/inner/deeper to be a dir"
+  [[ -f out/inner/deeper/x.txt ]] || fail "expected nested file to exist"
 
   local mode
-  mode="$(file_mode out/src/inner)"
+  mode="$(file_mode out/inner)"
   [[ $mode == '750' ]] || fail "expected mode 750 on restored dir; got $mode"
 }
 
@@ -250,16 +250,16 @@ function restore_round_trips_symlink { # @test
   run_cg restore "$rid" out
   assert_success
 
-  [[ -L out/src/link ]] || fail "expected out/src/link to be a symlink"
+  [[ -L out/link ]] || fail "expected out/link to be a symlink"
 
   local target
-  target="$(readlink out/src/link)"
+  target="$(readlink out/link)"
   [[ $target == 'target.txt' ]] ||
     fail "expected symlink target 'target.txt', got '$target'"
 
   # The link resolves through the restored target, so reading it gives
   # the captured content.
-  diff src/target.txt out/src/link ||
+  diff src/target.txt out/link ||
     fail "symlink-resolved content differs from captured target"
 }
 
@@ -290,7 +290,7 @@ function restore_uses_hint_store_when_config_matches { # @test
   refute_output --partial 'no store hint'
   refute_output --partial 'has been re-configured'
 
-  [[ -f out/src/x.txt ]] || fail "expected restored file"
+  [[ -f out/x.txt ]] || fail "expected restored file"
 }
 
 function restore_warns_on_config_drift { # @test
