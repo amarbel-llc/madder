@@ -9,7 +9,7 @@ import (
 // EnvVar declares an environment variable that an app or command reads,
 // for inclusion in the manpage ENVIRONMENT section.
 type EnvVar struct {
-	Name        string // variable name, e.g. "LUX_SOCKET"
+	Name        string // variable name, e.g. "<UTILITY>_SOCKET"
 	Description string // one-paragraph description (plain text)
 	Default     string // optional; rendered as "Default: ..." when non-empty
 }
@@ -17,7 +17,7 @@ type EnvVar struct {
 // FilePath declares a file or directory path that an app or command reads
 // or writes, for inclusion in the manpage FILES section.
 type FilePath struct {
-	Path        string // filesystem path, e.g. "$XDG_CONFIG_HOME/lux"
+	Path        string // filesystem path, e.g. "$XDG_CONFIG_HOME/<utility>"
 	Description string // one-paragraph description (plain text)
 }
 
@@ -33,7 +33,7 @@ type ManpageFile struct {
 	Source  fs.FS  // filesystem to read from; required
 	Path    string // path within Source; required
 	Section int    // man section number, e.g. 1, 5, 7; required
-	Name    string // installed filename, e.g. "lux-config.5"; required
+	Name    string // installed filename, e.g. "<utility>-config.5"; required
 }
 
 // ParamType identifies the data type of a command parameter.
@@ -112,8 +112,8 @@ type Command struct {
 	// the per-command manpage's FILES section.
 	Files []FilePath
 
-	// SeeAlso lists related command page names (e.g. "lux-definition",
-	// "lux-references") rendered into the per-command manpage's SEE ALSO
+	// SeeAlso lists related command page names (e.g. "<utility>-definition",
+	// "<utility>-references") rendered into the per-command manpage's SEE ALSO
 	// section alongside the automatic back-reference to the parent app page.
 	SeeAlso []string
 
