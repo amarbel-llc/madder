@@ -385,6 +385,73 @@ function diff_reports_multiple_differences_sorted_by_path { # @test
   assert_output --partial 'tree differs from receipt: 3 entries'
 }
 
+# Phase F: -color flag.
+#
+# Default (and `-color=auto`) is off when stdout isn't a TTY — which
+# is always the case under bats `run`, so the existing M/A/D/T/B
+# regex assertions in Phases A-D don't need updating. These tests
+# pin the `always` and `never` paths.
+
+function diff_color_always_emits_sgr { # @test
+  init_store
+
+  mkdir src
+  echo "a" >src/a.txt
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg restore "$rid" out
+  assert_success
+
+  echo "extra" >out/extra.txt
+
+  run_cg diff -color=always "$rid" out
+  assert_failure
+  # ESC[ + a foreground digit specific to A (green = 32). bats
+  # `run` keeps escape bytes literal; assert_line --partial matches
+  # against the captured byte string.
+  assert_line --partial $'\e[32m'
+  assert_line --partial $'\e[0m'
+}
+
+function diff_color_never_suppresses_sgr { # @test
+  init_store
+
+  mkdir src
+  echo "a" >src/a.txt
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg restore "$rid" out
+  assert_success
+
+  echo "extra" >out/extra.txt
+
+  run_cg diff -color=never "$rid" out
+  assert_failure
+  refute_output --partial $'\e['
+  assert_line --regexp '^A  extra\.txt'
+}
+
+function diff_color_invalid_value_errors { # @test
+  init_store
+
+  mkdir src
+  echo "a" >src/a.txt
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg restore "$rid" out
+  assert_success
+
+  run_cg diff -color=rainbow "$rid" out
+  assert_failure
+  assert_output --partial 'invalid -color value'
+}
+
 # Phase E: capture-diff symmetry.
 #
 # `cg capture <dir>` and `cg diff <rid> <dir>` are symmetric for

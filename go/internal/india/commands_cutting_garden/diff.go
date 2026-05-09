@@ -17,11 +17,14 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 func init() {
 	utility.AddCmd("diff", &Diff{
 		EnvBlobStore: command_components.EnvBlobStore{BlobStoreXDGScope: "madder"},
+		Color:        "auto",
 	})
 }
 
@@ -59,6 +62,12 @@ type Diff struct {
 	// diff exit only proves the tree matches the receipt's records,
 	// not that the receipt is fully restorable.
 	VerifyBlobsExist bool
+
+	// Color toggles ANSI SGR coloring of the per-line markers
+	// (A/D/M/T/B). One of "auto" (default), "always", "never".
+	// "auto" enables color when stdout is a TTY and NO_COLOR is
+	// unset. Validated in runDiff.
+	Color string
 }
 
 var (
@@ -125,6 +134,14 @@ func (cmd *Diff) SetFlagDefinitions(
 			"or that were hand-crafted with bogus ids. Off by default "+
 			"because it adds one HasBlob round-trip per file entry, "+
 			"which is meaningful on remote (e.g. SFTP) stores.",
+	)
+	flagSet.StringVar(
+		&cmd.Color,
+		"color",
+		"auto",
+		"ANSI SGR coloring of diff markers (A/D/M/T/B): "+
+			"auto (default; on when stdout is a TTY and NO_COLOR is "+
+			"unset), always, or never",
 	)
 }
 
@@ -221,8 +238,13 @@ func (cmd *Diff) runDiff(
 
 	differences := compareEntries(v1.Entries, diskEntries, missingBlobs)
 
+	renderer, err := newDiffRenderer(cmd.Color, os.Stdout)
+	if err != nil {
+		return err
+	}
+
 	for _, line := range differences {
-		fmt.Fprintln(os.Stdout, line)
+		fmt.Fprintln(os.Stdout, renderDiffLine(renderer, line))
 	}
 
 	if len(differences) > 0 {
@@ -422,4 +444,55 @@ func pluralize(singular, plural string, n int) string {
 		return singular
 	}
 	return plural
+}
+
+// newDiffRenderer builds a lipgloss.Renderer keyed off the -color
+// flag value. "auto" (or empty) lets lipgloss/termenv auto-detect
+// from stdout (TTY check, NO_COLOR env, COLORTERM, etc.); "always"
+// forces ANSI 16-color (enough for the diff marker palette);
+// "never" forces Ascii so styles render their input unchanged.
+func newDiffRenderer(mode string, stdout *os.File) (*lipgloss.Renderer, error) {
+	r := lipgloss.NewRenderer(stdout)
+	switch mode {
+	case "always":
+		r.SetColorProfile(termenv.ANSI)
+	case "never":
+		r.SetColorProfile(termenv.Ascii)
+	case "", "auto":
+		// NewRenderer already auto-detected the profile from stdout.
+	default:
+		return nil, errors.ErrorWithStackf(
+			"invalid -color value %q; expected auto, always, or never",
+			mode,
+		)
+	}
+	return r, nil
+}
+
+// renderDiffLine paints a per-marker color over the entire line.
+// Returns the line unchanged when its leading marker isn't one of
+// A/D/M/T/B (defensive — keeps the function total).
+func renderDiffLine(r *lipgloss.Renderer, line string) string {
+	if len(line) == 0 {
+		return line
+	}
+	var color lipgloss.Color
+	switch line[0] {
+	case 'A':
+		color = lipgloss.Color("2") // green   — added on disk
+	case 'D':
+		color = lipgloss.Color("1") // red     — deleted on disk
+	case 'M':
+		color = lipgloss.Color("3") // yellow  — modified
+	case 'T':
+		color = lipgloss.Color("5") // magenta — type-changed
+	case 'B':
+		color = lipgloss.Color("9") // bright red — receipt blob missing
+	default:
+		return line
+	}
+	return r.NewStyle().
+		Foreground(color).
+		TabWidth(lipgloss.NoTabConversion).
+		Render(line)
 }
