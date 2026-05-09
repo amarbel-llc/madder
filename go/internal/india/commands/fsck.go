@@ -30,6 +30,7 @@ type Fsck struct {
 	command_components.BlobStore
 
 	Format output_format.Format
+	Limit  int
 }
 
 var _ futility.CommandWithParams = (*Fsck)(nil)
@@ -68,6 +69,9 @@ func (cmd *Fsck) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
+	flagSet.IntVar(&cmd.Limit, "limit", 0,
+		"stop after verifying this many blobs per store (0 = no limit). "+
+			"Useful for quickly sanity-checking a large legacy store.")
 }
 
 func (cmd Fsck) Complete(
@@ -107,6 +111,10 @@ func (cmd Fsck) Run(req futility.Request) {
 			func(ctx errors.Context) {
 				for digest, err := range blobStore.AllBlobs() {
 					errors.ContextContinueOrPanic(ctx)
+
+					if cmd.Limit > 0 && count.Load() >= uint32(cmd.Limit) {
+						return
+					}
 
 					if err != nil {
 						sink.ReadError(storeId, err)
