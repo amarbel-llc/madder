@@ -23,6 +23,15 @@ type TomlV3 struct {
 	// publish, compare the temp file against the existing blob and fail
 	// if they differ. Off by default. See issue #31, ADR 0002, ADR 0003.
 	VerifyOnCollision bool `toml:"verify-on-collision"`
+
+	// SingleHash, when true, declares this store is laid out under a
+	// flat `<root>/<bucket>/<rest>` structure with no `<HashTypeId>/`
+	// parent directory. Defaults to false (multi-hash, the modern
+	// shape: `<root>/<HashTypeId>/<bucket>/<rest>`) so existing configs
+	// continue to read as multi-hash. Set explicitly when bootstrapping
+	// a config for a legacy single-hash store probed by
+	// sftp-analyze-and-suggest-configs. See #146 / #148.
+	SingleHash bool `toml:"single_hash,omitempty"`
 }
 
 func (TomlV3) GetBlobStoreType() string {
@@ -102,7 +111,7 @@ func (blobStoreConfig TomlV3) GetVerifyOnCollision() bool {
 }
 
 func (blobStoreConfig TomlV3) SupportsMultiHash() bool {
-	return true
+	return !blobStoreConfig.SingleHash
 }
 
 func (blobStoreConfig TomlV3) GetDefaultHashTypeId() string {

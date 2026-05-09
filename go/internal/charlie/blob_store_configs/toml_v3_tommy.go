@@ -77,6 +77,11 @@ func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
 				d.data.VerifyOnCollision = v
 				d.consumed["verify-on-collision"] = true
 			}
+		case "single_hash":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				d.data.SingleHash = v
+				d.consumed["single_hash"] = true
+			}
 		}
 	}
 	return d, nil
@@ -128,6 +133,13 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 		if err := cst.SetAny(d.cstDoc.Root(), "verify-on-collision", d.data.VerifyOnCollision); err != nil {
 			return nil, fmt.Errorf("%w", err)
 		}
+	}
+	if d.data.SingleHash != false {
+		if err := cst.SetAny(d.cstDoc.Root(), "single_hash", d.data.SingleHash); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "single_hash")
 	}
 	return d.cstDoc.Bytes(), nil
 }
@@ -189,6 +201,11 @@ func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node,
 				data.VerifyOnCollision = v
 				consumed[keyPrefix+"verify-on-collision"] = true
 			}
+		case "single_hash":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				data.SingleHash = v
+				consumed[keyPrefix+"single_hash"] = true
+			}
 		}
 	}
 	return nil
@@ -237,6 +254,13 @@ func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node)
 		if err := cst.SetAny(container, "verify-on-collision", data.VerifyOnCollision); err != nil {
 			return fmt.Errorf("%w", err)
 		}
+	}
+	if data.SingleHash != false {
+		if err := cst.SetAny(container, "single_hash", data.SingleHash); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "single_hash")
 	}
 	return nil
 }

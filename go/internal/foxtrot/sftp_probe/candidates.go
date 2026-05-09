@@ -86,6 +86,13 @@ func makeCandidate(
 		HashTypeId:      blob_store_configs.HashType(layout.HashTypeId),
 		HashBuckets:     layout.Buckets,
 		CompressionType: comp,
+		// Match the discovered layout: legacy single-hash stores
+		// (`<root>/<bucket>/<rest>`) get SingleHash=true so the
+		// emitted config doesn't claim a multi-hash layout the on-disk
+		// tree doesn't actually have. Without this, fsck/info-repo/
+		// sync would walk `<root>/<HashTypeId>/<bucket>/...` and miss
+		// every blob.
+		SingleHash: !layout.MultiHash,
 	}
 	if key != nil {
 		storeCfg.Encryption = []markl.Id{*key}
