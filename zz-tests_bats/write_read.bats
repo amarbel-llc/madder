@@ -11,11 +11,8 @@ function write_and_cat { # @test
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "hello world" >"$blob"
-
-  run_madder write -format tap "$blob"
-  assert_success
-  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash ]] || fail "write returned empty hash"
+  local hash
+  hash="$(write_blob_id "$blob")"
 
   run_madder cat "$hash"
   assert_success
@@ -50,10 +47,8 @@ function list_after_write { # @test
 
 function write_warns_when_file_shadows_store { # @test
 
-  # Init two stores: the default .default (CWD-scoped) plus one named
-  # "shadowed" (XDG user). Then create a file with the same bare name in
-  # the CWD. A bare `write shadowed` should resolve to the file but emit
-  # a warning comment pointing at the blob-store-id collision.
+  # Bare `write shadowed` resolves to the file but must warn about the
+  # blob-store-id collision.
   init_store
   run_madder init -encryption none shadowed
   assert_success
@@ -69,9 +64,8 @@ function write_warns_when_file_shadows_store { # @test
 
 function pack_blobs_warns_when_file_shadows_store { # @test
 
-  # Regression for #25: the shadow warning previously lived only in
-  # write; pack-blobs had the same ambiguity class but no warning. The
-  # shared arg_resolver fixes that.
+  # Regression for #25: pack-blobs shares write's arg_resolver and must
+  # emit the shadow warning even though .default isn't packable.
   init_store
   run_madder init -encryption none shadowed
   assert_success
@@ -79,15 +73,12 @@ function pack_blobs_warns_when_file_shadows_store { # @test
   echo "file content" >shadowed
 
   run_madder pack-blobs -format tap shadowed
-  # Pack will fail (.default isn't packable) but the shadow warning
-  # must fire before that on stdout/stderr.
   assert_output --partial "shadows blob-store-id"
 }
 
 function write_no_warning_when_no_store_collision { # @test
 
-  # Control: same file pattern, but no store with matching name. No
-  # warning should fire.
+  # Control for write_warns_when_file_shadows_store.
   init_store
 
   echo "file content" >unique_filename
@@ -101,8 +92,6 @@ function write_no_warning_when_no_store_collision { # @test
 
 function write_json_emits_ndjson_record { # @test
 
-  # Explicit -format=json returns one NDJSON object per blob with
-  # id/size/source fields.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -110,13 +99,12 @@ function write_json_emits_ndjson_record { # @test
 
   run_madder write -format json "$blob"
   assert_success
-  assert_output --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
+  assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
 }
 
 function write_auto_detects_json_when_stdout_is_pipe { # @test
 
-  # Default -format=auto should emit NDJSON when stdout is not a TTY,
-  # which is always the case under bats `run`.
+  # bats `run` is never a TTY, so auto-format must pick JSON.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -124,12 +112,11 @@ function write_auto_detects_json_when_stdout_is_pipe { # @test
 
   run_madder write "$blob"
   assert_success
-  assert_output --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
+  assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
 }
 
 function write_json_check_present { # @test
 
-  # -check with a blob already in the store emits present:true.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -144,8 +131,6 @@ function write_json_check_present { # @test
 
 function write_json_check_missing { # @test
 
-  # -check with a blob NOT in the store emits present:false and the
-  # command exits non-zero.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -158,7 +143,6 @@ function write_json_check_missing { # @test
 
 function write_tap_override_on_pipe { # @test
 
-  # Explicit -format=tap forces TAP even when stdout is piped.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -166,8 +150,8 @@ function write_tap_override_on_pipe { # @test
 
   run_madder write -format tap "$blob"
   assert_success
-  assert_output --partial 'TAP version 14'
-  assert_output --partial 'ok 1 - '
+  assert_line 'TAP version 14'
+  assert_line --regexp '^ok 1 - '
   refute_output --partial '"id":'
 }
 
@@ -182,10 +166,9 @@ function write_json_rejects_unknown_format { # @test
 
 function write_json_warning_goes_to_stderr { # @test
 
-  # Shadow warnings are informational; in JSON mode they must route to
-  # stderr so the stdout stream stays valid NDJSON. bats run merges
-  # stderr into $output, so we can't separate streams here — but we can
-  # at least assert the warning does NOT appear mid-NDJSON line.
+  # In JSON mode the warning must route to stderr so stdout stays valid
+  # NDJSON. bats `run` merges streams, so we can only assert no warning
+  # mid-record by checking that exactly one NDJSON line appears.
   init_store
   run_madder init -encryption none shadowed
   assert_success
@@ -194,7 +177,6 @@ function write_json_warning_goes_to_stderr { # @test
 
   run_madder write -format json shadowed
   assert_success
-  # Exactly one NDJSON record on stdout (merged with stderr by run).
   local n
   n="$(echo "$output" | grep -c '^{')"
   [[ $n -eq 1 ]] || fail "expected 1 NDJSON record, got $n"

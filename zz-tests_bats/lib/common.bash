@@ -86,3 +86,22 @@ capture_receipt_id() {
   echo "$output" | grep -F '"type":"store_group_receipt"' |
     sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
 }
+
+# today_session_file echoes the path of the (first) hyphence session
+# file under today's $XDG_LOG_HOME/madder/inventory_log/<date>/ dir.
+# Each madder CLI invocation produces its own session file; callers
+# running exactly one write get exactly one file. Returns nonzero if
+# no day-dir exists yet.
+today_session_file() {
+  local date day_dir
+  date="$(date -u +%Y-%m-%d)"
+  day_dir="$XDG_LOG_HOME/madder/inventory_log/$date"
+  [[ -d $day_dir ]] || return 1
+  ls -1 "$day_dir"/*.hyphence 2>/dev/null | head -n 1
+}
+
+# session_body strips the 4-line hyphence header (---, ! type, ---,
+# blank separator) from a session file, leaving just the NDJSON body.
+session_body() {
+  tail -n +5 "$1"
+}

@@ -18,34 +18,28 @@ function init_default_config_is_read_only { # @test
   local config=".madder/local/share/blob_stores/default/blob_store-config"
   [[ -f $config ]] || fail "expected config at $config"
 
-  local mode
-  mode="$(file_mode "$config")"
-  [[ $mode == '444' ]] || fail "expected mode 444 on $config; got $mode"
+  assert_equal "$(file_mode "$config")" '444'
 }
 
 function init_idempotent_fails { # @test
-
   init_store
   run_madder init -encryption none .default
   assert_failure
 }
 
 function init_compression_default { # @test
-
   init_store
   run_madder info-repo compression-type
   assert_output 'zstd'
 }
 
 function init_without_encryption { # @test
-
   init_store
   run_madder info-repo encryption
   assert_output ''
 }
 
 function init_with_encryption { # @test
-
   run_madder init -encryption generate .encrypted
   assert_success
   run_madder info-repo .encrypted encryption
@@ -54,14 +48,12 @@ function init_with_encryption { # @test
 }
 
 function init_inventory_archive { # @test
-
   init_store
   run_madder init-inventory-archive -encryption none .archive
   assert_success
 }
 
 function init_inventory_archive_with_encryption { # @test
-
   init_store
   run_madder init-inventory-archive -encryption generate .archive
   assert_success
@@ -71,12 +63,11 @@ function init_inventory_archive_with_encryption { # @test
 }
 
 function init_error_includes_store_id_and_path { # @test
-
   # Regression for #21: when store discovery hits an invalid config on
   # disk, the error must identify which store and which config file.
-  # Pre-populate a .broken store with hash_type-id = "", then try to
-  # init a new store. Discovery will try to decode .broken first and
-  # the error should name both the store id and the config path.
+  # Pre-populate a .broken store with hash_type-id = "", then init a
+  # new store. Discovery decodes .broken first; the error should name
+  # both the store id and the config path.
 
   local store_dir=".madder/local/share/blob_stores/broken"
   mkdir -p "$store_dir"

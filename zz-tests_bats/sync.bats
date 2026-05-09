@@ -11,9 +11,8 @@ function cross_hash_sync { # @test
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "cross-hash-test" >"$blob"
-  run_madder write -format tap "$blob"
-  assert_success
-  blake_sha="$(echo "$output" | grep -oP 'blake2b256-\S+' | head -1)"
+  local blake_sha
+  blake_sha="$(write_blob_id "$blob")"
 
   run_madder init -hash_type-id sha256 -encryption none .sha256
   assert_success
@@ -51,7 +50,7 @@ function sync_idempotent { # @test
 
 function sync_json_auto_detects { # @test
 
-  # Default (auto) + piped stdout -> NDJSON with transferred records.
+  # Default auto-format under `run` (no TTY) must emit NDJSON, not TAP.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"

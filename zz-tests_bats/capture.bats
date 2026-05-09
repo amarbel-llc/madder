@@ -42,36 +42,27 @@ function capture_simple_dir { # @test
   run_cg capture -format json tree
   assert_success
 
-  # One receipt summary record.
   local n
   n="$(echo "$output" | grep -c '"type":"store_group_receipt"' || true)"
   [[ $n -eq 1 ]] || fail "expected 1 receipt summary, got $n. output:"$'\n'"$output"
 
-  # Three files + tree/ + tree/sub = 5 entries.
-  local count
+  # 3 files + tree/ + tree/sub = 5 entries.
+  local count rid
   count="$(receipt_count_of_group "$output")"
   [[ $count -eq 5 ]] || fail "expected count=5 in summary, got $count. output:"$'\n'"$output"
 
-  # Receipt blob is retrievable.
-  local rid
   rid="$(receipt_id_of_group "$output")"
   [[ -n $rid ]] || fail "no receipt_id in output: $output"
 
   run_madder cat "$rid"
   assert_success
 
-  # Hyphence header present.
-  echo "$output" | grep -q '^! cutting_garden-capture_receipt-fs-v1$' ||
-    fail "receipt missing type tag. body: $output"
-
-  # Each captured filename appears as a path field.
-  echo "$output" | grep -q '"path":"a.txt"' || fail "missing a.txt: $output"
-  echo "$output" | grep -q '"path":"b.txt"' || fail "missing b.txt: $output"
-  echo "$output" | grep -q '"path":"sub/c.txt"' || fail "missing sub/c.txt: $output"
-  echo "$output" | grep -q '"path":"sub","root":".","type":"dir"' ||
-    fail "missing sub dir entry: $output"
-  echo "$output" | grep -q '"path":".","root":".","type":"dir"' ||
-    fail "missing root dir entry: $output"
+  assert_line '! cutting_garden-capture_receipt-fs-v1'
+  assert_output --partial '"path":"a.txt"'
+  assert_output --partial '"path":"b.txt"'
+  assert_output --partial '"path":"sub/c.txt"'
+  assert_output --partial '"path":"sub","root":".","type":"dir"'
+  assert_output --partial '"path":".","root":".","type":"dir"'
 }
 
 function capture_records_symlink_target { # @test
@@ -92,8 +83,7 @@ function capture_records_symlink_target { # @test
   run_madder cat "$rid"
   assert_success
 
-  echo "$output" | grep -q '"path":"link.txt","root":".","type":"symlink".*"target":"real.txt"' ||
-    fail "symlink entry missing or wrong shape: $output"
+  assert_line --regexp '"path":"link.txt","root":".","type":"symlink".*"target":"real.txt"'
 }
 
 function capture_includes_dotfiles { # @test
@@ -112,13 +102,12 @@ function capture_includes_dotfiles { # @test
   run_madder cat "$rid"
   assert_success
 
-  echo "$output" | grep -q '"path":".hidden"' ||
-    fail "dotfile not captured: $output"
+  assert_output --partial '"path":".hidden"'
 }
 
 function capture_zero_args_uses_pwd_into_default { # @test
 
-  # Use a non-CWD-relative store so it remains findable after cd.
+  # Non-CWD-relative store so it remains findable after cd.
   run_madder init -encryption none default
   assert_success
 
@@ -177,7 +166,6 @@ function capture_multi_store_group { # @test
   run_cg capture -format json .default src .alt docs
   assert_success
 
-  # Two distinct summaries.
   local n
   n="$(echo "$output" | grep -c '"type":"store_group_receipt"' || true)"
   [[ $n -eq 2 ]] || fail "expected 2 receipt summaries, got $n. output:"$'\n'"$output"
@@ -269,8 +257,7 @@ function capture_refuses_parent_escape_root { # @test
   popd >/dev/null
 
   assert_failure
-  echo "$output" | grep -qF 'outside working directory' ||
-    fail "expected parent-escape refusal: $output"
+  assert_output --partial 'outside working directory'
 }
 
 function capture_refuses_absolute_root { # @test
@@ -285,8 +272,7 @@ function capture_refuses_absolute_root { # @test
 
   run_cg capture -format json "$outside"
   assert_failure
-  echo "$output" | grep -qF 'outside working directory' ||
-    fail "expected absolute-path refusal: $output"
+  assert_output --partial 'outside working directory'
 }
 
 function capture_refuses_collision_after_clean { # @test
@@ -300,8 +286,7 @@ function capture_refuses_collision_after_clean { # @test
 
   run_cg capture -format json src ./src
   assert_failure
-  echo "$output" | grep -qF 'roots "src" and "./src" both resolve to "src"' ||
-    fail "expected exact RFC 0003 collision diagnostic: $output"
+  assert_output --partial 'roots "src" and "./src" both resolve to "src"'
 }
 
 function capture_emits_store_hint_when_known { # @test
@@ -325,8 +310,7 @@ function capture_emits_store_hint_when_known { # @test
 
   run_madder cat .work "$rid"
   assert_success
-  echo "$output" | grep -qE '^- store/\.work < blake2b256-' ||
-    fail "expected RFC 0003 store-hint line in receipt: $output"
+  assert_line --regexp '^- store/\.work < blake2b256-'
 }
 
 function capture_default_store_omits_hint { # @test
@@ -347,8 +331,7 @@ function capture_default_store_omits_hint { # @test
 
   run_madder cat "$rid"
   assert_success
-  ! echo "$output" | grep -qE '^- store/' ||
-    fail "default-store receipt should not emit a store-hint: $output"
+  refute_line --regexp '^- store/'
 }
 
 function capture_warns_when_dir_shadows_store { # @test
@@ -375,10 +358,8 @@ function capture_warns_when_dir_shadows_store { # @test
   [[ -n $rid ]] || fail "no receipt id: $output"
   [[ -z $store ]] || fail "expected default store (empty), got '$store'"
 
-  # Shadow warning surfaces somewhere in the run output. NDJSON sink
-  # routes notices to stderr; bats merges stdout+stderr into $output.
-  echo "$output" | grep -qF 'shadows blob-store-id' ||
-    fail "expected shadow warning in output: $output"
+  # NDJSON sink routes notices to stderr; bats merges into $output.
+  assert_output --partial 'shadows blob-store-id'
 }
 
 function capture_per_entry_failure_continues_walk { # @test
@@ -403,13 +384,8 @@ function capture_per_entry_failure_continues_walk { # @test
 
   assert_failure
 
-  # The good file is captured.
-  echo "$output" | grep -q '"path":"good.txt".*"type":"file"' ||
-    fail "good.txt should have been captured: $output"
-
-  # An error record names secret.txt.
-  echo "$output" | grep -q '"source":"tree/secret.txt".*"error"' ||
-    fail "expected error record for secret.txt: $output"
+  assert_line --regexp '"path":"good.txt".*"type":"file"'
+  assert_line --regexp '"source":"tree/secret.txt".*"error"'
 }
 
 function capture_writes_log_entry_at_cg_scope { # @test
@@ -446,16 +422,11 @@ function capture_writes_log_entry_at_cg_scope { # @test
   n="$(wc -l <"$log")"
   [[ $n -eq 1 ]] || fail "expected 1 captures.log line, got $n; contents:"$'\n'"$(cat "$log")"
 
-  local line
-  line="$(head -n 1 "$log")"
-
-  # Schema: ts + receipt_id + store_id + roots
-  echo "$line" | grep -qF "\"receipt_id\":\"$rid\"" ||
-    fail "captures.log line missing or wrong receipt_id; expected $rid; got: $line"
-  echo "$line" | grep -q '"store_id":""' ||
-    fail "captures.log line missing empty store_id (default store): $line"
-  echo "$line" | grep -q '"roots":\["tree"\]' ||
-    fail "captures.log line missing tree root: $line"
-  echo "$line" | grep -qE '"ts":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"' ||
-    fail "captures.log line missing RFC3339 ts: $line"
+  # Schema: ts + receipt_id + store_id + roots.
+  run head -n 1 "$log"
+  assert_success
+  assert_output --partial "\"receipt_id\":\"$rid\""
+  assert_output --partial '"store_id":""'
+  assert_output --partial '"roots":["tree"]'
+  assert_output --regexp '"ts":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z"'
 }

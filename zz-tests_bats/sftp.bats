@@ -36,8 +36,6 @@ function sftp_write_emits_written_record { # @test
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "hello sftp" >"$blob"
 
-  # Per `madder write`: a leading blob-store-id arg switches the active
-  # store for subsequent file args.
   run_madder write .sftp-test "$blob"
   assert_success
 
@@ -133,11 +131,6 @@ function sftp_list_after_write { # @test
 }
 
 function sftp_write_warns_when_file_shadows_store { # @test
-  # Init an SFTP store named `shadowed`, then create a file with the
-  # same bare name in CWD. Bare `write shadowed` should resolve to the
-  # file but warn about the blob-store-id collision — same semantics
-  # as the local-store version, since shadow detection is name-based
-  # and backend-agnostic.
   init_sftp_test_store "$BATS_TEST_TMPDIR/sftp-shadowed" shadowed
 
   echo "file content" >shadowed
@@ -146,16 +139,13 @@ function sftp_write_warns_when_file_shadows_store { # @test
   assert_success
   assert_output --partial "shadows blob-store-id"
   assert_output --partial "'./shadowed'"
-  # Unlike `init -encryption none shadowed`, which yields a CWD-scoped
-  # `.shadowed` store id in the warning, init-sftp-explicit registers
-  # the id at user (XDG) scope where the bare name is the canonical
-  # form — the warning quotes it as "shadowed".
+  # init-sftp-explicit registers the id at user (XDG) scope where the
+  # bare name is the canonical form, so the warning quotes "shadowed"
+  # rather than the CWD-scoped ".shadowed" you'd see from local init.
   assert_output --partial '"shadowed"'
 }
 
 function sftp_write_no_warning_when_no_store_collision { # @test
-  # Control: SFTP store id does not collide with any file in CWD;
-  # write of an unrelated file must not surface a shadow warning.
   init_sftp_test_store
 
   echo "file content" >unique_filename
@@ -173,12 +163,10 @@ function sftp_write_json_emits_ndjson_record { # @test
 
   run_madder write -format json .sftp-test "$blob"
   assert_success
-  # Non-default store, so the record carries a "store" field in
-  # addition to id/size/source. Field order is a commitment of the
-  # write contract. Use assert_line --regexp because $output
-  # interleaves the SFTP transport's dialing/connecting log lines
-  # with the NDJSON record; the local write_json_emits_ndjson_record
-  # version has clean output and so can anchor at $output level.
+  # Non-default store carries a "store" field; field order is a write
+  # contract commitment. Anchor on assert_line because the SFTP
+  # transport's merged dialing/connecting stderr would otherwise
+  # interleave with the NDJSON record.
   assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt","store":"\.sftp-test"\}$'
 }
 
@@ -227,9 +215,8 @@ $output"
 function sftp_init_idempotent_fails { # @test
   init_sftp_test_store
 
-  # A second init for the same id should fail because the local
-  # config file already exists; this matches the local-store
-  # init_idempotent_fails contract.
+  # Second init for the same id must fail; the local config file
+  # already exists.
   run_madder init-sftp-explicit \
     -host 127.0.0.1 \
     -port "$SFTP_PORT" \
@@ -242,12 +229,10 @@ function sftp_init_idempotent_fails { # @test
 }
 
 function sftp_init_compression_default { # @test
-  # Mirrors init_compression_default for SFTP. The local test uses
-  # assert_output (full-output equality) but the SFTP transport emits
-  # dialing/connecting log lines that bats' merged run output captures
-  # alongside the value, so anchor on assert_line for the printed
-  # info-repo value instead. Per ADR 0005 / #60: compression-type is a
-  # blob-store property and must come from the remote TomlV3.
+  # Per ADR 0005 / #60, compression-type is a blob-store property
+  # sourced from the remote TomlV3. Anchor on assert_line because the
+  # SFTP transport's merged dialing/connecting stderr would defeat a
+  # full-output equality check.
   init_sftp_test_store
 
   run_madder info-repo .sftp-test compression-type
@@ -256,9 +241,9 @@ function sftp_init_compression_default { # @test
 }
 
 function sftp_init_hash_type_id_default { # @test
-  # SFTP-init bootstrap writes a remote TomlV3 with HashTypeDefault
-  # (blake2b256). Per ADR 0005 / #60, info-repo must surface that
-  # (and not the stub sha256 the local TomlSFTPV0 returns).
+  # Per ADR 0005 / #60, info-repo must surface the remote TomlV3's
+  # HashTypeDefault (blake2b256), not the stub sha256 from local
+  # TomlSFTPV0.
   init_sftp_test_store
 
   run_madder info-repo .sftp-test hash_type-id
@@ -351,9 +336,6 @@ function sftp_write_compresses_per_remote_config { # @test
 }
 
 function sftp_cross_hash_sync { # @test
-  # Mirrors cross_hash_sync (sync.bats) for the SFTP transport: write a
-  # blob into a local blake2b256 store, then sync into an SFTP-backed
-  # store and confirm the blob materializes there.
   init_store
   init_sftp_test_store
 
@@ -375,8 +357,6 @@ function sftp_cross_hash_sync { # @test
 }
 
 function sftp_sync_idempotent { # @test
-  # Mirrors sync_idempotent (sync.bats): a second sync over an
-  # already-synced blob is a no-op refusal-free success.
   init_store
   init_sftp_test_store
 
@@ -393,8 +373,6 @@ function sftp_sync_idempotent { # @test
 }
 
 function sftp_sync_json_auto_detects { # @test
-  # Mirrors sync_json_auto_detects (sync.bats): NDJSON state records
-  # round-trip through the SFTP transport.
   init_store
   init_sftp_test_store
 
@@ -410,8 +388,6 @@ function sftp_sync_json_auto_detects { # @test
 }
 
 function sftp_fsck_with_blobs { # @test
-  # Mirrors with_blobs (fsck.bats): a healthy SFTP store with blobs
-  # fsck-passes without a 'not ok' line.
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -426,8 +402,6 @@ function sftp_fsck_with_blobs { # @test
 }
 
 function sftp_fsck_json_auto_detects { # @test
-  # Mirrors fsck_json_auto_detects (fsck.bats) for SFTP: piped stdout
-  # auto-selects NDJSON; verified records are emitted.
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -442,8 +416,6 @@ function sftp_fsck_json_auto_detects { # @test
 }
 
 function sftp_fsck_tap14_output { # @test
-  # Symmetric to tap14_output (fsck.bats): an empty SFTP store
-  # fsck-passes cleanly under tap formatting.
   init_sftp_test_store
 
   run_madder fsck -format tap .sftp-test
@@ -454,17 +426,13 @@ function sftp_fsck_tap14_output { # @test
 }
 
 function sftp_fsck_json_reports_missing { # @test
-  # Mirrors fsck_json_reports_missing (fsck.bats) for SFTP. Truncate
-  # remote blob files so the on-disk path still exists (AllBlobs
-  # emits a per-blob JSON record) but read-and-verify yields a
-  # digest mismatch.
+  # Truncate remote blobs so AllBlobs still emits per-blob JSON
+  # records but read-and-verify yields a digest mismatch.
   #
-  # Pre-#140 the test used find -delete; it passed for the wrong
-  # reason because the path-handling asymmetry meant the find ran
-  # against an absolute path while writes went to a
-  # relative-resolved path. find found nothing, the blobs stayed
-  # intact, and fsck verified them — the "store" substring matched
-  # the verified-success JSON shape too.
+  # Pre-#140 this used find -delete and passed for the wrong reason:
+  # path-handling asymmetry made find run against an absolute path
+  # while writes resolved relative, so blobs stayed intact, fsck
+  # verified them, and "store" still matched the success JSON shape.
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
@@ -514,9 +482,8 @@ EOM
 }
 
 function sftp_pack_with_delta { # @test
-  # Mirrors pack_with_delta (pack.bats) with the loose source on
-  # SFTP. The archive itself stays local; pack iterates the SFTP
-  # loose store via AllBlobs to collect candidates.
+  # Archive stays local; pack iterates the SFTP loose store via
+  # AllBlobs to collect candidates.
   init_sftp_test_store
   create_sftp_archive_config "archive" "true"
 
@@ -557,7 +524,6 @@ function sftp_pack_with_delta { # @test
 }
 
 function sftp_pack_without_delta { # @test
-  # Mirrors pack_without_delta (pack.bats) with the loose source on SFTP.
   init_sftp_test_store
   create_sftp_archive_config "archive" "false"
 
@@ -594,11 +560,10 @@ function sftp_pack_without_delta { # @test
 }
 
 function sftp_init_with_encryption { # @test
-  # Mirrors init_with_encryption (init.bats) for SFTP. ADR 0005 routes
-  # the -encryption flag to the remote TomlV3, so info-repo must surface
-  # a non-empty markl-id and a blob round-trip must work end-to-end.
-  # Add an on-disk check (mirroring sftp_write_compresses_per_remote_config)
-  # so a regression that silently no-ops the IO wrapper would still fail.
+  # Per ADR 0005, -encryption routes to the remote TomlV3. The
+  # on-disk cleartext check at the end catches a regression where
+  # the IO wrapper silently no-ops, even though the round-trip
+  # alone would still pass.
   local remote_root="$BATS_TEST_TMPDIR/sftp-encrypted"
   run_madder init-sftp-explicit \
     -host 127.0.0.1 \
@@ -690,22 +655,20 @@ function sftp_write_record_has_contracted_fields { # @test
 
   local log
   log="$(today_sftp_session_file)" || fail "no session file"
-  local line
-  line="$(sftp_session_body "$log" | head -n 1)"
 
-  # Every field the design contracts is present. The description field
-  # is optional (omitempty) and expected to be absent here since
+  # Drive bats-assert helpers off the first NDJSON record by routing
+  # `sftp_session_body | head -n 1` through `run`. The description
+  # field is optional (omitempty) and expected absent here since
   # --log-description is not passed.
-  echo "$line" | grep -q '"type":"blob-write-published-v1"' || fail "record missing type discriminator: $line"
-  echo "$line" | grep -q '"ts":' || fail "record missing ts field: $line"
-  echo "$line" | grep -q '"utility":"madder"' || fail "record utility != madder: $line"
-  echo "$line" | grep -q '"pid":' || fail "record missing pid field: $line"
-  echo "$line" | grep -q '"store_id":' || fail "record missing store_id: $line"
-  echo "$line" | grep -q '"markl_id":' || fail "record missing markl_id: $line"
-  echo "$line" | grep -q '"size":' || fail "record missing size field: $line"
-  echo "$line" | grep -q '"op":"written"' || fail "record op != written: $line"
-
-  echo "$line" | grep -q '"description"' &&
-    fail "description field should be absent when --log-description not passed: $line" ||
-    true
+  run bash -c "tail -n +5 \"$log\" | head -n 1"
+  assert_success
+  assert_output --partial '"type":"blob-write-published-v1"'
+  assert_output --partial '"ts":'
+  assert_output --partial '"utility":"madder"'
+  assert_output --partial '"pid":'
+  assert_output --partial '"store_id":'
+  assert_output --partial '"markl_id":'
+  assert_output --partial '"size":'
+  assert_output --partial '"op":"written"'
+  refute_output --partial '"description"'
 }

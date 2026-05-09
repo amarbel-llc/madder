@@ -6,29 +6,6 @@ setup() {
 
 # bats file_tags=inventory_log
 
-# today_session_file finds the (single) hyphence session file written by
-# the most recent madder invocation under today's date directory. Each
-# CLI invocation owns its own session file, so callers running exactly
-# one madder write per test should find exactly one file. Callers
-# running N writes get N session files.
-today_session_file() {
-  local date
-  date="$(date -u +%Y-%m-%d)"
-  local day_dir="$XDG_LOG_HOME/madder/inventory_log/$date"
-
-  if [[ ! -d $day_dir ]]; then
-    return 1
-  fi
-
-  ls -1 "$day_dir"/*.hyphence 2>/dev/null | head -n 1
-}
-
-# session_body strips the 4-line hyphence header (---, ! type, ---,
-# blank separator) from a session file, leaving just the NDJSON body.
-session_body() {
-  tail -n +5 "$1"
-}
-
 function inventory_log_emits_written_record { # @test
   init_store
 
@@ -45,7 +22,6 @@ function inventory_log_emits_written_record { # @test
   local body
   body="$(session_body "$log")"
 
-  # Exactly one NDJSON record, op=written, with the new "type" field.
   local n
   n="$(echo "$body" | grep -c '"op":"written"' || true)"
   [[ $n -eq 1 ]] || fail "expected 1 written record, got $n. body:$'\n'$body"
@@ -72,7 +48,6 @@ function inventory_log_duplicate_is_exists { # @test
   date="$(date -u +%Y-%m-%d)"
   day_dir="$XDG_LOG_HOME/madder/inventory_log/$date"
 
-  # Combine all today's session bodies for cross-session counting.
   local combined
   combined="$(for f in "$day_dir"/*.hyphence; do session_body "$f"; done)"
 
@@ -136,9 +111,6 @@ function inventory_log_record_has_contracted_fields { # @test
   local line
   line="$(session_body "$log" | head -n 1)"
 
-  # Every field the design contracts is present. The description field
-  # is optional (omitempty) and expected to be absent when
-  # --log-description is not passed — covered by a separate test below.
   echo "$line" | grep -q '"type":"blob-write-published-v1"' || fail "record missing type discriminator: $line"
   echo "$line" | grep -q '"ts":' || fail "record missing ts field: $line"
   echo "$line" | grep -q '"utility":"madder"' || fail "record utility != madder: $line"
@@ -196,9 +168,9 @@ function inventory_log_empty_description_omits_field { # @test
 }
 
 function inventory_log_session_file_has_hyphence_header { # @test
-  # New: the session file must start with a hyphence document whose
-  # metadata is exactly `! madder-inventory_log-ndjson-v1`. This pins
-  # the on-disk envelope contract from the design doc.
+  # The session file must start with a hyphence document whose metadata
+  # is exactly `! madder-inventory_log-ndjson-v1`. Pins the on-disk
+  # envelope contract from the design doc.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"

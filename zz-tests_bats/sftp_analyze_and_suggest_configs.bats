@@ -31,7 +31,7 @@ function existing_verifies_when_init_then_analyze { # @test
     -remote-path "$remote_root" \
     -known-hosts-file "$SFTP_KNOWN_HOSTS"
   assert_success
-  assert_output --partial 'ok 1 - existing'
+  assert_line --partial 'ok 1 - existing'
 }
 
 # --- helpers used by the tests below -------------------------------------
@@ -47,13 +47,13 @@ snapshot_tree() {
 function bad_input_missing_ssh_host { # @test
   run_madder sftp-analyze-and-suggest-configs -remote-path /tmp
   assert_failure
-  assert_output --partial '-ssh-host'
+  assert_line --partial '-ssh-host'
 }
 
 function bad_input_missing_remote_path { # @test
   run_madder sftp-analyze-and-suggest-configs -ssh-host madder-test
   assert_failure
-  assert_output --partial '-remote-path'
+  assert_line --partial '-remote-path'
 }
 
 function bad_input_key_path_does_not_exist { # @test
@@ -62,7 +62,7 @@ function bad_input_key_path_does_not_exist { # @test
     -remote-path /tmp \
     -key /no/such/key/file
   assert_failure
-  assert_output --partial 'no such file or directory'
+  assert_line --partial 'no such file or directory'
 }
 
 function empty_remote_path_errors_clearly { # @test
@@ -74,7 +74,7 @@ function empty_remote_path_errors_clearly { # @test
     -remote-path "$remote_root" \
     -known-hosts-file "$SFTP_KNOWN_HOSTS"
   assert_failure
-  assert_output --partial 'cannot discover bucket structure'
+  assert_line --partial 'cannot discover bucket structure'
 }
 
 # --- read-only invariant (#7) --------------------------------------------
@@ -120,7 +120,7 @@ function limit_caps_sample_count { # @test
   assert_success
   # TAP "verified=K/N" reports samples drawn as N. -limit 3 → all
   # candidates show /3.
-  assert_output --partial 'verified=3/3'
+  assert_line --partial 'verified=3/3'
   refute_output --partial 'verified=10/10'
 }
 
@@ -145,7 +145,7 @@ analyze_legacy_layout() {
     -limit 5
   assert_success
   # The matching candidate verifies all 5 samples cleanly.
-  assert_output --partial "ok 1 - $comp/none verified=5/5"
+  assert_line --partial "ok 1 - $comp/none verified=5/5"
 }
 
 function legacy_detection_none { # @test
@@ -185,9 +185,7 @@ function bootstrap_yes_to_all_writes_remote_config { # @test
   [[ -e "$remote_root/blob_store-config" ]] || \
     fail "blob_store-config not written to remote"
 
-  local mode
-  mode="$(stat -c '%a' "$remote_root/blob_store-config")"
-  [[ $mode == 444 ]] || fail "expected mode 444; got $mode"
+  assert_equal "$(file_mode "$remote_root/blob_store-config")" '444'
 
   # Config should have single_hash = true (legacy single-hash layout)
   # so subsequent reads walk the bucket tree correctly per #149.

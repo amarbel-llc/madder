@@ -24,10 +24,7 @@ function write_prints_digest_to_stdout { # @test
 
   run_madder write -format tap "$blob"
   assert_success
-
-  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash ]] || fail "write did not print digest in TAP output"
-  [[ $hash == blake2b256-* ]] || fail "digest does not start with hash algorithm prefix: $hash"
+  assert_line --regexp '^ok 1 - blake2b256-[A-Za-z0-9]+ '
 }
 
 function cat_exits_nonzero_on_missing_blob { # @test
@@ -50,11 +47,8 @@ function has_exits_zero_for_existing_blob { # @test
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "has test content" >"$blob"
-
-  run_madder write -format tap "$blob"
-  assert_success
-  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash ]] || fail "write did not print digest"
+  local hash
+  hash="$(write_blob_id "$blob")"
 
   run_madder has "$hash"
   assert_success
@@ -82,11 +76,8 @@ function has_mixed_found_and_missing { # @test
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "mixed test content" >"$blob"
-
-  run_madder write -format tap "$blob"
-  assert_success
-  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash ]] || fail "write did not print digest"
+  local hash
+  hash="$(write_blob_id "$blob")"
 
   local unstored="$BATS_TEST_TMPDIR/unstored.txt"
   echo "never-written-for-has-mixed-test" >"$unstored"
@@ -102,33 +93,25 @@ function has_mixed_found_and_missing { # @test
 
 function has_scopes_to_explicit_blob_store_id { # @test
 
-  # Regression for #25: `has` now accepts blob-store-id switches.
-  # Checking `has .default <hash>` scopes to .default only; if a blob
-  # is only in another store, it should report "not found" in this
-  # scope, not fall back to the all-stores search.
+  # Regression for #25: scoped `has .default <hash>` must not fall back to
+  # the all-stores search.
   init_store
   run_madder init -encryption none .elsewhere
   assert_success
 
-  # Write to .elsewhere only.
   local blob="$BATS_TEST_TMPDIR/blob.txt"
   echo "only in elsewhere" >"$blob"
-  run_madder write -format tap .elsewhere "$blob"
-  assert_success
-  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash ]] || fail "write did not print digest"
+  local hash
+  hash="$(write_blob_id .elsewhere "$blob")"
 
-  # has without scope finds it (all-stores search).
   run_madder has "$hash"
   assert_success
   assert_output --partial "found"
 
-  # has scoped to .default does NOT find it.
   run_madder has .default "$hash"
   assert_failure
   assert_output --partial "not found"
 
-  # has scoped to .elsewhere does find it.
   run_madder has .elsewhere "$hash"
   assert_success
   assert_output --partial $'\tfound'

@@ -6,7 +6,6 @@ setup() {
 # bats file_tags=info_repo
 
 function compression_type { # @test
-
   init_store
   run_madder info-repo compression-type
   assert_success
@@ -14,7 +13,6 @@ function compression_type { # @test
 }
 
 function encryption_none { # @test
-
   init_store
   run_madder info-repo encryption
   assert_success
@@ -22,19 +20,16 @@ function encryption_none { # @test
 }
 
 function unknown_key_fails { # @test
-
   init_store
   run_madder info-repo nonexistent-key
   assert_failure
 }
 
 function single_arg_resolves_as_store_id { # @test
-
   init_store
   run_madder info-repo .default
   assert_success
-  # The immutable config is multi-line hyphence; pinning one
-  # well-known key proves the immutable config (not a single key
-  # value) was emitted.
+  # Multi-line hyphence config; pin one well-known key to prove the
+  # full config (not a single key value) was emitted.
   assert_output --partial 'compression-type'
 }

@@ -59,19 +59,9 @@ function pack_with_delta { # @test
   printf '%s\nunique suffix gamma\n' "$prefix" >"$blob3"
 
   local hash1 hash2 hash3
-
-  run_madder write -format tap "$blob1"
-  assert_success
-  hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-  [[ -n $hash1 ]] || fail "write returned empty hash for blob one"
-
-  run_madder write -format tap "$blob2"
-  assert_success
-  hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-
-  run_madder write -format tap "$blob3"
-  assert_success
-  hash3="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+  hash1="$(write_blob_id "$blob1")"
+  hash2="$(write_blob_id "$blob2")"
+  hash3="$(write_blob_id "$blob3")"
 
   run timeout --preserve-status 10s "$MADDER_BIN" pack
   assert_success
@@ -104,13 +94,9 @@ function pack_without_delta { # @test
   echo "no delta alpha" >"$blob1"
   echo "no delta beta" >"$blob2"
 
-  run_madder write -format tap "$blob1"
-  assert_success
-  hash1="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
-
-  run_madder write -format tap "$blob2"
-  assert_success
-  hash2="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+  local hash1 hash2
+  hash1="$(write_blob_id "$blob1")"
+  hash2="$(write_blob_id "$blob2")"
 
   run timeout --preserve-status 10s "$MADDER_BIN" pack
   assert_success
@@ -130,9 +116,6 @@ function pack_without_delta { # @test
 
 function pack_blobs_json_emits_per_arg_and_final_record { # @test
 
-  # pack-blobs writes each arg as a blob, then packs those blobs. In JSON
-  # mode, per-arg writes are NDJSON records with id/size/source; the
-  # final record has state:"packed" or "pack_failed".
   init_store
   create_archive_config "archive" "false"
 
@@ -141,7 +124,6 @@ function pack_blobs_json_emits_per_arg_and_final_record { # @test
 
   run_madder pack-blobs -format json "$blob"
   assert_success
-  # One per-arg record (id/source) plus one final state:"packed".
-  assert_output --regexp '"id":"[^"]+".*"source":"[^"]+blob\.txt"'
-  assert_output --partial '"state":"packed"'
+  assert_line --regexp '"id":"[^"]+".*"source":"[^"]+blob\.txt"'
+  assert_line --partial '"state":"packed"'
 }

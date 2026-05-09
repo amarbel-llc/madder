@@ -28,7 +28,7 @@ function validate_rejects_invalid_prefix { # @test
   printf -- '---\n! md\nX bad\n---\n' >"$f"
   run_hyphence validate "$f"
   assert_failure
-  assert_output --partial 'invalid metadata prefix'
+  assert_line --partial 'invalid metadata prefix'
 }
 
 function validate_rejects_inline_body_with_at { # @test
@@ -38,7 +38,7 @@ function validate_rejects_inline_body_with_at { # @test
   printf -- '---\n@ blake2b256-abc\n! md\n---\n\nbody\n' >"$f"
   run_hyphence validate "$f"
   assert_failure
-  assert_output --partial "blob reference '@' line forbidden"
+  assert_line --partial "blob reference '@' line forbidden"
 }
 
 function validate_reads_stdin_with_dash { # @test
@@ -120,19 +120,18 @@ function format_is_idempotent { # @test
 function unknown_subcommand_fails { # @test
   run_hyphence frobnicate
   assert_failure
-  assert_output --partial 'unknown command'
+  assert_line --partial 'unknown command'
 }
 
 function validate_rejects_crlf_in_metadata { # @test
-  # MetadataValidator rejects \r in metadata lines per RFC 0001
-  # (Slice 1 fix in fix(hyphence): reject \r in MetadataBuilder...).
-  # Diagnostic surfaces the actual offending line bytes so the user
-  # can see the \r — assert on that suffix.
+  # MetadataValidator rejects \r in metadata lines per RFC 0001.
+  # Diagnostic surfaces the offending bytes so the user can see the
+  # \r — assert on that suffix.
   local f="$BATS_TEST_TMPDIR/crlf.hyphence"
   printf -- '---\r\n! md\r\n---\n' >"$f"
   run_hyphence validate "$f"
   assert_failure
-  assert_output --partial 'expected "---" but got "---\r"'
+  assert_line --partial 'expected "---" but got "---\r"'
 }
 
 function format_anchors_leading_comment { # @test

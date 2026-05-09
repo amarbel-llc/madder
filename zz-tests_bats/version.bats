@@ -17,7 +17,7 @@ function version_prints_burnt_in_identity { # @test
   run_madder version
   assert_success
 
-  # Format: <version>+<commit>. All lanes that produce MADDER_BIN stamp
+  # Format: <version>+<commit>. Every MADDER_BIN-producing lane stamps
   # ldflags from version.env, so the dev+unknown defaults must never
   # appear here.
   assert_output --regexp '^[^+]+\+[^+]+$'
@@ -25,9 +25,8 @@ function version_prints_burnt_in_identity { # @test
 }
 
 function version_matches_source_of_truth { # @test
-  # The version prefix before '+' must match MADDER_VERSION in
-  # version.env, the source of truth for releases. Guards against
-  # drift between bump-version's sed target and the ldflag target.
+  # Guards against drift between bump-version's sed target and the
+  # ldflag target — the version prefix must match version.env exactly.
   run_madder version
   assert_success
 
@@ -37,16 +36,14 @@ function version_matches_source_of_truth { # @test
   local expected_version
   expected_version="$(grep '^MADDER_VERSION=' "${BATS_TEST_DIRNAME}/../version.env" | cut -d= -f2)"
 
-  [[ $got_version == "$expected_version" ]] ||
-    fail "madder version prefix '$got_version' does not match version.env MADDER_VERSION '$expected_version'"
+  assert_equal "$got_version" "$expected_version"
 }
 
 function version_madder_cache_matches_madder { # @test
-  # Both binaries read from the same buildinfo package, so their
-  # reported identity must match byte-for-byte. Detects ldflag drift
-  # between the two subPackages if subPackages ever needs split builds.
-  # madder-cache is derived from MADDER_BIN because the bats harness
-  # only plumbs MADDER_BIN explicitly.
+  # Both binaries read from the same buildinfo package; reported
+  # identity must match byte-for-byte. Detects ldflag drift if
+  # subPackages ever needs split builds. madder-cache is derived from
+  # MADDER_BIN because the bats harness only plumbs MADDER_BIN.
   local madder_cache_bin
   madder_cache_bin="$(dirname "${MADDER_BIN:-madder}")/madder-cache"
 
@@ -58,6 +55,5 @@ function version_madder_cache_matches_madder { # @test
   assert_success
   local madder_cache_version="$output"
 
-  [[ $madder_version == "$madder_cache_version" ]] ||
-    fail "madder=\"$madder_version\" madder-cache=\"$madder_cache_version\" disagree"
+  assert_equal "$madder_version" "$madder_cache_version"
 }
