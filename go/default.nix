@@ -143,14 +143,14 @@ let
   # `clown.json.in` template uses an `@madder-mcp@` placeholder which is
   # rewritten to `${madder}/bin/madder-mcp` here. Consumers wire the
   # plugin into clown by pointing `--plugin-dir` at
-  # `${madder-clown-plugin}/share/clown-plugins/madder/`.
+  # `${madder-clown-plugin}/share/purse-first/madder/`.
   madder-clown-plugin = pkgs.runCommand "madder-clown-plugin" { } ''
-    mkdir -p $out/share/clown-plugins/madder/.claude-plugin
+    mkdir -p $out/share/purse-first/madder/.claude-plugin
     cp ${../plugins/madder/.claude-plugin/plugin.json} \
-       $out/share/clown-plugins/madder/.claude-plugin/plugin.json
+       $out/share/purse-first/madder/.claude-plugin/plugin.json
     substitute \
       ${../plugins/madder/clown.json.in} \
-      $out/share/clown-plugins/madder/clown.json \
+      $out/share/purse-first/madder/clown.json \
       --replace-fail '@madder-mcp@' '${madder}/bin/madder-mcp'
   '';
 
