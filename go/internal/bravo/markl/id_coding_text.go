@@ -39,11 +39,6 @@ func (id *Id) UnmarshalText(bites []byte) (err error) {
 		return err
 	}
 
-	// blech32.Decode reads HRP = "purpose@format" (or just "format")
-	// as a unit so the checksum verifies against the same bytes
-	// MarshalText computed it from. SetMarklId then runs the RFC 0002
-	// §4 validations: GetFormatOrError, (purpose, format)
-	// compatibility, and payload-size match.
 	var purposeAndFormatId string
 	var data []byte
 
@@ -52,9 +47,28 @@ func (id *Id) UnmarshalText(bites []byte) (err error) {
 		return err
 	}
 
-	purpose, formatId, hasPurpose := strings.Cut(purposeAndFormatId, "@")
+	if err = id.applyDecodedHRPAndData(purposeAndFormatId, data); err != nil {
+		err = errors.Wrapf(err, "Raw: %q", string(bites))
+		return err
+	}
+
+	return err
+}
+
+// applyDecodedHRPAndData is the post-blech32 half of the RFC 0002 §4
+// decode algorithm — shared between UnmarshalText (whose blech32 input
+// is []byte) and Set (whose input is string). Splits the HRP on the
+// first `@` to extract a purpose, then routes through SetMarklId for
+// the format-resolution, (purpose, format) compatibility, and
+// payload-size validations.
+//
+// Both decoders MUST run the blech32 step on the WHOLE input first
+// (with the combined HRP) — that is what makes the checksum verify
+// against the same bytes MarshalText computed it from.
+func (id *Id) applyDecodedHRPAndData(hrp string, data []byte) (err error) {
+	purpose, formatId, hasPurpose := strings.Cut(hrp, "@")
 	if !hasPurpose {
-		formatId = purposeAndFormatId
+		formatId = hrp
 	}
 
 	if hasPurpose {
@@ -65,7 +79,7 @@ func (id *Id) UnmarshalText(bites []byte) (err error) {
 	}
 
 	if err = id.SetMarklId(formatId, data); err != nil {
-		err = errors.Wrapf(err, "Raw: %q", string(bites))
+		err = errors.Wrap(err)
 		return err
 	}
 

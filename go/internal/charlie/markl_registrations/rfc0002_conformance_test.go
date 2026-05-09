@@ -107,6 +107,46 @@ func TestRFC0002InvalidVectorsRejected(t *testing.T) {
 	}
 }
 
+// TestRFC0002VectorsRoundTripViaSet exercises markl.Id.Set against the
+// same fixture, pinning that the string-form decoder accepts the same
+// canonical wire format the byte-form decoder (UnmarshalText) accepts.
+// This is the regression guard for #152 — Set used to split on `@`
+// before running blech32.Decode, so its checksum verification fired
+// against the wrong HRP for purpose-bearing IDs.
+func TestRFC0002VectorsRoundTripViaSet(t *testing.T) {
+	fixture := loadRFC0002Fixture(t)
+
+	if len(fixture.Vectors) == 0 {
+		t.Fatal("fixture has no vectors")
+	}
+
+	for _, v := range fixture.Vectors {
+		v := v
+		t.Run(v.Name, func(t *testing.T) {
+			payload := decodePayloadHex(t, v.Name, v.PayloadHex)
+
+			var decoded markl.Id
+			if err := decoded.Set(v.Encoded); err != nil {
+				t.Fatalf("Set(%q): %v", v.Encoded, err)
+			}
+
+			if got := decoded.GetPurposeId(); got != v.Purpose {
+				t.Errorf("decoded purpose: got %q, want %q", got, v.Purpose)
+			}
+			format := decoded.GetMarklFormat()
+			if format == nil {
+				t.Fatalf("decoded format is nil")
+			}
+			if got := format.GetMarklFormatId(); got != v.Format {
+				t.Errorf("decoded format: got %q, want %q", got, v.Format)
+			}
+			if got := decoded.GetBytes(); !bytes.Equal(got, payload) {
+				t.Errorf("decoded payload: got %x, want %x", got, payload)
+			}
+		})
+	}
+}
+
 // TestRFC0002AliasResolution pins the legacy compatibility path from
 // RFC 0002 §6: a purpose-id-shaped string sitting in the format-id slot
 // resolves through the alias table. This is the on-disk shape the
