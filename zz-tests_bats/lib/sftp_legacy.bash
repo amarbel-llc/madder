@@ -4,31 +4,37 @@
 # lib/sftp.bash (which spawns the test SFTP server and writes the
 # host key) and lib/common.bash (run_madder, fail, assert_*).
 
-# start_test_ssh_agent spawns ssh-agent on a per-test Unix socket
-# under $BATS_TEST_TMPDIR, generates a fresh ed25519 keypair, loads
-# it into the agent, and exports SSH_AUTH_SOCK. Pair with
-# stop_test_ssh_agent in teardown.
+# start_test_ssh_agent spawns ssh-agent, generates a fresh ed25519
+# keypair, loads it into the agent, and exports SSH_AUTH_SOCK. Pair
+# with stop_test_ssh_agent in teardown.
 #
 # Why: madder's MakeSSHClientFromSSHConfig uses pubkey-via-agent
-# auth, so the bats path needs an agent reachable from the sandbox.
-# Running ssh-agent inside $BATS_TEST_TMPDIR keeps the socket inside
-# the bats sandbox boundary.
+# auth, so the bats path needs an agent reachable from the test.
+#
+# Socket-path-length: ssh-agent (without -a) uses TMPDIR for its
+# socket dir, falling back to /tmp. Forcing TMPDIR=/tmp here
+# circumvents two compounding sources of nesting: the bats sandbox
+# under $BATS_TEST_TMPDIR, and any Claude-Code-style session TMPDIR
+# rooted inside the worktree (e.g. `.worktrees/<name>/.tmp/...`).
+# Either alone can blow past the 108-char Unix domain socket limit;
+# in combination they always do. /tmp is in sandcastle's allowWrite
+# list, so the redirect is permitted within the sandbox.
+# ssh-agent cleans up its own socket dir on SIGTERM, which is what
+# stop_test_ssh_agent sends.
 start_test_ssh_agent() {
-  local sock="$BATS_TEST_TMPDIR/ssh-agent.sock"
   local key="$BATS_TEST_TMPDIR/test_ed25519"
 
   ssh-keygen -t ed25519 -N '' -f "$key" -q
 
-  # Spawn the agent on the per-test socket. ssh-agent -s prints
-  # shell-eval lines that set SSH_AUTH_SOCK and SSH_AGENT_PID; -a
-  # forces the socket path so we can scope it to the test tmpdir.
+  # ssh-agent -s prints shell-eval lines that set SSH_AUTH_SOCK and
+  # SSH_AGENT_PID. TMPDIR=/tmp forces a short socket path.
   local agent_output
-  agent_output="$(ssh-agent -s -a "$sock")"
+  agent_output="$(TMPDIR=/tmp ssh-agent -s)"
   eval "$agent_output" >/dev/null
 
   ssh-add "$key" 2>/dev/null
 
-  export SSH_AUTH_SOCK="$sock"
+  export SSH_AUTH_SOCK
   export SSH_AGENT_PID
   export TEST_SSH_AGENT_KEY="$key"
 }
