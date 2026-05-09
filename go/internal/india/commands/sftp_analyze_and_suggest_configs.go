@@ -8,6 +8,7 @@ import (
 	"io"
 	mathrand "math/rand"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"strings"
@@ -59,6 +60,7 @@ type SftpAnalyzeAndSuggestConfigs struct {
 	maxSampleBytes int
 	emitTop        int
 	yesToAll       bool
+	viaOSSSH       bool
 }
 
 func (cmd SftpAnalyzeAndSuggestConfigs) GetDescription() futility.Description {
@@ -140,6 +142,12 @@ func (cmd *SftpAnalyzeAndSuggestConfigs) SetFlagDefinitions(
 		"max candidate files to write")
 	flags.BoolVar(&cmd.yesToAll, "yes-to-all", false,
 		"auto-confirm every prompt; combine with non-tty for scripted runs")
+	flags.BoolVar(&cmd.viaOSSSH, "via-os-ssh", false,
+		"dial SFTP through the system `ssh -s host sftp` instead of "+
+			"the in-process Go SSH client. Inherits OS ssh's full auth "+
+			"support: tailscale-ssh, ssh_config IdentityFile, ProxyCommand, "+
+			"jump hosts, ControlMaster reuse, password prompts, etc. "+
+			"Requires `ssh` on PATH.")
 	flags.Func("key", "age private key path; repeatable",
 		func(v string) error {
 			cmd.keyPaths = append(cmd.keyPaths, v)
@@ -313,13 +321,79 @@ func loadAgeKeys(paths []string) ([]markl.Id, error) {
 	return out, nil
 }
 
-// dialSFTP connects via ssh_config-style transport. Constructs a
-// throwaway TomlSFTPViaSSHConfigV0 from the cmd's flags so we can
-// reuse blob_stores.MakeSSHClientFromSSHConfig, which now
-// resolves Host aliases through `ssh -G` (#142). Bare aliases
-// like "my-host" resolve correctly; "user@host:port" forms still
-// work because URI-explicit fields override resolved values.
+// dialSFTP returns an *sftp.Client using either the in-process Go
+// SSH client (default) or by spawning OS `ssh -s host sftp` as a
+// subprocess and piping stdio into sftp.NewClientPipe (when
+// -via-os-ssh is set). The OS-ssh path inherits real ssh's full
+// auth machinery: tailscale-ssh, IdentityFile, ProxyCommand,
+// jump hosts, ControlMaster reuse, password prompts. The
+// in-process path is faster and self-contained but only does
+// pubkey-via-agent.
 func (cmd SftpAnalyzeAndSuggestConfigs) dialSFTP(
+	env command_components.BlobStoreEnv,
+) (*sftp.Client, func(), error) {
+	if cmd.viaOSSSH {
+		return cmd.dialSFTPViaOSSSH(env)
+	}
+	return cmd.dialSFTPInProcess(env)
+}
+
+// dialSFTPViaOSSSH spawns `ssh -s <host> sftp` and wires its
+// stdio into sftp.NewClientPipe. OS ssh handles the SSH protocol
+// + every form of auth its own ssh_config knows about. Madder
+// just speaks SFTP over the resulting pipe.
+//
+// stderr from the subprocess is forwarded to madder's stderr so
+// the user sees host-key prompts, password prompts, and ssh's
+// own diagnostics. (sftp -s is a non-interactive subsystem
+// invocation, so password prompts will appear on the controlling
+// tty if ssh requires them.)
+func (cmd SftpAnalyzeAndSuggestConfigs) dialSFTPViaOSSSH(
+	env command_components.BlobStoreEnv,
+) (*sftp.Client, func(), error) {
+	args := []string{"-s", cmd.sshHost, "sftp"}
+	sshCmd := exec.Command("ssh", args...)
+	sshCmd.Stderr = os.Stderr
+
+	stdin, err := sshCmd.StdinPipe()
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "ssh stdin pipe")
+	}
+	stdout, err := sshCmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, errors.Wrapf(err, "ssh stdout pipe")
+	}
+
+	env.GetUI().Printf("dialing via OS ssh: ssh -s %q sftp", cmd.sshHost)
+
+	if err := sshCmd.Start(); err != nil {
+		return nil, nil, errors.Wrapf(err, "ssh -s %q sftp", cmd.sshHost)
+	}
+
+	sftpClient, err := sftp.NewClientPipe(stdout, stdin)
+	if err != nil {
+		_ = stdin.Close()
+		_ = sshCmd.Process.Kill()
+		_ = sshCmd.Wait()
+		return nil, nil, errors.Wrapf(err, "sftp.NewClientPipe")
+	}
+
+	closeFn := func() {
+		_ = sftpClient.Close()
+		// Closing stdin signals EOF to the SFTP subsystem; ssh
+		// will terminate when its remote command exits.
+		_ = stdin.Close()
+		_ = sshCmd.Wait()
+	}
+
+	return sftpClient, closeFn, nil
+}
+
+// dialSFTPInProcess connects via blob_stores.MakeSSHClientFromSSHConfig
+// (which now resolves Host aliases through `ssh -G`, #142). Bare
+// aliases like "my-host" resolve correctly; "user@host:port" forms
+// still work because URI-explicit fields override resolved values.
+func (cmd SftpAnalyzeAndSuggestConfigs) dialSFTPInProcess(
 	env command_components.BlobStoreEnv,
 ) (*sftp.Client, func(), error) {
 	uriStr := fmt.Sprintf("sftp://%s/%s",
