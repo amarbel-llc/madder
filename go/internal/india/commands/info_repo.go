@@ -133,17 +133,9 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			}
 
 		case "config-path":
-			// Use the resolved store's path, not the env's default.
-			// Without this, `info-repo ..default config-path` would
-			// always print the deepest-ancestor default's config —
-			// hiding the disambiguation that #145's walk-up enables.
 			env.GetUI().Print(blobStore.Path.GetConfig())
 
 		case "dir-blob_stores":
-			// Same fix as config-path: use the resolved store's path
-			// instead of env's default, so `info-repo ..default
-			// dir-blob_stores` reflects the ancestor that actually
-			// owns this store.
 			env.GetUI().Print(filepath.Dir(blobStore.Path.GetBase()))
 
 		case "xdg":

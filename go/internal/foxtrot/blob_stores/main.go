@@ -78,15 +78,8 @@ func makeBlobStoreConfigs(
 	return blobStores
 }
 
-// makeAncestorOverrideStores walks every `.<utility>/` ancestor on the
-// CWD walk-up chain, deepest-first, and merges each ancestor's stores
-// into a single BlobStoreMap. Same-name stores at shallower ancestors
-// are tagged with cwdDepth = rank-among-prior-occurrences, so each
-// store gets a unique id-string (`.foo` for the deepest, `..foo` for
-// the next, etc.). Caller is responsible for the IsOverridden() guard
-// — invoking this from non-override mode would walk past nothing.
-//
-// See #145.
+// Caller is responsible for the IsOverridden() guard — invoking this
+// from non-override mode would walk past nothing.
 func makeAncestorOverrideStores(
 	ctx interfaces.ActiveContext,
 	envDir env_dir.Env,
@@ -153,14 +146,10 @@ func MakeBlobStores(
 	directoryLayout directory_layout.BlobStore,
 ) (blobStores BlobStoreMap) {
 	if envDir.GetXDG().IsOverridden() {
-		// CWD-override mode: discover at every `.<utility>/` ancestor
-		// on the walk-up chain (deepest-first). Same-name stores at
-		// shallower ancestors get extra `.` prefixes via cwdDepth so
-		// the user-facing id-string disambiguates them (#145).
 		blobStores = makeAncestorOverrideStores(ctx, envDir, directoryLayout)
 
-		// User-XDG fallback (unchanged): adds non-`.`-prefixed stores,
-		// disjoint key-space from the Cwd entries above.
+		// User-XDG entries are non-`.`-prefixed, disjoint from the
+		// Cwd entries above — the merge below cannot collide.
 		if directoryLayoutForUser, err := directory_layout.CloneBlobStoreWithXDG(
 			directoryLayout,
 			envDir.GetXDGForBlobStores().CloneWithoutOverride(),

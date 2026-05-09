@@ -78,14 +78,8 @@ func (id Id) String() string {
 // non-Cwd locations, and always single-dot for Cwd (depth dropped).
 // MarshalText delegates here so on-disk references survive CWD changes.
 func (id Id) Canonical() string {
-	if id.cwdDepth == 0 {
-		return id.String()
-	}
-
-	canonical := id
-	canonical.cwdDepth = 0
-
-	return canonical.String()
+	id.cwdDepth = 0
+	return id.String()
 }
 
 func (id *Id) Set(value string) (err error) {

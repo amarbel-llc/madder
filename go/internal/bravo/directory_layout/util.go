@@ -106,7 +106,7 @@ func FindAllCwdOverridePaths(
 	var ancestors []string
 
 	dir := cwd
-	for safety := 0; safety < 1024; safety++ {
+	for safety := 0; safety < 100; safety++ {
 		if files.Exists(filepath.Join(dir, marker)) {
 			ancestors = append(ancestors, dir)
 		}
