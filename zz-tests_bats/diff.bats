@@ -88,6 +88,28 @@ RECEIPT
   assert_output --partial 'entry escapes destination'
 }
 
+function diff_accepts_dot_destination { # @test
+  # Regression for `pathConfinedTo` with dest=`.`: filepath.Clean
+  # strips the `./` prefix from the materialized path, so the old
+  # HasPrefix(materialized, dest+sep) check rejected every benign
+  # entry. The fix uses filepath.Rel.
+  #
+  # We only assert the validate-phase guard does not fire. The
+  # tree-vs-receipt diff itself is noisy here (cwd holds the store
+  # and other test files), so we don't assert success — only that
+  # the `entry escapes destination` refusal is gone.
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg diff "$rid" .
+  refute_output --partial 'entry escapes destination'
+}
+
 # Phase B: happy path.
 
 function diff_is_clean_after_round_trip { # @test

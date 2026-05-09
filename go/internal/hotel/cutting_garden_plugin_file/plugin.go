@@ -333,10 +333,17 @@ func ValidateEntries(entries []capture_receipt.EntryV1, dest string) error {
 }
 
 func pathConfinedTo(materialized, dest string) bool {
-	if materialized == dest {
-		return true
+	rel, err := filepath.Rel(dest, materialized)
+	if err != nil {
+		return false
 	}
-	return strings.HasPrefix(materialized, dest+string(os.PathSeparator))
+	if rel == ".." {
+		return false
+	}
+	if strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return false
+	}
+	return true
 }
 
 func materializeEntries(
