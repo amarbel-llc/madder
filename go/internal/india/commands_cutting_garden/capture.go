@@ -179,12 +179,9 @@ func (cmd Capture) Run(req futility.Request) {
 			failCount += result.FailCount
 		}
 
-		// Single-root groups collapse Root to "." so the receipt
-		// describes the captured tree without a per-root prefix —
-		// `cg capture src` becomes symmetric with `cg diff <rid> src`.
-		// Multi-root groups keep distinct Root values per RFC 0003
-		// §Multi-Root Receipts; symmetry there is against the
-		// capture-time PWD, not any individual root.
+		// Collapse Root to "." for single-root groups per RFC 0003
+		// §Root Encoding. Multi-root groups keep distinct Root values
+		// (the §Multi-Root Receipts case).
 		if len(group.roots) == 1 {
 			for i := range entries {
 				entries[i].Root = "."

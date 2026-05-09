@@ -57,3 +57,32 @@ init_store() {
 file_mode() {
   stat -c '%a' "$1"
 }
+
+# write_blob_id pipes a file through `madder write -format tap` and
+# echoes just the blob-id (the 4th column of the `ok 1 - ...` line).
+# Used to inject hand-crafted receipt blobs without touching any
+# capture-specific layout. Pass an explicit store-id as the first
+# arg to target a non-default store: `write_blob_id .work path`.
+write_blob_id() {
+  local store path
+  if [[ $# -eq 1 ]]; then
+    path="$1"
+    run_madder write -format tap "$path"
+  else
+    store="$1"
+    path="$2"
+    run_madder write -format tap "$store" "$path"
+  fi
+  assert_success
+  echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
+}
+
+# capture_receipt_id captures the directory under PWD into the active
+# store and echoes the receipt blob-id from the JSON sink record.
+capture_receipt_id() {
+  local dir="$1"
+  run_cg capture -format json "$dir"
+  assert_success
+  echo "$output" | grep -F '"type":"store_group_receipt"' |
+    sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
+}

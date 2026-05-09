@@ -6,28 +6,19 @@
 
 # start_test_ssh_agent spawns ssh-agent, generates a fresh ed25519
 # keypair, loads it into the agent, and exports SSH_AUTH_SOCK. Pair
-# with stop_test_ssh_agent in teardown.
+# with stop_test_ssh_agent in teardown. madder's
+# MakeSSHClientFromSSHConfig uses pubkey-via-agent auth.
 #
-# Why: madder's MakeSSHClientFromSSHConfig uses pubkey-via-agent
-# auth, so the bats path needs an agent reachable from the test.
-#
-# Socket-path-length: ssh-agent (without -a) uses TMPDIR for its
-# socket dir, falling back to /tmp. Forcing TMPDIR=/tmp here
-# circumvents two compounding sources of nesting: the bats sandbox
-# under $BATS_TEST_TMPDIR, and any Claude-Code-style session TMPDIR
-# rooted inside the worktree (e.g. `.worktrees/<name>/.tmp/...`).
-# Either alone can blow past the 108-char Unix domain socket limit;
-# in combination they always do. /tmp is in sandcastle's allowWrite
-# list, so the redirect is permitted within the sandbox.
-# ssh-agent cleans up its own socket dir on SIGTERM, which is what
-# stop_test_ssh_agent sends.
+# TMPDIR=/tmp scopes ssh-agent's socket dir to a short path:
+# $BATS_TEST_TMPDIR plus any worktree-rooted session TMPDIR can
+# blow past the 108-char Unix domain socket limit. /tmp is in
+# sandcastle's allowWrite list, and ssh-agent cleans up the socket
+# dir on the SIGTERM that stop_test_ssh_agent sends.
 start_test_ssh_agent() {
   local key="$BATS_TEST_TMPDIR/test_ed25519"
 
   ssh-keygen -t ed25519 -N '' -f "$key" -q
 
-  # ssh-agent -s prints shell-eval lines that set SSH_AUTH_SOCK and
-  # SSH_AGENT_PID. TMPDIR=/tmp forces a short socket path.
   local agent_output
   agent_output="$(TMPDIR=/tmp ssh-agent -s)"
   eval "$agent_output" >/dev/null

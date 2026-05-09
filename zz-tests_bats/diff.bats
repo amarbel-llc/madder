@@ -11,36 +11,14 @@ setup() {
 # D (in receipt only), T (type changed). Exit 0 when the tree
 # matches; non-zero on any difference or error.
 #
-# Tests use the symmetric round-trip pattern: capture src → restore
-# out → diff $rid out. The dir arg to diff is "out" (the
-# materialization destination), so receipt entries with Root="src"
-# materialize to "src/..." under out/, and diff's keys align.
+# Single-root captures encode Root="." (RFC 0003 §Root Encoding),
+# so `restore <rid> out` lands files directly under `out/` (no per-
+# root prefix), and `diff <rid> src` (against the originally-
+# captured directory) is symmetric with `diff <rid> out` (against
+# the post-restore tree). Phase B-D tests use the post-restore
+# `out/` form; Phase E asserts the capture-symmetric form.
 
-# capture_receipt_id captures the directory under PWD into the active
-# store and echoes the receipt blob-id from the JSON sink record.
-capture_receipt_id() {
-  local dir="$1"
-  run_cg capture -format json "$dir"
-  assert_success
-  echo "$output" | grep -F '"type":"store_group_receipt"' |
-    sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
-}
-
-# write_blob_id pipes a file through `madder write -format tap` and
-# echoes just the blob-id (the 4th column of the `ok 1 - ...` line).
-write_blob_id() {
-  local store path
-  if [[ $# -eq 1 ]]; then
-    path="$1"
-    run_madder write -format tap "$path"
-  else
-    store="$1"
-    path="$2"
-    run_madder write -format tap "$store" "$path"
-  fi
-  assert_success
-  echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
-}
+# write_blob_id and capture_receipt_id live in lib/common.bash.
 
 # Phase A: refusals.
 
@@ -55,8 +33,7 @@ function diff_refuses_nonexistent_dir { # @test
 
   run_cg diff "$rid" no-such-dir
   assert_failure
-  echo "$output" | grep -qF 'directory does not exist' ||
-    fail "expected nonexistent-dir refusal: $output"
+  assert_output --partial 'directory does not exist'
 }
 
 function diff_refuses_dir_arg_that_is_a_file { # @test
@@ -72,8 +49,7 @@ function diff_refuses_dir_arg_that_is_a_file { # @test
 
   run_cg diff "$rid" regular-file.txt
   assert_failure
-  echo "$output" | grep -qF 'not a directory' ||
-    fail "expected not-a-directory refusal: $output"
+  assert_output --partial 'not a directory'
 }
 
 function diff_refuses_unparseable_receipt_id { # @test
@@ -82,8 +58,7 @@ function diff_refuses_unparseable_receipt_id { # @test
   mkdir dir
   run_cg diff "garbage-not-a-markl-id" dir
   assert_failure
-  echo "$output" | grep -qF 'parse receipt-id' ||
-    fail "expected parse-receipt-id refusal: $output"
+  assert_output --partial 'parse receipt-id'
 }
 
 function diff_refuses_path_escape { # @test
@@ -110,8 +85,7 @@ RECEIPT
   mkdir target
   run_cg diff "$rid" target
   assert_failure
-  echo "$output" | grep -qF 'entry escapes destination' ||
-    fail "expected escape refusal: $output"
+  assert_output --partial 'entry escapes destination'
 }
 
 # Phase B: happy path.
@@ -141,12 +115,8 @@ function diff_is_clean_after_round_trip { # @test
   assert_success
   # `output` captures stdout AND stderr; the source-store-hint
   # notices are stderr noise common to every default-store diff.
-  # Assert only that no M/A/D/T lines (the actual diff entries)
-  # were emitted.
-  local diff_lines
-  diff_lines="$(echo "$output" | grep -E '^[MADT]  ' || true)"
-  [[ -z $diff_lines ]] ||
-    fail "expected zero diff entries, got: $diff_lines"
+  # Refute only the M/A/D/T diff-entry lines.
+  refute_line --regexp '^[MADT]  '
 }
 
 # Phase C: drift detection.
@@ -170,10 +140,8 @@ function diff_detects_added_file { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^A  extra.txt' ||
-    fail "expected 'A  extra.txt' line: $output"
-  echo "$output" | grep -qF 'tree differs from receipt' ||
-    fail "expected tree-differs error: $output"
+  assert_line --regexp '^A  extra\.txt'
+  assert_output --partial 'tree differs from receipt'
 }
 
 function diff_detects_deleted_file { # @test
@@ -193,8 +161,7 @@ function diff_detects_deleted_file { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^D  b.txt' ||
-    fail "expected 'D  b.txt' line: $output"
+  assert_line --regexp '^D  b\.txt'
 }
 
 function diff_detects_modified_file_content { # @test
@@ -213,8 +180,7 @@ function diff_detects_modified_file_content { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  file.txt.*blob ' ||
-    fail "expected 'M  file.txt  blob ...' line: $output"
+  assert_line --regexp '^M  file\.txt.*blob '
 }
 
 function diff_detects_modified_file_mode { # @test
@@ -234,8 +200,7 @@ function diff_detects_modified_file_mode { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  file.txt.*mode ' ||
-    fail "expected 'M  file.txt  mode ...' line: $output"
+  assert_line --regexp '^M  file\.txt.*mode '
 }
 
 function diff_detects_type_change { # @test
@@ -258,8 +223,7 @@ function diff_detects_type_change { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^T  file.*file -> symlink' ||
-    fail "expected 'T  file  file -> symlink' line: $output"
+  assert_line --regexp '^T  file.*file -> symlink'
 }
 
 function diff_detects_symlink_target_change { # @test
@@ -281,8 +245,7 @@ function diff_detects_symlink_target_change { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  link.*target.*a.txt.*->.*b.txt' ||
-    fail "expected 'M  link  target ...' line: $output"
+  assert_line --regexp '^M  link.*target.*a\.txt.*->.*b\.txt'
 }
 
 # Phase D: -verify-blobs-exist (receipt-vs-store check).
@@ -312,10 +275,7 @@ function diff_verify_blobs_exist_clean_round_trip { # @test
 
   run_cg diff -verify-blobs-exist "$rid" out
   assert_success
-  local diff_lines
-  diff_lines="$(echo "$output" | grep -E '^[BMADT]  ' || true)"
-  [[ -z $diff_lines ]] ||
-    fail "expected zero diff entries with flag, got: $diff_lines"
+  refute_line --regexp '^[BMADT]  '
 }
 
 function diff_verify_blobs_exist_detects_missing_blob { # @test
@@ -343,8 +303,7 @@ RECEIPT
 
   run_cg diff -verify-blobs-exist "$rid" target
   assert_failure
-  echo "$output" | grep -qE '^B  src/file.txt.*blob .* missing in source store' ||
-    fail "expected 'B  src/file.txt blob ... missing' line: $output"
+  assert_line --regexp '^B  src/file\.txt.*blob .* missing in source store'
 }
 
 function diff_without_flag_does_not_emit_B_lines { # @test
@@ -372,10 +331,8 @@ RECEIPT
 
   run_cg diff "$rid" target
   assert_failure
-  echo "$output" | grep -qE '^B  ' &&
-    fail "expected no B lines without flag, got: $output"
-  echo "$output" | grep -qE '^D  src/file.txt' ||
-    fail "expected D lines for absent paths: $output"
+  refute_line --regexp '^B  '
+  assert_line --regexp '^D  src/file\.txt'
 }
 
 function diff_reports_multiple_differences_sorted_by_path { # @test
@@ -400,25 +357,21 @@ function diff_reports_multiple_differences_sorted_by_path { # @test
 
   run_cg diff "$rid" out
   assert_failure
-  echo "$output" | grep -qE '^M  a.txt.*blob ' ||
-    fail "expected M a.txt: $output"
-  echo "$output" | grep -qE '^D  b.txt' ||
-    fail "expected D b.txt: $output"
-  echo "$output" | grep -qE '^A  extra.txt' ||
-    fail "expected A extra.txt: $output"
-  echo "$output" | grep -qF 'tree differs from receipt: 3 entries' ||
-    fail "expected '3 entries' summary: $output"
+  assert_line --regexp '^M  a\.txt.*blob '
+  assert_line --regexp '^D  b\.txt'
+  assert_line --regexp '^A  extra\.txt'
+  assert_output --partial 'tree differs from receipt: 3 entries'
 }
 
 # Phase E: capture-diff symmetry.
 #
-# `cg capture <dir>` and `cg diff <rid> <dir>` should be symmetric:
-# the same <dir> argument that produced the receipt should diff
-# clean against it. Today this is not the case — the receipt records
-# entries with Root=<dir> and Path=<rel-to-dir>, so diff keys via
-# filepath.Join(Root, Path) end up one level deeper than the disk
-# walk of <dir> produces. These tests pin the desired symmetric
-# behavior; they currently fail.
+# `cg capture <dir>` and `cg diff <rid> <dir>` are symmetric for
+# single-root captures: the same <dir> argument that produced the
+# receipt diffs clean against it without an intermediate `restore`.
+# This is enabled by RFC 0003 §Root Encoding, which collapses Root
+# to "." for single-root capture-groups so the receipt key
+# (filepath.Join(Root, Path)) reduces to Path — matching the disk-
+# walk's rel-to-<dir> key.
 
 function diff_is_clean_against_originally_captured_dir { # @test
   # capture src → diff $rid src → expected: no differences, exit 0.

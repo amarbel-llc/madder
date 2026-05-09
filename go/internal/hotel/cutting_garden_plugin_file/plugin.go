@@ -364,13 +364,10 @@ func materializeEntries(
 			if err := os.MkdirAll(materialized, e.Mode.Perm()); err != nil {
 				return errors.Wrapf(err, "mkdir %q", materialized)
 			}
-			// MkdirAll does not apply mode to dirs that already exist.
-			// That matters for the receipt's root "." entry, whose
-			// materialization path equals cleanDest (pre-created above
-			// with a default mode); without an explicit Chmod the
-			// captured root mode would be silently dropped. Applying
-			// Chmod unconditionally is also a no-op for dirs we just
-			// created with the right mode.
+			// MkdirAll umasks the requested mode and skips it
+			// entirely for dirs that already exist (e.g. cleanDest
+			// itself, pre-created above). Chmod unconditionally so
+			// the captured perms survive both paths.
 			if err := os.Chmod(materialized, e.Mode.Perm()); err != nil {
 				return errors.Wrapf(err, "chmod %q", materialized)
 			}
