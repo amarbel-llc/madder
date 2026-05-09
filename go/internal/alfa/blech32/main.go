@@ -337,6 +337,13 @@ func DecodeString(input string) (hrp string, data []byte, err error) {
 // Decode decodes a Blech32 string. If the string is uppercase, the HRP
 // will be uppercase.
 func Decode(bites []byte) (hrp string, data []byte, err error) {
+	// Per BIP173 / blech32 §case-rules: the whole input — HRP and
+	// data together — MUST be uniformly cased. DecodeString already
+	// enforces this on its string input; do the same here on bytes.
+	if _, err = validateCase(bites); err != nil {
+		return hrp, data, err
+	}
+
 	pos := bytes.LastIndex(bites, []byte("-"))
 
 	if err = validateSeparatorPosition(bites, pos); err != nil {

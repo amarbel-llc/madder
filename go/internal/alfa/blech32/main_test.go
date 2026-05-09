@@ -25,8 +25,6 @@ import (
 )
 
 func TestBlech32(t1 *testing.T) {
-	t1.Skip()
-
 	t := ui.T{T: t1}
 
 	type testCase struct {

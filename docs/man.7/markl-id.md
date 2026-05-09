@@ -79,21 +79,24 @@ The entire string must be uniformly cased (all upper or all lower). The
 # FORMAT IDS
 
   Format               Size   Description
-  -------------------- ------ ---------------------------
+  -------------------- ------ -------------------------------------------
   sha256               32     SHA-256 digest
   blake2b256           32     BLAKE2b-256 digest
   ed25519_pub          32     Ed25519 public key
   ed25519_sec          64     Ed25519 private key
   ed25519_sig          64     Ed25519 signature
+  ed25519_ssh          32     Ed25519 public key surfaced via SSH agent
   ecdsa_p256_pub       33     ECDSA P-256 public key
   ecdsa_p256_sig       64     ECDSA P-256 signature
+  ecdsa_p256_ssh       33     ECDSA P-256 public key via SSH agent
   age_x25519_pub       32     age X25519 public key
   age_x25519_sec       32     age X25519 secret key
   pivy_ecdh_p256_pub   33     PIV ECDH P-256 public key
   nonce                32     Random nonce
 
-Variable-size formats **ed25519_ssh** and **ecdsa_p256_ssh** encode keys in SSH
-wire format.
+The **\*_ssh** formats carry a bare public-key payload (32 or 33 bytes); the
+SSH-agent integration that produces signatures with these keys is internal to
+the implementation and not part of the wire format.
 
 # PURPOSE IDS
 
@@ -117,7 +120,10 @@ Common purposes:
 **dodder-repo-private_key-v1**
 :   Repository private key. Formats: ed25519_sec, ed25519_ssh, ecdsa_p256_ssh.
 
-See RFC 0002 (docs/rfcs/0002-markl-id-format.md) for the complete registry.
+See RFC 0002 (docs/rfcs/0002-markl-id-format.md) for the normative wire-format
+spec and the cross-language stable purpose registry. The Go reference
+implementation registers additional dodder/madder-internal purposes that are
+out of scope for the RFC.
 
 # SEE ALSO
 

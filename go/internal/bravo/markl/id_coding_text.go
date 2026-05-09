@@ -39,31 +39,33 @@ func (id *Id) UnmarshalText(bites []byte) (err error) {
 		return err
 	}
 
+	// blech32.Decode reads HRP = "purpose@format" (or just "format")
+	// as a unit so the checksum verifies against the same bytes
+	// MarshalText computed it from. SetMarklId then runs the RFC 0002
+	// §4 validations: GetFormatOrError, (purpose, format)
+	// compatibility, and payload-size match.
 	var purposeAndFormatId string
+	var data []byte
 
-	if purposeAndFormatId, id.data, err = blech32.Decode(bites); err != nil {
+	if purposeAndFormatId, data, err = blech32.Decode(bites); err != nil {
 		err = errors.Wrapf(err, "Raw: %q", string(bites))
 		return err
 	}
 
-	purpose, formatId, ok := strings.Cut(purposeAndFormatId, "@")
+	purpose, formatId, hasPurpose := strings.Cut(purposeAndFormatId, "@")
+	if !hasPurpose {
+		formatId = purposeAndFormatId
+	}
 
-	if ok {
+	if hasPurpose {
 		if err = id.SetPurposeId(purpose); err != nil {
 			err = errors.Wrap(err)
 			return err
 		}
-	} else {
-		formatId = purposeAndFormatId
 	}
 
-	if id.format, err = GetFormatOrError(formatId); err != nil {
-		err = errors.Wrapf(
-			err,
-			"failed to unmarshal %T with contents: %s",
-			id,
-			bites,
-		)
+	if err = id.SetMarklId(formatId, data); err != nil {
+		err = errors.Wrapf(err, "Raw: %q", string(bites))
 		return err
 	}
 
