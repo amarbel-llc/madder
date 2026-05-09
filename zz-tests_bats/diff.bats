@@ -138,7 +138,7 @@ function diff_is_clean_after_round_trip { # @test
   # `output` captures stdout AND stderr; the source-store-hint
   # notices are stderr noise common to every default-store diff.
   # Refute only the M/A/D/T diff-entry lines.
-  refute_line --regexp '^[MADT]  '
+  [[ -z $output ]] || refute_line --regexp '^[MADT]  '
 }
 
 # Phase C: drift detection.
@@ -297,7 +297,7 @@ function diff_verify_blobs_exist_clean_round_trip { # @test
 
   run_cg diff -verify-blobs-exist "$rid" out
   assert_success
-  refute_line --regexp '^[BMADT]  '
+  [[ -z $output ]] || refute_line --regexp '^[BMADT]  '
 }
 
 function diff_verify_blobs_exist_detects_missing_blob { # @test
@@ -477,7 +477,7 @@ function diff_is_clean_against_originally_captured_dir { # @test
 
   run_cg diff "$rid" src
   assert_success
-  refute_line --regexp '^[MADT]  '
+  [[ -z $output ]] || refute_line --regexp '^[MADT]  '
 }
 
 function diff_is_clean_when_run_from_captured_dir_with_dot { # @test
@@ -506,5 +506,5 @@ function diff_is_clean_when_run_from_captured_dir_with_dot { # @test
   cd src
   run_cg diff "$rid" .
   assert_success
-  refute_line --regexp '^[MADT]  '
+  [[ -z $output ]] || refute_line --regexp '^[MADT]  '
 }

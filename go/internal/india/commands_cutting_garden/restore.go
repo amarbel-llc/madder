@@ -277,7 +277,7 @@ func resolveMaterializationStore(
 		return envBlobStore.GetDefaultBlobStore(), nil
 	}
 
-	localHint, err := computeStoreHint(hintedStore, hintId)
+	localHint, err := computeStoreHint(hintedStore, hintId.String())
 	if err != nil || localHint == nil {
 		fmt.Fprintf(os.Stderr,
 			"notice: cannot compute local config-markl-id for store %q: %v\n",

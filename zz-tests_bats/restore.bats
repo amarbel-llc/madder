@@ -240,6 +240,28 @@ function restore_uses_hint_store_when_config_matches { # @test
   [[ -f out/x.txt ]] || fail "expected restored file"
 }
 
+function restore_uses_hint_store_when_default_store_emits_hint { # @test
+  # Branch 2 for the default-store path. Per #92 option (c), default-
+  # store captures now emit a hint pointing at the resolved id
+  # (e.g. ".default"); restore must consume it silently rather than
+  # fall through the no-hint branch.
+  init_store
+
+  mkdir src
+  echo "x" >src/x.txt
+  local rid
+  rid="$(capture_receipt_id src)"
+  [[ -n $rid ]] || fail "no receipt id"
+
+  run_cg restore "$rid" out
+  assert_success
+  refute_output --partial 'falling back to active store'
+  refute_output --partial 'no store hint'
+  refute_output --partial 'has been re-configured'
+
+  [[ -f out/x.txt ]] || fail "expected restored file"
+}
+
 function restore_warns_on_config_drift { # @test
   # Branch 3: hint present, store configured, but the config-hash in
   # the hint does NOT match the local store's current config-hash.

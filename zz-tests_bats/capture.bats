@@ -313,10 +313,9 @@ function capture_emits_store_hint_when_known { # @test
   assert_line --regexp '^- store/\.work < blake2b256-'
 }
 
-function capture_default_store_omits_hint { # @test
-  # Per #92 open call (a): the default-store case skips hint emission
-  # because the storeID is empty and a synthetic id risks colliding
-  # with a user-named store. Confirm no `- store/` line appears.
+function capture_default_store_emits_hint { # @test
+  # Per #92 option (c): default-store captures emit a hint pointing
+  # at the resolved default-store id (e.g. ".default").
   init_store
 
   mkdir src
@@ -331,7 +330,7 @@ function capture_default_store_omits_hint { # @test
 
   run_madder cat "$rid"
   assert_success
-  refute_line --regexp '^- store/'
+  assert_line --regexp '^- store/\.default < blake2b256-'
 }
 
 function capture_warns_when_dir_shadows_store { # @test

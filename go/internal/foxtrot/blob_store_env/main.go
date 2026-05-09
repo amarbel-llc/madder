@@ -145,6 +145,15 @@ func (env BlobStoreEnv) GetDefaultBlobStore() blob_stores.BlobStoreInitialized {
 	return env.blobStores[env.defaultBlobStoreIdString]
 }
 
+// GetDefaultBlobStoreId returns the local id string of the store that
+// GetDefaultBlobStore() resolves to (e.g. ".default"). Returns "" when
+// no default has been resolved yet — GetDefaultBlobStore panics in
+// that case; this method is the soft-failure peer for callers that
+// want to omit a hint rather than abort.
+func (env BlobStoreEnv) GetDefaultBlobStoreId() string {
+	return env.defaultBlobStoreIdString
+}
+
 func (env BlobStoreEnv) GetBlobStores() blob_stores.BlobStoreMap {
 	blobStores := maps.Clone(env.blobStores)
 	return blobStores

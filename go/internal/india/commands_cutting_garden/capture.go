@@ -196,7 +196,16 @@ func (cmd Capture) Run(req futility.Request) {
 			continue
 		}
 
-		hint, hintErr := computeStoreHint(blobStore, group.storeID)
+		// Reuse storeName when non-empty; fall back to the resolved
+		// default-store id so consumers can lock the lookup to a real
+		// store rather than the active store at restore time
+		// (RFC 0003 §Store-Hint Resolution; closes #92 option (c)).
+		effectiveStoreId := storeName
+		if effectiveStoreId == "" {
+			effectiveStoreId = envBlobStore.GetDefaultBlobStoreId()
+		}
+
+		hint, hintErr := computeStoreHint(blobStore, effectiveStoreId)
 		if hintErr != nil {
 			sink.Notice(fmt.Sprintf(
 				"notice: omitting store-hint for store=%s: %v",
@@ -535,21 +544,25 @@ func writeReceiptBlob(
 }
 
 // computeStoreHint builds the RFC 0003 store-hint metadata for a
-// receipt. Returns (nil, nil) for the default store to avoid
-// colliding with user-named stores. Returns a non-nil error when the
-// hint should have been computable but failed; callers MAY treat that
-// as a soft failure (RFC 0003 §Producer Rules §Receipt Metadata: Store
-// Hint permits MAY-omit).
+// receipt. storeIdString is the resolved id of the destination store
+// (the default-store case is resolved to its actual id by the caller
+// per #92 option (c), not bypassed here). An empty string is the
+// "still couldn't determine an id" sentinel — returns (nil, nil), the
+// MAY-omit path RFC 0003 §Producer Rules §Receipt Metadata: Store Hint
+// permits.
 //
-// The hint pairs storeID with the markl-id of the store's
+// Returns a non-nil error when the hint should have been computable
+// but failed; callers MAY treat that as a soft failure.
+//
+// The hint pairs storeIdString with the markl-id of the store's
 // blob_store-config blob, computed in the store's default hash family
 // so consumers can validate it under the same hash the store
 // publishes blobs under.
 func computeStoreHint(
 	blobStore blob_stores.BlobStoreInitialized,
-	storeID blob_store_id.Id,
+	storeIdString string,
 ) (*capture_receipt.StoreHint, error) {
-	if storeID.IsEmpty() {
+	if storeIdString == "" {
 		return nil, nil
 	}
 
@@ -576,7 +589,7 @@ func computeStoreHint(
 	}
 
 	return &capture_receipt.StoreHint{
-		StoreId:       storeID.String(),
+		StoreId:       storeIdString,
 		ConfigMarklId: digester.GetMarklId().String(),
 	}, nil
 }

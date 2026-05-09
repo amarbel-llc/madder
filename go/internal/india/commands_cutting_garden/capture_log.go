@@ -24,6 +24,12 @@ type captureLogEntry struct {
 	// string for the default store, matching blob_store_id.Id.IsEmpty()
 	// conventions in the rest of capture.go and the user-facing NDJSON
 	// sink (where receipt_store_of_group also yields an empty string).
+	//
+	// Deliberately diverges from the receipt's store-hint, which records
+	// the *resolved* default-store id (e.g. ".default") per RFC 0003
+	// §Receipt Metadata: Store Hint and #92 option (c). The log keeps
+	// the user's CLI-level intent (no `-store` was passed → empty);
+	// the receipt records the resolved on-disk store. Don't unify them.
 	StoreID string `json:"store_id"`
 	// Roots is the directory args for this store-group's receipt, in the
 	// order they were captured.
