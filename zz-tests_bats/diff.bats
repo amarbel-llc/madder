@@ -415,10 +415,15 @@ function diff_is_clean_against_originally_captured_dir { # @test
 
 function diff_is_clean_when_run_from_captured_dir_with_dot { # @test
   # capture src; cd src; diff $rid . → expected: no differences, exit 0.
-  # Blocked on amarbel-llc/madder#145 (CWD-relative blob_stores
-  # discovery doesn't walk up to ancestor `.madder/`). Re-enable
-  # once #145 lands.
-  skip "blocked on #145 (subdir store discovery)"
+  #
+  # #145 added the multi-ancestor walk-up but mirrors dewey's ceiling
+  # quirk: when MADDER_CEILING_DIRECTORIES == $BATS_TEST_TMPDIR (which
+  # this harness sets by default) and CWD is a subdir, the walk breaks
+  # before checking the ceiling dir itself, so $BATS_TEST_TMPDIR/.madder/
+  # stays invisible from src/. Tracked in amarbel-llc/purse-first#75
+  # (dewey/xdg ceiling skips ceiling dir itself). Re-enable after
+  # purse-first#75 lands and dewey is bumped.
+  skip "blocked on purse-first#75 (dewey ceiling skips ceiling dir itself)"
 
   init_store
 
