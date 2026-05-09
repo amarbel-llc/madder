@@ -208,7 +208,19 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 	// Validates the existing config in addition to the synthesized
 	// candidates — a wrong existing config will fail verification
 	// alongside.
-	existingHas, existingCandidate := cmd.tryReadExistingConfig(env, sftpClient)
+	//
+	// existingLayoutMismatch is set when the existing config's
+	// declared layout (single-hash vs multi-hash) disagrees with
+	// the layout the probe just walked. Without this short-circuit,
+	// the per-sample content verification still passes — samples
+	// are sourced via the probed layout, which is correct for the
+	// content but says nothing about whether the declared layout
+	// matches reality. A mismatch silently corrupts every
+	// downstream consumer that trusts the declared layout (fsck,
+	// info-repo, sync), so we surface it as a layout_mismatch
+	// stage failure on the existing candidate.
+	existingHas, existingCandidate, existingLayoutMismatch :=
+		cmd.tryReadExistingConfig(env, sftpClient, layout)
 	if existingHas {
 		candidates = append([]sftp_probe.Candidate{existingCandidate}, candidates...)
 	}
@@ -219,11 +231,16 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 	}
 	for _, s := range samples {
 		for i := range candidates {
-			r := sftp_probe.VerifySample(
-				bytes.NewReader(s.buf),
-				s.digestHex,
-				candidates[i],
-			)
+			var r sftp_probe.SampleResult
+			if existingHas && i == 0 && existingLayoutMismatch {
+				r = sftp_probe.SampleResult{Stage: sftp_probe.StageLayoutMismatch}
+			} else {
+				r = sftp_probe.VerifySample(
+					bytes.NewReader(s.buf),
+					s.digestHex,
+					candidates[i],
+				)
+			}
 			aggregates[i].Add(r)
 		}
 	}
@@ -680,23 +697,26 @@ func (cmd SftpAnalyzeAndSuggestConfigs) emitTAP(
 }
 
 // tryReadExistingConfig opens <remote>/blob_store-config and
-// decodes it into a Candidate labeled "existing". Returns
-// (false, _) when the file is absent, decode-error'd, or when
-// the decoded config doesn't expose the IO-wrapper interface
-// VerifySample needs. Errors are logged via env.GetUI but never
-// fatal — a missing/corrupt remote config is fine; the
-// synthesized candidates still run.
+// decodes it into a Candidate labeled "existing". The third
+// return is layoutMismatch: true when the decoded config's
+// declared multi-hash flag disagrees with the layout the probe
+// walked. Returns (false, _, false) when the file is absent,
+// decode-error'd, or when the decoded config doesn't expose the
+// IO-wrapper interface VerifySample needs. Errors are logged via
+// env.GetUI but never fatal — a missing/corrupt remote config is
+// fine; the synthesized candidates still run.
 func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 	env command_components.BlobStoreEnv,
 	sftpClient *sftp.Client,
-) (bool, sftp_probe.Candidate) {
+	layout blob_stores.DiscoveredConfig,
+) (bool, sftp_probe.Candidate, bool) {
 	configPath := path.Join(cmd.remotePath, directory_layout.FileNameBlobStoreConfig)
 
 	configFile, err := sftpClient.Open(configPath)
 	if err != nil {
 		// Most legacy stores have no blob_store-config — that's
 		// the whole reason this command exists. Silent skip.
-		return false, sftp_probe.Candidate{}
+		return false, sftp_probe.Candidate{}, false
 	}
 	defer configFile.Close()
 
@@ -707,7 +727,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 		env.GetUI().Printf(
 			"existing remote config at %s did not decode: %v",
 			configPath, err)
-		return false, sftp_probe.Candidate{}
+		return false, sftp_probe.Candidate{}, false
 	}
 
 	wrapper, ok := typedConfig.Blob.(domain_interfaces.BlobIOWrapper)
@@ -715,18 +735,31 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 		env.GetUI().Printf(
 			"existing remote config at %s does not provide an IOWrapper",
 			configPath)
-		return false, sftp_probe.Candidate{}
+		return false, sftp_probe.Candidate{}, false
 	}
 
 	// Honor the existing config's hash type (sha256 vs blake2b256)
 	// rather than hardcoding sha256 — verification needs to compute
 	// the same hash the on-disk path was bucketed under.
 	hashFmt := blob_store_configs.DefaultHashType
+	layoutMismatch := false
 	if hashTyper, ok := typedConfig.Blob.(blob_store_configs.ConfigHashType); ok {
 		if got, err := markl.GetFormatHashOrError(
 			hashTyper.GetDefaultHashTypeId(),
 		); err == nil {
 			hashFmt = got
+		}
+		// Compare declared multi-hash vs probed multi-hash. Most
+		// common in the wild: a TomlV3 missing the `single_hash`
+		// field defaults to false, declaring multi-hash, while the
+		// on-disk layout was bootstrapped flat (single-hash). The
+		// probe's DiscoveredConfig.MultiHash is the ground truth.
+		declared := hashTyper.SupportsMultiHash()
+		if declared != layout.MultiHash {
+			layoutMismatch = true
+			env.GetUI().Printf(
+				"existing remote config at %s declares multi-hash=%t but probed layout is multi-hash=%t",
+				configPath, declared, layout.MultiHash)
 		}
 	}
 
@@ -741,7 +774,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 		StoreConfig: typedConfig.Blob,
 		IOConfig:    ioCfg,
 		Label:       "existing",
-	}
+	}, layoutMismatch
 }
 
 // runInteractiveFlow drives the post-emit huh prompts: deep-verify

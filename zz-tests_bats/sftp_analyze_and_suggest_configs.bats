@@ -160,6 +160,59 @@ function legacy_detection_gzip { # @test
   analyze_legacy_layout gzip
 }
 
+# --- existing-config layout mismatch (rsync.net repro) -------------------
+
+# Reproduces the rsync.net bug observed in #155 follow-up: a single-hash
+# legacy on-disk layout under a remote blob_store-config that does NOT
+# explicitly set `single_hash = true`. TomlV3.SingleHash defaults to
+# false → SupportsMultiHash() returns true → downstream consumers (fsck)
+# walk `<root>/<format-id>/<bucket>/<rest>` and try to parse the
+# bucket-prefix dirs as hash-type ids, producing
+# `unknown hash format: "<HH>"` for every top-level entry.
+#
+# Today analyze's `existing` candidate reports verified=N/N anyway
+# because its content-check probe finds blobs by walking, not by the
+# declared layout. This test pins the desired behavior: when the
+# declared layout disagrees with the probed layout, `existing` MUST
+# NOT pass.
+function existing_fails_when_remote_config_layout_mismatches { # @test
+  local remote_root="$BATS_TEST_TMPDIR/legacy-store"
+  mkdir -p "$remote_root"
+  for i in 1 2 3 4 5; do
+    place_legacy_blob_at_correct_path \
+      "$remote_root" none none - "blob $i some payload bytes"
+  done
+
+  # Hand-craft a remote config that omits single_hash, mirroring the
+  # rsync.net file we observed: declares the modern multi-hash shape
+  # by default while the on-disk layout is flat single-hash.
+  cat >"$remote_root/blob_store-config" <<'EOF'
+---
+! toml-blob_store_config-v3
+---
+
+hash_buckets = [2]
+hash_type-id = "sha256"
+encryption = []
+compression-type = "none"
+EOF
+
+  TMPDIR="$BATS_TEST_TMPDIR/suggest" run_madder sftp-analyze-and-suggest-configs \
+    -ssh-host "testuser@127.0.0.1:$SFTP_PORT" \
+    -remote-path "$remote_root" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    -limit 5
+
+  # The existing candidate must NOT verify cleanly: its declared
+  # multi-hash layout disagrees with the on-disk single-hash layout.
+  # Use anchored regexp so "not ok 1 - existing" is not eaten by a
+  # "ok 1 - existing" --partial match (the substring relationship
+  # would make refute_line --partial 'ok 1 - existing' falsely
+  # reject the desired "not ok" line).
+  assert_line --regexp '^not ok 1 - existing'
+  refute_line --regexp '^ok 1 - existing'
+}
+
 # --- bootstrap end-to-end with -yes-to-all (#8) --------------------------
 
 function bootstrap_yes_to_all_writes_remote_config { # @test
