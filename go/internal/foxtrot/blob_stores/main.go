@@ -5,6 +5,7 @@ package blob_stores
 import (
 	"fmt"
 	"maps"
+	"os"
 	"path/filepath"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -16,6 +17,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -76,6 +78,73 @@ func makeBlobStoreConfigs(
 	return blobStores
 }
 
+// makeAncestorOverrideStores walks every `.<utility>/` ancestor on the
+// CWD walk-up chain, deepest-first, and merges each ancestor's stores
+// into a single BlobStoreMap. Same-name stores at shallower ancestors
+// are tagged with cwdDepth = rank-among-prior-occurrences, so each
+// store gets a unique id-string (`.foo` for the deepest, `..foo` for
+// the next, etc.). Caller is responsible for the IsOverridden() guard
+// — invoking this from non-override mode would walk past nothing.
+//
+// See #145.
+func makeAncestorOverrideStores(
+	ctx interfaces.ActiveContext,
+	envDir env_dir.Env,
+	directoryLayout directory_layout.BlobStore,
+) BlobStoreMap {
+	utilityName := envDir.GetXDG().UtilityName
+	ceilings := xdg.ParseCeilingDirectories(
+		os.Getenv(xdg.CeilingEnvVarName(utilityName)),
+	)
+
+	ancestors := directory_layout.FindAllCwdOverridePaths(
+		envDir.GetCwd(),
+		utilityName,
+		ceilings,
+	)
+
+	blobStores := make(BlobStoreMap)
+	nameRank := make(map[string]uint)
+
+	for i, ancestor := range ancestors {
+		var layoutForAncestor directory_layout.BlobStore
+
+		if i == 0 {
+			// Deepest ancestor — the env's existing layout already
+			// resolves there. Reuse rather than re-clone.
+			layoutForAncestor = directoryLayout
+		} else {
+			cloned, err := directory_layout.CloneBlobStoreWithXDG(
+				directoryLayout,
+				envDir.GetXDGForBlobStores().CloneWithOverridePath(ancestor),
+			)
+			if err != nil {
+				ctx.Cancel(err)
+				return blobStores
+			}
+			layoutForAncestor = cloned
+		}
+
+		storesAtAncestor := makeBlobStoreConfigs(ctx, layoutForAncestor)
+
+		for _, store := range storesAtAncestor {
+			name := store.Path.GetId().GetName()
+			depth := nameRank[name]
+			nameRank[name]++
+
+			taggedId := store.Path.GetId().WithCwdDepth(depth)
+			store.Path = directory_layout.MakeBlobStorePath(
+				taggedId,
+				store.Path.GetBase(),
+				store.Path.GetConfig(),
+			)
+			blobStores[taggedId.String()] = store
+		}
+	}
+
+	return blobStores
+}
+
 // TODO pass in custom UI context for printing
 // TODO consolidated envDir and ctx arguments
 func MakeBlobStores(
@@ -83,11 +152,15 @@ func MakeBlobStores(
 	envDir env_dir.Env,
 	directoryLayout directory_layout.BlobStore,
 ) (blobStores BlobStoreMap) {
-	// based on explicit xdg (that is, may include override)
-	blobStores = makeBlobStoreConfigs(ctx, directoryLayout)
-
-	// If we're in an override directory, add the User blob stores
 	if envDir.GetXDG().IsOverridden() {
+		// CWD-override mode: discover at every `.<utility>/` ancestor
+		// on the walk-up chain (deepest-first). Same-name stores at
+		// shallower ancestors get extra `.` prefixes via cwdDepth so
+		// the user-facing id-string disambiguates them (#145).
+		blobStores = makeAncestorOverrideStores(ctx, envDir, directoryLayout)
+
+		// User-XDG fallback (unchanged): adds non-`.`-prefixed stores,
+		// disjoint key-space from the Cwd entries above.
 		if directoryLayoutForUser, err := directory_layout.CloneBlobStoreWithXDG(
 			directoryLayout,
 			envDir.GetXDGForBlobStores().CloneWithoutOverride(),
@@ -98,6 +171,8 @@ func MakeBlobStores(
 			blobStoresForXDG := makeBlobStoreConfigs(ctx, directoryLayoutForUser)
 			maps.Insert(blobStores, maps.All(blobStoresForXDG))
 		}
+	} else {
+		blobStores = makeBlobStoreConfigs(ctx, directoryLayout)
 	}
 
 	// Two-pass initialization: first pass creates stores that have no

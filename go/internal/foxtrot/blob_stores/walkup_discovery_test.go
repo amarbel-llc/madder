@@ -1,0 +1,251 @@
+//go:build test
+
+package blob_stores
+
+import (
+	"os"
+	"path/filepath"
+	"sort"
+	"testing"
+
+	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
+	delta_blob_store_configs "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+)
+
+// writeStoreConfig writes a minimal V3 hash-bucketed config to
+// `<madderDir>/local/share/blob_stores/<name>/blob_store-config`.
+func writeStoreConfig(t *testing.T, madderDir, name string) {
+	t.Helper()
+
+	storeDir := filepath.Join(madderDir, "local", "share", "blob_stores", name)
+	if err := os.MkdirAll(storeDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	configPath := filepath.Join(storeDir, directory_layout.FileNameBlobStoreConfig)
+
+	typedBlob := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigV3).TypeStruct,
+		Blob: &blob_store_configs.TomlV3{
+			HashTypeId:      "sha256",
+			HashBuckets:     []int{2},
+			CompressionType: "none",
+		},
+	}
+
+	if err := hyphence.EncodeToFile(
+		delta_blob_store_configs.Coder,
+		typedBlob,
+		configPath,
+	); err != nil {
+		t.Fatalf("encode %s: %v", configPath, err)
+	}
+}
+
+// setupAncestorTree builds a temp tree with `.madder/` directories at
+// every parent in `ancestorStores` (deepest-first by map iteration is
+// fine — the per-ancestor list of names is what matters). Returns
+// rootForCeiling, leafCWD, cleanup, and the deepest path used.
+//
+// `ancestorStores` keys are relative path segments under root, "." for
+// root itself, "sub" for `<root>/sub`, "sub/leaf" for `<root>/sub/leaf`,
+// etc. Values are the store names to seed under each `.madder/`.
+func setupAncestorTree(
+	t *testing.T,
+	ancestorStores map[string][]string,
+	leafSubPath string,
+) (rootCeiling, leafCWD string) {
+	t.Helper()
+
+	root := t.TempDir()
+	rootCeiling = filepath.Dir(root)
+
+	for relPath, stores := range ancestorStores {
+		ancestor := root
+		if relPath != "." {
+			ancestor = filepath.Join(root, relPath)
+		}
+		madderDir := filepath.Join(ancestor, ".madder")
+		if err := os.MkdirAll(madderDir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range stores {
+			writeStoreConfig(t, madderDir, name)
+		}
+	}
+
+	leafCWD = filepath.Join(root, leafSubPath)
+	if err := os.MkdirAll(leafCWD, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	return rootCeiling, leafCWD
+}
+
+// chdirAndMakeEnv chdirs to dir, registers a t.Cleanup to restore, and
+// builds a `madder`-scoped env_dir whose XDG walks up from dir.
+func chdirAndMakeEnv(t *testing.T, ceiling, dir string) env_dir.Env {
+	t.Helper()
+
+	t.Setenv("MADDER_CEILING_DIRECTORIES", ceiling)
+
+	saved, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(saved) })
+
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir %q: %v", dir, err)
+	}
+
+	return env_dir.MakeDefault(
+		errors.MakeContextDefault(),
+		env_dir.Config{},
+		"madder",
+	)
+}
+
+// makeLayoutFor builds a directory_layout.BlobStore for the env's
+// blob-store XDG (mirrors blob_store_env.makeBlobStoreEnvBase).
+func makeLayoutFor(t *testing.T, env env_dir.Env) directory_layout.BlobStore {
+	t.Helper()
+	layout, err := directory_layout.MakeBlobStore(env.GetXDGForBlobStores())
+	if err != nil {
+		t.Fatalf("MakeBlobStore: %v", err)
+	}
+	return layout
+}
+
+// keysOf returns the sorted keys of a BlobStoreMap so test diagnostics
+// are deterministic.
+func keysOf(m BlobStoreMap) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// TestMakeAncestorOverrideStores_DiscoversAllAncestors pins #145: each
+// `.madder/` ancestor on the walk-up chain contributes its CWD-prefix
+// stores. Same-name stores at shallower ancestors get extra `.`
+// prefixes (`..rsync_dot_net` for depth-1).
+func TestMakeAncestorOverrideStores_DiscoversAllAncestors(t *testing.T) {
+	ceiling, leaf := setupAncestorTree(t,
+		map[string][]string{
+			".":   {"default", "rsync_dot_net"},
+			"sub": {"default"},
+		},
+		filepath.Join("sub", "leaf"),
+	)
+
+	env := chdirAndMakeEnv(t, ceiling, leaf)
+	layout := makeLayoutFor(t, env)
+
+	stores := makeAncestorOverrideStores(
+		errors.MakeContextDefault(),
+		env,
+		layout,
+	)
+
+	got := keysOf(stores)
+	want := []string{".default", "..default", ".rsync_dot_net"}
+	sort.Strings(want)
+
+	if !equalStringSlices(got, want) {
+		t.Errorf("keys = %v, want %v", got, want)
+	}
+}
+
+// TestMakeAncestorOverrideStores_UniqueNamesGetSingleDot pins the
+// "minimal disambiguation" rule: a name that exists at only one
+// ancestor — even a shallow one — uses a single dot.
+func TestMakeAncestorOverrideStores_UniqueNamesGetSingleDot(t *testing.T) {
+	ceiling, leaf := setupAncestorTree(t,
+		map[string][]string{
+			".":   {"home_only"},
+			"sub": {"sub_only"},
+		},
+		filepath.Join("sub", "leaf"),
+	)
+
+	env := chdirAndMakeEnv(t, ceiling, leaf)
+	layout := makeLayoutFor(t, env)
+
+	stores := makeAncestorOverrideStores(
+		errors.MakeContextDefault(),
+		env,
+		layout,
+	)
+
+	got := keysOf(stores)
+	want := []string{".home_only", ".sub_only"}
+	sort.Strings(want)
+
+	if !equalStringSlices(got, want) {
+		t.Errorf("keys = %v, want %v (unique names get single dot regardless of depth)",
+			got, want)
+	}
+}
+
+// TestMakeAncestorOverrideStores_RespectsCeiling pins that an ancestor
+// `.madder/` at-or-above the ceiling is invisible. dewey's ceiling
+// semantics: the loop breaks before traversing INTO a parent that is
+// at-or-above the ceiling, so `ceiling = root` means "mid is checked,
+// root is not".
+func TestMakeAncestorOverrideStores_RespectsCeiling(t *testing.T) {
+	root := t.TempDir()
+	mid := filepath.Join(root, "mid")
+	leaf := filepath.Join(mid, "leaf")
+	if err := os.MkdirAll(leaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	rootMadder := filepath.Join(root, ".madder")
+	if err := os.MkdirAll(rootMadder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeStoreConfig(t, rootMadder, "above_ceiling")
+
+	midMadder := filepath.Join(mid, ".madder")
+	if err := os.MkdirAll(midMadder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeStoreConfig(t, midMadder, "below_ceiling")
+
+	env := chdirAndMakeEnv(t, root, leaf)
+	layout := makeLayoutFor(t, env)
+
+	stores := makeAncestorOverrideStores(
+		errors.MakeContextDefault(),
+		env,
+		layout,
+	)
+
+	got := keysOf(stores)
+	want := []string{".below_ceiling"}
+
+	if !equalStringSlices(got, want) {
+		t.Errorf("keys = %v, want %v (ancestor above ceiling must not appear)",
+			got, want)
+	}
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

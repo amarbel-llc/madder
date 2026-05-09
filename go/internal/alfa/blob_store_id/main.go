@@ -5,15 +5,22 @@ package blob_store_id
 import (
 	"encoding"
 	"fmt"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
+// Id is a blob-store id. cwdDepth is a runtime CLI-rendering concern,
+// only meaningful when location == Cwd: 0 = single-dot prefix (the
+// deepest `.<utility>/` ancestor on the walk-up), 1 = `..`, etc. Wire-
+// format serialization via MarshalText always emits the canonical
+// single-dot form so on-disk refs stay stable across CWDs (#145).
 type Id struct {
 	location xdg_location_type.Typee
 	id       string
+	cwdDepth uint
 }
 
 var (
@@ -54,6 +61,10 @@ func (id Id) String() string {
 		return ""
 	}
 
+	if id.location == xdg_location_type.Cwd {
+		return strings.Repeat(".", int(id.cwdDepth)+1) + id.id
+	}
+
 	prefix := id.location.GetPrefix()
 
 	if prefix == 0 {
@@ -63,11 +74,48 @@ func (id Id) String() string {
 	return fmt.Sprintf("%c%s", prefix, id.id)
 }
 
+// Canonical returns the wire-format form of an Id: same as String for
+// non-Cwd locations, and always single-dot for Cwd (depth dropped).
+// MarshalText delegates here so on-disk references survive CWD changes.
+func (id Id) Canonical() string {
+	if id.cwdDepth == 0 {
+		return id.String()
+	}
+
+	canonical := id
+	canonical.cwdDepth = 0
+
+	return canonical.String()
+}
+
 func (id *Id) Set(value string) (err error) {
 	if len(value) == 0 {
 		err = errors.Errorf("empty blob_store_id")
 		return err
 	}
+
+	if value[0] == '.' {
+		dots := 0
+		for dots < len(value) && value[dots] == '.' {
+			dots++
+		}
+
+		if dots == len(value) {
+			err = errors.Errorf(
+				"blob_store_id is all dots, no name: %q",
+				value,
+			)
+			return err
+		}
+
+		id.location = xdg_location_type.Cwd
+		id.cwdDepth = uint(dots - 1)
+		id.id = value[dots:]
+
+		return err
+	}
+
+	id.cwdDepth = 0
 
 	firstChar := rune(value[0])
 
@@ -91,15 +139,33 @@ func (id *Id) Set(value string) (err error) {
 }
 
 func (id Id) Less(otherId Id) bool {
-	if id.location < otherId.location {
-		return true
+	if id.location != otherId.location {
+		return id.location < otherId.location
 	}
 
-	return id.id < otherId.id
+	if id.id != otherId.id {
+		return id.id < otherId.id
+	}
+
+	return id.cwdDepth < otherId.cwdDepth
+}
+
+// WithCwdDepth returns a copy of id with the cwdDepth set. Caller is
+// expected to ensure location == Cwd; depth is ignored on render for
+// other locations.
+func (id Id) WithCwdDepth(depth uint) Id {
+	id.cwdDepth = depth
+	return id
+}
+
+// GetCwdDepth returns the runtime walk-up rank of this id; 0 for
+// non-Cwd locations.
+func (id Id) GetCwdDepth() uint {
+	return id.cwdDepth
 }
 
 func (id Id) MarshalText() ([]byte, error) {
-	return []byte(id.String()), nil
+	return []byte(id.Canonical()), nil
 }
 
 func (id *Id) UnmarshalText(bites []byte) (err error) {

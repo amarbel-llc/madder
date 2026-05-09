@@ -544,6 +544,49 @@ debug-init-repro storeid="default":
   echo "(tmp workdir: $workdir)"
   echo "(tmp home:    $home)"
 
+# Reproduce issue #145: `madder list` from a leaf below an inner
+# `.madder/` should surface both ancestor `.madder/` stores with
+# disambiguating dot prefixes. Builds a fresh fixture under tmp so it
+# does not touch the host's $HOME or any real stores.
+[group("debug")]
+debug-issue-145-multi-ancestor-repro:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+  just build >/dev/null
+  madder_bin="{{justfile_directory()}}/result/bin/madder"
+
+  home=$(mktemp -d)
+  workdir=$(mktemp -d)
+  trap 'rm -rf "$home" "$workdir"' EXIT
+  cd "$workdir"
+
+  unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME XDG_LOG_HOME
+  export HOME="$home"
+  # Ceiling at workdir's parent so walk-up visits workdir and its
+  # children but never leaks into the real $HOME.
+  export MADDER_CEILING_DIRECTORIES="$(dirname "$workdir")"
+
+  mkdir -p outer/inner/leaf
+  cd outer
+  "$madder_bin" init -encryption none .outer_only >/dev/null
+  "$madder_bin" init -encryption none .default >/dev/null
+  cd inner
+  "$madder_bin" init -encryption none .default >/dev/null
+  "$madder_bin" init -encryption none .inner_only >/dev/null
+  cd leaf
+
+  echo "=== madder list from $(pwd) ==="
+  "$madder_bin" list
+
+  echo
+  echo "=== madder info-repo .default config-path (deepest) ==="
+  "$madder_bin" info-repo .default config-path
+
+  echo
+  echo "=== madder info-repo ..default config-path (next ancestor up) ==="
+  "$madder_bin" info-repo ..default config-path
+
 # Exercise tap-dancer-backed TAP emitters and assert no `# Output` comment
 # directives appear in the output. Catches regressions where a writer
 # falls back to legacy bats-style `# Output: ...` lines instead of the

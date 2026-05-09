@@ -7,6 +7,8 @@ import (
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
 )
 
 const (
@@ -80,4 +82,51 @@ func DirBlobStore(
 	targets ...string,
 ) string {
 	return PathBlobStore(layout, targets...).String()
+}
+
+// FindAllCwdOverridePaths walks up from cwd and returns every ancestor
+// that contains `.<utilityName>/` (file or directory), deepest-first.
+// Honors `<UTILITYNAME>_CEILING_DIRECTORIES` (parsed via dewey's
+// xdg.ParseCeilingDirectories + xdg.IsAtOrAboveCeiling).
+//
+// This is the multi-match counterpart of dewey's
+// xdg.getCwdXDGOverridePath, which only returns the deepest match.
+// Loop shape and ceiling semantics deliberately mirror dewey so a
+// future dewey API can subsume this helper. See #145.
+func FindAllCwdOverridePaths(
+	cwd, utilityName string,
+	ceilings []string,
+) []string {
+	if cwd == "" || utilityName == "" {
+		return nil
+	}
+
+	marker := "." + utilityName
+
+	var ancestors []string
+
+	dir := cwd
+	for safety := 0; safety < 1024; safety++ {
+		if files.Exists(filepath.Join(dir, marker)) {
+			ancestors = append(ancestors, dir)
+		}
+
+		if dir == string(filepath.Separator) {
+			break
+		}
+
+		parent := filepath.Dir(dir)
+
+		if xdg.IsAtOrAboveCeiling(parent, ceilings) {
+			break
+		}
+
+		if parent == dir {
+			break
+		}
+
+		dir = parent
+	}
+
+	return ancestors
 }

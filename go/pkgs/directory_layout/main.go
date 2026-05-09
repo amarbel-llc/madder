@@ -14,6 +14,7 @@ type (
 var (
 	CloneBlobStoreWithXDG         = internal.CloneBlobStoreWithXDG
 	DirBlobStore                  = internal.DirBlobStore
+	FindAllCwdOverridePaths       = internal.FindAllCwdOverridePaths
 	GetBlobStoreConfigPaths       = internal.GetBlobStoreConfigPaths
 	GetBlobStorePath              = internal.GetBlobStorePath
 	GetBlobStorePathForCustomPath = internal.GetBlobStorePathForCustomPath
