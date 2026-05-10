@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blech32"
@@ -48,20 +49,30 @@ func (id Id) String() string {
 	}
 }
 
-// StringWithFormat returns the canonical RFC 0002 §3 wire-form string
-// for the markl ID — identical to MarshalText output. Both purpose-
-// bearing and purposeless IDs round-trip through Set (and via a file,
-// SetFromPath).
-//
-// Pre-RFC versions returned a split-HRP form
-// (`purpose@<blech32(format,data)>`) where the purpose was textually
-// prepended after blech32 encoding the (format, data) pair. That form
-// did NOT round-trip through Set when a purpose was present (#152).
-// The canonical form does.
+// StringWithFormat returns the RFC 0002 §3 wire-form string for the
+// markl ID — identical to MarshalText output. The blech32 checksum
+// binds to (format, data); the purpose, when present, is prepended
+// textually after blech32 encoding so that the same (format, data)
+// under different purposes shares an identical blech32 body.
 func (id Id) StringWithFormat() string {
-	bites, err := id.MarshalText()
+	if id.format == nil && len(id.data) == 0 {
+		return ""
+	}
+
+	if len(id.data) == 0 {
+		return ""
+	}
+
+	bites, err := blech32.Encode(id.format.GetMarklFormatId(), id.data)
 	errors.PanicIfError(err)
-	return string(bites)
+
+	bitesString := string(bites)
+
+	if id.purposeId != "" {
+		return fmt.Sprintf("%s@%s", id.purposeId, bitesString)
+	}
+
+	return bitesString
 }
 
 func (id Id) GetPurposeId() string {
@@ -111,12 +122,11 @@ func (id Id) IsNull() bool {
 	return false
 }
 
-// Set parses a markl ID per the RFC 0002 §4 algorithm. It is the
-// string-form companion to UnmarshalText: blech32-decodes the whole
-// input first (so the checksum verifies against HRP =
-// "purpose@format" or "format" as a unit, matching how MarshalText
-// writes it), then runs SetMarklId for the §4 size +
-// (purpose, format) compatibility checks.
+// Set parses a markl ID per the RFC 0002 §4 algorithm. The wire form
+// is `[purpose@]<blech32(format, data)>`: the purpose, when present,
+// is textual decoration prepended after blech32 encoding, so Set
+// splits on the first `@` first and then blech32-decodes the body
+// against HRP=format. The checksum binds to (format, data) only.
 //
 // An empty value resets the Id to its null state, matching
 // MarshalText's symmetric output.
@@ -126,16 +136,48 @@ func (id *Id) Set(value string) (err error) {
 		return err
 	}
 
-	var purposeAndFormatId string
+	purpose, body, hasPurpose := strings.Cut(value, "@")
+
+	if hasPurpose {
+		if err = id.setWithPurpose(purpose, body); err != nil {
+			err = errors.Wrap(err)
+			return err
+		}
+	} else {
+		if err = id.setWithoutPurpose(value); err != nil {
+			err = errors.Wrap(err)
+			return err
+		}
+	}
+
+	return err
+}
+
+func (id *Id) setWithPurpose(purpose, body string) (err error) {
+	if err = id.SetPurposeId(purpose); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	if err = id.setWithoutPurpose(body); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	return err
+}
+
+func (id *Id) setWithoutPurpose(value string) (err error) {
+	var formatId string
 	var data []byte
 
-	if purposeAndFormatId, data, err = blech32.DecodeString(value); err != nil {
+	if formatId, data, err = blech32.DecodeString(value); err != nil {
 		err = errors.Wrapf(err, "Value: %q", value)
 		return err
 	}
 
-	if err = id.applyDecodedHRPAndData(purposeAndFormatId, data); err != nil {
-		err = errors.Wrapf(err, "Value: %q", value)
+	if err = id.SetMarklId(formatId, data); err != nil {
+		err = errors.Wrap(err)
 		return err
 	}
 

@@ -1,7 +1,10 @@
 ---
 status: proposed
-date: 2026-05-09
+date: 2026-05-10
 authors: Sasha F (with Clown), drafted from amarbel-llc/madder#150
+revisions:
+  - 2026-05-09: initial draft (amarbel-llc/madder#150)
+  - 2026-05-10: revert combined-HRP checksum rule to split-HRP form (amarbel-llc/madder#159)
 ---
 
 # RFC 0002 — Markl ID Format
@@ -65,8 +68,12 @@ The three parts are:
   6-character blech32 checksum (§3).
 
 The blech32 separator (literal `-`) sits between `format` and `data`.
-The checksum is computed over the entire HRP (i.e. either `format` or
-`purpose@format`), not just `format`.
+The checksum is computed over `format` only. The purpose, when
+present, is textual decoration prepended to the blech32 string after
+encoding — it is **not** part of the checksum input. Encoding the same
+`(format, data)` under two different purposes therefore produces
+identical blech32 bodies, differing only in their `<purpose>@`
+prefixes.
 
 A markl ID with empty `data` and unset `format` is the *null* state;
 its canonical text form is the empty string. Implementations MUST NOT
@@ -128,10 +135,14 @@ The polymod XOR target is `1`. The HRP expansion is identical to
 BIP173: each HRP byte contributes its top-3 bits, then a single zero
 byte, then each HRP byte's low-5 bits.
 
-For purpose-bearing markl IDs the HRP MUST be the literal string
-`<purpose>@<format>` — i.e. the `@` is part of the HRP and contributes
-to the checksum input. *(test:
-`TestRFC0002VectorsRoundTrip/purpose/...` in
+For purpose-bearing markl IDs the HRP MUST be just `<format>` — the
+purpose is **not** part of the HRP and does **not** contribute to the
+checksum input. The purpose's role is identity decoration around the
+digest, not part of the cryptographic content; binding the checksum to
+the purpose would break legitimate digest-extraction paths (e.g.
+mother→child signature lineage, audit references) that copy the same
+digest bytes between purposes. *(test:
+`TestRFC0002CrossPurposeBlech32Equal` in
 `go/internal/charlie/markl_registrations/`.)*
 
 ### 3.4. Bit Conversion
@@ -163,21 +174,23 @@ subject to the data-portion-minimum of 7 characters (1+ payload byte +
 
 Given an input string `S`:
 
-1. Validate `S` is uniformly cased per §3.5. If not, fail with
+1. Locate the *first* `@` in `S`. If present, split into `purpose`
+   (before `@`) and `body` (after). Otherwise, set `purpose = ""` and
+   `body = S`.
+2. Validate `body` is uniformly cased per §3.5. If not, fail with
    `MixedCase`.
-2. Locate the *last* `-` in `S`. If absent, fail with
+3. Locate the *last* `-` in `body`. If absent, fail with
    `SeparatorMissing`.
-3. Split `S` into `hrp` (before the last `-`) and `data` (after).
-4. Validate `len(data) >= 7`. If not, fail with `DataPortionTooShort`.
-5. Validate every byte in `data` is in the charset of §3.1. If not,
+4. Split `body` into `hrp` (before the last `-`) and `data` (after).
+   The `hrp` is `formatId`; it MUST NOT contain `@`.
+5. Validate `len(data) >= 7`. If not, fail with `DataPortionTooShort`.
+6. Validate every byte in `data` is in the charset of §3.1. If not,
    fail with `InvalidCharacter`.
-6. Verify the blech32 checksum over (HRP-expand(hrp) || data-as-5-bit).
-   If the polymod ≠ 1, fail with `InvalidChecksum`.
-7. Convert the first `len(data)-6` 5-bit values to 8-bit bytes per
+7. Verify the blech32 checksum over (HRP-expand(hrp) || data-as-5-bit).
+   If the polymod ≠ 1, fail with `InvalidChecksum`. The HRP here is
+   `formatId` only; the purpose is **not** part of the checksum input.
+8. Convert the first `len(data)-6` 5-bit values to 8-bit bytes per
    §3.4. Reject non-zero padding.
-8. Locate the *first* `@` in `hrp`. If present, split into `purpose`
-   (before `@`) and `formatId` (after). Otherwise, set `purpose = ""`
-   and `formatId = hrp`.
 9. Resolve `formatId` against the format registry (§5), applying the
    purpose-id alias table (§6.4) if present. If unresolvable, fail
    with `UnknownFormat`.
@@ -186,13 +199,15 @@ Given an input string `S`:
 11. Validate `len(payload)` matches the resolved format's declared size
     (§5). If not, fail with `WrongSize`.
 
-The order of steps 8 vs the hrp-as-checksum-input is deliberate: the
-checksum (step 6) MUST be verified over the *combined* HRP including
-any `@` and purpose, not over just the `format` substring after
-splitting on `@`. *(test: `TestRFC0002InvalidVectorsRejected` covers
-each terminal failure category;
-`TestRFC0002VectorsRoundTrip/purpose/...` covers the combined-HRP
-checksum rule.)*
+The order of step 1 (`@`-split) before step 7 (checksum) is
+deliberate: the checksum MUST be verified over the `formatId` substring
+only, not over a combined `<purpose>@<format>` string. Binding the
+checksum to the purpose would change a digest's encoded form when its
+identity decoration changes, breaking digest-extraction and
+mother→child signature paths. *(test:
+`TestRFC0002InvalidVectorsRejected` covers each terminal failure
+category; `TestRFC0002CrossPurposeBlech32Equal` covers the
+purpose-independent checksum rule.)*
 
 ## 5. Format ID Registry
 
@@ -236,8 +251,9 @@ ID's interpretation.
 
 Purpose IDs follow the convention `system-domain-role-version` and
 constrain which format IDs are valid in their position. The purpose
-appears textually *before* the `@` separator in a markl ID and is
-included in the blech32 HRP (§3.3).
+appears textually *before* the `@` separator in a markl ID; it is
+**not** part of the blech32 HRP (§3.3) and does not contribute to the
+checksum.
 
 ### 6.1. Registered Purposes
 
@@ -463,6 +479,20 @@ two decoders to match this spec where they previously diverged:
 These tightenings reject inputs the prior implementation silently
 accepted. No prior input that was actually valid per this RFC is
 affected.
+
+A third tightening — binding the blech32 checksum to
+`<purpose>@<format>` rather than just `<format>` — was incorrect and
+has been **reverted** under
+[#159](https://github.com/amarbel-llc/madder/issues/159). The
+combined-HRP rule shipped briefly between commits `8dc78c7` and the
+issue-#159 revert. The current spec restores the property that the
+same `(format, data)` under different purposes encodes to identical
+blech32 bodies — load-bearing for dodder's mother→child signature
+lineage and any digest-extraction path that re-attaches a digest under
+a different purpose. Existing pre-`8dc78c7` on-disk data is
+checksum-verifiable again under the restored rule; downstream
+consumers (dodder, piggy) coordinating on this spec MUST use the
+split-HRP form.
 
 ## 10. References
 

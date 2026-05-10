@@ -324,18 +324,20 @@ func buildInvalidVectors(t *testing.T) []rfc0002InvalidVector {
 
 	// Incompatible (purpose, format): construct a markl ID with the
 	// blob-digest purpose but an ed25519_sig format (purpose accepts
-	// only sha256 / blake2b256).
+	// only sha256 / blake2b256). Under the RFC 0002 split-HRP wire
+	// form the purpose is textual decoration prepended after blech32
+	// encoding the (format, payload) body.
 	{
 		const purposeId = markl.PurposeBlobDigestV1
 		sig := sequencePayload(64)
-		hrp := purposeId + "@" + markl.FormatIdEd25519Sig
-		bad, err := blech32.Encode(hrp, sig)
+		body, err := blech32.Encode(markl.FormatIdEd25519Sig, sig)
 		if err != nil {
 			t.Fatalf("blech32.Encode: %v", err)
 		}
+		bad := purposeId + "@" + string(body)
 		out = append(out, rfc0002InvalidVector{
 			Name:    "incompatible_purpose_format",
-			Encoded: string(bad),
+			Encoded: bad,
 			Error:   "IncompatiblePurposeAndFormat",
 		})
 	}

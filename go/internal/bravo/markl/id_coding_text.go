@@ -1,85 +1,66 @@
 package markl
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blech32"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
+// MarshalText writes the RFC 0002 §3 wire form
+// `[purpose@]<blech32(format, data)>`. The blech32 checksum binds to
+// (format, data) only; the purpose, when present, is prepended
+// textually after blech32 encoding so the same digest under different
+// purposes shares a byte-identical blech32 body.
 func (id Id) MarshalText() (bites []byte, err error) {
 	if id.format == nil {
 		return bites, err
 	}
 
-	var hrp string
-
-	if prupose := id.GetPurposeId(); prupose != "" {
-		hrp = fmt.Sprintf(
-			"%s@%s",
-			id.GetPurposeId(),
-			id.format.GetMarklFormatId(),
-		)
-	} else {
-		hrp = id.format.GetMarklFormatId()
-	}
-
-	if bites, err = blech32.Encode(hrp, id.data); err != nil {
+	if bites, err = blech32.Encode(id.format.GetMarklFormatId(), id.data); err != nil {
 		err = errors.Wrap(err)
 		return bites, err
+	}
+
+	if purpose := id.GetPurposeId(); purpose != "" {
+		bites = []byte(fmt.Sprintf("%s@%s", purpose, string(bites)))
 	}
 
 	return bites, err
 }
 
+// UnmarshalText parses the RFC 0002 §4 wire form. The purpose, when
+// present, is split off textually before blech32 decoding so the
+// checksum verifies against HRP=format only.
 func (id *Id) UnmarshalText(bites []byte) (err error) {
 	if len(bites) == 0 {
 		id.Reset()
 		return err
 	}
 
-	var purposeAndFormatId string
-	var data []byte
+	body := bites
 
-	if purposeAndFormatId, data, err = blech32.Decode(bites); err != nil {
-		err = errors.Wrapf(err, "Raw: %q", string(bites))
-		return err
-	}
+	if at := bytes.IndexByte(bites, '@'); at >= 0 {
+		purpose := string(bites[:at])
+		body = bites[at+1:]
 
-	if err = id.applyDecodedHRPAndData(purposeAndFormatId, data); err != nil {
-		err = errors.Wrapf(err, "Raw: %q", string(bites))
-		return err
-	}
-
-	return err
-}
-
-// applyDecodedHRPAndData is the post-blech32 half of the RFC 0002 §4
-// decode algorithm — shared between UnmarshalText (whose blech32 input
-// is []byte) and Set (whose input is string). Splits the HRP on the
-// first `@` to extract a purpose, then routes through SetMarklId for
-// the format-resolution, (purpose, format) compatibility, and
-// payload-size validations.
-//
-// Both decoders MUST run the blech32 step on the WHOLE input first
-// (with the combined HRP) — that is what makes the checksum verify
-// against the same bytes MarshalText computed it from.
-func (id *Id) applyDecodedHRPAndData(hrp string, data []byte) (err error) {
-	purpose, formatId, hasPurpose := strings.Cut(hrp, "@")
-	if !hasPurpose {
-		formatId = hrp
-	}
-
-	if hasPurpose {
 		if err = id.SetPurposeId(purpose); err != nil {
-			err = errors.Wrap(err)
+			err = errors.Wrapf(err, "Raw: %q", string(bites))
 			return err
 		}
 	}
 
+	var formatId string
+	var data []byte
+
+	if formatId, data, err = blech32.Decode(body); err != nil {
+		err = errors.Wrapf(err, "Raw: %q", string(bites))
+		return err
+	}
+
 	if err = id.SetMarklId(formatId, data); err != nil {
-		err = errors.Wrap(err)
+		err = errors.Wrapf(err, "Raw: %q", string(bites))
 		return err
 	}
 

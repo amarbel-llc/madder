@@ -4,6 +4,7 @@ package markl_registrations_test
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blech32"
@@ -52,14 +53,14 @@ func TestRFC0002VectorsRoundTrip(t *testing.T) {
 					string(gotEncoded), v.Encoded)
 			}
 
-			// Decode via UnmarshalText, which reads HRP =
-			// "purpose@format" as a unit (matching how MarshalText
-			// writes it) and runs the §4 validations (size,
-			// (purpose, format) compatibility) via SetMarklId.
-			// Set() splits on @ before running blech32.Decode and
-			// so verifies the checksum against the wrong HRP for
-			// purpose-bearing IDs — that asymmetry is tracked
-			// separately.
+			// Decode via UnmarshalText, which splits on `@`
+			// textually before blech32-decoding the body with HRP
+			// = format (matching how MarshalText writes it) and
+			// runs the §4 validations (size, (purpose, format)
+			// compatibility) via SetMarklId. The split-HRP
+			// asymmetry that previously existed between Set and
+			// UnmarshalText is gone: both decoders now extract the
+			// purpose textually before running blech32.
 			var decoded markl.Id
 			if err := decoded.UnmarshalText([]byte(v.Encoded)); err != nil {
 				t.Fatalf("UnmarshalText(%q): %v", v.Encoded, err)
@@ -109,10 +110,12 @@ func TestRFC0002InvalidVectorsRejected(t *testing.T) {
 
 // TestRFC0002VectorsRoundTripViaSet exercises markl.Id.Set against the
 // same fixture, pinning that the string-form decoder accepts the same
-// canonical wire format the byte-form decoder (UnmarshalText) accepts.
-// This is the regression guard for #152 — Set used to split on `@`
-// before running blech32.Decode, so its checksum verification fired
-// against the wrong HRP for purpose-bearing IDs.
+// wire format the byte-form decoder (UnmarshalText) accepts. The
+// split-HRP form (#159) restored a property that #152 originally
+// flagged: under the combined-HRP form Set's pre-blech32 `@` split
+// produced a checksum mismatch. Under the restored split-HRP form the
+// `@` split is mandatory before blech32 — the property holds because
+// MarshalText now embeds the purpose textually too.
 func TestRFC0002VectorsRoundTripViaSet(t *testing.T) {
 	fixture := loadRFC0002Fixture(t)
 
@@ -144,6 +147,69 @@ func TestRFC0002VectorsRoundTripViaSet(t *testing.T) {
 				t.Errorf("decoded payload: got %x, want %x", got, payload)
 			}
 		})
+	}
+}
+
+// TestRFC0002CrossPurposeBlech32Equal pins the wire-form property
+// restored by #159: encoding the same (format, data) under two
+// different purposes MUST produce identical blech32 bodies, differing
+// only in the `<purpose>@` textual prefix. The blech32 checksum binds
+// to (format, data) only — purpose-bound checksums break dodder's
+// mother→child signature lineage and any digest-extraction path that
+// re-attaches a digest under a different purpose.
+func TestRFC0002CrossPurposeBlech32Equal(t *testing.T) {
+	const (
+		formatId   = markl.FormatIdHashBlake2b256
+		purposeOne = markl.PurposeBlobDigestV1
+		purposeTwo = markl.PurposeObjectDigestV2
+	)
+
+	payload := bytes.Repeat([]byte{0xCD}, 32)
+
+	encode := func(purposeId string) string {
+		var id markl.Id
+		if purposeId != "" {
+			if err := id.SetPurposeId(purposeId); err != nil {
+				t.Fatalf("SetPurposeId(%q): %v", purposeId, err)
+			}
+		}
+		if err := id.SetMarklId(formatId, payload); err != nil {
+			t.Fatalf("SetMarklId(%q, ...): %v", formatId, err)
+		}
+		bites, err := id.MarshalText()
+		if err != nil {
+			t.Fatalf("MarshalText: %v", err)
+		}
+		return string(bites)
+	}
+
+	bodyOf := func(encoded string) string {
+		at := strings.IndexByte(encoded, '@')
+		if at < 0 {
+			return encoded
+		}
+		return encoded[at+1:]
+	}
+
+	bare := encode("")
+	one := encode(purposeOne)
+	two := encode(purposeTwo)
+
+	bareBody := bodyOf(bare)
+	oneBody := bodyOf(one)
+	twoBody := bodyOf(two)
+
+	if oneBody != bareBody {
+		t.Errorf("blech32 body under %q diverged from purposeless form:\n got  %q\n want %q",
+			purposeOne, oneBody, bareBody)
+	}
+	if twoBody != bareBody {
+		t.Errorf("blech32 body under %q diverged from purposeless form:\n got  %q\n want %q",
+			purposeTwo, twoBody, bareBody)
+	}
+	if oneBody != twoBody {
+		t.Errorf("blech32 bodies diverged across purposes:\n %q -> %q\n %q -> %q",
+			purposeOne, oneBody, purposeTwo, twoBody)
 	}
 }
 

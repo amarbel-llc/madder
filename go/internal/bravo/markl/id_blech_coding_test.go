@@ -45,11 +45,11 @@ func TestSetMarklIdWithFormatBlech32_StripsLegacyAtPrefix(t *testing.T) {
 		},
 		{
 			// Caller-supplied purposeId pinning: the legacy token is
-			// purposeless (no `@purpose@` prefix in the wire form),
+			// purposeless (no `purpose@` prefix in the wire form),
 			// but the caller declares the purpose externally. Pins
 			// that the purpose argument survives id.Set's
-			// applyDecodedHRPAndData (which skips SetPurposeId when
-			// the decoded HRP has no `@`).
+			// purposeless branch (which doesn't touch purposeId
+			// when the input has no `@`).
 			name:        "ed25519_pub_with_caller_purpose",
 			purposeId:   testPurposePub,
 			legacyValue: "@ed25519_pub-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0srk9anc",
