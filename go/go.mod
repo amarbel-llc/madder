@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/DataDog/zstd v1.5.7
-	github.com/amarbel-llc/purse-first/libs/dewey v0.0.5-0.20260509234944-e856297bc19d
+	github.com/amarbel-llc/purse-first/libs/dewey v0.1.0
 	github.com/amarbel-llc/tap/go v0.1.2
 	github.com/amarbel-llc/tommy v0.0.0-20260405143331-87255e87bf37
 	github.com/brandondube/tai v0.1.0
