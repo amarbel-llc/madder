@@ -87,12 +87,13 @@ func DirBlobStore(
 // FindAllCwdOverridePaths walks up from cwd and returns every ancestor
 // that contains `.<utilityName>/` (file or directory), deepest-first.
 // Honors `<UTILITYNAME>_CEILING_DIRECTORIES` (parsed via dewey's
-// xdg.ParseCeilingDirectories + xdg.IsAtOrAboveCeiling).
+// xdg.ParseCeilingDirectories + xdg.IsAboveCeiling).
 //
-// This is the multi-match counterpart of dewey's
-// xdg.getCwdXDGOverridePath, which only returns the deepest match.
-// Loop shape and ceiling semantics deliberately mirror dewey so a
-// future dewey API can subsume this helper. See #145.
+// Multi-match counterpart of dewey's xdg.getCwdXDGOverridePath, which
+// returns only the deepest match. Loop shape mirrors the post-#75
+// dewey: the ceiling dir is the LAST dir checked, not the first
+// excluded — match git's GIT_CEILING_DIRECTORIES semantics. See #145
+// and amarbel-llc/purse-first#75.
 func FindAllCwdOverridePaths(
 	cwd, utilityName string,
 	ceilings []string,
@@ -116,16 +117,15 @@ func FindAllCwdOverridePaths(
 		}
 
 		parent := filepath.Dir(dir)
-
-		if xdg.IsAtOrAboveCeiling(parent, ceilings) {
-			break
-		}
-
 		if parent == dir {
 			break
 		}
 
 		dir = parent
+
+		if xdg.IsAboveCeiling(dir, ceilings) {
+			break
+		}
 	}
 
 	return ancestors

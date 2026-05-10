@@ -195,24 +195,31 @@ func TestMakeAncestorOverrideStores_UniqueNamesGetSingleDot(t *testing.T) {
 	}
 }
 
-// TestMakeAncestorOverrideStores_RespectsCeiling pins that an ancestor
-// `.madder/` at-or-above the ceiling is invisible. dewey's ceiling
-// semantics: the loop breaks before traversing INTO a parent that is
-// at-or-above the ceiling, so `ceiling = root` means "mid is checked,
-// root is not".
+// TestMakeAncestorOverrideStores_RespectsCeiling pins git-style
+// ceiling semantics (matching the post-purse-first#75 dewey): the
+// ceiling dir itself IS in the walk, but anything strictly above is
+// not. With ceiling = mid, the walk visits mid (at-ceiling) and leaf
+// (below) but never aboveCeiling (strictly above).
 func TestMakeAncestorOverrideStores_RespectsCeiling(t *testing.T) {
-	root := t.TempDir()
-	mid := filepath.Join(root, "mid")
+	aboveCeiling := t.TempDir()
+	ceiling := filepath.Join(aboveCeiling, "ceiling")
+	mid := filepath.Join(ceiling, "mid")
 	leaf := filepath.Join(mid, "leaf")
 	if err := os.MkdirAll(leaf, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
-	rootMadder := filepath.Join(root, ".madder")
-	if err := os.MkdirAll(rootMadder, 0o755); err != nil {
+	aboveMadder := filepath.Join(aboveCeiling, ".madder")
+	if err := os.MkdirAll(aboveMadder, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeStoreConfig(t, rootMadder, "above_ceiling")
+	writeStoreConfig(t, aboveMadder, "above_ceiling")
+
+	ceilingMadder := filepath.Join(ceiling, ".madder")
+	if err := os.MkdirAll(ceilingMadder, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeStoreConfig(t, ceilingMadder, "at_ceiling")
 
 	midMadder := filepath.Join(mid, ".madder")
 	if err := os.MkdirAll(midMadder, 0o755); err != nil {
@@ -220,7 +227,7 @@ func TestMakeAncestorOverrideStores_RespectsCeiling(t *testing.T) {
 	}
 	writeStoreConfig(t, midMadder, "below_ceiling")
 
-	env := chdirAndMakeEnv(t, root, leaf)
+	env := chdirAndMakeEnv(t, ceiling, leaf)
 	layout := makeLayoutFor(t, env)
 
 	stores := makeAncestorOverrideStores(
@@ -230,10 +237,10 @@ func TestMakeAncestorOverrideStores_RespectsCeiling(t *testing.T) {
 	)
 
 	got := keysOf(stores)
-	want := []string{".below_ceiling"}
+	want := []string{".at_ceiling", ".below_ceiling"}
 
 	if !equalStringSlices(got, want) {
-		t.Errorf("keys = %v, want %v (ancestor above ceiling must not appear)",
+		t.Errorf("keys = %v, want %v (ceiling dir IS in the walk, strictly-above is not)",
 			got, want)
 	}
 }
