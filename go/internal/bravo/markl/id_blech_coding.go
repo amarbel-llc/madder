@@ -48,6 +48,16 @@ func SetMarklIdWithFormatBlech32(
 		return err
 	}
 
+	// Legacy dodder box_format wire form prefixes purposeless markl-ID
+	// tokens with `@` to distinguish them from other tokens (type tags
+	// `!type`, etc.). The canonical RFC 0002 form has no leading `@`,
+	// so strip it before handing off to id.Set — otherwise blech32
+	// computes its checksum against HRP=`@<algo>` while the encoder
+	// wrote with HRP=`<algo>`, the verification fails, and the dispatch
+	// below misroutes through setSha256's hex.Decode (which then chokes
+	// on the `@`). Closes amarbel-llc/madder#157.
+	blechValue = strings.TrimPrefix(blechValue, "@")
+
 	if err = id.Set(
 		blechValue,
 	); errors.Is(err, blech32.ErrSeparatorMissing) {
