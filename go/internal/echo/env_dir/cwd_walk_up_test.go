@@ -78,6 +78,135 @@ func TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp(t *testing.T) {
 	}
 }
 
+// TestMakeDefault_XDGUserLocationOnly_NegativeCases proves that the
+// walk-up still fires when the env var is unset, falsy, or when the
+// bundle field is empty (so the env-var name is never resolved). Pairs
+// with TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp.
+func TestMakeDefault_XDGUserLocationOnly_NegativeCases(t *testing.T) {
+	const userLocationOnlyEnv = "X_USER_LOCATION_ONLY"
+
+	cases := []struct {
+		name      string
+		envValue  string // "" means unset
+		bundle    EnvVarNames
+		setEnvVar bool
+	}{
+		{
+			name:      "empty bundle field, env=1 — env var name never resolved",
+			envValue:  "1",
+			bundle:    EnvVarNames{},
+			setEnvVar: true,
+		},
+		{
+			name:      "bundle field set, env unset — falls through to walk-up",
+			envValue:  "",
+			bundle:    EnvVarNames{XDGUserLocationOnly: userLocationOnlyEnv},
+			setEnvVar: false,
+		},
+		{
+			name:      "bundle field set, env=0 — falsy, walk-up fires",
+			envValue:  "0",
+			bundle:    EnvVarNames{XDGUserLocationOnly: userLocationOnlyEnv},
+			setEnvVar: true,
+		},
+		{
+			name:      "bundle field set, env=garbage — falsy, walk-up fires",
+			envValue:  "maybe",
+			bundle:    EnvVarNames{XDGUserLocationOnly: userLocationOnlyEnv},
+			setEnvVar: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			madderDir := filepath.Join(root, ".madder")
+			if err := os.MkdirAll(madderDir, 0o755); err != nil {
+				t.Fatalf("mkdir .madder: %v", err)
+			}
+			subdir := filepath.Join(root, "some-subdir")
+			if err := os.MkdirAll(subdir, 0o755); err != nil {
+				t.Fatalf("mkdir subdir: %v", err)
+			}
+
+			t.Setenv("MADDER_CEILING_DIRECTORIES", filepath.Dir(root))
+			if tc.setEnvVar {
+				t.Setenv(userLocationOnlyEnv, tc.envValue)
+			}
+
+			saved, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("getwd: %v", err)
+			}
+			t.Cleanup(func() { _ = os.Chdir(saved) })
+			if err := os.Chdir(subdir); err != nil {
+				t.Fatalf("chdir: %v", err)
+			}
+
+			env := MakeDefault(
+				errors.MakeContextDefault(),
+				Config{EnvVarNames: tc.bundle},
+				"madder",
+			)
+
+			if !env.XDG.IsOverridden() {
+				t.Errorf(
+					"expected walk-up to fire (XDG overridden) for case %q; "+
+						"got IsOverridden=false",
+					tc.name,
+				)
+			}
+		})
+	}
+}
+
+// TestMakeDefault_XDGUserLocationOnly_AcceptsParseBoolEnvValues proves
+// the truthiness check matches the package's parseBoolEnv helper, not a
+// stricter "1"-only comparison. Same accepted set as VerifyOnCollision
+// per env_dir convention.
+func TestMakeDefault_XDGUserLocationOnly_AcceptsParseBoolEnvValues(t *testing.T) {
+	const userLocationOnlyEnv = "X_USER_LOCATION_ONLY"
+
+	for _, value := range []string{"1", "true", "yes", "on", "TRUE", "Yes"} {
+		t.Run("value="+value, func(t *testing.T) {
+			root := t.TempDir()
+			madderDir := filepath.Join(root, ".madder")
+			if err := os.MkdirAll(madderDir, 0o755); err != nil {
+				t.Fatalf("mkdir .madder: %v", err)
+			}
+			subdir := filepath.Join(root, "some-subdir")
+			if err := os.MkdirAll(subdir, 0o755); err != nil {
+				t.Fatalf("mkdir subdir: %v", err)
+			}
+
+			t.Setenv("MADDER_CEILING_DIRECTORIES", filepath.Dir(root))
+			t.Setenv(userLocationOnlyEnv, value)
+
+			saved, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("getwd: %v", err)
+			}
+			t.Cleanup(func() { _ = os.Chdir(saved) })
+			if err := os.Chdir(subdir); err != nil {
+				t.Fatalf("chdir: %v", err)
+			}
+
+			env := MakeDefault(
+				errors.MakeContextDefault(),
+				Config{EnvVarNames: EnvVarNames{XDGUserLocationOnly: userLocationOnlyEnv}},
+				"madder",
+			)
+
+			if env.XDG.IsOverridden() {
+				t.Errorf(
+					"expected walk-up disabled for env value %q; got IsOverridden=true",
+					value,
+				)
+			}
+		})
+	}
+}
+
 // TestMakeDefault_CwdWalkUpFindsAncestorMadder is a regression test for #145.
 // `madder list` from a subdir of a `.madder/`-rooted directory should
 // resolve XDG paths against the ancestor (the directory containing

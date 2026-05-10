@@ -39,8 +39,9 @@ type EnvVarNames struct {
 	// #38 for the eventual migration to a CLI flag.
 	VerifyOnCollision string
 
-	// XDGUserLocationOnly names the env var that, when set to "1",
-	// disables the cwd walk-up MakeDefault would otherwise perform via
+	// XDGUserLocationOnly names the env var that, when truthy (parseBoolEnv:
+	// "1", "true", "yes", "on", case-insensitive), disables the cwd walk-up
+	// MakeDefault would otherwise perform via
 	// xdg.InitializeOverriddenIfNecessary. With this set, env_dir falls
 	// through to xdg.InitializeStandardFromEnv — honoring $XDG_DATA_HOME
 	// etc. directly. Useful for embedders and test harnesses that exec

@@ -132,7 +132,7 @@ func MakeWithDefaultHome(
 	}
 
 	if permitCwdXDGOverride {
-		if name := cfg.EnvVarNames.XDGUserLocationOnly; name != "" && os.Getenv(name) == "1" {
+		if name := cfg.EnvVarNames.XDGUserLocationOnly; name != "" && parseBoolEnv(os.Getenv(name)) {
 			permitCwdXDGOverride = false
 		}
 	}
