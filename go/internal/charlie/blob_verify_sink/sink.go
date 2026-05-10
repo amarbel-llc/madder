@@ -12,7 +12,6 @@
 package blob_verify_sink
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -36,12 +35,15 @@ func NewTAP(w io.Writer) Sink {
 	return &tapSink{tw: tap.NewWriter(w)}
 }
 
-// NewJSON constructs an NDJSON sink. The record stream is buffered; Finalize flushes.
+// NewJSON constructs an NDJSON sink. The encoder writes directly to
+// `out` — no outer buffering — so each Encode call results in a single
+// `Write` syscall. On a pipe (or merged stdout/stderr fd from `2>&1`)
+// that single write is atomic up to PIPE_BUF, which is enough for the
+// record sizes we emit and prevents the byte-level interleaving we'd
+// otherwise see when stderr Notices land mid-record. See #154.
 func NewJSON(out, errOut io.Writer) Sink {
-	buf := bufio.NewWriter(out)
 	return &jsonSink{
-		buf:    buf,
-		enc:    json.NewEncoder(buf),
+		enc:    json.NewEncoder(out),
 		errOut: errOut,
 	}
 }
@@ -100,7 +102,6 @@ const (
 )
 
 type jsonSink struct {
-	buf    *bufio.Writer
 	enc    *json.Encoder
 	errOut io.Writer
 }
@@ -125,13 +126,19 @@ func (s *jsonSink) ReadError(store string, err error) {
 	s.emit(record{Store: store, State: StateReadError, Error: err.Error()})
 }
 
+// Notice writes a TAP-comment-formatted line ("# <msg>") to errOut so
+// the merged stdout+stderr stream stays parseable as TAP — the JSON
+// event records are valid TAP "ok"/"not ok" lines from a strict-TAP
+// consumer's standpoint, and the leading "# " on notices keeps them
+// from being misclassified. The single Fprintln is one Write syscall,
+// atomic on a pipe up to PIPE_BUF.
 func (s *jsonSink) Notice(msg string) {
-	fmt.Fprintln(s.errOut, msg)
+	fmt.Fprintln(s.errOut, "# "+msg)
 }
 
-func (s *jsonSink) Finalize() {
-	_ = s.buf.Flush()
-}
+// Finalize is a no-op for the JSON sink. The encoder writes
+// unbuffered directly to `out`; nothing to flush.
+func (s *jsonSink) Finalize() {}
 
 func (s *jsonSink) BailOut(msg string) {
 	// Bail-out becomes a final error record so consumers can detect the

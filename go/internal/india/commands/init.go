@@ -273,7 +273,7 @@ func (cmd *Init) runDiscover(
 
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
-		fmt.Sprintf("(blob_store: %s) ", blobStoreId),
+		fmt.Sprintf("# (blob_store: %s) ", blobStoreId),
 	)
 
 	sshClient, err := makeSSHClientForSFTPConfig(req, printer, cmd.blobStoreConfig)
@@ -420,7 +420,7 @@ func (cmd *Init) ensureRemoteConfigExists(
 ) bool {
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
-		fmt.Sprintf("(blob_store: %s) ", blobStoreId),
+		fmt.Sprintf("# (blob_store: %s) ", blobStoreId),
 	)
 
 	sshClient, err := makeSSHClientForSFTPConfig(req, printer, cmd.blobStoreConfig)

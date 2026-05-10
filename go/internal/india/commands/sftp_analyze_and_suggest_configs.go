@@ -430,7 +430,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) dialSFTPInProcess(
 
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
-		fmt.Sprintf("(sftp-analyze: %s) ", cmd.sshHost),
+		fmt.Sprintf("# (sftp-analyze: %s) ", cmd.sshHost),
 	)
 
 	sshClient, err := blob_stores.MakeSSHClientFromSSHConfig(env, printer, cfg)

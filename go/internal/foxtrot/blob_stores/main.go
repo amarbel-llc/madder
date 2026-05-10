@@ -267,7 +267,7 @@ func MakeBlobStore(
 
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
-		fmt.Sprintf("(blob_store: %s) ", configNamed.Path.GetId()),
+		fmt.Sprintf("# (blob_store: %s) ", configNamed.Path.GetId()),
 	)
 
 	configBlob := configNamed.Config.Blob
