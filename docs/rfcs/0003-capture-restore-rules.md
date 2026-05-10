@@ -124,7 +124,7 @@ For each entry `e` in a receipt being restored into destination `dest`, the cons
 
 The consumer MUST refuse to restore the entire receipt — without leaving any partial materialization on disk — if any of the following hold for any entry:
 
-1. `materialized` is not equal to `filepath.Clean(dest)` and is not lexically rooted under `filepath.Clean(dest) + os.PathSeparator`.
+1. `materialized` is not contained within `dest`. The check is on the relative path from `dest` to `materialized`: compute `rel := filepath.Rel(dest, materialized)`; refuse if the call errors, if `rel == ".."`, or if `rel` begins with `".." + os.PathSeparator`. (An earlier draft framed this as a `HasPrefix(materialized, dest+os.PathSeparator)` check; that wording is incorrect when `dest` is a relative path like `"."`, because `filepath.Clean` strips the `./` prefix from `materialized` and the `HasPrefix` rejects every benign entry. Implementations MUST use the relative-path form.)
 2. `e.root` or `e.path` contains a NUL byte (`\x00`).
 3. `e.root` is the empty string.
 
