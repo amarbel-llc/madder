@@ -19,8 +19,13 @@ cutting-garden owns the format and uses its own
 `<utility>-<artifact>-<subtype>-<version>` shape rather than madder's
 vocabulary, so the tag is not in #16's locked-strings bucket.
 
-The extraction plan is recorded at
-`docs/plans/2026-05-02-extract-cutting-garden.md`.
+The current extraction design is recorded at
+`docs/plans/2026-05-10-extract-cutting-garden-design.md`. It pivots
+the strategy: cutting-garden moves to its own repo
+(`amarbel-llc/cutting-garden`) atop madder's public `pkgs/` substrate
+rather than being lifted out of `go/internal/india/`. Until that work
+lands, madder keeps building `cutting-garden` from
+`go/internal/india/commands_cutting_garden/` unchanged.
 
 ## History: madder was extracted from dodder
 
