@@ -2,78 +2,87 @@ package markl
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
 )
 
-// Regression for #157: dodder's legacy box_format wire form prefixes
-// purposeless markl-ID tokens with `@` to distinguish them from other
-// tokens (type tags `!type`, etc.). After RFC 0002 landed in madder
-// v0.3.16, SetMarklIdWithFormatBlech32 fed the `@`-prefixed string
-// straight into id.Set; blech32 decoded HRP=`@<algo>` (with the `@`)
-// and the checksum failed because the encoder side had written with
-// HRP=`<algo>`. The function-level fallback to setSha256 then ran
-// hex.DecodeString on the `@`-bearing input, surfacing as
-// `encoding/hex: invalid byte: U+0040 '@'`. Stripping the leading `@`
-// before Set fixes all three dodder call sites in box_format/read.go.
-//
-// Each fixture below is a real RFC 0002 string from the madder
-// fixture (testdata/0002-markl-id-format-vectors.json), prefixed with
-// `@` to mimic the legacy dodder wire form.
+// Regression for #157. Each fixture is an RFC 0002 vector from
+// `testdata/0002-markl-id-format-vectors.json`, prefixed with the
+// legacy dodder `@` to mimic the wire form that triggered the
+// hex.Decode panic before the strip.
 func TestSetMarklIdWithFormatBlech32_StripsLegacyAtPrefix(t *testing.T) {
 	cases := []struct {
 		name        string
-		canonical   string
+		purposeId   string
 		legacyValue string
 		wantFormat  string
+		wantPurpose string
+		wantHex     string
 	}{
 		{
 			name:        "sha256",
-			canonical:   "sha256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s7lcgm6",
 			legacyValue: "@sha256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s7lcgm6",
 			wantFormat:  FormatIdHashSha256,
+			wantHex:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 		},
 		{
 			name:        "blake2b256",
-			canonical:   "blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400",
 			legacyValue: "@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400",
 			wantFormat:  FormatIdHashBlake2b256,
+			wantHex:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 		},
 		{
 			name:        "ed25519_pub",
-			canonical:   "ed25519_pub-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0srk9anc",
 			legacyValue: "@ed25519_pub-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0srk9anc",
 			wantFormat:  FormatIdEd25519Pub,
+			wantHex:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 		},
 		{
 			name:        "ed25519_sig",
-			canonical:   "ed25519_sig-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgfzyvjz2f389q5j52ev95hz7vp3xgengdfkxuurjw3m8s7nu0cy4lu83",
 			legacyValue: "@ed25519_sig-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0jqgfzyvjz2f389q5j52ev95hz7vp3xgengdfkxuurjw3m8s7nu0cy4lu83",
 			wantFormat:  FormatIdEd25519Sig,
+			wantHex:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+		},
+		{
+			// Caller-supplied purposeId pinning: the legacy token is
+			// purposeless (no `@purpose@` prefix in the wire form),
+			// but the caller declares the purpose externally. Pins
+			// that the purpose argument survives id.Set's
+			// applyDecodedHRPAndData (which skips SetPurposeId when
+			// the decoded HRP has no `@`).
+			name:        "ed25519_pub_with_caller_purpose",
+			purposeId:   testPurposePub,
+			legacyValue: "@ed25519_pub-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0srk9anc",
+			wantFormat:  FormatIdEd25519Pub,
+			wantPurpose: testPurposePub,
+			wantHex:     "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
 		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var canonicalId Id
-			if err := canonicalId.Set(tc.canonical); err != nil {
-				t.Fatalf("canonical %q: %v", tc.canonical, err)
+			wantBytes, err := hex.DecodeString(tc.wantHex)
+			if err != nil {
+				t.Fatalf("decode wantHex: %v", err)
 			}
 
-			var legacyId Id
-			if err := SetMarklIdWithFormatBlech32(&legacyId, "", tc.legacyValue); err != nil {
+			var id Id
+			if err := SetMarklIdWithFormatBlech32(&id, tc.purposeId, tc.legacyValue); err != nil {
 				t.Fatalf("legacy @-prefixed input %q: %v", tc.legacyValue, err)
 			}
 
-			format := legacyId.GetMarklFormat()
+			format := id.GetMarklFormat()
 			if format == nil {
-				t.Fatal("legacy: format is nil after parse")
+				t.Fatal("format is nil after parse")
 			}
 			if got := format.GetMarklFormatId(); got != tc.wantFormat {
-				t.Errorf("legacy format: got %q, want %q", got, tc.wantFormat)
+				t.Errorf("format: got %q, want %q", got, tc.wantFormat)
 			}
-			if !bytes.Equal(legacyId.GetBytes(), canonicalId.GetBytes()) {
-				t.Errorf("legacy and canonical decode produced different bytes:\n legacy:    %x\n canonical: %x",
-					legacyId.GetBytes(), canonicalId.GetBytes())
+			if got := id.GetPurposeId(); got != tc.wantPurpose {
+				t.Errorf("purpose: got %q, want %q", got, tc.wantPurpose)
+			}
+			if !bytes.Equal(id.GetBytes(), wantBytes) {
+				t.Errorf("bytes: got %x, want %x", id.GetBytes(), wantBytes)
 			}
 		})
 	}
