@@ -26,6 +26,16 @@ func TestEnvVerifyOnCollision(t *testing.T) {
 	}
 }
 
+// TestEnvXDGUserLocationOnly pins the cwd-walk-up-disable env-var name.
+// User-visible contract — embedders set this to "1" to opt out of
+// walk-up resolution.
+func TestEnvXDGUserLocationOnly(t *testing.T) {
+	if EnvXDGUserLocationOnly != "MADDER_XDG_USER_LOCATION_ONLY" {
+		t.Errorf("EnvXDGUserLocationOnly = %q, want %q",
+			EnvXDGUserLocationOnly, "MADDER_XDG_USER_LOCATION_ONLY")
+	}
+}
+
 // TestDefaultEnvVarNames pins the bundle madder commands pass into
 // env_dir.Config.EnvVarNames. The constants alone are easy to mis-
 // wire; this test confirms the bundle's fields point at the right
@@ -34,8 +44,9 @@ func TestEnvVerifyOnCollision(t *testing.T) {
 // package doc-comment).
 func TestDefaultEnvVarNames(t *testing.T) {
 	want := env_dir.EnvVarNames{
-		Binary:            EnvBin,
-		VerifyOnCollision: EnvVerifyOnCollision,
+		Binary:              EnvBin,
+		VerifyOnCollision:   EnvVerifyOnCollision,
+		XDGUserLocationOnly: EnvXDGUserLocationOnly,
 		// XDGUtilityOverride: "" — madder defines no override env var
 	}
 

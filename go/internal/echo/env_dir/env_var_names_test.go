@@ -10,9 +10,10 @@ import "testing"
 // its own EnvVarNames bundle.
 func TestConfig_EnvVarNamesPassedThrough(t *testing.T) {
 	custom := EnvVarNames{
-		Binary:             "X_BIN",
-		XDGUtilityOverride: "X_OVERRIDE",
-		VerifyOnCollision:  "X_VERIFY",
+		Binary:              "X_BIN",
+		XDGUtilityOverride:  "X_OVERRIDE",
+		VerifyOnCollision:   "X_VERIFY",
+		XDGUserLocationOnly: "X_USER_LOCATION_ONLY",
 	}
 	cfg := Config{EnvVarNames: custom}
 

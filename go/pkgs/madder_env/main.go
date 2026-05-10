@@ -9,6 +9,7 @@ var (
 )
 
 const (
-	EnvBin               = internal.EnvBin
-	EnvVerifyOnCollision = internal.EnvVerifyOnCollision
+	EnvBin                 = internal.EnvBin
+	EnvVerifyOnCollision   = internal.EnvVerifyOnCollision
+	EnvXDGUserLocationOnly = internal.EnvXDGUserLocationOnly
 )

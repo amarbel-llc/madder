@@ -18,6 +18,9 @@ import "github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
 //   - Empty `VerifyOnCollision`: env_dir does not honor any env-var
 //     override of the verify-on-collision toggle
 //     (`os.Getenv("")` returns "", which parses as false).
+//   - Empty `XDGUserLocationOnly`: env_dir does not honor any env-var
+//     opt-out of the cwd walk-up (MakeWithDefaultHome's
+//     permitCwdXDGOverride arg is the only knob).
 //
 // This makes `Config{}` (zero-value) a viable construction shape for
 // callers that want a pure XDG-only env_dir with no env-var-driven
@@ -35,6 +38,14 @@ type EnvVarNames struct {
 	// GetVerifyOnCollisionOverride to true. See ADR 0003 for rationale,
 	// #38 for the eventual migration to a CLI flag.
 	VerifyOnCollision string
+
+	// XDGUserLocationOnly names the env var that, when set to "1",
+	// disables the cwd walk-up MakeDefault would otherwise perform via
+	// xdg.InitializeOverriddenIfNecessary. With this set, env_dir falls
+	// through to xdg.InitializeStandardFromEnv — honoring $XDG_DATA_HOME
+	// etc. directly. Useful for embedders and test harnesses that exec
+	// madder from a cwd whose path branch the ceiling can't gate.
+	XDGUserLocationOnly string
 }
 
 // Config bundles the construction inputs that are reusable across XDG

@@ -43,6 +43,16 @@ func init() {
 				"ancestor directories.",
 		},
 		futility.EnvVar{
+			Name: "MADDER_XDG_USER_LOCATION_ONLY",
+			Description: "Set to \"1\" to disable the cwd walk-up that would " +
+				"otherwise resolve XDG paths against an ancestor .madder/ " +
+				"directory. With this flag set, madder-cache uses standard " +
+				"XDG resolution only ($XDG_DATA_HOME etc., defaulting to " +
+				"$HOME/.local/share). Useful for embedders and test harnesses " +
+				"that exec madder-cache from a cwd whose path branch a " +
+				"MADDER_CEILING_DIRECTORIES entry can't gate.",
+		},
+		futility.EnvVar{
 			Name: "HOME",
 			Description: "User home directory. Base for XDG default paths " +
 				"when XDG_* vars are unset.",

@@ -132,6 +132,12 @@ func MakeWithDefaultHome(
 	}
 
 	if permitCwdXDGOverride {
+		if name := cfg.EnvVarNames.XDGUserLocationOnly; name != "" && os.Getenv(name) == "1" {
+			permitCwdXDGOverride = false
+		}
+	}
+
+	if permitCwdXDGOverride {
 		if err := env.XDG.InitializeOverriddenIfNecessary(env.xdgInitArgs); err != nil {
 			env.Cancel(err)
 			return env
