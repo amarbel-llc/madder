@@ -36,9 +36,10 @@ func TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp(t *testing.T) {
 	// not the ceiling, is what disables it.
 	t.Setenv("MADDER_CEILING_DIRECTORIES", filepath.Dir(root))
 
-	// Use a test-scoped env-var name to keep this package independent
-	// of madder_env (which would otherwise create a cyclic import).
-	t.Setenv("X_USER_LOCATION_ONLY", "1")
+	// Test-scoped env-var name keeps this package independent of
+	// madder_env (which would otherwise create a cyclic import).
+	const userLocationOnlyEnv = "X_USER_LOCATION_ONLY"
+	t.Setenv(userLocationOnlyEnv, "1")
 
 	saved, err := os.Getwd()
 	if err != nil {
@@ -52,7 +53,7 @@ func TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp(t *testing.T) {
 
 	env := MakeDefault(
 		errors.MakeContextDefault(),
-		Config{EnvVarNames: EnvVarNames{XDGUserLocationOnly: "X_USER_LOCATION_ONLY"}},
+		Config{EnvVarNames: EnvVarNames{XDGUserLocationOnly: userLocationOnlyEnv}},
 		"madder",
 	)
 

@@ -44,13 +44,8 @@ const EnvBin = "BIN_MADDER"
 // flag.
 const EnvVerifyOnCollision = "MADDER_VERIFY_ON_COLLISION"
 
-// EnvXDGUserLocationOnly is the env-var name that, when set to "1",
-// disables the cwd walk-up env_dir.MakeDefault would otherwise perform
-// to find an ancestor `.madder/` directory. With this set, env_dir
-// uses standard XDG resolution only — honoring $XDG_DATA_HOME etc.
-// directly. Useful for embedders and test harnesses that exec madder
-// from a cwd whose path branch a MADDER_CEILING_DIRECTORIES entry
-// can't gate.
+// EnvXDGUserLocationOnly is the env-var name madder_env publishes to
+// env_dir; see env_dir.EnvVarNames.XDGUserLocationOnly for behavior.
 const EnvXDGUserLocationOnly = "MADDER_XDG_USER_LOCATION_ONLY"
 
 // DefaultEnvVarNames is madder's env-var contract bundled for
