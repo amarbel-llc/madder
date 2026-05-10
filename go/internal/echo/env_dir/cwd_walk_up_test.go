@@ -36,6 +36,13 @@ func TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp(t *testing.T) {
 	// not the ceiling, is what disables it.
 	t.Setenv("MADDER_CEILING_DIRECTORIES", filepath.Dir(root))
 
+	// HOME must point at a writable path because walk-up is about to
+	// be disabled; the standard XDG fallback templates resolve to
+	// $HOME/.{cache,local/share,...}/madder, and initializeXDG
+	// MkdirAll's the cache. Nix sandbox $HOME=/homeless-shelter is
+	// read-only, so without this the test fails in `nix build`.
+	t.Setenv("HOME", root)
+
 	// Test-scoped env-var name keeps this package independent of
 	// madder_env (which would otherwise create a cyclic import).
 	const userLocationOnlyEnv = "X_USER_LOCATION_ONLY"
@@ -180,6 +187,10 @@ func TestMakeDefault_XDGUserLocationOnly_AcceptsParseBoolEnvValues(t *testing.T)
 			}
 
 			t.Setenv("MADDER_CEILING_DIRECTORIES", filepath.Dir(root))
+			// Walk-up is about to be disabled — point HOME at a writable
+			// path so initializeXDG's MkdirAll on the cache succeeds in
+			// sandboxed environments (nix build).
+			t.Setenv("HOME", root)
 			t.Setenv(userLocationOnlyEnv, value)
 
 			saved, err := os.Getwd()
