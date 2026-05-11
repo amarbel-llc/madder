@@ -16,7 +16,7 @@ var globalFlags = &Globals{}
 func init() {
 	utility.GlobalFlags = globalFlags
 
-	// TODO why is this duplicated with the GlobalFlagDefiner below?
+	// TODO(#166) investigate whether this duplicates GlobalFlagDefiner below
 	utility.GlobalParams = []futility.Param{
 		futility.BoolFlag{
 			Name: "no-inventory-log",
