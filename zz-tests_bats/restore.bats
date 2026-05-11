@@ -241,7 +241,7 @@ function restore_uses_hint_store_when_config_matches { # @test
 }
 
 function restore_uses_hint_store_when_default_store_emits_hint { # @test
-  # Branch 2 for the default-store path. Per #92 option (c), default-
+  # Branch 2 for the default-store path. Per amarbel-llc/cutting-garden#12 option (c), default-
   # store captures now emit a hint pointing at the resolved id
   # (e.g. ".default"); restore must consume it silently rather than
   # fall through the no-hint branch.

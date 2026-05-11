@@ -314,7 +314,7 @@ function capture_emits_store_hint_when_known { # @test
 }
 
 function capture_default_store_emits_hint { # @test
-  # Per #92 option (c): default-store captures emit a hint pointing
+  # Per amarbel-llc/cutting-garden#12 option (c): default-store captures emit a hint pointing
   # at the resolved default-store id (e.g. ".default").
   init_store
 

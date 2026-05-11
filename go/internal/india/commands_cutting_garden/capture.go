@@ -199,7 +199,7 @@ func (cmd Capture) Run(req futility.Request) {
 		// Reuse storeName when non-empty; fall back to the resolved
 		// default-store id so consumers can lock the lookup to a real
 		// store rather than the active store at restore time
-		// (RFC 0003 §Store-Hint Resolution; closes #92 option (c)).
+		// (RFC 0003 §Store-Hint Resolution; closes amarbel-llc/cutting-garden#12 option (c)).
 		effectiveStoreId := storeName
 		if effectiveStoreId == "" {
 			effectiveStoreId = envBlobStore.GetDefaultBlobStoreId()
@@ -546,7 +546,7 @@ func writeReceiptBlob(
 // computeStoreHint builds the RFC 0003 store-hint metadata for a
 // receipt. storeIdString is the resolved id of the destination store
 // (the default-store case is resolved to its actual id by the caller
-// per #92 option (c), not bypassed here). An empty string is the
+// per amarbel-llc/cutting-garden#12 option (c), not bypassed here). An empty string is the
 // "still couldn't determine an id" sentinel — returns (nil, nil), the
 // MAY-omit path RFC 0003 §Producer Rules §Receipt Metadata: Store Hint
 // permits.

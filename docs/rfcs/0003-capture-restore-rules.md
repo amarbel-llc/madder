@@ -11,7 +11,7 @@ This document specifies behavioral rules for producers (`cutting-garden capture`
 
 ## Introduction
 
-`cutting-garden capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`capture-receipt(7)`). The inverse — `cutting-garden restore` — is being introduced under [#87](https://github.com/amarbel-llc/madder/issues/87) and consumes a receipt to materialize the captured tree on disk.
+`cutting-garden capture` walks one or more directories and writes their contents as content-addressable blobs into a configured store, emitting a receipt blob per store-group that lists every captured entry (`capture-receipt(7)`). The inverse — `cutting-garden restore` — is being introduced under [amarbel-llc/cutting-garden#9](https://github.com/amarbel-llc/cutting-garden/issues/9) and consumes a receipt to materialize the captured tree on disk.
 
 For the producer/consumer pair to be safe and predictable, several rules need to be normative rather than implicit:
 
@@ -265,8 +265,8 @@ Consumers MUST NOT follow symlinks they create during restore in any subsequent 
 
 Conformance tests for this specification live in `zz-tests_bats/`:
 
-- `zz-tests_bats/capture.bats` — producer rules. Existing file; new tests are added under #87's parent issue for Root Scoping and Root Collision.
-- `zz-tests_bats/restore.bats` — consumer rules. To be created when [#87](https://github.com/amarbel-llc/madder/issues/87) lands.
+- `zz-tests_bats/capture.bats` — producer rules. Existing file; new tests are added under amarbel-llc/cutting-garden#9's parent issue for Root Scoping and Root Collision.
+- `zz-tests_bats/restore.bats` — consumer rules. To be created when [amarbel-llc/cutting-garden#9](https://github.com/amarbel-llc/cutting-garden/issues/9) lands.
 
 Tests use binary injection via `bats-emo`:
 
@@ -300,8 +300,8 @@ The body schema (`cutting_garden-capture_receipt-fs-v1`) is preserved unchanged.
 
 Implementation lands in two phases:
 
-1. **Producer-side enforcement**: PWD-scoping check and collision detection in the `capture` planner. Store-hint metadata emission in the receipt encoder. Filed as one or more issues stacked under #87.
-2. **Consumer**: `restore` is implemented per #87. The producer-side phase MUST land first, so receipts produced once the consumer ships already conform to this RFC.
+1. **Producer-side enforcement**: PWD-scoping check and collision detection in the `capture` planner. Store-hint metadata emission in the receipt encoder. Filed as one or more issues stacked under amarbel-llc/cutting-garden#9.
+2. **Consumer**: `restore` is implemented per amarbel-llc/cutting-garden#9. The producer-side phase MUST land first, so receipts produced once the consumer ships already conform to this RFC.
 
 ## References
 
@@ -314,7 +314,7 @@ Implementation lands in two phases:
 
 ### Informative
 
-- [#87](https://github.com/amarbel-llc/madder/issues/87) — `restore` command implementation.
-- [#88](https://github.com/amarbel-llc/madder/issues/88) — Pre-walk huh confirm-gate for large captures (independent of this RFC).
+- [amarbel-llc/cutting-garden#9](https://github.com/amarbel-llc/cutting-garden/issues/9) — `restore` command implementation.
+- [amarbel-llc/cutting-garden#10](https://github.com/amarbel-llc/cutting-garden/issues/10) — Pre-walk huh confirm-gate for large captures (independent of this RFC).
 - [#89](https://github.com/amarbel-llc/madder/issues/89) — `hyphence(7)` tag-syntax clarification (informative; this RFC's `- store/<id>` convention does not depend on the man-page wording fix).
 - `docs/decisions/0005-remote-driven-sftp-blob-stores.md` — adjacent ADR establishing that the remote `blob_store-config` is the source of truth for hash/buckets/compression/encryption, which informs this RFC's choice to lock the store-hint to the config-blob's markl-id rather than to the store's transport-layer settings.

@@ -170,7 +170,7 @@ Register a new plugin (sketch — no second plugin ships today):
   mirroring an `-fs-` receipt to an s3 prefix), but they are out
   of scope for this pass. A `TODO(#NNN)` anchor in
   `commands_cutting_garden/{restore,diff}.go` flags the future
-  decision is tracked in [#144][]: relax the constraint, gate on
+  decision is tracked in [amarbel-llc/cutting-garden#18][]: relax the constraint, gate on
   an `--allow-cross-scheme` flag, or let `RestorePlugin` declare
   which receipt tags it accepts.
 - **Blob-store-ids stay bare.** `capture`'s alternating positional
@@ -207,4 +207,4 @@ Register a new plugin (sketch — no second plugin ships today):
 [FDR 0001]: 0001-restore.md
 [FDR 0006]: 0006-diff.md
 [#16]: https://github.com/amarbel-llc/madder/issues/16
-[#144]: https://github.com/amarbel-llc/madder/issues/144
+[amarbel-llc/cutting-garden#18]: https://github.com/amarbel-llc/cutting-garden/issues/18

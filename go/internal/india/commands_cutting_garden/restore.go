@@ -149,7 +149,7 @@ func (cmd *Restore) runRestore(
 			&receiptId, blob)
 	}
 
-	// TODO(#144) cross-scheme restores. Today the receipt's
+	// TODO(amarbel-llc/cutting-garden#18) cross-scheme restores. Today the receipt's
 	// type-tag must match the dest plugin's TypeTag(): the file
 	// plugin can only restore `cutting_garden-capture_receipt-fs-v1`
 	// receipts. As more plugins arrive there will be legitimate

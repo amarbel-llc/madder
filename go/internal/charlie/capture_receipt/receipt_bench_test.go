@@ -9,7 +9,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 )
 
-// benchIndexEntry mirrors the in-memory shape proposed by issue #80's
+// benchIndexEntry mirrors the in-memory shape proposed by issue amarbel-llc/cutting-garden#5's
 // streaming-writer plan: just the sort key plus an (offset, length)
 // reference into a disk-backed spool. Defined here, not as part of the
 // public API, so the benchmark can compare retention apples-to-apples
@@ -89,7 +89,7 @@ func retainedHeapBytes(build func() any) uint64 {
 
 // BenchmarkAccumulatorRetention measures the heap held by the existing
 // in-memory `[]Entry` accumulator in capture.Run. This is the
-// memory footprint #80's streaming refactor would relieve.
+// memory footprint amarbel-llc/cutting-garden#5's streaming refactor would relieve.
 func BenchmarkAccumulatorRetention(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("entries=%d", n), func(b *testing.B) {
@@ -107,7 +107,7 @@ func BenchmarkAccumulatorRetention(b *testing.B) {
 // BenchmarkIndexRetention measures the heap held by the proposed
 // `[]indexEntry` slice — sort key only, with offset/length references
 // to a disk-backed spool. Compare against BenchmarkAccumulatorRetention
-// to validate the savings #80 promises.
+// to validate the savings amarbel-llc/cutting-garden#5 promises.
 func BenchmarkIndexRetention(b *testing.B) {
 	for _, n := range []int{1_000, 10_000, 100_000} {
 		b.Run(fmt.Sprintf("entries=%d", n), func(b *testing.B) {

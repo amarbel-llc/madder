@@ -195,7 +195,7 @@ func (cmd *Diff) runDiff(
 			&receiptId, blob)
 	}
 
-	// TODO(#144) cross-scheme diffs. Same constraint as restore:
+	// TODO(amarbel-llc/cutting-garden#18) cross-scheme diffs. Same constraint as restore:
 	// today the receipt's type-tag must match the dir plugin's
 	// TypeTag(). When cross-scheme restore is allowed, diff should
 	// follow the same rule.

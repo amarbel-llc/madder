@@ -22,7 +22,7 @@ of the operational contract specified by [RFC 0003] §Consumer Rules.
 
 The absence of a consumer also leaves [RFC 0003]'s store-hint
 mechanism unused: receipts now carry `- store/<id> < <markl-id>`
-metadata (per #92), but no in-tree code consumes it. `restore` is
+metadata (per amarbel-llc/cutting-garden#12), but no in-tree code consumes it. `restore` is
 the first consumer that needs to resolve the source store, validate
 config drift, and surface the diagnostics RFC 0003 §Store-Hint
 Resolution specifies.
@@ -60,7 +60,7 @@ Materialization happens in three phases:
 
 1. **Resolve store + parse receipt.** Use `-store` if set, else the
    active default store. Open the receipt blob. Parse via
-   `capture_receipt.Coder.DecodeFrom` (the dispatcher in #87
+   `capture_receipt.Coder.DecodeFrom` (the dispatcher in amarbel-llc/cutting-garden#9
    step 2). The result is a `*V1` carrying optional `Hint` and
    `Entries`.
 
@@ -156,7 +156,7 @@ formula used in [Sanitization](#sanitization).
 
 The consumer MUST NOT re-canonicalize `e.root` beyond what
 `filepath.Join` + `filepath.Clean` provides. Producer-side root
-collision detection (#91) guarantees that no two distinct values of
+collision detection (amarbel-llc/cutting-garden#11) guarantees that no two distinct values of
 `e.root` within a single receipt resolve to the same path under
 `filepath.Clean`, so consumers MAY rely on root-distinctness as a
 structural invariant for reporting and diagnostics — but MUST NOT use
@@ -230,7 +230,7 @@ receipt could legitimately split entries across stores — but the v1
 consumer does not handle that case (see [Limitations](#limitations)).
 
 The local config-blob markl-id is computed the same way `capture`
-computes the hint at write time (see #92's `computeStoreHint`):
+computes the hint at write time (see amarbel-llc/cutting-garden#12's `computeStoreHint`):
 re-encode the store's `GetBlobStoreConfig()` through a digesting
 writer using the store's `GetDefaultHashType()`. Hash families MUST
 match for the comparison; if the receipt's hint uses a hash family the
@@ -404,10 +404,10 @@ follow-up issue or deferred to a future schema version.
 - [RFC 0003] — Capture / Restore Operational Rules
   (`docs/rfcs/0003-capture-restore-rules.md`). Normative source
   for every behavioral rule in this FDR.
-- [#87] — the issue this FDR resolves.
-- [#91] — producer-side root scoping + collision detection. Closes the
+- [amarbel-llc/cutting-garden#9] — the issue this FDR resolves.
+- [amarbel-llc/cutting-garden#11] — producer-side root scoping + collision detection. Closes the
   capture-time half of [RFC 0003] §Producer Rules.
-- [#92] — store-hint metadata emission. Produces the metadata this
+- [amarbel-llc/cutting-garden#12] — store-hint metadata emission. Produces the metadata this
   FDR's §Store-Hint Resolution consumes.
 - ADR 0005 — the remote-driven SFTP design that motivated the
   config-hash lock in the store hint.
@@ -445,6 +445,6 @@ The `-store` override row is FDR-added (not in the [RFC 0003]
 auditable as a superset rather than a divergence.
 
 [RFC 0003]: ../rfcs/0003-capture-restore-rules.md
-[#87]: https://github.com/amarbel-llc/madder/issues/87
-[#91]: https://github.com/amarbel-llc/madder/issues/91
-[#92]: https://github.com/amarbel-llc/madder/issues/92
+[amarbel-llc/cutting-garden#9]: https://github.com/amarbel-llc/cutting-garden/issues/9
+[amarbel-llc/cutting-garden#11]: https://github.com/amarbel-llc/cutting-garden/issues/11
+[amarbel-llc/cutting-garden#12]: https://github.com/amarbel-llc/cutting-garden/issues/12

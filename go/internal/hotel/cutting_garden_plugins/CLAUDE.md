@@ -25,4 +25,4 @@ nothing imports back the other way.
 
 - `docs/features/0007-cutting-garden-uri-plugins.md` — design
   decisions, scope boundaries, and the cross-scheme constraint
-  tracked at #144.
+  tracked at amarbel-llc/cutting-garden#18.
