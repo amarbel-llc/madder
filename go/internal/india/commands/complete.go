@@ -22,7 +22,8 @@ import (
 func init() {
 	utility.AddCmd(
 		"complete",
-		&Complete{})
+		&Complete{},
+	)
 }
 
 type Complete struct {

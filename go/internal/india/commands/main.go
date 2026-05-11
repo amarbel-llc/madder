@@ -5,7 +5,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
 )
 
-var utility = futility.NewUtility("madder", "content-addressable blob store operations")
+var utility = futility.NewUtility("madder", "content-addressed blob stores")
 
 // globalFlags is the singleton Globals struct whose fields hold the
 // parsed values of every --flag declared on the utility (not on a
@@ -15,6 +15,8 @@ var globalFlags = &Globals{}
 
 func init() {
 	utility.GlobalFlags = globalFlags
+
+	// TODO why is this duplicated with the GlobalFlagDefiner below?
 	utility.GlobalParams = []futility.Param{
 		futility.BoolFlag{
 			Name: "no-inventory-log",
@@ -22,8 +24,9 @@ func init() {
 				"under $XDG_LOG_HOME/madder/inventory_log/. See ADR 0004.",
 		},
 	}
-	utility.GlobalFlagDefiner = func(fs *flags.FlagSet) {
-		fs.BoolVar(
+
+	utility.GlobalFlagDefiner = func(flagSet *flags.FlagSet) {
+		flagSet.BoolVar(
 			&globalFlags.NoInventoryLog,
 			"no-inventory-log",
 			false,
@@ -74,6 +77,14 @@ func init() {
 			Description: "Per-store configuration file in hyphence format. " +
 				"Specifies hash type, compression, encryption, and " +
 				"store-type-specific fields.",
+		},
+		futility.FilePath{
+			Path: "$XDG_LOG_HOME/madder/inventory_log/YYYY-MM-DD/<id>.hyphence",
+			Description: "Append-only hyphence-wrapped NDJSON record of " +
+				"every blob publish, one file per write session. Deletion " +
+				"is safe and must not affect application correctness (per " +
+				"xdg_log_home(7)). Suppress with --no-inventory-log or " +
+				"MADDER_INVENTORY_LOG=0.",
 		},
 	)
 
@@ -140,17 +151,6 @@ func init() {
 				"inventory-log. Equivalent to the --no-inventory-log " +
 				"global flag. Any other value (including unset) leaves " +
 				"logging enabled.",
-		},
-	)
-
-	utility.Files = append(utility.Files,
-		futility.FilePath{
-			Path: "$XDG_LOG_HOME/madder/inventory_log/YYYY-MM-DD/<id>.hyphence",
-			Description: "Append-only hyphence-wrapped NDJSON record of " +
-				"every blob publish, one file per write session. Deletion " +
-				"is safe and must not affect application correctness (per " +
-				"xdg_log_home(7)). Suppress with --no-inventory-log or " +
-				"MADDER_INVENTORY_LOG=0.",
 		},
 	)
 }
