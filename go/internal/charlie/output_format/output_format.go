@@ -10,6 +10,8 @@
 // flag type and auto-detect helper; it does not prescribe a sink shape.
 package output_format
 
+//go:generate dagnabit export
+
 import (
 	"fmt"
 	"os"

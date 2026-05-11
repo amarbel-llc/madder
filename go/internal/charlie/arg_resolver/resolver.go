@@ -27,6 +27,8 @@
 // should call DetectShadow on a KindFile result.
 package arg_resolver
 
+//go:generate dagnabit export
+
 import (
 	"fmt"
 	"strings"
