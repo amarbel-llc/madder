@@ -13,6 +13,7 @@ type (
 	DiscoveredKey                                                                      = internal.DiscoveredKey
 	ErrFormatOperationNotSupported                                                     = internal.ErrFormatOperationNotSupported
 	ErrIsNull                                                                          = internal.ErrIsNull
+	ErrLegacyCombinedHRPWireForm                                                       = internal.ErrLegacyCombinedHRPWireForm
 	ErrNotEqual                                                                        = internal.ErrNotEqual
 	ErrNotEqualBytes                                                                   = internal.ErrNotEqualBytes
 	ErrUnsupportedIdFormat                                                             = internal.ErrUnsupportedIdFormat

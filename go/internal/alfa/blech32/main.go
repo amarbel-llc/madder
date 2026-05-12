@@ -25,6 +25,8 @@
 // instead.
 package blech32
 
+//go:generate dagnabit export
+
 import (
 	"bytes"
 	"fmt"
