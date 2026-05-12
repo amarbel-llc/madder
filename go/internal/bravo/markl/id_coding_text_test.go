@@ -33,8 +33,8 @@ func cycleCharsetByte(c byte) byte {
 // file from genuine corruption.
 func TestUnmarshalText_LegacyCombinedHRPWireForm(t *testing.T) {
 	const (
-		purpose = "test-purpose-v1"
-		format  = FormatIdHashBlake2b256
+		purpose = testPurposePub
+		format  = FormatIdEd25519Pub
 	)
 
 	combinedHRP := purpose + "@" + format
@@ -68,6 +68,87 @@ func TestUnmarshalText_LegacyCombinedHRPWireForm(t *testing.T) {
 
 	if legacy.Raw != string(legacyEncoded) {
 		t.Errorf("Raw: got %q, want %q", legacy.Raw, string(legacyEncoded))
+	}
+
+	if legacy.FormatId != format {
+		t.Errorf("FormatId: got %q, want %q", legacy.FormatId, format)
+	}
+
+	if !bytes.Equal(legacy.Data, payload) {
+		t.Errorf("Data: got %x, want %x", legacy.Data, payload)
+	}
+
+	if len(legacy.SplitHRPChecksum) != 6 {
+		t.Errorf(
+			"SplitHRPChecksum: got %q (len %d), want 6 chars",
+			legacy.SplitHRPChecksum, len(legacy.SplitHRPChecksum),
+		)
+	}
+
+	// Splice path: replace the last 6 chars of the legacy body
+	// section (post-`@`) with SplitHRPChecksum and re-parse. The
+	// result must round-trip cleanly under the canonical
+	// UnmarshalText.
+	at := strings.IndexByte(legacy.Raw, '@')
+	if at < 0 {
+		t.Fatalf("expected `@` in legacy.Raw: %q", legacy.Raw)
+	}
+	prefix := legacy.Raw[:at+1]
+	bodySection := legacy.Raw[at+1:]
+	if len(bodySection) < 6 {
+		t.Fatalf("body section too short: %q", bodySection)
+	}
+	spliced := prefix + bodySection[:len(bodySection)-6] + legacy.SplitHRPChecksum
+
+	var splicedId Id
+	if err := splicedId.UnmarshalText([]byte(spliced)); err != nil {
+		t.Fatalf("splice round-trip UnmarshalText(%q): %v", spliced, err)
+	}
+
+	if splicedId.GetPurposeId() != purpose {
+		t.Errorf(
+			"splice round-trip purpose: got %q, want %q",
+			splicedId.GetPurposeId(), purpose,
+		)
+	}
+
+	// Programmatic path: build a fresh Id from FormatId+Data,
+	// re-marshal, re-parse, assert the recovered Id matches.
+	var programmaticId Id
+	if err := programmaticId.SetPurposeId(legacy.Purpose); err != nil {
+		t.Fatalf("SetPurposeId(%q): %v", legacy.Purpose, err)
+	}
+	if err := programmaticId.SetMarklId(legacy.FormatId, legacy.Data); err != nil {
+		t.Fatalf(
+			"SetMarklId(%q, %x): %v",
+			legacy.FormatId, legacy.Data, err,
+		)
+	}
+
+	canonical, err := programmaticId.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText: %v", err)
+	}
+
+	var reparsed Id
+	if err := reparsed.UnmarshalText(canonical); err != nil {
+		t.Fatalf(
+			"programmatic round-trip UnmarshalText(%q): %v",
+			string(canonical), err,
+		)
+	}
+
+	if reparsed.GetPurposeId() != purpose {
+		t.Errorf(
+			"programmatic round-trip purpose: got %q, want %q",
+			reparsed.GetPurposeId(), purpose,
+		)
+	}
+
+	if !Equals(programmaticId, reparsed) {
+		t.Errorf(
+			"programmatic round-trip: ids differ before/after re-parse",
+		)
 	}
 }
 

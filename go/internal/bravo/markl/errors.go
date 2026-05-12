@@ -30,13 +30,34 @@ var ErrEmptyType = newPkgError("type is empty")
 // and the #159 revert (`fd53684`); see madder#167 for the broader
 // migration story. UnmarshalText returns this in place of the bare
 // blech32 ErrInvalidChecksum so callers can distinguish a legacy
-// pre-v0.3.16 file (recoverable by re-encoding under current
-// madder) from genuine corruption.
+// pre-v0.3.16 file from genuine corruption.
 //
-// Verification-only: no value is produced from the legacy path.
+// Recovery — two shapes, pick one:
+//
+//  1. Programmatic: build a fresh markl.Id and re-marshal —
+//
+//     var id markl.Id
+//     _ = id.SetPurposeId(legacy.Purpose)
+//     _ = id.SetMarklId(legacy.FormatId, legacy.Data)
+//     canonical, _ := id.MarshalText()
+//
+//  2. Splice: the legacy and canonical bodies differ only in the
+//     last 6 chars (the checksum). Replace them with
+//     SplitHRPChecksum:
+//
+//     body := legacy.Raw // (or just the post-`@` section)
+//     canonical := body[:len(body)-6] + legacy.SplitHRPChecksum
+//
+// Sensitivity (#169 coupling): for `*_sec` formats, Data is the
+// secret. Error() MUST NOT render Data; Raw rendering will be
+// redacted when #169 ships. SplitHRPChecksum is derived public
+// material and is safe to render unredacted.
 type ErrLegacyCombinedHRPWireForm struct {
-	Purpose string
-	Raw     string
+	Purpose          string
+	FormatId         string
+	Data             []byte
+	SplitHRPChecksum string
+	Raw              string
 }
 
 func (err ErrLegacyCombinedHRPWireForm) Error() string {
