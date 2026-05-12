@@ -55,6 +55,18 @@ func (id *Id) UnmarshalText(bites []byte) (err error) {
 	var data []byte
 
 	if formatId, data, err = blech32.Decode(body); err != nil {
+		if purpose := id.GetPurposeId(); purpose != "" &&
+			errors.Is(err, blech32.ErrInvalidChecksum) {
+			if sep := bytes.LastIndexByte(body, '-'); sep > 0 {
+				combinedHRP := purpose + "@" + string(body[:sep])
+				if blech32.VerifyChecksumWithHRPOverride(combinedHRP, body) {
+					return ErrLegacyCombinedHRPWireForm{
+						Purpose: purpose,
+						Raw:     string(bites),
+					}
+				}
+			}
+		}
 		err = errors.Wrapf(err, "Raw: %q", string(bites))
 		return err
 	}

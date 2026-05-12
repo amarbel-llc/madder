@@ -20,6 +20,42 @@ func newPkgError(text string) pkgError {
 
 var ErrEmptyType = newPkgError("type is empty")
 
+// ErrLegacyCombinedHRPWireForm signals that a markl-id wire string
+// failed checksum verification under the canonical split-HRP rule
+// (RFC 0002 §3.3) but verifies under the legacy combined-HRP form
+// (RFC 0002 §9.1) where the entire `<purpose>@<format>` string was
+// used as the blech32 HRP.
+//
+// The combined-HRP form shipped briefly between commits `8dc78c7`
+// and the #159 revert (`fd53684`); see madder#167 for the broader
+// migration story. UnmarshalText returns this in place of the bare
+// blech32 ErrInvalidChecksum so callers can distinguish a legacy
+// pre-v0.3.16 file (recoverable by re-encoding under current
+// madder) from genuine corruption.
+//
+// Verification-only: no value is produced from the legacy path.
+type ErrLegacyCombinedHRPWireForm struct {
+	Purpose string
+	Raw     string
+}
+
+func (err ErrLegacyCombinedHRPWireForm) Error() string {
+	return fmt.Sprintf(
+		"legacy combined-HRP wire form for purpose %q: %q -- written by pre-v0.3.16 madder, see madder#167 for migration",
+		err.Purpose,
+		err.Raw,
+	)
+}
+
+func (err ErrLegacyCombinedHRPWireForm) Is(target error) bool {
+	_, ok := target.(ErrLegacyCombinedHRPWireForm)
+	return ok
+}
+
+func (err ErrLegacyCombinedHRPWireForm) GetErrorType() pkgErrDisamb {
+	return pkgErrDisamb{}
+}
+
 // ErrNilFormat signals that an Id mutation requires a non-nil MarklFormat
 // but received nil. Raised via panic from resetDataForFormat — the sole
 // mutation primitive — so any in-package bug that tries to populate an Id
