@@ -100,9 +100,6 @@ func (cmd Has) Run(req futility.Request) {
 	}
 }
 
-// findStores returns the ids of every cache store that holds blobId,
-// in search order. Without -all the search short-circuits on the first
-// hit; with -all every configured store is probed.
 func (cmd Has) findStores(
 	envBlobStore command_components.BlobStoreEnv,
 	blobId *markl.Id,
@@ -130,8 +127,7 @@ func (cmd Has) findStores(
 	return hits
 }
 
-// stableOrder returns the BlobStoreMap entries in id-sorted order so
-// -all output is deterministic across runs.
+// stableOrder sorts by id so -all output is deterministic across runs.
 func stableOrder(m blob_stores.BlobStoreMap) []blob_stores.BlobStoreInitialized {
 	out := make([]blob_stores.BlobStoreInitialized, 0, len(m))
 	for _, store := range m {

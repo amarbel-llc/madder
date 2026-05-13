@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"path/filepath"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -76,14 +75,12 @@ func emitListText(
 	envBlobStore command_components.BlobStoreEnv,
 	blobStores blob_stores.BlobStoreMap,
 ) {
-	cwd, _ := os.Getwd()
-
 	for _, blobStore := range blobStores {
 		envBlobStore.GetUI().Printf(
 			"%s: %s # path: %s",
 			blobStore.Path.GetId(),
 			blobStore.GetBlobStoreDescription(),
-			relOrAbs(cwd, blobStore.Path.GetConfig()),
+			envBlobStore.RelToCwdOrSame(blobStore.Path.GetConfig()),
 		)
 	}
 }
@@ -102,19 +99,4 @@ func emitListJSON(blobStores blob_stores.BlobStoreMap) {
 			Base:        blobStore.Path.GetBase(),
 		})
 	}
-}
-
-// relOrAbs returns abs expressed relative to cwd, or abs unchanged if
-// cwd is empty or filepath.Rel rejects the inputs.
-func relOrAbs(cwd, abs string) string {
-	if cwd == "" {
-		return abs
-	}
-
-	rel, err := filepath.Rel(cwd, abs)
-	if err != nil {
-		return abs
-	}
-
-	return rel
 }

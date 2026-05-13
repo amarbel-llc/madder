@@ -130,10 +130,6 @@ func (cmd Has) Run(req futility.Request) {
 	}
 }
 
-// findStores returns the ids of every store that holds blobId, in
-// search order. With an explicit scope it probes only that store.
-// Without -all, the search short-circuits on the first hit. With -all,
-// it walks every configured store unconditionally.
 func (cmd Has) findStores(
 	envBlobStore command_components.BlobStoreEnv,
 	blobId domain_interfaces.MarklId,
@@ -171,8 +167,7 @@ func (cmd Has) findStores(
 	return hits
 }
 
-// stableOrder returns the BlobStoreMap entries in id-sorted order so
-// -all output is deterministic across runs.
+// stableOrder sorts by id so -all output is deterministic across runs.
 func stableOrder(m blob_stores.BlobStoreMap) []blob_stores.BlobStoreInitialized {
 	out := make([]blob_stores.BlobStoreInitialized, 0, len(m))
 	for _, store := range m {
