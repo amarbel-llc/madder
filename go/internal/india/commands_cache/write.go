@@ -83,7 +83,7 @@ func (cmd Write) Run(req futility.Request) {
 
 	var sink blob_write_sink.Sink
 	switch cmd.Format.Resolve(os.Stdout) {
-	case output_format.FormatJSON:
+	case output_format.FormatJSON, output_format.FormatNDJSON:
 		sink = blob_write_sink.NewJSON(os.Stdout, os.Stderr, cmd.Check)
 	default:
 		sink = blob_write_sink.NewTAP(os.Stdout)

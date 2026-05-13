@@ -93,7 +93,7 @@ func (cmd Fsck) Run(req futility.Request) {
 
 	var sink blob_verify_sink.Sink
 	switch cmd.Format.Resolve(os.Stdout) {
-	case output_format.FormatJSON:
+	case output_format.FormatJSON, output_format.FormatNDJSON:
 		sink = blob_verify_sink.NewJSON(os.Stdout, os.Stderr)
 	default:
 		sink = blob_verify_sink.NewTAP(os.Stdout)

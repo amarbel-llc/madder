@@ -129,7 +129,7 @@ func (cmd PackBlobs) Run(req futility.Request) {
 	)
 
 	switch format {
-	case output_format.FormatJSON:
+	case output_format.FormatJSON, output_format.FormatNDJSON:
 		sink = blob_write_sink.NewJSON(os.Stdout, os.Stderr, false)
 		packTapWriter = tap.NewWriter(os.Stderr)
 		jsonFinalWriter = os.Stdout
@@ -201,7 +201,7 @@ func (cmd PackBlobs) Run(req futility.Request) {
 		blobFilter[blobId.String()] = blobId
 	}
 
-	if format == output_format.FormatJSON {
+	if format == output_format.FormatJSON || format == output_format.FormatNDJSON {
 		enc := json.NewEncoder(jsonFinalWriter)
 		emitFinal = func(success bool, err error) {
 			rec := packFinalRecord{Store: storeIdString}

@@ -121,7 +121,7 @@ func (cmd Capture) Run(req futility.Request) {
 
 	var sink capture_sink.Sink
 	switch cmd.Format.Resolve(os.Stdout) {
-	case output_format.FormatJSON:
+	case output_format.FormatJSON, output_format.FormatNDJSON:
 		sink = capture_sink.NewNDJSON(os.Stdout, os.Stderr)
 	default:
 		sink = capture_sink.NewTAP(os.Stdout)

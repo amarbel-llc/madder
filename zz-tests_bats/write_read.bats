@@ -56,15 +56,15 @@ function list_text_includes_path_comment { # @test
   assert_output --partial "# path: "
 }
 
-function list_json_emits_ndjson_records { # @test
+function list_ndjson_emits_one_record_per_store { # @test
 
-  # #173: `-format=json` emits one NDJSON record per store with the
+  # #173: `-format=ndjson` emits one JSON object per line with the
   # documented fields.
   init_store
   run_madder init -encryption none .other
   assert_success
 
-  run_madder list -format json
+  run_madder list -format ndjson
   assert_success
 
   local count
@@ -77,7 +77,35 @@ function list_json_emits_ndjson_records { # @test
   [[ $bad -eq 0 ]] || fail "records missing required fields: $output"
 }
 
-function list_json_rejects_unknown_format { # @test
+function list_json_emits_object_keyed_by_store_id { # @test
+
+  # `-format=json` emits a single JSON document: an object whose keys
+  # are PWD-resolved store IDs and whose values are the same per-store
+  # records that ndjson mode emits.
+  init_store
+  run_madder init -encryption none .other
+  assert_success
+
+  run_madder list -format json
+  assert_success
+
+  # Must parse as one JSON object.
+  local type
+  type="$(printf '%s\n' "$output" | jq -r 'type')"
+  [[ $type == "object" ]] || fail "expected json object, got $type: $output"
+
+  # Must have a key for each store (.default + .other).
+  local keys
+  keys="$(printf '%s\n' "$output" | jq -r 'keys | sort | join(",")')"
+  [[ $keys == ".default,.other" ]] || fail "unexpected keys: $keys"
+
+  # Each value must carry the same fields as ndjson mode.
+  local bad
+  bad="$(printf '%s\n' "$output" | jq -r '[.[] | select((has("id") and has("description") and has("config_path") and has("base")) | not)] | length')"
+  [[ $bad -eq 0 ]] || fail "values missing required fields: $output"
+}
+
+function list_format_rejects_unknown_value { # @test
 
   init_store
 
@@ -85,26 +113,28 @@ function list_json_rejects_unknown_format { # @test
   assert_failure
 }
 
-function list_json_records_are_deterministically_ordered { # @test
+function list_json_and_ndjson_output_deterministic_across_runs { # @test
 
-  # Map iteration in Go is randomized; list must sort by store-id so
-  # consecutive runs produce byte-identical output and downstream
-  # consumers see stable ordering.
+  # Map iteration in Go is randomized; list must produce byte-identical
+  # output across runs in both ndjson (stable sort) and json (sorted
+  # map encoding) modes.
   init_store
   run_madder init -encryption none .other
   assert_success
   run_madder init -encryption none .third
   assert_success
 
-  run_madder list -format json
-  assert_success
-  local first="$output"
+  for format in ndjson json; do
+    run_madder list -format "$format"
+    assert_success
+    local first="$output"
 
-  run_madder list -format json
-  assert_success
-  local second="$output"
+    run_madder list -format "$format"
+    assert_success
+    local second="$output"
 
-  [[ $first == "$second" ]] || fail "list -format json output not deterministic across runs"
+    [[ $first == "$second" ]] || fail "list -format $format not deterministic"
+  done
 }
 
 function write_warns_when_file_shadows_store { # @test

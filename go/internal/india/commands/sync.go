@@ -238,7 +238,7 @@ func (cmd Sync) runStore(
 ) {
 	var sink syncSink
 	switch cmd.Format.Resolve(os.Stdout) {
-	case output_format.FormatJSON:
+	case output_format.FormatJSON, output_format.FormatNDJSON:
 		buf := bufio.NewWriter(os.Stdout)
 		sink = &syncJsonSink{
 			buf:    buf,

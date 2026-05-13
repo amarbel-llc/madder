@@ -13,5 +13,6 @@ const (
 	FlagDescription = internal.FlagDescription
 	FormatAuto      = internal.FormatAuto
 	FormatJSON      = internal.FormatJSON
+	FormatNDJSON    = internal.FormatNDJSON
 	FormatTAP       = internal.FormatTAP
 )

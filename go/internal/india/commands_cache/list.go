@@ -37,12 +37,14 @@ func (cmd List) GetDescription() futility.Description {
 			"location of its on-disk config file. In text mode each line " +
 			"is '<id>: <description> # path: <rel>' where <rel> is the " +
 			"config-file path expressed relative to the current working " +
-			"directory (absolute fallback). In JSON mode (-format=json) " +
-			"each store emits an NDJSON record with fields \"id\", " +
+			"directory (absolute fallback). In ndjson mode (-format=ndjson) " +
+			"each store emits one JSON object per line with fields \"id\", " +
 			"\"description\", \"config_path\" (absolute), and \"base\" " +
-			"(absolute). Output defaults to text on an interactive " +
-			"terminal and to NDJSON when stdout is piped; pass -format to " +
-			"force a specific encoding.",
+			"(absolute). In json mode (-format=json) the same per-store " +
+			"records are emitted as values of a single top-level JSON " +
+			"object keyed by store ID. Output defaults to text on an " +
+			"interactive terminal and to ndjson when stdout is piped; " +
+			"pass -format to force a specific encoding.",
 	}
 }
 
@@ -64,11 +66,14 @@ func (cmd List) Run(req futility.Request) {
 	blobStores := envBlobStore.GetBlobStores()
 
 	// list is not a streaming TAP producer: tap-mode and the
-	// auto-on-TTY default both render the same human text. Only json
-	// switches to NDJSON.
+	// auto-on-TTY default both render the same human text. ndjson
+	// emits one record per line; json wraps the same records in a
+	// single top-level object keyed by store id.
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
-		emitListJSON(blobStores)
+		emitListJSONObject(blobStores)
+	case output_format.FormatNDJSON:
+		emitListNDJSON(blobStores)
 	case output_format.FormatTAP:
 		emitListText(envBlobStore, blobStores)
 	default:
@@ -90,18 +95,38 @@ func emitListText(
 	}
 }
 
-func emitListJSON(blobStores blob_stores.BlobStoreMap) {
+func emitListNDJSON(blobStores blob_stores.BlobStoreMap) {
 	buf := bufio.NewWriter(os.Stdout)
 	defer buf.Flush()
 
 	enc := json.NewEncoder(buf)
 
 	for _, blobStore := range stableOrder(blobStores) {
-		_ = enc.Encode(listRecord{
-			Id:          blobStore.Path.GetId().String(),
-			Description: blobStore.GetBlobStoreDescription(),
-			ConfigPath:  blobStore.Path.GetConfig(),
-			Base:        blobStore.Path.GetBase(),
-		})
+		_ = enc.Encode(makeListRecord(blobStore))
+	}
+}
+
+func emitListJSONObject(blobStores blob_stores.BlobStoreMap) {
+	out := make(map[string]listRecord, len(blobStores))
+
+	for _, blobStore := range blobStores {
+		id := blobStore.Path.GetId().String()
+		out[id] = makeListRecord(blobStore)
+	}
+
+	buf := bufio.NewWriter(os.Stdout)
+	defer buf.Flush()
+
+	enc := json.NewEncoder(buf)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
+}
+
+func makeListRecord(blobStore blob_stores.BlobStoreInitialized) listRecord {
+	return listRecord{
+		Id:          blobStore.Path.GetId().String(),
+		Description: blobStore.GetBlobStoreDescription(),
+		ConfigPath:  blobStore.Path.GetConfig(),
+		Base:        blobStore.Path.GetBase(),
 	}
 }
