@@ -1,20 +1,26 @@
 package commands_cache
 
 import (
+	"bufio"
+	"encoding/json"
 	"os"
 	"path/filepath"
 
+	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
 
 func init() {
-	utility.AddCmd("list", &List{})
+	utility.AddCmd("list", &List{Format: output_format.Default})
 }
 
 type List struct {
 	command_components.EnvBlobStore
+
+	Format output_format.Format
 }
 
 var (
@@ -29,22 +35,47 @@ func (cmd List) GetDescription() futility.Description {
 		Short: "list configured cache blob stores",
 		Long: "List all cache blob stores configured for the current " +
 			"environment, showing each store's ID, description, and the " +
-			"location of its on-disk config file. Each line ends with " +
-			"'# path: <rel>' where <rel> is the config-file path expressed " +
-			"relative to the current working directory (falling back to " +
-			"absolute when the relative form cannot be computed).",
+			"location of its on-disk config file. In text mode each line " +
+			"is '<id>: <description> # path: <rel>' where <rel> is the " +
+			"config-file path expressed relative to the current working " +
+			"directory (absolute fallback). In JSON mode (-format=json) " +
+			"each store emits an NDJSON record with fields \"id\", " +
+			"\"description\", \"config_path\" (absolute), and \"base\" " +
+			"(absolute). Output defaults to text on an interactive " +
+			"terminal and to NDJSON when stdout is piped; pass -format to " +
+			"force a specific encoding.",
 	}
 }
 
 func (cmd *List) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
+	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
+}
+
+type listRecord struct {
+	Id          string `json:"id"`
+	Description string `json:"description"`
+	ConfigPath  string `json:"config_path"`
+	Base        string `json:"base"`
 }
 
 func (cmd List) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
 
+	switch cmd.Format.Resolve(os.Stdout) {
+	case output_format.FormatJSON:
+		emitListJSON(blobStores)
+	default:
+		emitListText(envBlobStore, blobStores)
+	}
+}
+
+func emitListText(
+	envBlobStore command_components.BlobStoreEnv,
+	blobStores blob_stores.BlobStoreMap,
+) {
 	cwd, _ := os.Getwd()
 
 	for _, blobStore := range blobStores {
@@ -54,6 +85,22 @@ func (cmd List) Run(req futility.Request) {
 			blobStore.GetBlobStoreDescription(),
 			relOrAbs(cwd, blobStore.Path.GetConfig()),
 		)
+	}
+}
+
+func emitListJSON(blobStores blob_stores.BlobStoreMap) {
+	buf := bufio.NewWriter(os.Stdout)
+	defer buf.Flush()
+
+	enc := json.NewEncoder(buf)
+
+	for _, blobStore := range blobStores {
+		_ = enc.Encode(listRecord{
+			Id:          blobStore.Path.GetId().String(),
+			Description: blobStore.GetBlobStoreDescription(),
+			ConfigPath:  blobStore.Path.GetConfig(),
+			Base:        blobStore.Path.GetBase(),
+		})
 	}
 }
 

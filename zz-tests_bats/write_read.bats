@@ -45,6 +45,46 @@ function list_after_write { # @test
   assert_output
 }
 
+function list_text_includes_path_comment { # @test
+
+  # #172: each text-mode line ends with `# path: <rel>` pointing at the
+  # store's on-disk config file.
+  init_store
+
+  run_madder list -format tap
+  assert_success
+  assert_output --partial "# path: "
+}
+
+function list_json_emits_ndjson_records { # @test
+
+  # #173: `-format=json` emits one NDJSON record per store with the
+  # documented fields.
+  init_store
+  run_madder init -encryption none .other
+  assert_success
+
+  run_madder list -format json
+  assert_success
+
+  local count
+  count="$(printf '%s\n' "$output" | jq -s 'length')"
+  [[ $count -eq 2 ]] || fail "expected 2 NDJSON records, got $count: $output"
+
+  # Every record must have all four documented fields.
+  local bad
+  bad="$(printf '%s\n' "$output" | jq -r 'select((has("id") and has("description") and has("config_path") and has("base")) | not) | input_line_number' | wc -l)"
+  [[ $bad -eq 0 ]] || fail "records missing required fields: $output"
+}
+
+function list_json_rejects_unknown_format { # @test
+
+  init_store
+
+  run_madder list -format wat
+  assert_failure
+}
+
 function write_warns_when_file_shadows_store { # @test
 
   # Bare `write shadowed` resolves to the file but must warn about the
