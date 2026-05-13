@@ -116,3 +116,60 @@ function has_scopes_to_explicit_blob_store_id { # @test
   assert_success
   assert_output --partial $'\tfound'
 }
+
+function has_default_output_includes_store_id { # @test
+
+  # #171: a single-store hit emits `<digest>\tfound\t<store-id>` (three
+  # tab-separated columns).
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "store-id column test" >"$blob"
+  local hash
+  hash="$(write_blob_id "$blob")"
+
+  run_madder has "$hash"
+  assert_success
+  assert_line --regexp $'^'"$hash"$'\tfound\t.+$'
+}
+
+function has_all_emits_one_line_per_store { # @test
+
+  # #171: with -all, every store that holds the blob produces its own
+  # `<digest>\tfound\t<store-id>` line.
+  init_store
+  run_madder init -encryption none .elsewhere
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "multi-store has-all test" >"$blob"
+  local hash
+  hash="$(write_blob_id "$blob")"
+  # Write the same content into the second store so both should report
+  # the blob as present.
+  hash2="$(write_blob_id .elsewhere "$blob")"
+  [[ $hash == "$hash2" ]] || fail "expected identical digest across stores"
+
+  run_madder has -all "$hash"
+  assert_success
+  # Two `found` lines, one per store.
+  local found_lines
+  found_lines="$(printf '%s\n' "$output" | grep -c $'\tfound\t' || true)"
+  [[ $found_lines -eq 2 ]] || fail "expected 2 found lines, got $found_lines: $output"
+}
+
+function has_all_with_explicit_store_errors { # @test
+
+  # #171: -all combined with an explicit blob-store-id arg is a usage
+  # error and exits nonzero.
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "all-plus-scope test" >"$blob"
+  local hash
+  hash="$(write_blob_id "$blob")"
+
+  run_madder has -all .default "$hash"
+  assert_failure
+  assert_output --partial "-all"
+}

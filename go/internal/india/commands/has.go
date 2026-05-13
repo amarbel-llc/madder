@@ -2,12 +2,15 @@ package commands
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
@@ -19,9 +22,14 @@ func init() {
 
 type Has struct {
 	command_components.EnvBlobStore
+
+	All bool
 }
 
-var _ futility.CommandWithParams = (*Has)(nil)
+var (
+	_ interfaces.CommandComponentWriter = (*Has)(nil)
+	_ futility.CommandWithParams        = (*Has)(nil)
+)
 
 func (cmd *Has) GetParams() []futility.Param {
 	return []futility.Param{
@@ -31,6 +39,18 @@ func (cmd *Has) GetParams() []futility.Param {
 			Variadic:    true,
 		},
 	}
+}
+
+func (cmd *Has) SetFlagDefinitions(
+	flagSet interfaces.CLIFlagDefinitions,
+) {
+	flagSet.BoolVar(
+		&cmd.All,
+		"all",
+		false,
+		"list every store containing each blob (one tab-separated line per store); "+
+			"incompatible with an explicit blob-store-id arg",
+	)
 }
 
 func (cmd Has) GetDescription() futility.Description {
@@ -44,8 +64,11 @@ func (cmd Has) GetDescription() futility.Description {
 			"blob-store(7). With no blob-store-id prefix set, checks " +
 			"fall back to searching every configured store if the blob " +
 			"is missing from the active one. Exits 0 if all blobs are " +
-			"found, nonzero if any are missing. For each ID, prints the " +
-			"digest followed by 'found' or 'not found'.",
+			"found, nonzero if any are missing. For each found ID, " +
+			"prints '<digest>\\tfound\\t<store-id>' for the store that " +
+			"answered; missing IDs print '<digest>\\tnot found'. With " +
+			"-all (no explicit blob-store-id), every configured store " +
+			"that holds a given blob produces its own line.",
 	}
 }
 
@@ -64,6 +87,15 @@ func (cmd Has) Run(req futility.Request) {
 
 		switch resolved.Kind {
 		case arg_resolver.KindStoreSwitch:
+			if cmd.All {
+				errors.ContextCancelWithBadRequestf(
+					req,
+					"-all is incompatible with an explicit blob-store-id arg %q",
+					arg,
+				)
+				return
+			}
+
 			blobStoreId = resolved.BlobStoreId
 			explicitStore = true
 			ui.Err().Print(arg_resolver.FormatStoreSwitchNotice(blobStoreId))
@@ -76,12 +108,15 @@ func (cmd Has) Run(req futility.Request) {
 		}
 
 		// KindBlobId
-		found := cmd.hasBlob(envBlobStore, &resolved.BlobId, blobStoreId, explicitStore)
-		if found {
-			envBlobStore.GetUI().Printf("%s\tfound", &resolved.BlobId)
-		} else {
+		stores := cmd.findStores(envBlobStore, &resolved.BlobId, blobStoreId, explicitStore)
+		if len(stores) == 0 {
 			envBlobStore.GetUI().Printf("%s\tnot found", &resolved.BlobId)
 			missCount++
+			continue
+		}
+
+		for _, id := range stores {
+			envBlobStore.GetUI().Printf("%s\tfound\t%s", &resolved.BlobId, id)
 		}
 	}
 
@@ -95,30 +130,58 @@ func (cmd Has) Run(req futility.Request) {
 	}
 }
 
-// hasBlob checks for blob existence. When the caller has scoped to an
-// explicit blob-store-id via a prior switch arg, the check is limited
-// to that store. Otherwise it searches every configured store.
-func (cmd Has) hasBlob(
+// findStores returns the ids of every store that holds blobId, in
+// search order. With an explicit scope it probes only that store.
+// Without -all, the search short-circuits on the first hit. With -all,
+// it walks every configured store unconditionally.
+func (cmd Has) findStores(
 	envBlobStore command_components.BlobStoreEnv,
 	blobId domain_interfaces.MarklId,
 	blobStoreId blob_store_id.Id,
 	explicitStore bool,
-) bool {
+) []blob_store_id.Id {
 	if explicitStore {
-		return envBlobStore.GetBlobStore(blobStoreId).HasBlob(blobId)
+		store := envBlobStore.GetBlobStore(blobStoreId)
+		if store.HasBlob(blobId) {
+			return []blob_store_id.Id{store.Path.GetId()}
+		}
+		return nil
 	}
 
 	defaultStore, remaining := envBlobStore.GetDefaultBlobStoreAndRemaining()
 
-	if defaultStore.HasBlob(blobId) {
-		return true
-	}
+	var hits []blob_store_id.Id
 
-	for _, store := range remaining {
-		if store.HasBlob(blobId) {
-			return true
+	if defaultStore.HasBlob(blobId) {
+		hits = append(hits, defaultStore.Path.GetId())
+		if !cmd.All {
+			return hits
 		}
 	}
 
-	return false
+	for _, store := range stableOrder(remaining) {
+		if store.HasBlob(blobId) {
+			hits = append(hits, store.Path.GetId())
+			if !cmd.All {
+				return hits
+			}
+		}
+	}
+
+	return hits
+}
+
+// stableOrder returns the BlobStoreMap entries in id-sorted order so
+// -all output is deterministic across runs.
+func stableOrder(m blob_stores.BlobStoreMap) []blob_stores.BlobStoreInitialized {
+	out := make([]blob_stores.BlobStoreInitialized, 0, len(m))
+	for _, store := range m {
+		out = append(out, store)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Path.GetId().String() < out[j].Path.GetId().String()
+	})
+
+	return out
 }
