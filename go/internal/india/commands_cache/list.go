@@ -63,9 +63,14 @@ func (cmd List) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
 
+	// list is not a streaming TAP producer: tap-mode and the
+	// auto-on-TTY default both render the same human text. Only json
+	// switches to NDJSON.
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
 		emitListJSON(blobStores)
+	case output_format.FormatTAP:
+		emitListText(envBlobStore, blobStores)
 	default:
 		emitListText(envBlobStore, blobStores)
 	}
@@ -75,7 +80,7 @@ func emitListText(
 	envBlobStore command_components.BlobStoreEnv,
 	blobStores blob_stores.BlobStoreMap,
 ) {
-	for _, blobStore := range blobStores {
+	for _, blobStore := range stableOrder(blobStores) {
 		envBlobStore.GetUI().Printf(
 			"%s: %s # path: %s",
 			blobStore.Path.GetId(),
@@ -91,7 +96,7 @@ func emitListJSON(blobStores blob_stores.BlobStoreMap) {
 
 	enc := json.NewEncoder(buf)
 
-	for _, blobStore := range blobStores {
+	for _, blobStore := range stableOrder(blobStores) {
 		_ = enc.Encode(listRecord{
 			Id:          blobStore.Path.GetId().String(),
 			Description: blobStore.GetBlobStoreDescription(),

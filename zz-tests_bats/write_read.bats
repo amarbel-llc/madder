@@ -85,6 +85,28 @@ function list_json_rejects_unknown_format { # @test
   assert_failure
 }
 
+function list_json_records_are_deterministically_ordered { # @test
+
+  # Map iteration in Go is randomized; list must sort by store-id so
+  # consecutive runs produce byte-identical output and downstream
+  # consumers see stable ordering.
+  init_store
+  run_madder init -encryption none .other
+  assert_success
+  run_madder init -encryption none .third
+  assert_success
+
+  run_madder list -format json
+  assert_success
+  local first="$output"
+
+  run_madder list -format json
+  assert_success
+  local second="$output"
+
+  [[ $first == "$second" ]] || fail "list -format json output not deterministic across runs"
+}
+
 function write_warns_when_file_shadows_store { # @test
 
   # Bare `write shadowed` resolves to the file but must warn about the
