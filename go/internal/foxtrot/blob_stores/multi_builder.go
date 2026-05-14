@@ -13,9 +13,9 @@ const modeConfused multiMode = -1
 
 // MultiBuilder constructs a Multi blob store with one of two modes:
 // Mirror (broadcast writes across all child stores) or WriteThrough
-// (single write store + N read stores, populated in Task 9). Each
-// mode-selecting method (Mirror, WriteTo, ...) sets the mode field;
-// Build() validates and returns the configured Multi.
+// (single write store + N read stores). Each mode-selecting method
+// (Mirror, WriteTo, ...) sets the mode field; Build() validates and
+// returns the configured Multi.
 type MultiBuilder struct {
 	ctx          interfaces.ActiveContext
 	mode         multiMode
@@ -26,8 +26,8 @@ type MultiBuilder struct {
 }
 
 // NewMulti starts a builder bound to ctx. readFill defaults to true so
-// the Task 9 WriteThrough path enables tee-during-read unless callers
-// opt out via ReadFill(false).
+// the WriteThrough path enables tee-during-read (Task 10) unless
+// callers opt out via ReadFill(false).
 func NewMulti(ctx interfaces.ActiveContext) *MultiBuilder {
 	return &MultiBuilder{ctx: ctx, readFill: true}
 }
@@ -81,9 +81,7 @@ func (b *MultiBuilder) ReadFill(enabled bool) *MultiBuilder {
 // Build returns the configured Multi. It validates that exactly one
 // mode was selected, that the mode's required stores are present, and
 // (for write-through) that the write store is not also in the read
-// list. Task 9 wires the modeWriteThrough branch into actual
-// read/write behavior on Multi; this builder produces the
-// fully-validated value.
+// list.
 func (b *MultiBuilder) Build() (Multi, error) {
 	switch b.mode {
 	case modeMirror:

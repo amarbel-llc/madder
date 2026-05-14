@@ -17,6 +17,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
 
@@ -36,6 +37,11 @@ type multiModeStub struct {
 	readerBytes  map[string][]byte
 	lastWriter   *spyBlobWriter
 	writerToHand *spyBlobWriter
+
+	// makeWriterCount tracks how many times MakeBlobWriter has been
+	// invoked on this stub. Used by the WriteThrough writer tests to
+	// pin that read sources never have their writer constructed.
+	makeWriterCount int
 
 	// allBlobsSeq, when non-nil, is the SeqError the stub yields from
 	// AllBlobs(). Tests construct it via makeMarklIdSeq or inline.
@@ -81,6 +87,7 @@ func (s *multiModeStub) MakeBlobReader(
 func (s *multiModeStub) MakeBlobWriter(
 	_ domain_interfaces.FormatHash,
 ) (domain_interfaces.BlobWriter, error) {
+	s.makeWriterCount++
 	w := s.writerToHand
 	if w == nil {
 		w = &spyBlobWriter{}
@@ -663,5 +670,311 @@ func TestMulti_AllBlobs_SkipsNilIdHead(t *testing.T) {
 	wantIds := []string{d1.String(), d2.String()}
 	if !reflect.DeepEqual(gotIds, wantIds) {
 		t.Fatalf("AllBlobs: got %v, want %v", gotIds, wantIds)
+	}
+}
+
+// TestMulti_WriteThrough_HasBlob_WriteOrAnyRead pins write-through
+// HasBlob: it returns true if any of the write store or read sources
+// claims the blob, and false only when none do.
+func TestMulti_WriteThrough_HasBlob_WriteOrAnyRead(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-has-blob")
+	idKey := id.String()
+
+	type want struct {
+		name     string
+		writeHas bool
+		readAHas bool
+		readBHas bool
+		expected bool
+	}
+
+	cases := []want{
+		{name: "only-write", writeHas: true, readAHas: false, readBHas: false, expected: true},
+		{name: "only-one-read", writeHas: false, readAHas: false, readBHas: true, expected: true},
+		{name: "both", writeHas: true, readAHas: true, readBHas: false, expected: true},
+		{name: "none", writeHas: false, readAHas: false, readBHas: false, expected: false},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			writeStore := &multiModeStub{hasIds: map[string]bool{idKey: c.writeHas}}
+			readA := &multiModeStub{hasIds: map[string]bool{idKey: c.readAHas}}
+			readB := &multiModeStub{hasIds: map[string]bool{idKey: c.readBHas}}
+
+			m, err := NewMulti(&spyActiveContext{}).
+				WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+				Read(
+					BlobStoreInitialized{BlobStore: readA},
+					BlobStoreInitialized{BlobStore: readB},
+				).
+				ReadFill(false).
+				Build()
+			if err != nil {
+				t.Fatalf("Build: %v", err)
+			}
+
+			if got := m.HasBlob(id); got != c.expected {
+				t.Fatalf("HasBlob: got %v, want %v", got, c.expected)
+			}
+		})
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_WriteStoreFirst pins read
+// precedence: when both the write store and a read source claim to
+// have the blob, the reader comes from the write store.
+func TestMulti_WriteThrough_MakeBlobReader_WriteStoreFirst(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-write-first")
+	idKey := id.String()
+
+	bytesFromWrite := []byte("from-write-store")
+	bytesFromRead := []byte("from-read-source")
+
+	writeStore := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: bytesFromWrite},
+	}
+	readSrc := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: bytesFromRead},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v", err)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if !bytes.Equal(got, bytesFromWrite) {
+		t.Fatalf(
+			"reader bytes: got %q, want %q (write store first)",
+			got,
+			bytesFromWrite,
+		)
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_FallsBackToReadSource_NoFill
+// pins that with ReadFill(false), a write-store miss falls back to
+// the first read source that has the blob and returns its reader
+// directly — no copy-back through the write store.
+func TestMulti_WriteThrough_MakeBlobReader_FallsBackToReadSource_NoFill(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-fallback-no-fill")
+	idKey := id.String()
+
+	bytesFromRead := []byte("from-read-source")
+
+	writeStore := &multiModeStub{
+		hasIds:      map[string]bool{idKey: false},
+		readerBytes: map[string][]byte{},
+	}
+	readSrc := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: bytesFromRead},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v", err)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if !bytes.Equal(got, bytesFromRead) {
+		t.Fatalf(
+			"reader bytes: got %q, want %q (read source)",
+			got,
+			bytesFromRead,
+		)
+	}
+
+	// With ReadFill=false, the write store must NOT have had a
+	// writer constructed during the read.
+	if writeStore.makeWriterCount != 0 {
+		t.Fatalf(
+			"write store MakeBlobWriter count: got %d, want 0 (no fill)",
+			writeStore.makeWriterCount,
+		)
+	}
+	if writeStore.lastWriter != nil {
+		t.Fatalf("write store lastWriter: got non-nil, want nil (no fill)")
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_AllMiss pins that when neither
+// the write store nor any read source has the blob, MakeBlobReader
+// returns ErrBlobMissing.
+func TestMulti_WriteThrough_MakeBlobReader_AllMiss(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-all-miss")
+
+	writeStore := &multiModeStub{hasIds: map[string]bool{}}
+	readA := &multiModeStub{hasIds: map[string]bool{}}
+	readB := &multiModeStub{hasIds: map[string]bool{}}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(
+			BlobStoreInitialized{BlobStore: readA},
+			BlobStoreInitialized{BlobStore: readB},
+		).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader, want nil on all-miss")
+	}
+	if !errors.Is(gotErr, blob_io.ErrBlobMissing{}) {
+		t.Fatalf("MakeBlobReader error: got %v, want ErrBlobMissing", gotErr)
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobWriter_WriteStoreOnly pins that
+// writes from MakeBlobWriter go to the write store only — read
+// sources never have their writer constructed.
+func TestMulti_WriteThrough_MakeBlobWriter_WriteStoreOnly(t *testing.T) {
+	writeStoreWriter := &spyBlobWriter{}
+	writeStore := &multiModeStub{writerToHand: writeStoreWriter}
+	readA := &multiModeStub{}
+	readB := &multiModeStub{}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(
+			BlobStoreInitialized{BlobStore: readA},
+			BlobStoreInitialized{BlobStore: readB},
+		).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	payload := []byte("wt-write-payload")
+
+	writer, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	if _, err := writer.Write(payload); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	if !bytes.Equal(writeStoreWriter.received, payload) {
+		t.Errorf(
+			"write store bytes: got %q, want %q",
+			writeStoreWriter.received,
+			payload,
+		)
+	}
+
+	if writeStore.makeWriterCount != 1 {
+		t.Errorf(
+			"write store MakeBlobWriter count: got %d, want 1",
+			writeStore.makeWriterCount,
+		)
+	}
+	if readA.makeWriterCount != 0 {
+		t.Errorf(
+			"readA MakeBlobWriter count: got %d, want 0",
+			readA.makeWriterCount,
+		)
+	}
+	if readB.makeWriterCount != 0 {
+		t.Errorf(
+			"readB MakeBlobWriter count: got %d, want 0",
+			readB.makeWriterCount,
+		)
+	}
+}
+
+// TestMulti_WriteThrough_Description_NamesWriteAndRead pins the
+// write-through GetBlobStoreDescription format:
+// "multi/write-through(W=<desc>, R=<desc>, R=<desc>)".
+func TestMulti_WriteThrough_Description_NamesWriteAndRead(t *testing.T) {
+	writeStore := &multiModeStub{description: "local"}
+	readA := &multiModeStub{description: "remoteA"}
+	readB := &multiModeStub{description: "remoteB"}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(
+			BlobStoreInitialized{BlobStore: readA},
+			BlobStoreInitialized{BlobStore: readB},
+		).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	got := m.GetBlobStoreDescription()
+	want := "multi/write-through(W=local, R=remoteA, R=remoteB)"
+	if got != want {
+		t.Fatalf("GetBlobStoreDescription: got %q, want %q", got, want)
+	}
+}
+
+// TestMulti_WriteThrough_DefaultHashType_FromWriteStore pins that the
+// wrapper's default hash type delegates to the write store, not to
+// any read source.
+func TestMulti_WriteThrough_DefaultHashType_FromWriteStore(t *testing.T) {
+	writeStore := &multiModeStub{defaultHash: markl.FormatHashSha256}
+	readSrc := &multiModeStub{} // would panic if consulted
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	got := m.GetDefaultHashType()
+	if got == nil {
+		t.Fatalf("GetDefaultHashType: got nil, want write store's hash")
+	}
+	if got.GetMarklFormatId() != markl.FormatHashSha256.GetMarklFormatId() {
+		t.Fatalf(
+			"GetDefaultHashType: got %q, want %q (write store)",
+			got.GetMarklFormatId(),
+			markl.FormatHashSha256.GetMarklFormatId(),
+		)
 	}
 }

@@ -26,9 +26,9 @@ type Multi struct {
 	ctx         interfaces.ActiveContext
 	mode        multiMode
 	childStores []BlobStoreInitialized // mirror mode
-	writeStore  BlobStoreInitialized   // write-through mode (filled in Task 9)
-	readStores  []BlobStoreInitialized // write-through mode (filled in Task 9)
-	readFill    bool                   // write-through mode (filled in Task 9)
+	writeStore  BlobStoreInitialized   // write-through mode
+	readStores  []BlobStoreInitialized // write-through mode
+	readFill    bool                   // write-through mode (Task 10 wires the tee)
 }
 
 var _ domain_interfaces.BlobStore = Multi{}
@@ -44,9 +44,14 @@ func (parentStore Multi) HasBlob(id domain_interfaces.MarklId) bool {
 		return false
 
 	case modeWriteThrough:
-		// Task 9 wires write-through HasBlob across writeStore and
-		// readStores. Until then, report no blobs to keep the contract
-		// honest rather than silently iterating the wrong slice.
+		if parentStore.writeStore.HasBlob(id) {
+			return true
+		}
+		for _, readStore := range parentStore.readStores {
+			if readStore.HasBlob(id) {
+				return true
+			}
+		}
 		return false
 	}
 
@@ -71,8 +76,22 @@ func (parentStore Multi) MakeBlobReader(
 		}
 
 	case modeWriteThrough:
-		// Task 9 wires write-through reads (writeStore-first then
-		// readStores, with optional tee-during-read).
+		if parentStore.writeStore.HasBlob(id) {
+			return parentStore.writeStore.MakeBlobReader(id)
+		}
+		for _, readStore := range parentStore.readStores {
+			if !readStore.HasBlob(id) {
+				continue
+			}
+			if !parentStore.readFill {
+				return readStore.MakeBlobReader(id)
+			}
+			// Task 10 will replace this branch with the tee-during-read
+			// wrapper. Until then, fall back to the source reader so the
+			// call still works end-to-end.
+			return readStore.MakeBlobReader(id)
+		}
+
 		clonedId, _ := markl.Clone(id) //repool:owned
 		return nil, blob_io.ErrBlobMissing{
 			BlobId: clonedId,
@@ -114,10 +133,7 @@ func (parentStore Multi) MakeBlobWriter(
 		return multiWriter, nil
 
 	case modeWriteThrough:
-		// Task 9 wires write-through writes to writeStore only.
-		return nil, errors.Errorf(
-			"Multi: write-through MakeBlobWriter not yet implemented",
-		)
+		return parentStore.writeStore.MakeBlobWriter(marklHashType)
 	}
 
 	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
@@ -125,9 +141,9 @@ func (parentStore Multi) MakeBlobWriter(
 
 // GetBlobStoreDescription synthesizes a description that reflects the
 // wrapper's mode and the identities of its children. Mirror produces
-// "multi/mirror(<descA>,<descB>,...)"; WriteThrough produces a
-// placeholder "multi/write-through(W=<desc>)" until Task 9 finalizes
-// the format.
+// "multi/mirror(<descA>,<descB>,...)"; WriteThrough names the write
+// store as W= and each read source as R=, in source order, e.g.
+// "multi/write-through(W=local, R=remoteA, R=remoteB)".
 func (parentStore Multi) GetBlobStoreDescription() string {
 	switch parentStore.mode {
 	case modeMirror:
@@ -138,13 +154,18 @@ func (parentStore Multi) GetBlobStoreDescription() string {
 		return fmt.Sprintf("multi/mirror(%s)", strings.Join(ids, ","))
 
 	case modeWriteThrough:
-		// Task 9 finalizes the write-through description; this
-		// placeholder keeps the BlobStore interface satisfied so the
-		// wrapper is observable in fsck/list output until then.
-		return fmt.Sprintf(
-			"multi/write-through(W=%s)",
-			parentStore.writeStore.GetBlobStoreDescription(),
+		parts := make([]string, 0, 1+len(parentStore.readStores))
+		parts = append(
+			parts,
+			fmt.Sprintf("W=%s", parentStore.writeStore.GetBlobStoreDescription()),
 		)
+		for _, readStore := range parentStore.readStores {
+			parts = append(
+				parts,
+				fmt.Sprintf("R=%s", readStore.GetBlobStoreDescription()),
+			)
+		}
+		return fmt.Sprintf("multi/write-through(%s)", strings.Join(parts, ", "))
 	}
 
 	return ""
@@ -353,8 +374,7 @@ func compareMarklIds(a, b domain_interfaces.MarklId) int {
 // allBlobSources returns the ordered set of children whose AllBlobs
 // sequences participate in the N-way merge. Mirror mode merges every
 // child; WriteThrough mode merges the write store followed by the read
-// stores (Task 9 wires the write-through paths — until then the slice
-// is built from whatever the builder populated).
+// stores.
 func (parentStore Multi) allBlobSources() []BlobStoreInitialized {
 	switch parentStore.mode {
 	case modeMirror:
