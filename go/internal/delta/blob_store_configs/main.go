@@ -29,6 +29,7 @@ type (
 	ConfigSFTPUri               = charlie_bsc.ConfigSFTPUri
 	ConfigSFTPConfigExplicit    = charlie_bsc.ConfigSFTPConfigExplicit
 	ConfigWebDAV                = charlie_bsc.ConfigWebDAV
+	ConfigS3                    = charlie_bsc.ConfigS3
 	ErrUnsupportedHashType      = charlie_bsc.ErrUnsupportedHashType
 	HashType                    = charlie_bsc.HashType
 	EncryptionKeys              = charlie_bsc.EncryptionKeys
@@ -41,6 +42,7 @@ type (
 	TomlSFTPV0                  = charlie_bsc.TomlSFTPV0
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
 	TomlWebDAVV0                = charlie_bsc.TomlWebDAVV0
+	TomlS3V0                    = charlie_bsc.TomlS3V0
 	TomlPointerV0               = charlie_bsc.TomlPointerV0
 	TomlPointerV1               = charlie_bsc.TomlPointerV1
 	TomlUriV0                   = charlie_bsc.TomlUriV0
@@ -76,6 +78,7 @@ var (
 	DecodeTomlSFTPV0              = charlie_bsc.DecodeTomlSFTPV0
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlWebDAVV0            = charlie_bsc.DecodeTomlWebDAVV0
+	DecodeTomlS3V0                = charlie_bsc.DecodeTomlS3V0
 	DecodeTomlPointerV0           = charlie_bsc.DecodeTomlPointerV0
 	DecodeTomlPointerV1           = charlie_bsc.DecodeTomlPointerV1
 	DecodeTomlUriV0               = charlie_bsc.DecodeTomlUriV0
@@ -118,6 +121,8 @@ var (
 	_ ConfigMutable               = &TomlSFTPViaSSHConfigV0{}
 	_ ConfigWebDAV                = &TomlWebDAVV0{}
 	_ ConfigMutable               = &TomlWebDAVV0{}
+	_ ConfigS3                    = &TomlS3V0{}
+	_ ConfigMutable               = &TomlS3V0{}
 )
 
 type DefaultType = TomlV3
@@ -158,6 +163,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0
 	case *TomlWebDAVV0:
 		typeId = ids.TypeTomlBlobStoreConfigWebdavV0
+	case *TomlS3V0:
+		typeId = ids.TypeTomlBlobStoreConfigS3V0
 	case *TomlPointerV0, TomlPointerV0:
 		typeId = ids.TypeTomlBlobStoreConfigPointerV0
 	case *TomlPointerV1, TomlPointerV1:

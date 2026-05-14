@@ -140,6 +140,19 @@ type (
 		GetTLSServerName() string
 		GetTLSInsecureSkipVerify() bool
 	}
+
+	ConfigS3 interface {
+		Config
+		GetEndpoint() string
+		GetRegion() string
+		GetBucket() string
+		GetPrefix() string
+		GetAccessKeyId() string
+		GetSecretAccessKey() string
+		GetSessionToken() string
+		GetUsePathStyle() bool
+		GetInsecureSkipVerify() bool
+	}
 )
 
 var DefaultHashBuckets []int = []int{2}
