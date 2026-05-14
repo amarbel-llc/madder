@@ -87,6 +87,12 @@ type (
 		GetBlobStoreDescription() string
 		GetDefaultHashType() FormatHash
 		GetBlobStoreConfig() BlobStoreConfig
+		// AllBlobs yields every blob id this store holds. Implementations
+		// MUST yield ids in ascending lexicographic byte order of the
+		// MarklId representation (which embeds the hash-format tag).
+		// The sort is load-bearing for callers that N-way merge across
+		// stores (see blob_stores.Multi). Filesystem-backed stores
+		// satisfy this naturally via filepath.WalkDir's lexical order.
 		AllBlobs() interfaces.SeqError[MarklId]
 	}
 
