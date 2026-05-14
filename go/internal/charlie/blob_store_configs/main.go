@@ -127,6 +127,13 @@ type (
 		GetPassword() string
 		GetPrivateKeyPath() string
 	}
+
+	ConfigWebDAV interface {
+		Config
+		GetURL() string
+		GetUser() string
+		GetPassword() string
+	}
 )
 
 var DefaultHashBuckets []int = []int{2}

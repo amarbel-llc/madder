@@ -28,6 +28,7 @@ type (
 	ConfigSFTPRemotePath        = charlie_bsc.ConfigSFTPRemotePath
 	ConfigSFTPUri               = charlie_bsc.ConfigSFTPUri
 	ConfigSFTPConfigExplicit    = charlie_bsc.ConfigSFTPConfigExplicit
+	ConfigWebDAV                = charlie_bsc.ConfigWebDAV
 	ErrUnsupportedHashType      = charlie_bsc.ErrUnsupportedHashType
 	HashType                    = charlie_bsc.HashType
 	EncryptionKeys              = charlie_bsc.EncryptionKeys
@@ -39,6 +40,7 @@ type (
 	TomlV3                      = charlie_bsc.TomlV3
 	TomlSFTPV0                  = charlie_bsc.TomlSFTPV0
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
+	TomlWebDAVV0                = charlie_bsc.TomlWebDAVV0
 	TomlPointerV0               = charlie_bsc.TomlPointerV0
 	TomlUriV0                   = charlie_bsc.TomlUriV0
 	TomlInventoryArchiveV0      = charlie_bsc.TomlInventoryArchiveV0
@@ -72,6 +74,7 @@ var (
 	DecodeTomlV3                  = charlie_bsc.DecodeTomlV3
 	DecodeTomlSFTPV0              = charlie_bsc.DecodeTomlSFTPV0
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
+	DecodeTomlWebDAVV0            = charlie_bsc.DecodeTomlWebDAVV0
 	DecodeTomlPointerV0           = charlie_bsc.DecodeTomlPointerV0
 	DecodeTomlUriV0               = charlie_bsc.DecodeTomlUriV0
 	DecodeTomlInventoryArchiveV0  = charlie_bsc.DecodeTomlInventoryArchiveV0
@@ -109,6 +112,8 @@ var (
 	_ SelectorConfigImmutable     = TomlInventoryArchiveV2{}
 	_ ConfigSFTPRemotePath        = TomlSFTPViaSSHConfigV0{}
 	_ ConfigMutable               = &TomlSFTPViaSSHConfigV0{}
+	_ ConfigWebDAV                = &TomlWebDAVV0{}
+	_ ConfigMutable               = &TomlWebDAVV0{}
 )
 
 type DefaultType = TomlV3
@@ -147,6 +152,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigSftpExplicitV0
 	case *TomlSFTPViaSSHConfigV0, TomlSFTPViaSSHConfigV0:
 		typeId = ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0
+	case *TomlWebDAVV0:
+		typeId = ids.TypeTomlBlobStoreConfigWebdavV0
 	case *TomlPointerV0, TomlPointerV0:
 		typeId = ids.TypeTomlBlobStoreConfigPointerV0
 	case *TomlInventoryArchiveV0, TomlInventoryArchiveV0:

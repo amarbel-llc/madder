@@ -108,6 +108,28 @@ var Coder = hyphence.CoderToTypedBlob[Config]{
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigWebdavV0: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlWebDAVV0(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlWebDAVV0(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlWebDAVV0); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0: hyphence.CoderTommy[
 				Config,
 				*Config,

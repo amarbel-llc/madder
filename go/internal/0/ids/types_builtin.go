@@ -5,6 +5,7 @@ import "fmt"
 const (
 	TypeTomlBlobStoreConfigSftpExplicitV0           = "!toml-blob_store_config_sftp-explicit-v0"
 	TypeTomlBlobStoreConfigSftpViaSSHConfigV0       = "!toml-blob_store_config_sftp-ssh_config-v0"
+	TypeTomlBlobStoreConfigWebdavV0                 = "!toml-blob_store_config_webdav-v0"
 	TypeTomlBlobStoreConfigV1                       = "!toml-blob_store_config-v1"
 	TypeTomlBlobStoreConfigV2                       = "!toml-blob_store_config-v2"
 	TypeTomlBlobStoreConfigV3                       = "!toml-blob_store_config-v3"
@@ -35,6 +36,7 @@ func init() {
 		TypeTomlBlobStoreConfigInventoryArchiveV2,
 		TypeTomlBlobStoreConfigSftpExplicitV0,
 		TypeTomlBlobStoreConfigSftpViaSSHConfigV0,
+		TypeTomlBlobStoreConfigWebdavV0,
 	} {
 		ts := MustTypeStruct(tipeString)
 		allMap[ts] = BuiltinType{TypeStruct: ts}
