@@ -1,7 +1,9 @@
 package blob_stores
 
 import (
+	"fmt"
 	"io"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
@@ -117,6 +119,88 @@ func (parentStore Multi) MakeBlobWriter(
 	}
 
 	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
+}
+
+// GetBlobStoreDescription synthesizes a description that reflects the
+// wrapper's mode and the identities of its children. Mirror produces
+// "multi/mirror(<descA>,<descB>,...)"; WriteThrough produces a
+// placeholder "multi/write-through(W=<desc>)" until Task 9 finalizes
+// the format.
+func (parentStore Multi) GetBlobStoreDescription() string {
+	switch parentStore.mode {
+	case modeMirror:
+		ids := make([]string, 0, len(parentStore.childStores))
+		for _, childStore := range parentStore.childStores {
+			ids = append(ids, childStore.GetBlobStoreDescription())
+		}
+		return fmt.Sprintf("multi/mirror(%s)", strings.Join(ids, ","))
+
+	case modeWriteThrough:
+		// Task 9 finalizes the write-through description; this
+		// placeholder keeps the BlobStore interface satisfied so the
+		// wrapper is observable in fsck/list output until then.
+		return fmt.Sprintf(
+			"multi/write-through(W=%s)",
+			parentStore.writeStore.GetBlobStoreDescription(),
+		)
+	}
+
+	return ""
+}
+
+// GetDefaultHashType reports the wrapper's default hash type by
+// delegating to the first child in Mirror mode (the canonical write
+// hash for the mirror set) and to the single write store in
+// WriteThrough mode.
+func (parentStore Multi) GetDefaultHashType() domain_interfaces.FormatHash {
+	switch parentStore.mode {
+	case modeMirror:
+		if len(parentStore.childStores) == 0 {
+			return nil
+		}
+		return parentStore.childStores[0].GetDefaultHashType()
+
+	case modeWriteThrough:
+		return parentStore.writeStore.GetDefaultHashType()
+	}
+
+	return nil
+}
+
+// GetBlobStoreConfig delegates to the first child in Mirror mode and
+// to the write store in WriteThrough mode. The wrapper has no config
+// of its own — Multi is purely an orchestration layer.
+func (parentStore Multi) GetBlobStoreConfig() domain_interfaces.BlobStoreConfig {
+	switch parentStore.mode {
+	case modeMirror:
+		if len(parentStore.childStores) == 0 {
+			return nil
+		}
+		return parentStore.childStores[0].GetBlobStoreConfig()
+
+	case modeWriteThrough:
+		return parentStore.writeStore.GetBlobStoreConfig()
+	}
+
+	return nil
+}
+
+// GetBlobIOWrapper delegates to the first child in Mirror mode and to
+// the write store in WriteThrough mode. As with GetBlobStoreConfig,
+// the wrapper itself has no IO-wrapper state.
+func (parentStore Multi) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper {
+	switch parentStore.mode {
+	case modeMirror:
+		if len(parentStore.childStores) == 0 {
+			return nil
+		}
+		return parentStore.childStores[0].GetBlobIOWrapper()
+
+	case modeWriteThrough:
+		return parentStore.writeStore.GetBlobIOWrapper()
+	}
+
+	return nil
 }
 
 type multiStoreBlobWriter struct {
