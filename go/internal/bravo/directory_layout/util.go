@@ -95,18 +95,9 @@ func DirBlobStore(
 // excluded — match git's GIT_CEILING_DIRECTORIES semantics. See #145
 // and amarbel-llc/purse-first#75.
 //
-// Both cwd and each ceiling are resolved through filepath.EvalSymlinks
-// before the walk, matching git(1)'s documented behavior for
-// GIT_CEILING_DIRECTORIES: "Normally, Git has to read the entries in
-// this list and resolve any symlink that might be present in order to
-// compare them with the current directory." Without symmetric resolution
-// on both sides, macOS's /var → /private/var symlink (and similar)
-// leaves ceiling and walked dir in incompatible string forms, so the
-// walk never stops. In production this canonicalization is a no-op:
-// os.Getwd() already returns the canonical form on macOS and Linux, so
-// returned ancestor paths look the same as before. Tracked upstream in
-// dewey: ceiling resolution should live in xdg.IsAboveCeiling itself.
-// See amarbel-llc/purse-first#80.
+// xdg.IsAboveCeiling symlink-resolves both dir and each ceiling before
+// comparison (amarbel-llc/purse-first#80), so this wrapper no longer
+// needs to canonicalize either side.
 func FindAllCwdOverridePaths(
 	cwd, utilityName string,
 	ceilings []string,
@@ -116,12 +107,10 @@ func FindAllCwdOverridePaths(
 	}
 
 	marker := "." + utilityName
-	resolvedCwd := resolveSymlinksBestEffort(cwd)
-	resolvedCeilings := resolveCeilings(ceilings)
 
 	var ancestors []string
 
-	dir := resolvedCwd
+	dir := cwd
 	for safety := 0; safety < 100; safety++ {
 		if files.Exists(filepath.Join(dir, marker)) {
 			ancestors = append(ancestors, dir)
@@ -138,36 +127,10 @@ func FindAllCwdOverridePaths(
 
 		dir = parent
 
-		if xdg.IsAboveCeiling(dir, resolvedCeilings) {
+		if xdg.IsAboveCeiling(dir, ceilings) {
 			break
 		}
 	}
 
 	return ancestors
-}
-
-// resolveCeilings runs each ceiling through filepath.EvalSymlinks so
-// that path-string comparison in xdg.IsAboveCeiling sees the same form
-// for both sides regardless of intermediate symlinks. Entries that fail
-// to resolve (e.g. the ceiling doesn't exist on disk) are passed through
-// unchanged so a user-supplied non-existent ceiling still bounds the
-// walk by name — matches git's best-effort behavior.
-func resolveCeilings(ceilings []string) []string {
-	if len(ceilings) == 0 {
-		return ceilings
-	}
-
-	out := make([]string, len(ceilings))
-	for i, c := range ceilings {
-		out[i] = resolveSymlinksBestEffort(c)
-	}
-
-	return out
-}
-
-func resolveSymlinksBestEffort(p string) string {
-	if resolved, err := filepath.EvalSymlinks(p); err == nil {
-		return resolved
-	}
-	return p
 }
