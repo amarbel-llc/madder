@@ -28,3 +28,42 @@ func TestBuilder_Mirror_HappyPath(t *testing.T) {
 		t.Fatalf("childStores: got %d, want 2", len(m.childStores))
 	}
 }
+
+func TestBuilder_Build_EmptyStores(t *testing.T) {
+	_, err := NewMulti(&spyActiveContext{}).Build()
+	if err == nil {
+		t.Fatal("expected error for empty/no-mode-selected; got nil")
+	}
+}
+
+func TestBuilder_Build_ModeConfusion_MirrorThenRead(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).Mirror(s).Read(s).Build()
+	if err == nil {
+		t.Fatal("expected mode-confusion error; got nil")
+	}
+}
+
+func TestBuilder_Build_ModeConfusion_WriteToThenMirror(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).WriteTo(s).Mirror(s).Build()
+	if err == nil {
+		t.Fatal("expected mode-confusion error; got nil")
+	}
+}
+
+func TestBuilder_Build_WriteStoreInReadList(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).WriteTo(s).Read(s).Build()
+	if err == nil {
+		t.Fatal("expected error for write-store-also-in-read-list; got nil")
+	}
+}
+
+func TestBuilder_Build_ReadFillAfterMirror(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).Mirror(s).ReadFill(false).Build()
+	if err == nil {
+		t.Fatal("expected error for ReadFill after Mirror; got nil")
+	}
+}
