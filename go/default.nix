@@ -308,9 +308,13 @@ let
           bats-race = mkBatsLane { filter = "!net_cap"; base = madder-race; };
         };
 
-  # Devshell-only test harness for SFTP integration tests (RFC 0001).
-  # Intentionally NOT included in the `packages` output — release
-  # artifacts must not ship a server that accepts any password.
+  # SFTP test harness (RFC 0001). Exposed as a named package output so
+  # downstream test harnesses (e.g. dodder's haustoria_orgmode bats
+  # lanes) can consume it without duplicating the server. Kept out of
+  # `packages.default` — release artifacts must not ship a server that
+  # accepts any password — but addressable as
+  # `madder.packages.${system}.madder-test-sftp-server` for explicit
+  # opt-in by test-only consumers. See amarbel-llc/madder#177.
   madder-test-sftp-server = pkgs.buildGoApplication {
     pname = "madder-test-sftp-server";
     version = "0.0.0";
@@ -339,7 +343,7 @@ let
 in
 {
   packages = {
-    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin cutting-garden;
+    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin cutting-garden madder-test-sftp-server;
     default = madder;
   } // batsLaneOutputs;
 
