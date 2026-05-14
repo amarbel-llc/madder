@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -379,11 +380,24 @@ func makeMultiAllBlobsTestId(
 	seedByte byte,
 ) domain_interfaces.MarklId {
 	t.Helper()
+	return makeMultiAllBlobsTestIdForFormat(t, markl.FormatHashSha256, seedByte)
+}
+
+// makeMultiAllBlobsTestIdForFormat is the format-parameterized variant of
+// makeMultiAllBlobsTestId. Both registered hash formats (sha256 and
+// blake2b256) emit 32-byte digests, so the same seed-byte repetition
+// trick works across formats.
+func makeMultiAllBlobsTestIdForFormat(
+	t *testing.T,
+	formatHash markl.FormatHash,
+	seedByte byte,
+) domain_interfaces.MarklId {
+	t.Helper()
 	hexString := strings.Repeat(
 		hex.EncodeToString([]byte{seedByte}),
-		sha256.Size,
+		formatHash.GetSize(),
 	)
-	id, repool := markl.FormatHashSha256.GetBlobIdForHexString(hexString)
+	id, repool := formatHash.GetBlobIdForHexString(hexString)
 	t.Cleanup(repool)
 	return id
 }
@@ -550,5 +564,104 @@ func TestMulti_AllBlobs_PropagatesErrors(t *testing.T) {
 	wantIds := []string{d1.String(), d3.String()}
 	if !reflect.DeepEqual(gotIds, wantIds) {
 		t.Fatalf("AllBlobs ids: got %v, want %v", gotIds, wantIds)
+	}
+}
+
+// TestMulti_AllBlobs_CrossHashPassesThrough pins that ids under
+// different hash formats never compare equal and therefore pass through
+// the merge as separate entries. storeA yields blake2b256 ids and
+// storeB yields sha256 ids; the merged seq must contain the union of
+// both sets with no dedupe across formats. Order depends on
+// (format-id, raw bytes) lex compare — testing the set is more readable
+// and matches the spec's "by design" framing.
+func TestMulti_AllBlobs_CrossHashPassesThrough(t *testing.T) {
+	blakeA := makeMultiAllBlobsTestIdForFormat(t, markl.FormatHashBlake2b256, 0x11)
+	blakeB := makeMultiAllBlobsTestIdForFormat(t, markl.FormatHashBlake2b256, 0x22)
+	sha256A := makeMultiAllBlobsTestIdForFormat(t, markl.FormatHashSha256, 0x11)
+	sha256B := makeMultiAllBlobsTestIdForFormat(t, markl.FormatHashSha256, 0x22)
+
+	storeA := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(blakeA, blakeB),
+	}
+	storeB := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(sha256A, sha256B),
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+
+	wantSet := []string{
+		blakeA.String(),
+		blakeB.String(),
+		sha256A.String(),
+		sha256B.String(),
+	}
+	gotSet := append([]string(nil), gotIds...)
+	sort.Strings(gotSet)
+	sort.Strings(wantSet)
+
+	if !reflect.DeepEqual(gotSet, wantSet) {
+		t.Fatalf(
+			"AllBlobs cross-hash set: got %v, want %v (no dedupe across formats)",
+			gotSet,
+			wantSet,
+		)
+	}
+}
+
+// TestMulti_AllBlobs_SkipsNilIdHead pins that a child yielding
+// (nil id, nil err) — a misbehaving producer — is skipped instead of
+// being passed to compareMarklIds, where it would panic. The merge
+// continues with the remaining good ids.
+func TestMulti_AllBlobs_SkipsNilIdHead(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+
+	storeA := &multiModeStub{
+		allBlobsSeq: func(
+			yield func(domain_interfaces.MarklId, error) bool,
+		) {
+			if !yield(d1, nil) {
+				return
+			}
+			// Misbehaving emit: nil id, nil err. The Multi merge must
+			// treat this as a skipped head, not feed it to
+			// compareMarklIds.
+			if !yield(nil, nil) {
+				return
+			}
+			if !yield(d2, nil) {
+				return
+			}
+		},
+	}
+	storeB := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+
+	wantIds := []string{d1.String(), d2.String()}
+	if !reflect.DeepEqual(gotIds, wantIds) {
+		t.Fatalf("AllBlobs: got %v, want %v", gotIds, wantIds)
 	}
 }

@@ -252,9 +252,16 @@ func (parentStore Multi) AllBlobs() interfaces.SeqError[domain_interfaces.MarklI
 
 		for {
 			// Surface any pending errors first, advancing the head past
-			// each error before moving on to id comparison.
+			// each error before moving on to id comparison. Also advance
+			// past any (nil id, nil err) emission from a misbehaving
+			// producer; leaving such a head pinned would block the merge
+			// or, worse, surface a nil id to callers (panic on String).
 			for i, h := range heads {
-				if h.ok && h.err != nil {
+				if !h.ok {
+					continue
+				}
+
+				if h.err != nil {
 					if !yield(nil, h.err) {
 						return
 					}
@@ -263,14 +270,26 @@ func (parentStore Multi) AllBlobs() interfaces.SeqError[domain_interfaces.MarklI
 					heads[i].id = id
 					heads[i].err = err
 					heads[i].ok = ok
+					continue
+				}
+
+				if h.id == nil {
+					id, err, ok := heads[i].next()
+					heads[i].id = id
+					heads[i].err = err
+					heads[i].ok = ok
 				}
 			}
 
 			// Find lexicographic minimum across live error-free heads.
+			// The h.id == nil guard is belt-and-suspenders: the pass
+			// above advances past nil-id heads, but keep the check here
+			// so a future refactor can't accidentally feed nil into
+			// compareMarklIds.
 			minIdx := -1
 
 			for i, h := range heads {
-				if !h.ok || h.err != nil {
+				if !h.ok || h.err != nil || h.id == nil {
 					continue
 				}
 
@@ -290,9 +309,10 @@ func (parentStore Multi) AllBlobs() interfaces.SeqError[domain_interfaces.MarklI
 			}
 
 			// Advance every head matching the minimum so same-hash
-			// duplicates collapse to a single yield.
+			// duplicates collapse to a single yield. Same nil-id
+			// defensive guard as the min-finder loop above.
 			for i, h := range heads {
-				if !h.ok || h.err != nil {
+				if !h.ok || h.err != nil || h.id == nil {
 					continue
 				}
 
