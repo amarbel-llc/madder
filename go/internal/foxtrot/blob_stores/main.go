@@ -322,6 +322,15 @@ func MakeBlobStore(
 			envDir.GetBlobWriteObserver(),
 		)
 
+	case blob_store_configs.ConfigS3:
+		return makeS3Store(
+			envDir.GetActiveContext(),
+			printer,
+			configNamed.GetId(),
+			config,
+			envDir.GetBlobWriteObserver(),
+		)
+
 	case blob_store_configs.ConfigLocalHashBucketed:
 		return makeLocalHashBucketed(
 			envDir,

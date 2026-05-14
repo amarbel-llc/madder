@@ -135,6 +135,25 @@ func init() {
 	)
 
 	utility.AddCmd(
+		"init-s3",
+		&Init{
+			tipe: ids.GetOrPanic(
+				ids.TypeTomlBlobStoreConfigS3V0,
+			).TypeStruct,
+			blobStoreConfig: &blob_store_configs.TomlS3V0{},
+			desc: futility.Description{
+				Short: "initialize an S3 / S3-compatible blob store",
+				Long: "Create a blob store backed by an S3 bucket (AWS S3, " +
+					"MinIO, Ceph RGW, R2, etc.). Credentials are stored in " +
+					"the local config file; use -use-path-style for " +
+					"S3-compatible servers like MinIO. The remote " +
+					"blob_store-config object is bootstrapped on first " +
+					"init unless one already exists at the prefix.",
+			},
+		},
+	)
+
+	utility.AddCmd(
 		"init-inventory-archive",
 		&Init{
 			tipe: ids.GetOrPanic(
@@ -299,6 +318,15 @@ func (cmd *Init) Run(req futility.Request) {
 	// PUT a default TomlV3 to <url>/blob_store-config when missing.
 	if webdavConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigWebDAV); ok {
 		if !cmd.ensureWebdavRemoteConfigExists(req, blobStoreId, webdavConfig) {
+			return
+		}
+	}
+
+	// S3-backed stores follow the same ADR 0005 pattern: a
+	// blob_store-config object at <prefix>/blob_store-config holds
+	// the authoritative blob-store-properties.
+	if s3Config, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigS3); ok {
+		if !cmd.ensureS3RemoteConfigExists(req, blobStoreId, s3Config) {
 			return
 		}
 	}
@@ -557,6 +585,48 @@ func (cmd *Init) ensureRemoteConfigExists(
 		},
 		printer,
 	); err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
+		return false
+	}
+
+	return true
+}
+
+// ensureS3RemoteConfigExists mirrors ensureRemoteConfigExists for S3.
+// Builds an s3 client from the local transport config, checks for an
+// existing <prefix>/blob_store-config object, and bootstraps a default
+// one when absent. Returns false when the request was cancelled.
+func (cmd *Init) ensureS3RemoteConfigExists(
+	req futility.Request,
+	blobStoreId blob_store_id.Id,
+	s3Config blob_store_configs.ConfigS3,
+) bool {
+	printer := ui.MakePrefixPrinter(
+		ui.Err(),
+		fmt.Sprintf("# (blob_store: %s) ", blobStoreId),
+	)
+
+	client, err := blob_stores.MakeS3Client(req, s3Config)
+	if err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
+		return false
+	}
+
+	if err := blob_stores.WriteRemoteConfigS3(
+		req,
+		client,
+		s3Config,
+		blob_stores.DiscoveredConfig{
+			HashTypeId: string(blob_store_configs.HashTypeDefault),
+			Buckets:    blob_store_configs.DefaultHashBuckets,
+			MultiHash:  true,
+		},
+		printer,
+	); err != nil {
+		if blob_stores.IsRemoteConfigAlreadyExists(err) {
+			printer.Printf("remote blob_store-config already present; using existing")
+			return true
+		}
 		errors.ContextCancelWithBadRequestError(req, err)
 		return false
 	}

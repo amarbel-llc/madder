@@ -133,6 +133,23 @@ HEAD-checks the destination and treats an existing target as a duplicate
 write, preserving the CAS invariant. **MKCOL** races are absorbed via the
 405-then-PROPFIND-confirm-collection pattern.
 
+## S3
+
+Remote blob store backed by Amazon S3 or any S3-compatible object store
+(MinIO, Ceph RGW, Cloudflare R2, Backblaze B2, etc.). Created with
+**madder init-s3**.
+
+The local config file holds bucket, region, endpoint, prefix, and
+credentials (access-key-id, secret-access-key, optional session-token).
+For S3-compatible servers like MinIO or self-hosted Ceph, pass
+**-use-path-style**.
+
+Per ADR 0005, the authoritative blob-store-properties (hash type,
+buckets, compression, encryption) live in an object at
+**\<prefix\>/blob_store-config** inside the bucket. **init-s3**
+bootstraps that object on first run; if one already exists it is
+reused.
+
 ## Pointer
 
 A store that delegates to another store by reference. The pointer store does

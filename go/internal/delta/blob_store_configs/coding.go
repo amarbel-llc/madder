@@ -130,6 +130,28 @@ var Coder = hyphence.CoderToTypedBlob[Config]{
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigS3V0: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlS3V0(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlS3V0(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlS3V0); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0: hyphence.CoderTommy[
 				Config,
 				*Config,
