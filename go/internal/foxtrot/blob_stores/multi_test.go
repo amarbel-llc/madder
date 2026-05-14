@@ -6,7 +6,10 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -32,6 +35,10 @@ type multiModeStub struct {
 	readerBytes  map[string][]byte
 	lastWriter   *spyBlobWriter
 	writerToHand *spyBlobWriter
+
+	// allBlobsSeq, when non-nil, is the SeqError the stub yields from
+	// AllBlobs(). Tests construct it via makeMarklIdSeq or inline.
+	allBlobsSeq interfaces.SeqError[domain_interfaces.MarklId]
 
 	description string
 	defaultHash domain_interfaces.FormatHash
@@ -79,6 +86,13 @@ func (s *multiModeStub) MakeBlobWriter(
 	}
 	s.lastWriter = w
 	return w, nil
+}
+
+func (s *multiModeStub) AllBlobs() interfaces.SeqError[domain_interfaces.MarklId] {
+	if s.allBlobsSeq != nil {
+		return s.allBlobsSeq
+	}
+	return func(yield func(domain_interfaces.MarklId, error) bool) {}
 }
 
 // makeMultiMirrorTestId returns a deterministic markl ID for tests
@@ -353,5 +367,188 @@ func TestMulti_Mirror_GetBlobIOWrapper_FirstChild(t *testing.T) {
 			got,
 			wantWrapper,
 		)
+	}
+}
+
+// makeMultiAllBlobsTestId returns a deterministic SHA-256 markl id whose
+// raw byte content is the 32-byte repetition of seedByte. This makes the
+// id's lex byte-order trivially predictable across tests: id(0xAA) sorts
+// before id(0xBB).
+func makeMultiAllBlobsTestId(
+	t *testing.T,
+	seedByte byte,
+) domain_interfaces.MarklId {
+	t.Helper()
+	hexString := strings.Repeat(
+		hex.EncodeToString([]byte{seedByte}),
+		sha256.Size,
+	)
+	id, repool := markl.FormatHashSha256.GetBlobIdForHexString(hexString)
+	t.Cleanup(repool)
+	return id
+}
+
+// makeMarklIdSeq adapts a slice of ids into a SeqError that yields each
+// id with a nil error.
+func makeMarklIdSeq(
+	ids ...domain_interfaces.MarklId,
+) interfaces.SeqError[domain_interfaces.MarklId] {
+	return func(yield func(domain_interfaces.MarklId, error) bool) {
+		for _, id := range ids {
+			if !yield(id, nil) {
+				return
+			}
+		}
+	}
+}
+
+// drainAllBlobs collects every (id, err) the seq yields. Errors are
+// returned as a separate slice in yield order; callers assert on both.
+func drainAllBlobs(
+	seq interfaces.SeqError[domain_interfaces.MarklId],
+) (ids []string, errs []error) {
+	for id, err := range seq {
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		ids = append(ids, id.String())
+	}
+	return ids, errs
+}
+
+// TestMulti_AllBlobs_SameHashDedupes pins the N-way merge: storeA
+// yields [d1, d2, d3] and storeB yields [d2, d3, d4]. Same-hash heads
+// (d2, d3 present in both) collapse to a single yield, producing the
+// sorted union [d1, d2, d3, d4].
+func TestMulti_AllBlobs_SameHashDedupes(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+	d3 := makeMultiAllBlobsTestId(t, 0x33)
+	d4 := makeMultiAllBlobsTestId(t, 0x44)
+
+	storeA := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(d1, d2, d3),
+	}
+	storeB := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(d2, d3, d4),
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+
+	wantIds := []string{d1.String(), d2.String(), d3.String(), d4.String()}
+	if !reflect.DeepEqual(gotIds, wantIds) {
+		t.Fatalf("AllBlobs: got %v, want %v", gotIds, wantIds)
+	}
+}
+
+// TestMulti_AllBlobs_BothStoresEmpty pins that two empty sources yield
+// nothing through the merge.
+func TestMulti_AllBlobs_BothStoresEmpty(t *testing.T) {
+	storeA := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+	storeB := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+	if len(gotIds) != 0 {
+		t.Fatalf("AllBlobs: got %v, want []", gotIds)
+	}
+}
+
+// TestMulti_AllBlobs_OneStoreEmpty pins that a non-empty source merged
+// with an empty one yields the non-empty source's full sequence.
+func TestMulti_AllBlobs_OneStoreEmpty(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+
+	storeA := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(d1, d2),
+	}
+	storeB := &multiModeStub{
+		allBlobsSeq: makeMarklIdSeq(),
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+
+	wantIds := []string{d1.String(), d2.String()}
+	if !reflect.DeepEqual(gotIds, wantIds) {
+		t.Fatalf("AllBlobs: got %v, want %v", gotIds, wantIds)
+	}
+}
+
+// TestMulti_AllBlobs_PropagatesErrors pins error propagation: a source
+// that yields an error mid-sequence surfaces that error through the
+// merged seq, and subsequent good entries still come through.
+func TestMulti_AllBlobs_PropagatesErrors(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d3 := makeMultiAllBlobsTestId(t, 0x33)
+
+	sentinel := errors.New("mid-sequence boom")
+
+	storeA := &multiModeStub{
+		allBlobsSeq: func(
+			yield func(domain_interfaces.MarklId, error) bool,
+		) {
+			if !yield(d1, nil) {
+				return
+			}
+			if !yield(nil, sentinel) {
+				return
+			}
+			if !yield(d3, nil) {
+				return
+			}
+		},
+	}
+	storeB := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 1 || gotErrs[0] != sentinel {
+		t.Fatalf("AllBlobs errors: got %v, want [%v]", gotErrs, sentinel)
+	}
+
+	wantIds := []string{d1.String(), d3.String()}
+	if !reflect.DeepEqual(gotIds, wantIds) {
+		t.Fatalf("AllBlobs ids: got %v, want %v", gotIds, wantIds)
 	}
 }

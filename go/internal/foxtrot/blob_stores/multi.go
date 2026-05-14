@@ -1,8 +1,10 @@
 package blob_stores
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"iter"
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -29,7 +31,7 @@ type Multi struct {
 	readFill    bool                   // write-through mode (filled in Task 9)
 }
 
-var _ domain_interfaces.BlobAccess = Multi{}
+var _ domain_interfaces.BlobStore = Multi{}
 
 func (parentStore Multi) HasBlob(id domain_interfaces.MarklId) bool {
 	switch parentStore.mode {
@@ -198,6 +200,155 @@ func (parentStore Multi) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper {
 
 	case modeWriteThrough:
 		return parentStore.writeStore.GetBlobIOWrapper()
+	}
+
+	return nil
+}
+
+// AllBlobs N-way merges its children's ordered AllBlobs sequences.
+// Each child satisfies the BlobStore contract: ids arrive in ascending
+// lex byte order of the MarklId raw bytes within a given hash format.
+// At every step the merge picks the lexicographic minimum across all
+// live heads (by format-id then raw bytes) and yields it once; every
+// head that compares equal to the minimum is advanced, which dedupes
+// same-hash ids that appear in multiple children.
+//
+// Cross-hash digests have distinct format-ids and therefore never
+// compare as equal; they pass through as separate entries. Errors
+// surface as nil id + non-nil err pairs, matching the SeqError
+// contract; an erroring head is advanced past the error and the merge
+// continues.
+func (parentStore Multi) AllBlobs() interfaces.SeqError[domain_interfaces.MarklId] {
+	sources := parentStore.allBlobSources()
+
+	return func(yield func(domain_interfaces.MarklId, error) bool) {
+		type head struct {
+			id   domain_interfaces.MarklId
+			err  error
+			ok   bool
+			next func() (domain_interfaces.MarklId, error, bool)
+			stop func()
+		}
+
+		heads := make([]head, len(sources))
+
+		for i, source := range sources {
+			next, stop := iter.Pull2(source.AllBlobs())
+			id, err, ok := next()
+			heads[i] = head{
+				id:   id,
+				err:  err,
+				ok:   ok,
+				next: next,
+				stop: stop,
+			}
+		}
+
+		defer func() {
+			for _, h := range heads {
+				h.stop()
+			}
+		}()
+
+		for {
+			// Surface any pending errors first, advancing the head past
+			// each error before moving on to id comparison.
+			for i, h := range heads {
+				if h.ok && h.err != nil {
+					if !yield(nil, h.err) {
+						return
+					}
+
+					id, err, ok := heads[i].next()
+					heads[i].id = id
+					heads[i].err = err
+					heads[i].ok = ok
+				}
+			}
+
+			// Find lexicographic minimum across live error-free heads.
+			minIdx := -1
+
+			for i, h := range heads {
+				if !h.ok || h.err != nil {
+					continue
+				}
+
+				if minIdx == -1 || compareMarklIds(h.id, heads[minIdx].id) < 0 {
+					minIdx = i
+				}
+			}
+
+			if minIdx == -1 {
+				return
+			}
+
+			minId := heads[minIdx].id
+
+			if !yield(minId, nil) {
+				return
+			}
+
+			// Advance every head matching the minimum so same-hash
+			// duplicates collapse to a single yield.
+			for i, h := range heads {
+				if !h.ok || h.err != nil {
+					continue
+				}
+
+				if compareMarklIds(h.id, minId) == 0 {
+					id, err, ok := heads[i].next()
+					heads[i].id = id
+					heads[i].err = err
+					heads[i].ok = ok
+				}
+			}
+		}
+	}
+}
+
+// compareMarklIds orders MarklIds first by their hash-format id and
+// then by their raw bytes. Two ids that share both format and bytes
+// compare as 0 — the merge in AllBlobs treats those as duplicates and
+// collapses them. Cross-hash ids always differ in format-id, so they
+// never compare equal and pass through the merge separately.
+func compareMarklIds(a, b domain_interfaces.MarklId) int {
+	aFormat, bFormat := "", ""
+
+	if af := a.GetMarklFormat(); af != nil {
+		aFormat = af.GetMarklFormatId()
+	}
+
+	if bf := b.GetMarklFormat(); bf != nil {
+		bFormat = bf.GetMarklFormatId()
+	}
+
+	if cmp := strings.Compare(aFormat, bFormat); cmp != 0 {
+		return cmp
+	}
+
+	return bytes.Compare(a.GetBytes(), b.GetBytes())
+}
+
+// allBlobSources returns the ordered set of children whose AllBlobs
+// sequences participate in the N-way merge. Mirror mode merges every
+// child; WriteThrough mode merges the write store followed by the read
+// stores (Task 9 wires the write-through paths — until then the slice
+// is built from whatever the builder populated).
+func (parentStore Multi) allBlobSources() []BlobStoreInitialized {
+	switch parentStore.mode {
+	case modeMirror:
+		return parentStore.childStores
+
+	case modeWriteThrough:
+		sources := make(
+			[]BlobStoreInitialized,
+			0,
+			1+len(parentStore.readStores),
+		)
+		sources = append(sources, parentStore.writeStore)
+		sources = append(sources, parentStore.readStores...)
+		return sources
 	}
 
 	return nil
