@@ -30,10 +30,20 @@ type Multi struct {
 var _ domain_interfaces.BlobAccess = Multi{}
 
 func (parentStore Multi) HasBlob(id domain_interfaces.MarklId) bool {
-	for _, childStore := range parentStore.childStores {
-		if childStore.HasBlob(id) {
-			return true
+	switch parentStore.mode {
+	case modeMirror:
+		for _, childStore := range parentStore.childStores {
+			if childStore.HasBlob(id) {
+				return true
+			}
 		}
+		return false
+
+	case modeWriteThrough:
+		// Task 9 wires write-through HasBlob across writeStore and
+		// readStores. Until then, report no blobs to keep the contract
+		// honest rather than silently iterating the wrong slice.
+		return false
 	}
 
 	return false
@@ -42,47 +52,71 @@ func (parentStore Multi) HasBlob(id domain_interfaces.MarklId) bool {
 func (parentStore Multi) MakeBlobReader(
 	id domain_interfaces.MarklId,
 ) (domain_interfaces.BlobReader, error) {
-	for _, childStore := range parentStore.childStores {
-		if childStore.HasBlob(id) {
-			return childStore.MakeBlobReader(id)
+	switch parentStore.mode {
+	case modeMirror:
+		for _, childStore := range parentStore.childStores {
+			if childStore.HasBlob(id) {
+				return childStore.MakeBlobReader(id)
+			}
+		}
+
+		clonedId, _ := markl.Clone(id) //repool:owned
+
+		return nil, blob_io.ErrBlobMissing{
+			BlobId: clonedId,
+		}
+
+	case modeWriteThrough:
+		// Task 9 wires write-through reads (writeStore-first then
+		// readStores, with optional tee-during-read).
+		clonedId, _ := markl.Clone(id) //repool:owned
+		return nil, blob_io.ErrBlobMissing{
+			BlobId: clonedId,
 		}
 	}
 
-	clonedId, _ := markl.Clone(id) //repool:owned
-
-	return nil, blob_io.ErrBlobMissing{
-		BlobId: clonedId,
-	}
+	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
 }
 
 func (parentStore Multi) MakeBlobWriter(
 	marklHashType domain_interfaces.FormatHash,
 ) (domain_interfaces.BlobWriter, error) {
-	writers := make([]io.Writer, len(parentStore.childStores))
+	switch parentStore.mode {
+	case modeMirror:
+		writers := make([]io.Writer, len(parentStore.childStores))
 
-	multiWriter := multiStoreBlobWriter{
-		blobWriters: make(
-			[]domain_interfaces.BlobWriter,
-			len(parentStore.childStores),
-		),
-	}
-
-	for i, childStore := range parentStore.childStores {
-		var err error
-
-		if multiWriter.blobWriters[i], err = childStore.MakeBlobWriter(
-			marklHashType,
-		); err != nil {
-			err = errors.Wrap(err)
-			return nil, err
+		multiWriter := multiStoreBlobWriter{
+			blobWriters: make(
+				[]domain_interfaces.BlobWriter,
+				len(parentStore.childStores),
+			),
 		}
 
-		writers[i] = multiWriter.blobWriters[i]
+		for i, childStore := range parentStore.childStores {
+			var err error
+
+			if multiWriter.blobWriters[i], err = childStore.MakeBlobWriter(
+				marklHashType,
+			); err != nil {
+				err = errors.Wrap(err)
+				return nil, err
+			}
+
+			writers[i] = multiWriter.blobWriters[i]
+		}
+
+		multiWriter.Writer = io.MultiWriter(writers...)
+
+		return multiWriter, nil
+
+	case modeWriteThrough:
+		// Task 9 wires write-through writes to writeStore only.
+		return nil, errors.Errorf(
+			"Multi: write-through MakeBlobWriter not yet implemented",
+		)
 	}
 
-	multiWriter.Writer = io.MultiWriter(writers...)
-
-	return multiWriter, nil
+	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
 }
 
 type multiStoreBlobWriter struct {
