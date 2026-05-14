@@ -135,6 +135,45 @@ let
     '';
   });
 
+  # cutting-garden is the standalone flake-package form of the
+  # cmd/cutting-garden binary (plus its `cg` alias). The `madder`
+  # derivation already builds both as part of its subPackages list, so
+  # the binaries also live at `${madder}/bin/{cutting-garden,cg}`. This
+  # standalone package exists so downstream `amarbel-llc/cutting-garden`
+  # can `nix build github:amarbel-llc/madder#cutting-garden` for the
+  # Phase 6 receipt-identity cross-test (madder#176) without pulling
+  # the rest of the madder toolchain.
+  #
+  # `doCheck = false` because the full Go test suite is already run by
+  # the `madder` derivation's checkPhase; re-running it here would
+  # double-pay the cost on every downstream consumer. Man pages are
+  # intentionally not generated — `madder-gen_man` emits pages for
+  # every utility at once, which is the wrong shape for a single-binary
+  # package, and the cross-test consumer only needs the binary itself.
+  cutting-garden = pkgs.buildGoApplication {
+    pname = "cutting-garden";
+    inherit version commit;
+    src = ./.;
+    pwd = ./.;
+    subPackages = [
+      "cmd/cutting-garden"
+      "cmd/cg"
+    ];
+    modules = ./gomod2nix.toml;
+    go = pkgs-master.go_1_26;
+    GOTOOLCHAIN = "local";
+
+    nativeBuildInputs = [
+      purse-first.packages.${system}.dagnabit
+    ];
+
+    preBuild = ''
+      dagnabit export
+    '';
+
+    doCheck = false;
+  };
+
   # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)
   # / clown-json(5)) that exposes madder blobs as MCP resources at
   # `madder://blobs/<digest>`. The clown plugin protocol disallows
@@ -300,7 +339,7 @@ let
 in
 {
   packages = {
-    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin;
+    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin cutting-garden;
     default = madder;
   } // batsLaneOutputs;
 
