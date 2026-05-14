@@ -10,9 +10,21 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
+type multiMode int
+
+const (
+	modeUnset multiMode = iota
+	modeMirror
+	modeWriteThrough
+)
+
 type Multi struct {
 	ctx         interfaces.ActiveContext
-	childStores []BlobStoreInitialized
+	mode        multiMode
+	childStores []BlobStoreInitialized // mirror mode
+	writeStore  BlobStoreInitialized   // write-through mode (filled in Task 9)
+	readStores  []BlobStoreInitialized // write-through mode (filled in Task 9)
+	readFill    bool                   // write-through mode (filled in Task 9)
 }
 
 var _ domain_interfaces.BlobAccess = Multi{}
