@@ -5,6 +5,7 @@ package blob_stores
 import (
 	"fmt"
 	"maps"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -297,6 +298,22 @@ func MakeBlobStore(
 			config,
 			func() (*ssh.Client, error) {
 				return MakeSSHClientForExplicitConfig(
+					envDir.GetActiveContext(),
+					printer,
+					config,
+				)
+			},
+			envDir.GetBlobWriteObserver(),
+		)
+
+	case blob_store_configs.ConfigWebDAV:
+		return makeWebdavStore(
+			envDir.GetActiveContext(),
+			printer,
+			configNamed.GetId(),
+			config,
+			func() (*http.Client, error) {
+				return MakeHTTPClientForWebDAVConfig(
 					envDir.GetActiveContext(),
 					printer,
 					config,
