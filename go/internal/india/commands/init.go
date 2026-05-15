@@ -50,14 +50,32 @@ func init() {
 		"init-pointer",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigPointerV0,
+				ids.TypeTomlBlobStoreConfigPointerV1,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlPointerV0{},
+			blobStoreConfig: &blob_store_configs.TomlPointerV1{},
 			desc: futility.Description{
 				Short: "initialize a pointer blob store",
 				Long: "Create a blob store that delegates to another store by " +
 					"reference. The pointer store does not hold blobs itself " +
-					"but redirects reads and writes to the target store.",
+					"but redirects reads and writes to the target store. The " +
+					"v1 config carries only an absolute base-path; the config " +
+					"file location is derived as <base-path>/blob_store-config.",
+			},
+		},
+	)
+
+	utility.AddCmd(
+		"init-pointer-v0",
+		&Init{
+			tipe: ids.GetOrPanic(
+				ids.TypeTomlBlobStoreConfigPointerV0,
+			).TypeStruct,
+			blobStoreConfig: &blob_store_configs.TomlPointerV0{},
+			desc: futility.Description{
+				Short: "initialize a pointer blob store (v0)",
+				Long: "Create a v0-format pointer blob store carrying " +
+					"id/base-path/config-path. Prefer init-pointer for the " +
+					"current path-only v1 format.",
 			},
 		},
 	)
