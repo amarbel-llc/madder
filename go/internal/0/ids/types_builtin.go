@@ -10,6 +10,7 @@ const (
 	TypeTomlBlobStoreConfigV2                       = "!toml-blob_store_config-v2"
 	TypeTomlBlobStoreConfigV3                       = "!toml-blob_store_config-v3"
 	TypeTomlBlobStoreConfigPointerV0                = "!toml-blob_store_config-pointer-v0"
+	TypeTomlBlobStoreConfigPointerV1                = "!toml-blob_store_config-pointer-v1"
 	TypeTomlBlobStoreConfigInventoryArchiveV0       = "!toml-blob_store_config-inventory_archive-v0"
 	TypeTomlBlobStoreConfigInventoryArchiveV1       = "!toml-blob_store_config-inventory_archive-v1"
 	TypeTomlBlobStoreConfigInventoryArchiveV2       = "!toml-blob_store_config-inventory_archive-v2"
@@ -31,6 +32,7 @@ func init() {
 		TypeTomlBlobStoreConfigV2,
 		TypeTomlBlobStoreConfigV3,
 		TypeTomlBlobStoreConfigPointerV0,
+		TypeTomlBlobStoreConfigPointerV1,
 		TypeTomlBlobStoreConfigInventoryArchiveV0,
 		TypeTomlBlobStoreConfigInventoryArchiveV1,
 		TypeTomlBlobStoreConfigInventoryArchiveV2,

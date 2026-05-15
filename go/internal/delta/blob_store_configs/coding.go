@@ -177,6 +177,31 @@ var Coder = hyphence.CoderToTypedBlob[Config]{
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigPointerV1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlPointerV1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlPointerV1(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlPointerV1:
+						*doc.Data() = *v
+					case TomlPointerV1:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigInventoryArchiveV0: hyphence.CoderTommy[
 				Config,
 				*Config,

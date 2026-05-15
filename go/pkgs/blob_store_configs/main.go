@@ -19,6 +19,7 @@ type (
 	ConfigSFTPRemotePath        = internal.ConfigSFTPRemotePath
 	ConfigSFTPUri               = internal.ConfigSFTPUri
 	ConfigUpgradeable           = internal.ConfigUpgradeable
+	ConfigWebDAV                = internal.ConfigWebDAV
 	DefaultType                 = internal.DefaultType
 	DeltaConfig                 = internal.DeltaConfig
 	DeltaConfigImmutable        = internal.DeltaConfigImmutable
@@ -35,10 +36,12 @@ type (
 	TomlLocalHashBucketedV1     = internal.TomlLocalHashBucketedV1
 	TomlLocalHashBucketedV2     = internal.TomlLocalHashBucketedV2
 	TomlPointerV0               = internal.TomlPointerV0
+	TomlPointerV1               = internal.TomlPointerV1
 	TomlSFTPV0                  = internal.TomlSFTPV0
 	TomlSFTPViaSSHConfigV0      = internal.TomlSFTPViaSSHConfigV0
 	TomlUriV0                   = internal.TomlUriV0
 	TomlV3                      = internal.TomlV3
+	TomlWebDAVV0                = internal.TomlWebDAVV0
 	TypedConfig                 = internal.TypedConfig
 	TypedMutableConfig          = internal.TypedMutableConfig
 )
@@ -53,10 +56,12 @@ var (
 	DecodeTomlLocalHashBucketedV1    = internal.DecodeTomlLocalHashBucketedV1
 	DecodeTomlLocalHashBucketedV2    = internal.DecodeTomlLocalHashBucketedV2
 	DecodeTomlPointerV0              = internal.DecodeTomlPointerV0
+	DecodeTomlPointerV1              = internal.DecodeTomlPointerV1
 	DecodeTomlSFTPV0                 = internal.DecodeTomlSFTPV0
 	DecodeTomlSFTPViaSSHConfigV0     = internal.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlUriV0                  = internal.DecodeTomlUriV0
 	DecodeTomlV3                     = internal.DecodeTomlV3
+	DecodeTomlWebDAVV0               = internal.DecodeTomlWebDAVV0
 	Default                          = internal.Default
 	DefaultHashBuckets               = internal.DefaultHashBuckets
 	DefaultHashType                  = internal.DefaultHashType

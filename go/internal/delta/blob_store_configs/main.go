@@ -42,6 +42,7 @@ type (
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
 	TomlWebDAVV0                = charlie_bsc.TomlWebDAVV0
 	TomlPointerV0               = charlie_bsc.TomlPointerV0
+	TomlPointerV1               = charlie_bsc.TomlPointerV1
 	TomlUriV0                   = charlie_bsc.TomlUriV0
 	TomlInventoryArchiveV0      = charlie_bsc.TomlInventoryArchiveV0
 	TomlInventoryArchiveV1      = charlie_bsc.TomlInventoryArchiveV1
@@ -76,6 +77,7 @@ var (
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlWebDAVV0            = charlie_bsc.DecodeTomlWebDAVV0
 	DecodeTomlPointerV0           = charlie_bsc.DecodeTomlPointerV0
+	DecodeTomlPointerV1           = charlie_bsc.DecodeTomlPointerV1
 	DecodeTomlUriV0               = charlie_bsc.DecodeTomlUriV0
 	DecodeTomlInventoryArchiveV0  = charlie_bsc.DecodeTomlInventoryArchiveV0
 	DecodeTomlInventoryArchiveV1  = charlie_bsc.DecodeTomlInventoryArchiveV1
@@ -98,6 +100,8 @@ var (
 	_ ConfigMutable               = &TomlV3{}
 	_ ConfigPointer               = TomlPointerV0{}
 	_ ConfigMutable               = &TomlPointerV0{}
+	_ ConfigPointer               = TomlPointerV1{}
+	_ ConfigMutable               = &TomlPointerV1{}
 	_ ConfigInventoryArchive      = TomlInventoryArchiveV0{}
 	_ ConfigUpgradeable           = TomlInventoryArchiveV0{}
 	_ ConfigMutable               = &TomlInventoryArchiveV0{}
@@ -156,6 +160,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigWebdavV0
 	case *TomlPointerV0, TomlPointerV0:
 		typeId = ids.TypeTomlBlobStoreConfigPointerV0
+	case *TomlPointerV1, TomlPointerV1:
+		typeId = ids.TypeTomlBlobStoreConfigPointerV1
 	case *TomlInventoryArchiveV0, TomlInventoryArchiveV0:
 		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV0
 	case *TomlInventoryArchiveV1, TomlInventoryArchiveV1:

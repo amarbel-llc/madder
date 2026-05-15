@@ -27,10 +27,12 @@ const (
 	TypeTomlBlobStoreConfigInventoryArchiveV2       = internal.TypeTomlBlobStoreConfigInventoryArchiveV2
 	TypeTomlBlobStoreConfigInventoryArchiveVCurrent = internal.TypeTomlBlobStoreConfigInventoryArchiveVCurrent
 	TypeTomlBlobStoreConfigPointerV0                = internal.TypeTomlBlobStoreConfigPointerV0
+	TypeTomlBlobStoreConfigPointerV1                = internal.TypeTomlBlobStoreConfigPointerV1
 	TypeTomlBlobStoreConfigSftpExplicitV0           = internal.TypeTomlBlobStoreConfigSftpExplicitV0
 	TypeTomlBlobStoreConfigSftpViaSSHConfigV0       = internal.TypeTomlBlobStoreConfigSftpViaSSHConfigV0
 	TypeTomlBlobStoreConfigV1                       = internal.TypeTomlBlobStoreConfigV1
 	TypeTomlBlobStoreConfigV2                       = internal.TypeTomlBlobStoreConfigV2
 	TypeTomlBlobStoreConfigV3                       = internal.TypeTomlBlobStoreConfigV3
 	TypeTomlBlobStoreConfigVCurrent                 = internal.TypeTomlBlobStoreConfigVCurrent
+	TypeTomlBlobStoreConfigWebdavV0                 = internal.TypeTomlBlobStoreConfigWebdavV0
 )
