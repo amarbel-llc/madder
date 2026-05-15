@@ -117,6 +117,48 @@ func TestHandshakeLineFormat(t *testing.T) {
 // TestStdinCloseTriggersCleanExit asserts RFC 0001 Lifecycle:
 // closing the child's stdin MUST trigger graceful shutdown with
 // exit 0 within a short grace window.
+// TestHandshakeLineFormat_TLS pins the TLS-mode handshake: subprotocol
+// is "https", metadata is "cert=<path>", and the cert file exists at
+// the advertised path so the bats helper can pass it as -tls-ca-path.
+func TestHandshakeLineFormat_TLS(t *testing.T) {
+	const cookie = "0123456789abcdef0123456789abcdef"
+	cmd := exec.Command(binaryPath, "-tls")
+	cmd.Env = append(envWithoutCookie(), "MADDER_PLUGIN_COOKIE="+cookie)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = cmd.Process.Kill()
+		_ = cmd.Wait()
+	}()
+
+	buf := make([]byte, 1024)
+	n, _ := stdout.Read(buf)
+	line := strings.TrimRight(string(buf[:n]), "\n")
+	if line == "" {
+		t.Fatal("no handshake line read")
+	}
+
+	fields := strings.Split(line, "|")
+	if len(fields) != 6 {
+		t.Fatalf("expected 6 pipe-delimited fields, got %d: %q", len(fields), line)
+	}
+	if fields[5] != "https" {
+		t.Errorf("field[5] (subprotocol) = %q, want https", fields[5])
+	}
+	if !strings.HasPrefix(fields[4], "cert=") {
+		t.Errorf("field[4] (metadata) = %q, want cert= prefix", fields[4])
+	}
+	certPath := strings.TrimPrefix(fields[4], "cert=")
+	if _, err := os.Stat(certPath); err != nil {
+		t.Errorf("cert path %q does not exist: %v", certPath, err)
+	}
+}
+
 func TestStdinCloseTriggersCleanExit(t *testing.T) {
 	const cookie = "0123456789abcdef0123456789abcdef"
 	cmd := exec.Command(binaryPath)

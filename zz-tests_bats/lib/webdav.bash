@@ -8,6 +8,18 @@
 # Caller contract: must call from a setup() that has already loaded
 # common.bash. Pair with stop_webdav_server in teardown().
 start_webdav_server() {
+  _start_webdav_server_inner "http"
+}
+
+# start_webdav_server_tls spawns the test server with -tls. Sets
+# WEBDAV_URL to an https:// URL and exports WEBDAV_CERT_PATH so tests
+# can pin the CA via -tls-ca-path on init-webdav.
+start_webdav_server_tls() {
+  _start_webdav_server_inner "https"
+}
+
+_start_webdav_server_inner() {
+  local scheme="$1"
   require_bin MADDER_TEST_WEBDAV_SERVER madder-test-webdav-server
   local webdav_bin="${MADDER_TEST_WEBDAV_SERVER:-madder-test-webdav-server}"
 
@@ -16,9 +28,14 @@ start_webdav_server() {
 
   local stderr_file="$BATS_TEST_TMPDIR/madder-test-webdav-server.stderr"
 
+  local -a server_args=()
+  if [[ $scheme == "https" ]]; then
+    server_args+=("-tls")
+  fi
+
   coproc WEBDAV_PROC {
     MADDER_PLUGIN_COOKIE="$cookie" \
-      "$webdav_bin" 2>"$stderr_file"
+      "$webdav_bin" "${server_args[@]}" 2>"$stderr_file"
   }
   export WEBDAV_STDOUT_FD="${WEBDAV_PROC[0]}"
   export WEBDAV_STDIN_FD="${WEBDAV_PROC[1]}"
@@ -42,12 +59,20 @@ start_webdav_server() {
   if [[ ${fields[1]} != "1" ]]; then
     fail "WebDAV handshake version: got ${fields[1]}, want 1"
   fi
-  if [[ ${fields[5]} != "http" ]]; then
-    fail "WebDAV handshake subprotocol: got ${fields[5]}, want http"
+  if [[ ${fields[5]} != "$scheme" ]]; then
+    fail "WebDAV handshake subprotocol: got ${fields[5]}, want $scheme"
   fi
 
   export WEBDAV_ADDR="${fields[3]}"
-  export WEBDAV_URL="http://${WEBDAV_ADDR}/"
+  export WEBDAV_URL="${scheme}://${WEBDAV_ADDR}/"
+  if [[ $scheme == "https" ]]; then
+    if [[ ${fields[4]} != cert=* ]]; then
+      fail "WebDAV TLS handshake missing cert= metadata: ${fields[4]}"
+    fi
+    export WEBDAV_CERT_PATH="${fields[4]#cert=}"
+  else
+    unset WEBDAV_CERT_PATH
+  fi
 }
 
 # init_webdav_test_store provisions a WebDAV-backed blob store rooted
@@ -80,5 +105,5 @@ stop_webdav_server() {
     wait "$WEBDAV_PID" 2>/dev/null || true
     unset WEBDAV_PID
   fi
-  unset WEBDAV_ADDR WEBDAV_URL
+  unset WEBDAV_ADDR WEBDAV_URL WEBDAV_CERT_PATH
 }

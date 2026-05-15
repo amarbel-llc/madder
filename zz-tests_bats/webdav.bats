@@ -272,9 +272,8 @@ function webdav_init_with_user_password { # @test
   # webdav.Dir from golang.org/x/net/webdav does not enforce auth, so
   # any user/password combination is accepted by the test server. The
   # actionable surface here is that the auth header is sent without
-  # blowing up the request, which is what this scenario exercises.
-  # Auth-rejection tests land once Phase 2's TLS plus bearer harness
-  # ships.
+  # blowing up the request — config plumbing + applyWebdavAuth basic
+  # branch.
   run_madder init-webdav \
     -url "${WEBDAV_URL}store-auth/" \
     -user testuser \
@@ -287,4 +286,139 @@ function webdav_init_with_user_password { # @test
 
   run_madder write -format tap .webdav-auth "$blob"
   assert_success
+}
+
+function webdav_init_with_bearer_token { # @test
+  # webdav.Dir does not enforce bearer auth either, so this scenario
+  # exercises only the client-side plumbing — that
+  # 'Authorization: Bearer <t>' is set without breaking the request
+  # and that the basic-auth branch is skipped when a bearer token is
+  # configured.
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-bearer/" \
+    -bearer-token "test-bearer-eyJhbGc.payload.sig" \
+    .webdav-bearer
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "bearer roundtrip" >"$blob"
+
+  run_madder write -format tap .webdav-bearer "$blob"
+  assert_success
+  local hash
+  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run_madder cat .webdav-bearer "$hash"
+  assert_success
+  assert_output --partial "bearer roundtrip"
+}
+
+function webdav_init_rejects_multiple_auth_modes { # @test
+  # validateWebdavAuth (called from makeWebdavStore) refuses to build
+  # a store when more than one of {password, bearer-token,
+  # tls-client-cert-path} is set. The CLI surface here is that the
+  # error reaches the user with an actionable message rather than a
+  # confusing "unexpected status 401" later.
+  #
+  # Note: init-webdav writes the local config and then calls into
+  # ensureWebdavRemoteConfigExists -> makeWebdavStore (indirectly via
+  # the factory). The validation fires before any HTTP request, so
+  # the failure is fast and the local config remains absent.
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-multi-auth/" \
+    -password testpass \
+    -bearer-token testbearer \
+    .webdav-multi-auth
+  assert_failure
+  assert_output --partial 'at most one of'
+}
+
+function webdav_https_round_trip_anonymous { # @test
+  # Swap the default plaintext setup for a TLS server. With
+  # -tls-ca-path pinned to the server's self-signed cert, the
+  # client-side cert verification succeeds; without it, the handshake
+  # would fail because Go's default CA bundle doesn't include the
+  # test cert.
+  stop_webdav_server
+  start_webdav_server_tls
+
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-tls-anon/" \
+    -tls-ca-path "$WEBDAV_CERT_PATH" \
+    .webdav-tls-anon
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "tls anonymous roundtrip" >"$blob"
+
+  run_madder write -format tap .webdav-tls-anon "$blob"
+  assert_success
+  local hash
+  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run_madder cat .webdav-tls-anon "$hash"
+  assert_success
+  assert_output --partial "tls anonymous roundtrip"
+}
+
+function webdav_https_round_trip_with_basic_auth { # @test
+  # Combine TLS transport with basic auth credentials on the client
+  # side. The test server doesn't actually validate the credentials,
+  # so this confirms applyWebdavAuth's basic-branch + TLS-client
+  # construction co-exist without breaking the request.
+  stop_webdav_server
+  start_webdav_server_tls
+
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-tls-basic/" \
+    -tls-ca-path "$WEBDAV_CERT_PATH" \
+    -user tlsuser \
+    -password tlspass \
+    .webdav-tls-basic
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "tls + basic roundtrip" >"$blob"
+
+  run_madder write -format tap .webdav-tls-basic "$blob"
+  assert_success
+}
+
+function webdav_init_with_tls_client_cert { # @test
+  # Generates a self-signed client cert + key with openssl, then
+  # init-webdav with -tls-client-cert-path + -tls-client-key-path.
+  # The test server accepts any client cert (no ClientCAs configured
+  # via webdav.Dir), so this scenario verifies the client-side
+  # plumbing — tls.LoadX509KeyPair runs, the http.Transport's
+  # TLSClientConfig.Certificates is populated, and a write+cat
+  # round-trips through the TLS handshake.
+  stop_webdav_server
+  start_webdav_server_tls
+
+  local client_key="$BATS_TEST_TMPDIR/client.key"
+  local client_crt="$BATS_TEST_TMPDIR/client.crt"
+  openssl req -x509 -newkey ed25519 \
+    -keyout "$client_key" -out "$client_crt" \
+    -days 1 -nodes -subj '/CN=test-client' >/dev/null 2>&1 \
+    || fail "openssl could not generate a self-signed client cert+key pair"
+
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-tls-cert/" \
+    -tls-ca-path "$WEBDAV_CERT_PATH" \
+    -tls-client-cert-path "$client_crt" \
+    -tls-client-key-path "$client_key" \
+    .webdav-tls-cert
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "tls client-cert roundtrip" >"$blob"
+
+  run_madder write -format tap .webdav-tls-cert "$blob"
+  assert_success
+  local hash
+  hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
+
+  run_madder cat .webdav-tls-cert "$hash"
+  assert_success
+  assert_output --partial "tls client-cert roundtrip"
 }

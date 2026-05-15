@@ -142,14 +142,21 @@ test-bats: build
     just zz-tests_bats/test
 
 # Run net_cap-tagged bats tests under sandcastle's --allow-local-binding.
-# Currently covers the SFTP harness; future loopback-binding harnesses
-# (HTTP, CalDAV, etc.) get the same treatment.
+# Currently covers the SFTP + WebDAV harnesses; future loopback-binding
+# harnesses (HTTP, CalDAV, etc.) get the same treatment.
+#
+# Wrapped in `nix develop --command` so the devshell is freshly
+# evaluated against the worktree's current state. Without this, the
+# direnv-cached PATH could resolve madder-test-*-server binaries from a
+# previous source revision (direnv watches .envrc/flake.nix/flake.lock,
+# not Go source), and the bats lane would silently exercise stale code.
 [group("test")]
 test-bats-net-cap: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
+  nix develop --command bash -c '\
+    MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
     HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
-    just zz-tests_bats/test-net-cap
+    just zz-tests_bats/test-net-cap'
 
 # Run bats integration tests against race-instrumented binaries.
 # Catches data races that the unit-test -race pass won't, since several

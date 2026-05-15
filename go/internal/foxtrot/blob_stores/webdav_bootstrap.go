@@ -31,6 +31,14 @@ func BootstrapWebdavRemoteConfig(
 	config blob_store_configs.ConfigWebDAV,
 	discovered DiscoveredConfig,
 ) (err error) {
+	// Validate before any HTTP work so init-webdav's
+	// mutually-exclusive-auth check surfaces here too, not just at
+	// store-construction time. Without this, init succeeds locally
+	// and the inconsistency only manifests on the first write.
+	if err = validateWebdavAuth(config); err != nil {
+		return errors.Wrap(err)
+	}
+
 	httpClient, err := MakeHTTPClientForWebDAVConfig(ctx, uiPrinter, config)
 	if err != nil {
 		return errors.Wrap(err)
