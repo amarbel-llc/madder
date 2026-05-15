@@ -100,6 +100,39 @@ Remote blob store accessed over SSH/SFTP. Two initialization modes:
 Both support **-discover** to detect an existing remote store's configuration
 from its directory structure.
 
+## WebDAV
+
+Remote blob store accessed over HTTP/HTTPS WebDAV. Works with Nextcloud,
+Apache **mod_dav**, **nginx-webdav**, **rclone serve webdav**, and hosted
+providers that expose a WebDAV endpoint. Initialised with **madder
+init-webdav**:
+
+**madder init-webdav -url URL** *blob-store-id*
+:   Provision a fresh store rooted at **URL**. The local config carries
+    transport only — URL and (optional) basic-auth user/password; the
+    remote **blob_store-config** governs hash type, buckets, compression,
+    and encryption per ADR 0005. The parent path of the target URL must
+    already exist on the server; **init-webdav** issues a single MKCOL
+    against the URL itself and a PUT for the remote config file.
+
+Auth in v0:
+
+- **anonymous** (default; **-url** only).
+- **basic** (**-url ... -user U -password P**).
+- **bearer** and **TLS client certificate** modes land in a follow-up.
+
+**-discover** is not supported in v0 — only the fresh-bootstrap path is
+available. To adopt an existing remote layout, copy the existing
+**blob_store-config** into place before invoking **init-webdav** (or wait
+for the **-discover** follow-up).
+
+The store implementation issues **HEAD**, **GET**, **PUT**, **MOVE**,
+**MKCOL**, and **PROPFIND** against the server. **MOVE** is always issued
+with **Overwrite: F**; on failure (412/409/507) the implementation
+HEAD-checks the destination and treats an existing target as a duplicate
+write, preserving the CAS invariant. **MKCOL** races are absorbed via the
+405-then-PROPFIND-confirm-collection pattern.
+
 ## Pointer
 
 A store that delegates to another store by reference. Created with **madder
@@ -130,6 +163,14 @@ mutex; safety at the remote end depends on the remote filesystem's own
 rename semantics and is not verified by madder's tests. The
 **inventory-archive** store's concurrent-write behaviour follows from the
 loose blob store it delegates to (typically local hash-bucketed).
+
+The **WebDAV** store relies on WebDAV's MOVE semantics with
+**Overwrite: F** as the publish step. Concurrent writers producing the
+same bytes both PUT to distinct **tmp_*** URLs, then one MOVE wins; the
+loser HEAD-checks the destination, observes that a blob already lives
+there, and deletes its temp. Concurrent writers producing different
+bytes do not interact (their final URLs differ). MKCOL races for shared
+parent buckets are absorbed via 405-then-PROPFIND-confirm-collection.
 
 ## Durability
 
