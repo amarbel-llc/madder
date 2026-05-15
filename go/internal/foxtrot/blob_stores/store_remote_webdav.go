@@ -309,13 +309,8 @@ func (blobStore *remoteWebdav) makeEnvDirConfig() blob_io.Config {
 	)
 }
 
-// setAuth applies the configured auth scheme to the request. v0
-// supports basic auth and anonymous; bearer/TLS-cert come in a later
-// commit.
 func (blobStore *remoteWebdav) setAuth(req *http.Request) {
-	if user := blobStore.config.GetUser(); user != "" {
-		req.SetBasicAuth(user, blobStore.config.GetPassword())
-	}
+	applyWebdavAuth(req, blobStore.config)
 }
 
 func (blobStore *remoteWebdav) urlForRelPath(relPath string) string {

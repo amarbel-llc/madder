@@ -97,6 +97,26 @@ func init() {
 	)
 
 	utility.AddCmd(
+		"init-webdav",
+		&Init{
+			tipe: ids.GetOrPanic(
+				ids.TypeTomlBlobStoreConfigWebdavV0,
+			).TypeStruct,
+			blobStoreConfig: &blob_store_configs.TomlWebDAVV0{},
+			desc: futility.Description{
+				Short: "initialize a WebDAV blob store",
+				Long: "Create a blob store backed by a WebDAV server (Nextcloud, " +
+					"Apache mod_dav, nginx-webdav, rclone serve webdav). The local " +
+					"config carries only transport details (URL and basic-auth " +
+					"credentials per v0); the remote blob_store-config governs " +
+					"hash type, buckets, compression, and encryption per ADR 0005. " +
+					"-discover is not supported in v0; only the fresh-bootstrap " +
+					"path is available.",
+			},
+		},
+	)
+
+	utility.AddCmd(
 		"init-inventory-archive",
 		&Init{
 			tipe: ids.GetOrPanic(
@@ -216,6 +236,18 @@ func (cmd *Init) SetFlagDefinitions(
 			&cmd.encryption,
 		)
 	}
+
+	if _, isWebDAV := cmd.blobStoreConfig.(blob_store_configs.ConfigWebDAV); isWebDAV {
+		// WebDAV in v0 supports the fresh-bootstrap path only; no
+		// -discover until the inverse "adopt existing remote" flow is
+		// designed. Encryption follows the same key-blind pattern as
+		// SFTP: the flag value lands on the remote blob_store-config
+		// via the bootstrap helper, not on the local transport config.
+		blob_store_configs.SetMultiEncryptionFlagDefinition(
+			flagDefinitions,
+			&cmd.encryption,
+		)
+	}
 }
 
 func (cmd *Init) Run(req futility.Request) {
@@ -241,6 +273,14 @@ func (cmd *Init) Run(req futility.Request) {
 	// remote doesn't already have one.
 	if sftpConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); ok {
 		if !cmd.ensureRemoteConfigExists(req, blobStoreId, sftpConfig) {
+			return
+		}
+	}
+
+	// WebDAV-backed stores follow the same Mode-B bootstrap as SFTP:
+	// PUT a default TomlV3 to <url>/blob_store-config when missing.
+	if webdavConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigWebDAV); ok {
+		if !cmd.ensureWebdavRemoteConfigExists(req, blobStoreId, webdavConfig) {
 			return
 		}
 	}
