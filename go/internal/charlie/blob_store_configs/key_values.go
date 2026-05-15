@@ -71,12 +71,25 @@ func ConfigKeyValues(config Config) map[string]string {
 		keyValues["remote-path"] = configSFTPRemote.GetRemotePath()
 	}
 
-	// Per the WebDAV design and ADR 0005: surface URL and user but
-	// NEVER password (or bearer-token / TLS-client-key-path in the
-	// follow-up auth/TLS commit). The redaction is unit-pinned.
+	// Per the WebDAV design and ADR 0005: surface URL, user, and the
+	// non-secret TLS material (cert path + CA path + server-name +
+	// insecure-skip-verify); NEVER surface password, bearer-token, or
+	// tls-client-key-path. Redaction is unit-pinned.
 	if configWebDAV, ok := config.(ConfigWebDAV); ok {
 		keyValues["url"] = configWebDAV.GetURL()
 		keyValues["user"] = configWebDAV.GetUser()
+		if v := configWebDAV.GetTLSClientCertPath(); v != "" {
+			keyValues["tls-client-cert-path"] = v
+		}
+		if v := configWebDAV.GetTLSCAPath(); v != "" {
+			keyValues["tls-ca-path"] = v
+		}
+		if v := configWebDAV.GetTLSServerName(); v != "" {
+			keyValues["tls-server-name"] = v
+		}
+		if configWebDAV.GetTLSInsecureSkipVerify() {
+			keyValues["tls-insecure-skip-verify"] = "true"
+		}
 	}
 
 	return keyValues

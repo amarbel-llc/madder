@@ -92,6 +92,11 @@ func makeWebdavStore(
 	httpClientInitializer func() (*http.Client, error),
 	observer domain_interfaces.BlobWriteObserver,
 ) (blobStore *remoteWebdav, err error) {
+	if err = validateWebdavAuth(config); err != nil {
+		err = errors.Wrap(err)
+		return blobStore, err
+	}
+
 	var defaultHashType markl.FormatHash
 
 	if defaultHashType, err = markl.GetFormatHashOrError(

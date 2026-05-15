@@ -132,9 +132,16 @@ func BootstrapWebdavRemoteConfig(
 }
 
 // applyWebdavAuth applies the configured auth scheme to an outbound
-// request. v0 supports basic auth and anonymous; bearer/TLS-cert
-// come in a follow-up.
+// request. Supports basic-auth (user/password), bearer-token, and
+// anonymous. TLS-client-cert auth is handled at http.Client
+// construction time (in MakeHTTPClientForWebDAVConfig), not per
+// request. Mutual exclusivity between basic / bearer / TLS-cert /
+// anonymous is enforced at store construction.
 func applyWebdavAuth(req *http.Request, config blob_store_configs.ConfigWebDAV) {
+	if token := config.GetBearerToken(); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+		return
+	}
 	if user := config.GetUser(); user != "" {
 		req.SetBasicAuth(user, config.GetPassword())
 	}

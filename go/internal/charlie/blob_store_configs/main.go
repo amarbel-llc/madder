@@ -133,6 +133,12 @@ type (
 		GetURL() string
 		GetUser() string
 		GetPassword() string
+		GetBearerToken() string
+		GetTLSClientCertPath() string
+		GetTLSClientKeyPath() string
+		GetTLSCAPath() string
+		GetTLSServerName() string
+		GetTLSInsecureSkipVerify() bool
 	}
 )
 

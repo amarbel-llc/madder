@@ -53,6 +53,36 @@ func DecodeTomlWebDAVV0(input []byte) (*TomlWebDAVV0Document, error) {
 				d.data.Password = v
 				d.consumed["password"] = true
 			}
+		case "bearer-token":
+			if v, ok := cst.ExtractString(_kv); ok {
+				d.data.BearerToken = v
+				d.consumed["bearer-token"] = true
+			}
+		case "tls-client-cert-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				d.data.TLSClientCertPath = v
+				d.consumed["tls-client-cert-path"] = true
+			}
+		case "tls-client-key-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				d.data.TLSClientKeyPath = v
+				d.consumed["tls-client-key-path"] = true
+			}
+		case "tls-ca-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				d.data.TLSCAPath = v
+				d.consumed["tls-ca-path"] = true
+			}
+		case "tls-server-name":
+			if v, ok := cst.ExtractString(_kv); ok {
+				d.data.TLSServerName = v
+				d.consumed["tls-server-name"] = true
+			}
+		case "tls-insecure-skip-verify":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				d.data.TLSInsecureSkipVerify = v
+				d.consumed["tls-insecure-skip-verify"] = true
+			}
 		}
 	}
 	return d, nil
@@ -79,6 +109,48 @@ func (d *TomlWebDAVV0Document) Encode() ([]byte, error) {
 		}
 	} else {
 		cst.DeleteValue(d.cstDoc.Root(), "password")
+	}
+	if d.data.BearerToken != "" {
+		if err := cst.SetAny(d.cstDoc.Root(), "bearer-token", d.data.BearerToken); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "bearer-token")
+	}
+	if d.data.TLSClientCertPath != "" {
+		if err := cst.SetAny(d.cstDoc.Root(), "tls-client-cert-path", d.data.TLSClientCertPath); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "tls-client-cert-path")
+	}
+	if d.data.TLSClientKeyPath != "" {
+		if err := cst.SetAny(d.cstDoc.Root(), "tls-client-key-path", d.data.TLSClientKeyPath); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "tls-client-key-path")
+	}
+	if d.data.TLSCAPath != "" {
+		if err := cst.SetAny(d.cstDoc.Root(), "tls-ca-path", d.data.TLSCAPath); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "tls-ca-path")
+	}
+	if d.data.TLSServerName != "" {
+		if err := cst.SetAny(d.cstDoc.Root(), "tls-server-name", d.data.TLSServerName); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "tls-server-name")
+	}
+	if d.data.TLSInsecureSkipVerify != false {
+		if err := cst.SetAny(d.cstDoc.Root(), "tls-insecure-skip-verify", d.data.TLSInsecureSkipVerify); err != nil {
+			return nil, fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(d.cstDoc.Root(), "tls-insecure-skip-verify")
 	}
 	return d.cstDoc.Bytes(), nil
 }
@@ -118,6 +190,36 @@ func DecodeTomlWebDAVV0Into(data *TomlWebDAVV0, doc *document.Document, containe
 				data.Password = v
 				consumed[keyPrefix+"password"] = true
 			}
+		case "bearer-token":
+			if v, ok := cst.ExtractString(_kv); ok {
+				data.BearerToken = v
+				consumed[keyPrefix+"bearer-token"] = true
+			}
+		case "tls-client-cert-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				data.TLSClientCertPath = v
+				consumed[keyPrefix+"tls-client-cert-path"] = true
+			}
+		case "tls-client-key-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				data.TLSClientKeyPath = v
+				consumed[keyPrefix+"tls-client-key-path"] = true
+			}
+		case "tls-ca-path":
+			if v, ok := cst.ExtractString(_kv); ok {
+				data.TLSCAPath = v
+				consumed[keyPrefix+"tls-ca-path"] = true
+			}
+		case "tls-server-name":
+			if v, ok := cst.ExtractString(_kv); ok {
+				data.TLSServerName = v
+				consumed[keyPrefix+"tls-server-name"] = true
+			}
+		case "tls-insecure-skip-verify":
+			if v, ok := cst.ExtractBool(_kv); ok {
+				data.TLSInsecureSkipVerify = v
+				consumed[keyPrefix+"tls-insecure-skip-verify"] = true
+			}
 		}
 	}
 	return nil
@@ -141,6 +243,48 @@ func EncodeTomlWebDAVV0From(data *TomlWebDAVV0, doc *document.Document, containe
 		}
 	} else {
 		cst.DeleteValue(container, "password")
+	}
+	if data.BearerToken != "" {
+		if err := cst.SetAny(container, "bearer-token", data.BearerToken); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "bearer-token")
+	}
+	if data.TLSClientCertPath != "" {
+		if err := cst.SetAny(container, "tls-client-cert-path", data.TLSClientCertPath); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "tls-client-cert-path")
+	}
+	if data.TLSClientKeyPath != "" {
+		if err := cst.SetAny(container, "tls-client-key-path", data.TLSClientKeyPath); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "tls-client-key-path")
+	}
+	if data.TLSCAPath != "" {
+		if err := cst.SetAny(container, "tls-ca-path", data.TLSCAPath); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "tls-ca-path")
+	}
+	if data.TLSServerName != "" {
+		if err := cst.SetAny(container, "tls-server-name", data.TLSServerName); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "tls-server-name")
+	}
+	if data.TLSInsecureSkipVerify != false {
+		if err := cst.SetAny(container, "tls-insecure-skip-verify", data.TLSInsecureSkipVerify); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+	} else {
+		cst.DeleteValue(container, "tls-insecure-skip-verify")
 	}
 	return nil
 }
