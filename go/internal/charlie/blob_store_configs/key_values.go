@@ -71,6 +71,14 @@ func ConfigKeyValues(config Config) map[string]string {
 		keyValues["remote-path"] = configSFTPRemote.GetRemotePath()
 	}
 
+	// Per the WebDAV design and ADR 0005: surface URL and user but
+	// NEVER password (or bearer-token / TLS-client-key-path in the
+	// follow-up auth/TLS commit). The redaction is unit-pinned.
+	if configWebDAV, ok := config.(ConfigWebDAV); ok {
+		keyValues["url"] = configWebDAV.GetURL()
+		keyValues["user"] = configWebDAV.GetUser()
+	}
+
 	return keyValues
 }
 
