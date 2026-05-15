@@ -14,22 +14,26 @@ type (
 	DeletionPrecondition = internal.DeletionPrecondition
 	DiscoveredConfig     = internal.DiscoveredConfig
 	Multi                = internal.Multi
+	MultiBuilder         = internal.MultiBuilder
 	PackOptions          = internal.PackOptions
 	PackableArchive      = internal.PackableArchive
 )
 
 var (
+	BootstrapWebdavRemoteConfig    = internal.BootstrapWebdavRemoteConfig
 	CopyBlobIfNecessary            = internal.CopyBlobIfNecessary
 	CopyReaderToWriter             = internal.CopyReaderToWriter
 	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
 	MakeBlobStore                  = internal.MakeBlobStore
 	MakeBlobStoreMap               = internal.MakeBlobStoreMap
 	MakeBlobStores                 = internal.MakeBlobStores
+	MakeHTTPClientForWebDAVConfig  = internal.MakeHTTPClientForWebDAVConfig
 	MakeRemoteBlobStore            = internal.MakeRemoteBlobStore
 	MakeSSHAgent                   = internal.MakeSSHAgent
 	MakeSSHClientForExplicitConfig = internal.MakeSSHClientForExplicitConfig
 	MakeSSHClientFromSSHConfig     = internal.MakeSSHClientFromSSHConfig
 	NewDiscardBlobStore            = internal.NewDiscardBlobStore
+	NewMulti                       = internal.NewMulti
 	NopDeletionPrecondition        = internal.NopDeletionPrecondition
 	VerifyBlob                     = internal.VerifyBlob
 	WriteRemoteConfig              = internal.WriteRemoteConfig
