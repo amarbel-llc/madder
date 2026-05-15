@@ -340,6 +340,20 @@ let
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
   };
+
+  # Devshell-only test harness for WebDAV integration tests (RFC 0001).
+  # Intentionally NOT included in the `packages` output — release
+  # artifacts must not ship a server that accepts any auth.
+  madder-test-webdav-server = pkgs.buildGoApplication {
+    pname = "madder-test-webdav-server";
+    version = "0.0.0";
+    src = ./.;
+    pwd = ./.;
+    subPackages = [ "cmd/madder-test-webdav-server" ];
+    modules = ./gomod2nix.toml;
+    go = pkgs-master.go_1_26;
+    GOTOOLCHAIN = "local";
+  };
 in
 {
   packages = {
@@ -355,6 +369,7 @@ in
       purse-first.packages.${system}.dagnabit
       madder-test-sftp-server
       madder-test-craft-legacy-blob
+      madder-test-webdav-server
     ]
     ++ (with pkgs-master; [
       delve
