@@ -135,9 +135,26 @@ write, preserving the CAS invariant. **MKCOL** races are absorbed via the
 
 ## Pointer
 
-A store that delegates to another store by reference. Created with **madder
-init-pointer**. The pointer store does not hold blobs itself but redirects reads
-and writes to the target store.
+A store that delegates to another store by reference. The pointer store does
+not hold blobs itself but redirects reads and writes to the target store.
+
+Two on-disk wire formats exist:
+
+**madder init-pointer -base-path PATH** *blob-store-id*
+:   Current path-only format (**!toml-blob_store_config-pointer-v1**).
+    Carries a single absolute **base-path** field; the config file location
+    is derived as **&lt;base-path&gt;/blob_store-config**. Use this for new
+    pointer stores.
+
+**madder init-pointer-v0 -id ID -base-path PATH -config-path PATH** *blob-store-id*
+:   Legacy three-field format (**!toml-blob_store_config-pointer-v0**).
+    Carries **id**, **base-path**, and **config-path** explicitly. The
+    **id** field is required at decode time but unused at resolve time
+    (the resolver uses the directory name the pointer was discovered
+    under); **config-path** must agree with
+    **&lt;base-path&gt;/blob_store-config** for the pointer to dereference.
+    Retained for existing on-disk configs and callers that need the
+    explicit shape.
 
 # CONCURRENCY AND DURABILITY
 
