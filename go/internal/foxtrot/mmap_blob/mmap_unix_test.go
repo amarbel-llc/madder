@@ -24,7 +24,7 @@ func TestMmapFile_Bytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer mb.Close()
+	defer mb.Close() //defer:err-checked
 	if !bytes.Equal(mb.Bytes(), payload) {
 		t.Fatalf("bytes mismatch: got %q want %q", mb.Bytes(), payload)
 	}
