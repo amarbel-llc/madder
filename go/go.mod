@@ -4,7 +4,7 @@ go 1.26
 
 require (
 	github.com/DataDog/zstd v1.5.7
-	github.com/amarbel-llc/purse-first/libs/dewey v0.1.1-0.20260514213118-2be74f0104b8
+	github.com/amarbel-llc/purse-first/libs/dewey v0.1.1-0.20260516125550-eac862321b10
 	github.com/amarbel-llc/tap/go v0.1.2
 	github.com/amarbel-llc/tommy v0.0.0-20260405143331-87255e87bf37
 	github.com/aws/aws-sdk-go-v2 v1.41.7
@@ -70,7 +70,16 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/tools v0.45.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
+)
+
+tool (
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/defererr
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/repool
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/seqerror
 )

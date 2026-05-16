@@ -96,6 +96,27 @@ test-go *flags:
 vet-go *flags:
   cd go && go vet -tags test {{flags}} ./...
 
+# Build a dewey go/analysis analyzer (defererr, repool, or seqerror)
+# from the module cache into .tmp/analyzers/, then run it via
+# `go vet -vettool`. Strict: any analyzer finding fails the recipe.
+# The analyzer cmds are pinned via go.mod `tool` directives so
+# `go mod tidy` does not drop their transitive deps.
+[group("test")]
+vet-go-analyzer name:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  bin="{{justfile_directory()}}/.tmp/analyzers/{{name}}"
+  mkdir -p "$(dirname "$bin")"
+  cd go
+  go build -o "$bin" github.com/amarbel-llc/purse-first/libs/dewey/cmd/{{name}}
+  go vet -tags test -vettool="$bin" ./...
+
+# Run every dewey analyzer in sequence. Runnable today; once madder's
+# source is clean against all three, wire this into the top-level
+# `test` aggregate.
+[group("test")]
+vet-go-analyzers: (vet-go-analyzer "seqerror") (vet-go-analyzer "repool") (vet-go-analyzer "defererr")
+
 # Build, vet, and test a single internal subpackage tree — the standard
 # verification triple, but scoped to ./internal/<subpath>/... so we don't
 # wait for the whole module when iterating on one package.
