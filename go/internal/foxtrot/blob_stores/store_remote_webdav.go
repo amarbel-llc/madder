@@ -762,7 +762,9 @@ func (mover *webdavMover) Close() (err error) {
 
 func (mover *webdavMover) GetMarklId() domain_interfaces.MarklId {
 	if mover.writer == nil {
-		return nil
+		panic(errors.ErrorWithStackf(
+			"webdavMover.GetMarklId called before initialize; mover.writer is nil",
+		))
 	}
 	return mover.writer.GetDigest()
 }

@@ -797,7 +797,9 @@ func (mover *sftpMover) Close() (err error) {
 
 func (mover *sftpMover) GetMarklId() domain_interfaces.MarklId {
 	if mover.writer == nil {
-		return mover.GetMarklId()
+		panic(errors.ErrorWithStackf(
+			"sftpMover.GetMarklId called before initialize; mover.writer is nil",
+		))
 	}
 
 	return mover.writer.GetDigest()

@@ -68,6 +68,27 @@ func TestWebdavMoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, 0)
 }
 
+// TestWebdavMoverGetMarklId_PanicsBeforeInitialize is the WebDAV
+// twin of the SFTP pin (#184): defending against a state that
+// shouldn't exist (initialize sets writer before MakeBlobWriter
+// returns) MUST fail loudly if the invariant is violated, not
+// silently return nil or stack-overflow.
+func TestWebdavMoverGetMarklId_PanicsBeforeInitialize(t *testing.T) {
+	mover := &webdavMover{}
+
+	r := recoverPanic(func() { _ = mover.GetMarklId() })
+	if r == nil {
+		t.Fatal("GetMarklId on nil-writer mover did not panic")
+	}
+	err, ok := r.(error)
+	if !ok {
+		t.Fatalf("panic value is not an error: %T %v", r, r)
+	}
+	if !strings.Contains(err.Error(), "mover.writer is nil") {
+		t.Errorf("panic error %q missing 'mover.writer is nil' anchor", err.Error())
+	}
+}
+
 // TestWebdavInitializeOnce_PanicsOnInitFailure mirrors the SFTP
 // pin on issue #134: when httpClientInitializer returns an error,
 // HasBlob/AllBlobs callers must see a panic carrying the wrapped

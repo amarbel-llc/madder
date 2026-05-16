@@ -89,6 +89,28 @@ func TestSftpMoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, 0)
 }
 
+// TestSftpMoverGetMarklId_PanicsBeforeInitialize pins #184: the
+// pre-fix code self-recursed on nil writer, producing a stack overflow
+// instead of a debuggable error. The branch defends against a state
+// that shouldn't exist — initialize sets writer before MakeBlobWriter
+// returns the mover — but the defense MUST fail loudly if the
+// invariant is ever violated, not silently or by stack overflow.
+func TestSftpMoverGetMarklId_PanicsBeforeInitialize(t *testing.T) {
+	mover := &sftpMover{}
+
+	r := recoverPanic(func() { _ = mover.GetMarklId() })
+	if r == nil {
+		t.Fatal("GetMarklId on nil-writer mover did not panic")
+	}
+	err, ok := r.(error)
+	if !ok {
+		t.Fatalf("panic value is not an error: %T %v", r, r)
+	}
+	if !strings.Contains(err.Error(), "mover.writer is nil") {
+		t.Errorf("panic error %q missing 'mover.writer is nil' anchor", err.Error())
+	}
+}
+
 // recoverPanic runs f and returns the panic value, or nil if f did not
 // panic. Used by the initializeOnce panic-semantics tests below where
 // each case asserts both that a panic happened and what its payload
