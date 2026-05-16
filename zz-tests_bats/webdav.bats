@@ -87,6 +87,81 @@ function webdav_fsck_clean { # @test
   refute_output --partial "not ok"
 }
 
+# ADR-0005 parity scenarios: each one has a direct SFTP analogue
+# (sftp_init_idempotent_fails, sftp_init_compression_default,
+# sftp_init_hash_type_id_default, sftp_info_repo_host_stays_local,
+# sftp_info_repo_config_immutable_encodes_remote in sftp.bats).
+# The WebDAV store must surface the same authoritative-config
+# semantics. The on-disk zstd-magic check from
+# sftp_write_compresses_per_remote_config is tracked separately in
+# issue #187 — it needs the test server's tmpdir exposed via the
+# RFC 0001 handshake, which doesn't fit a focused-test commit.
+
+function webdav_init_idempotent_local_fails { # @test
+  # Second init for the same local store id must fail; the local
+  # pointer config already exists. The remote bootstrap is
+  # idempotent on its own (HEAD-then-skip), but the local config
+  # write is not.
+  init_webdav_test_store
+
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-1/" \
+    .webdav-test
+  assert_failure
+}
+
+function webdav_info_repo_compression_type_from_remote { # @test
+  # Per ADR 0005, info-repo MUST surface the remote TomlV3's
+  # compression-type rather than anything from the local
+  # TomlWebDAVV0 transport config. The bootstrap config uses
+  # "zstd"; a regression that falls back to the local zero value
+  # would surface "" here.
+  init_webdav_test_store
+
+  run_madder info-repo .webdav-test compression-type
+  assert_success
+  assert_line 'zstd'
+}
+
+function webdav_info_repo_hash_type_id_from_remote { # @test
+  # Sibling of webdav_info_repo_compression_type_from_remote:
+  # hash_type-id is also a blob-store-property, not transport, so
+  # it must resolve through the remote blob_store-config.
+  init_webdav_test_store
+
+  run_madder info-repo .webdav-test hash_type-id
+  assert_success
+  assert_line 'blake2b256'
+}
+
+function webdav_info_repo_url_stays_local { # @test
+  # Reading a transport-only key (url) on a WebDAV store MUST NOT
+  # open an HTTP connection. Backend-property keys (compression-type,
+  # hash_type-id, encryption) do; transport keys (url, user) do not.
+  # Parallels sftp_info_repo_host_stays_local.
+  init_webdav_test_store
+
+  run_madder info-repo .webdav-test url
+  assert_success
+  assert_output --partial "$WEBDAV_URL"
+  refute_output --partial 'reading remote config'
+}
+
+function webdav_info_repo_config_immutable_no_password { # @test
+  # End-to-end counterpart to TestConfigKeyValues_WebDAVRedactsSecrets:
+  # info-repo's config-immutable dump must not leak the password
+  # (or any other secret). Catches a regression where a sibling
+  # field re-serialises the whole struct or where the redaction
+  # branch is bypassed in a future refactor.
+  init_webdav_test_store "store-creds" .webdav-creds \
+    -user testuser -password sekret-do-not-leak
+
+  run_madder info-repo .webdav-creds config-immutable
+  assert_success
+  refute_output --partial 'password'
+  refute_output --partial 'sekret-do-not-leak'
+}
+
 function webdav_concurrent_same_blob_writes { # @test
   # Two parallel writes of identical bytes. The duplicate-write
   # fallback in moveResource (HEAD-then-DELETE-temp on MOVE failure)
