@@ -586,7 +586,11 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryOneSample(
 	if err != nil {
 		return sample{}, false
 	}
-	defer f.Close()
+	// Probe path: tryOneSample intentionally swallows every error
+	// shape (any failure means "skip this sample"). Close error on
+	// a read-only remote handle after the bytes have been buffered
+	// is not actionable.
+	defer f.Close() //defer:err-checked
 
 	limited := io.LimitReader(f, int64(cmd.maxSampleBytes)+1)
 	buf, err := io.ReadAll(limited)
@@ -718,7 +722,11 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 		// the whole reason this command exists. Silent skip.
 		return false, sftp_probe.Candidate{}, false
 	}
-	defer configFile.Close()
+	// Probe path: tryReadExistingConfig is documented as
+	// non-fatal — every error logs via env.GetUI and returns
+	// "skip this candidate". Close error after the config has
+	// been decoded is not actionable.
+	defer configFile.Close() //defer:err-checked
 
 	var typedConfig hyphence.TypedBlob[delta_blob_store_configs.Config]
 	if _, err := delta_blob_store_configs.Coder.DecodeFrom(
@@ -1025,17 +1033,17 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 	return nil
 }
 
-func writeCandidateFile(filePath string, c sftp_probe.Candidate) error {
+func writeCandidateFile(filePath string, c sftp_probe.Candidate) (err error) {
 	typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		Blob: c.StoreConfig,
 	}
-	f, err := os.Create(filePath)
-	if err != nil {
+	var f *os.File
+	if f, err = os.Create(filePath); err != nil {
 		return errors.Wrap(err)
 	}
-	defer f.Close()
-	if _, err := delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
+	defer errors.DeferredCloser(&err, f)
+	if _, err = delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
 		return errors.Wrap(err)
 	}
 	return nil
