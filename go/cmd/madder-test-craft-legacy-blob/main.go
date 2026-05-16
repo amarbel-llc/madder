@@ -95,7 +95,14 @@ func run(comp, enc, recip, contentPath, outPath string, stdin io.Reader) (err er
 	if _, err = io.Copy(w, src); err != nil {
 		return err
 	}
-	return w.Close()
+	// Assign w.Close()'s result to the named return so the deferred
+	// errors.DeferredCloser on dst joins (rather than masks) it.
+	// `return w.Close()` would be functionally equivalent (Go's
+	// spec orders return-expression assignment before defers, and
+	// DeferredCloser uses errors.Join), but the explicit form keeps
+	// the join visible to the reader.
+	err = w.Close()
+	return err
 }
 
 // makeIOConfig translates the CLI flags into a blob_io.Config that
