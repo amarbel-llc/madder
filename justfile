@@ -81,8 +81,11 @@ clean: clean-go clean-nix-result
 # Run all tests (unit + integration) with the race detector enabled.
 # Concurrent-write paths (pack_parallel, blob_mover link publish) are
 # load-bearing, so default verification runs them under -race.
+# vet-go-analyzers runs first because it's cheap and catches issues
+# the test suites would not (deferred error drops, pool leaks,
+# discarded iter.Seq2 errors).
 [group("test")]
-test: test-go-race test-bats test-bats-net-cap
+test: vet-go-analyzers test-go-race test-bats test-bats-net-cap
 
 # Run Go unit tests only.
 [group("test")]
@@ -111,9 +114,9 @@ vet-go-analyzer name:
   go build -o "$bin" github.com/amarbel-llc/purse-first/libs/dewey/cmd/{{name}}
   go vet -tags test -vettool="$bin" ./...
 
-# Run every dewey analyzer in sequence. Runnable today; once madder's
-# source is clean against all three, wire this into the top-level
-# `test` aggregate.
+# Run every dewey analyzer in sequence. Wired into the top-level
+# `test` aggregate; runs first so analyzer findings break the loop
+# before the slower bats lanes start.
 [group("test")]
 vet-go-analyzers: (vet-go-analyzer "seqerror") (vet-go-analyzer "repool") (vet-go-analyzer "defererr")
 
