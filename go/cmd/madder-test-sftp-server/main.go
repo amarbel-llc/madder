@@ -15,6 +15,7 @@ import (
 	"net"
 	"os"
 
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -104,12 +105,12 @@ func generateECDSAHostKey() (ssh.Signer, error) {
 // writeKnownHosts writes the host public key into a temp file in
 // OpenSSH known_hosts format scoped to [127.0.0.1]:port — the exact
 // host:port pattern the client will connect to.
-func writeKnownHosts(publicKey ssh.PublicKey, port int) (string, error) {
-	f, err := os.CreateTemp("", "madder-test-sftp-server-known_hosts-*")
-	if err != nil {
+func writeKnownHosts(publicKey ssh.PublicKey, port int) (name string, err error) {
+	var f *os.File
+	if f, err = os.CreateTemp("", "madder-test-sftp-server-known_hosts-*"); err != nil {
 		return "", err
 	}
-	defer f.Close() //nolint:errcheck
+	defer errors.DeferredCloser(&err, f)
 
 	line := fmt.Sprintf(
 		"[127.0.0.1]:%d %s %s\n",
@@ -117,7 +118,7 @@ func writeKnownHosts(publicKey ssh.PublicKey, port int) (string, error) {
 		publicKey.Type(),
 		base64.StdEncoding.EncodeToString(publicKey.Marshal()),
 	)
-	if _, err := f.WriteString(line); err != nil {
+	if _, err = f.WriteString(line); err != nil {
 		_ = os.Remove(f.Name())
 		return "", err
 	}
@@ -160,14 +161,17 @@ func serve(listener net.Listener, hostSigner ssh.Signer) {
 }
 
 func handleConnection(conn net.Conn, config *ssh.ServerConfig) {
-	defer conn.Close() //nolint:errcheck
+	// Server-side teardown; both Closes happen on goroutine exit
+	// when the client has already finished. Close errors here
+	// (e.g. "use of closed network connection") are not actionable.
+	defer conn.Close() //defer:err-checked
 
 	sshConn, chans, reqs, err := ssh.NewServerConn(conn, config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "[%s] ssh handshake failed: %v\n", programName, err)
 		return
 	}
-	defer sshConn.Close() //nolint:errcheck
+	defer sshConn.Close() //defer:err-checked
 
 	go ssh.DiscardRequests(reqs)
 
