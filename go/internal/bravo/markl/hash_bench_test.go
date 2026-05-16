@@ -40,6 +40,7 @@ func BenchmarkGetMarklId(b *testing.B) {
 					hash, repool := f.fh.Get()
 					if p.size > 0 {
 						if _, err := hash.Write(payload); err != nil {
+							repool()
 							b.Fatal(err)
 						}
 					}
