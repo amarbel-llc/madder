@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 )
 
 func TestDocument_Zero(t *testing.T) {
@@ -333,7 +335,7 @@ func TestDocumentRFCConformance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open vectors: %v", err)
 	}
-	defer f.Close()
+	defer files.CloseReadOnly(f)
 
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
