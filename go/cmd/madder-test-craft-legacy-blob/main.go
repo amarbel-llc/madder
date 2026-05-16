@@ -22,6 +22,8 @@ import (
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 )
 
 func main() {
@@ -64,33 +66,33 @@ func runMain(argv []string) error {
 // between this binary and the verifier in sftp_probe; the
 // production sftp-analyze command takes -key flags pointing at
 // the same kind of file.
-func run(comp, enc, recip, contentPath, outPath string, stdin io.Reader) error {
+func run(comp, enc, recip, contentPath, outPath string, stdin io.Reader) (err error) {
 	var src io.Reader = stdin
 	if contentPath != "-" {
-		f, err := os.Open(contentPath)
-		if err != nil {
+		var f *os.File
+		if f, err = os.Open(contentPath); err != nil {
 			return err
 		}
-		defer f.Close()
+		defer files.CloseReadOnly(f)
 		src = f
 	}
 
-	dst, err := os.Create(outPath)
-	if err != nil {
+	var dst *os.File
+	if dst, err = os.Create(outPath); err != nil {
 		return err
 	}
-	defer dst.Close()
+	defer errors.DeferredCloser(&err, dst)
 
-	cfg, err := makeIOConfig(comp, enc, recip)
-	if err != nil {
+	var cfg blob_io.Config
+	if cfg, err = makeIOConfig(comp, enc, recip); err != nil {
 		return err
 	}
 
-	w, err := blob_io.NewWriter(cfg, dst)
-	if err != nil {
-		return err
+	w, werr := blob_io.NewWriter(cfg, dst)
+	if werr != nil {
+		return werr
 	}
-	if _, err := io.Copy(w, src); err != nil {
+	if _, err = io.Copy(w, src); err != nil {
 		return err
 	}
 	return w.Close()
