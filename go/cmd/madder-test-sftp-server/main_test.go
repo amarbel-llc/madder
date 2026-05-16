@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +25,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(tmpDir) //nolint:errcheck
 
 	binaryPath = filepath.Join(tmpDir, "madder-test-sftp-server")
 	build := exec.Command("go", "build", "-tags", "test", "-o", binaryPath, ".")
@@ -33,7 +33,14 @@ func TestMain(m *testing.M) {
 		panic("build failed: " + err.Error())
 	}
 
-	os.Exit(m.Run())
+	// Run the suite, then clean up before os.Exit. A bare
+	// `defer os.RemoveAll(tmpDir); os.Exit(m.Run())` would leak
+	// tmpDir on every run -- os.Exit bypasses defers.
+	code := m.Run()
+	if rerr := os.RemoveAll(tmpDir); rerr != nil {
+		fmt.Fprintf(os.Stderr, "warning: removing tmpDir %q: %v\n", tmpDir, rerr)
+	}
+	os.Exit(code)
 }
 
 // TestCookieMismatchExitsOne asserts RFC 0001's Cookie Envelope
