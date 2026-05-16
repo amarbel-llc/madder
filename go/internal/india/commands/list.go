@@ -10,6 +10,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
 func init() {
@@ -72,15 +73,19 @@ func (cmd List) Run(req futility.Request) {
 	// auto-on-TTY default both render the same human text. ndjson
 	// emits one record per line; json wraps the same records in a
 	// single top-level object keyed by store id.
+	var err error
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
-		emitListJSONObject(blobStores)
+		err = emitListJSONObject(blobStores)
 	case output_format.FormatNDJSON:
-		emitListNDJSON(blobStores)
+		err = emitListNDJSON(blobStores)
 	case output_format.FormatTAP:
 		emitListText(envBlobStore, blobStores)
 	default:
 		emitListText(envBlobStore, blobStores)
+	}
+	if err != nil {
+		req.Cancel(err)
 	}
 }
 
@@ -98,18 +103,19 @@ func emitListText(
 	}
 }
 
-func emitListNDJSON(blobStores blob_stores.BlobStoreMap) {
+func emitListNDJSON(blobStores blob_stores.BlobStoreMap) (err error) {
 	buf := bufio.NewWriter(os.Stdout)
-	defer buf.Flush()
+	defer errors.DeferredFlusher(&err, buf)
 
 	enc := json.NewEncoder(buf)
 
 	for _, blobStore := range stableOrder(blobStores) {
 		_ = enc.Encode(makeListRecord(blobStore))
 	}
+	return nil
 }
 
-func emitListJSONObject(blobStores blob_stores.BlobStoreMap) {
+func emitListJSONObject(blobStores blob_stores.BlobStoreMap) (err error) {
 	out := make(map[string]listRecord, len(blobStores))
 
 	for _, blobStore := range blobStores {
@@ -118,11 +124,12 @@ func emitListJSONObject(blobStores blob_stores.BlobStoreMap) {
 	}
 
 	buf := bufio.NewWriter(os.Stdout)
-	defer buf.Flush()
+	defer errors.DeferredFlusher(&err, buf)
 
 	enc := json.NewEncoder(buf)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(out)
+	return nil
 }
 
 func makeListRecord(blobStore blob_stores.BlobStoreInitialized) listRecord {
