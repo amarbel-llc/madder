@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"golang.org/x/net/webdav"
 )
 
@@ -178,13 +179,13 @@ func generateSelfSignedCert() (tls.Certificate, []byte, error) {
 	return cert, certPEM, nil
 }
 
-func writeCertPEM(pemBytes []byte) (string, error) {
-	f, err := os.CreateTemp("", "madder-test-webdav-server-cert-*.pem")
-	if err != nil {
+func writeCertPEM(pemBytes []byte) (name string, err error) {
+	var f *os.File
+	if f, err = os.CreateTemp("", "madder-test-webdav-server-cert-*.pem"); err != nil {
 		return "", err
 	}
-	defer f.Close() //nolint:errcheck
-	if _, err := f.Write(pemBytes); err != nil {
+	defer errors.DeferredCloser(&err, f)
+	if _, err = f.Write(pemBytes); err != nil {
 		_ = os.Remove(f.Name())
 		return "", err
 	}
