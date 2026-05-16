@@ -106,12 +106,36 @@ func TestHandshakeLineFormat(t *testing.T) {
 	if !strings.HasPrefix(fields[3], "127.0.0.1:") {
 		t.Errorf("field[3] (address) = %q, want 127.0.0.1: prefix", fields[3])
 	}
-	if fields[4] != "" {
-		t.Errorf("field[4] (metadata) = %q, want empty", fields[4])
+	rootPath, ok := metadataValue(fields[4], "root")
+	if !ok {
+		t.Errorf("field[4] (metadata) = %q, want root= key", fields[4])
+	} else if info, err := os.Stat(rootPath); err != nil {
+		t.Errorf("root path %q does not exist: %v", rootPath, err)
+	} else if !info.IsDir() {
+		t.Errorf("root path %q is not a directory", rootPath)
 	}
 	if fields[5] != "http" {
 		t.Errorf("field[5] (subprotocol) = %q, want http", fields[5])
 	}
+}
+
+// metadataValue parses an RFC 0001 subprotocol_metadata field
+// (`k=v&k=v` form) and returns the value for `key`. Returns ok=false
+// if the key is absent.
+func metadataValue(metadata, key string) (string, bool) {
+	if metadata == "" {
+		return "", false
+	}
+	for _, kv := range strings.Split(metadata, "&") {
+		k, v, found := strings.Cut(kv, "=")
+		if !found {
+			continue
+		}
+		if k == key {
+			return v, true
+		}
+	}
+	return "", false
 }
 
 // TestHandshakeLineFormat_TLS pins the TLS-mode handshake: subprotocol
@@ -158,12 +182,19 @@ func TestHandshakeLineFormat_TLS(t *testing.T) {
 	if fields[5] != "https" {
 		t.Errorf("field[5] (subprotocol) = %q, want https", fields[5])
 	}
-	if !strings.HasPrefix(fields[4], "cert=") {
-		t.Errorf("field[4] (metadata) = %q, want cert= prefix", fields[4])
-	}
-	certPath := strings.TrimPrefix(fields[4], "cert=")
-	if _, err := os.Stat(certPath); err != nil {
+	certPath, ok := metadataValue(fields[4], "cert")
+	if !ok {
+		t.Errorf("field[4] (metadata) = %q, want cert= key", fields[4])
+	} else if _, err := os.Stat(certPath); err != nil {
 		t.Errorf("cert path %q does not exist: %v", certPath, err)
+	}
+	rootPath, ok := metadataValue(fields[4], "root")
+	if !ok {
+		t.Errorf("field[4] (metadata) = %q, want root= key", fields[4])
+	} else if info, err := os.Stat(rootPath); err != nil {
+		t.Errorf("root path %q does not exist: %v", rootPath, err)
+	} else if !info.IsDir() {
+		t.Errorf("root path %q is not a directory", rootPath)
 	}
 }
 

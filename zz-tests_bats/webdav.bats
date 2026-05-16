@@ -162,6 +162,33 @@ function webdav_info_repo_config_immutable_no_password { # @test
   refute_output --partial 'sekret-do-not-leak'
 }
 
+function webdav_write_compresses_per_remote_config { # @test
+  # Per ADR 0005, the remote blob_store-config dictates on-wire
+  # shape. init_webdav_test_store provisions zstd, so a published
+  # blob's bytes MUST start with the zstd magic (28b52ffd). If the
+  # IO wrapper falls back to compression-none, the on-disk bytes
+  # equal the plaintext and this fails. Parallels
+  # sftp_write_compresses_per_remote_config.
+  #
+  # Closes #187 — the test depends on WEBDAV_ROOT being exposed via
+  # the RFC 0001 handshake metadata.
+  init_webdav_test_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'compress me please' >"$blob"
+
+  run_madder write .webdav-test "$blob"
+  assert_success
+
+  local on_disk
+  on_disk="$(find "$WEBDAV_ROOT" -type f -path '*/blake2b256/*' -print -quit)"
+  [[ -n $on_disk ]] || fail "no blob file found under $WEBDAV_ROOT"
+
+  local magic
+  magic="$(xxd -p -l 4 "$on_disk")"
+  [[ $magic == '28b52ffd' ]] || fail "expected zstd magic at start of $on_disk; got $magic"
+}
+
 function webdav_concurrent_same_blob_writes { # @test
   # Two parallel writes of identical bytes. The duplicate-write
   # fallback in moveResource (HEAD-then-DELETE-temp on MOVE failure)

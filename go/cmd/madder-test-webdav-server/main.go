@@ -20,6 +20,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/net/webdav"
@@ -56,11 +57,18 @@ func main() {
 	addr := listener.Addr().(*net.TCPAddr)
 
 	var (
-		tlsConfig    *tls.Config
-		certPath     string
-		subprotocol  = "http"
-		metadataLine string
+		tlsConfig   *tls.Config
+		certPath    string
+		subprotocol = "http"
 	)
+
+	// metadataParts accumulates the subprotocol_metadata key/value
+	// pairs per RFC 0001 (joined with `&`). `root=` is always
+	// present so bats helpers can locate the on-disk filesystem the
+	// server is vending — used for on-disk-shape assertions like
+	// the zstd-magic-after-write check (issue #187). `cert=` is
+	// added in TLS mode so bats can pin the CA via -tls-ca-path.
+	metadataParts := []string{"root=" + rootDir}
 
 	if *tlsEnabled {
 		var cert tls.Certificate
@@ -84,8 +92,10 @@ func main() {
 		tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}}
 		listener = tls.NewListener(listener, tlsConfig)
 		subprotocol = "https"
-		metadataLine = "cert=" + certPath
+		metadataParts = append(metadataParts, "cert="+certPath)
 	}
+
+	metadataLine := strings.Join(metadataParts, "&")
 
 	fmt.Printf(
 		"%s|%s|tcp|%s|%s|%s\n",

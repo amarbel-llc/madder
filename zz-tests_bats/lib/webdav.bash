@@ -2,8 +2,10 @@
 
 # start_webdav_server spawns madder-test-webdav-server as a coproc per
 # RFC 0001. Reads and validates the handshake line, then exports
-# WEBDAV_ADDR (host:port) and WEBDAV_URL (http://host:port/) for the
-# test body to use. Mirrors start_sftp_server in lib/sftp.bash.
+# WEBDAV_ADDR (host:port), WEBDAV_URL (http://host:port/), and
+# WEBDAV_ROOT (the on-disk path the server is vending — useful for
+# tests that need to assert on-disk shape after a write). Mirrors
+# start_sftp_server in lib/sftp.bash.
 #
 # Caller contract: must call from a setup() that has already loaded
 # common.bash. Pair with stop_webdav_server in teardown().
@@ -65,13 +67,27 @@ _start_webdav_server_inner() {
 
   export WEBDAV_ADDR="${fields[3]}"
   export WEBDAV_URL="${scheme}://${WEBDAV_ADDR}/"
-  if [[ $scheme == "https" ]]; then
-    if [[ ${fields[4]} != cert=* ]]; then
-      fail "WebDAV TLS handshake missing cert= metadata: ${fields[4]}"
-    fi
-    export WEBDAV_CERT_PATH="${fields[4]#cert=}"
-  else
-    unset WEBDAV_CERT_PATH
+
+  # Parse the &-separated metadata pairs into WEBDAV_ROOT and
+  # WEBDAV_CERT_PATH. root= is always present; cert= only in TLS mode.
+  local metadata="${fields[4]}"
+  local kv key value
+  unset WEBDAV_ROOT WEBDAV_CERT_PATH
+  while IFS= read -r kv; do
+    [[ -z $kv ]] && continue
+    key="${kv%%=*}"
+    value="${kv#*=}"
+    case "$key" in
+      root) export WEBDAV_ROOT="$value" ;;
+      cert) export WEBDAV_CERT_PATH="$value" ;;
+    esac
+  done < <(printf '%s\n' "${metadata//&/$'\n'}")
+
+  if [[ -z ${WEBDAV_ROOT:-} ]]; then
+    fail "WebDAV handshake missing root= metadata: ${fields[4]}"
+  fi
+  if [[ $scheme == "https" && -z ${WEBDAV_CERT_PATH:-} ]]; then
+    fail "WebDAV TLS handshake missing cert= metadata: ${fields[4]}"
   fi
 }
 
@@ -105,5 +121,5 @@ stop_webdav_server() {
     wait "$WEBDAV_PID" 2>/dev/null || true
     unset WEBDAV_PID
   fi
-  unset WEBDAV_ADDR WEBDAV_URL WEBDAV_CERT_PATH
+  unset WEBDAV_ADDR WEBDAV_URL WEBDAV_ROOT WEBDAV_CERT_PATH
 }
