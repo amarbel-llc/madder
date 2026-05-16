@@ -6,6 +6,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -48,7 +49,7 @@ func (cmd Body) Run(req futility.Request) {
 		bail(req, "body", path, err)
 		return
 	}
-	defer closer.Close()
+	defer errors.ContextMustClose(req, closer)
 
 	body := &hyphence.BodyStreamer{W: os.Stdout}
 	reader := hyphence.Reader{

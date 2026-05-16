@@ -6,6 +6,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -50,7 +51,7 @@ func (cmd Meta) Run(req futility.Request) {
 		bail(req, "meta", path, err)
 		return
 	}
-	defer closer.Close()
+	defer errors.ContextMustClose(req, closer)
 
 	streamer := &hyphence.MetadataStreamer{W: os.Stdout}
 	body := &hyphence.CountingDiscardReaderFrom{}

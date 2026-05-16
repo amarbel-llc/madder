@@ -7,6 +7,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
 
@@ -51,7 +52,7 @@ func (cmd Validate) Run(req futility.Request) {
 		bail(req, "validate", path, err)
 		return
 	}
-	defer closer.Close()
+	defer errors.ContextMustClose(req, closer)
 
 	if err := validateDocument(in); err != nil {
 		bail(req, "validate", source, err)
