@@ -11,6 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
 )
 
 func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {
@@ -25,7 +26,10 @@ func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer br.Close()
+	// Read-only path; close error after a successful read is not
+	// actionable. BlobReader is an interface (not *os.File), so
+	// files.CloseReadOnly doesn't apply directly.
+	defer br.Close() //defer:err-checked
 
 	// NewFileReaderOrErrNotExist returns the BlobReader interface, so
 	// the MmapSource capability has to be discovered via type-assert.
@@ -84,7 +88,7 @@ func TestMmapSource_ZstdCompression(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer f.Close()
+	defer files.CloseReadOnly(f)
 
 	br, err := NewReader(cfg, f)
 	if err != nil {
