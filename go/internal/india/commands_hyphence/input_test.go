@@ -22,7 +22,7 @@ func TestOpenInput_FilePath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer closer.Close()
+	defer closer.Close() //defer:err-checked
 	if source != f.Name() {
 		t.Errorf("source mismatch: got %q, want %q", source, f.Name())
 	}
@@ -38,7 +38,7 @@ func TestOpenInput_Stdin(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer closer.Close()
+	defer closer.Close() //defer:err-checked
 	if source != "-" {
 		t.Errorf("source for stdin should be '-', got %q", source)
 	}
