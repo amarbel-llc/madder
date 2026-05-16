@@ -9,8 +9,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
@@ -28,6 +30,25 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
 )
+
+// sftpWriterBufferSize aligns the streaming-writer's bufio buffer with
+// pkg/sftp's default MaxPacket (32 KB). With UseConcurrentWrites enabled
+// the SFTP client pipelines packet-sized writes; sizing the upstream
+// bufio to match avoids fragmenting age's 64 KB chunks into the 4 KB
+// Go default.
+const sftpWriterBufferSize = 1 << 15 // 32 KiB
+
+// sftpKeepaliveInterval is the cadence at which initialize() sends
+// keepalive@openssh.com requests on the underlying ssh.Client so long
+// uploads or idle periods do not get torn down by servers (or NAT/
+// firewall stateful flows) that drop inactive connections.
+const sftpKeepaliveInterval = 30 * time.Second
+
+// sftpAllBlobsWorkerCount is the parallelism of the bucket-subtree walk
+// in allBlobsForBase. Each worker pulls a top-level bucket directory
+// from the task channel and walks it sequentially; the single shared
+// *sftp.Client pipelines RPCs over the one SSH channel.
+const sftpAllBlobsWorkerCount = 8
 
 type remoteSftp struct {
 	ctx       interfaces.ActiveContext
@@ -82,6 +103,14 @@ type remoteSftp struct {
 	// TODO extract below into separate struct
 	blobCacheLock sync.RWMutex
 	blobCache     map[string]struct{}
+
+	// dirsKnown remembers directories the store has already confirmed
+	// exist on the remote (either by creating them at init or by a
+	// successful MkdirAll during an upload). sftpMover.Close consults
+	// this to skip the per-write MkdirAll round trips on the deep
+	// bucket path that almost always already exists after the first
+	// blob lands in that bucket.
+	dirsKnown sync.Map
 }
 
 var _ domain_interfaces.BlobStore = &remoteSftp{}
@@ -265,10 +294,23 @@ func (blobStore *remoteSftp) initialize() (err error) {
 		return err
 	}
 
-	if blobStore.sftpClient, err = sftp.NewClient(blobStore.sshClient); err != nil {
+	// Enable pkg/sftp's pipelined reads and writes. Without these the
+	// client issues one MaxPacket-sized request per file at a time,
+	// which caps throughput at ~MaxPacket/RTT regardless of available
+	// bandwidth. The single *sftp.Client is goroutine-safe; concurrent
+	// requests multiplex over the one SSH channel. Keeping MaxPacket
+	// at the default (32 KB) preserves compatibility with SFTP servers
+	// that cap packet size to the protocol minimum.
+	if blobStore.sftpClient, err = sftp.NewClient(
+		blobStore.sshClient,
+		sftp.UseConcurrentReads(true),
+		sftp.UseConcurrentWrites(true),
+	); err != nil {
 		err = errors.Wrapf(err, "failed to create SFTP client")
 		return err
 	}
+
+	blobStore.startKeepalive()
 
 	blobStore.ctx.After(errors.MakeFuncContextFromFuncErr(blobStore.close))
 
@@ -301,6 +343,7 @@ func (blobStore *remoteSftp) initialize() (err error) {
 		blobStore.uiPrinter.Printf("checking directory %q...", currentPath)
 		_, err = blobStore.sftpClient.Stat(currentPath)
 		if err == nil {
+			blobStore.dirsKnown.Store(currentPath, struct{}{})
 			continue
 		}
 		if !errors.IsNotExist(err) {
@@ -323,9 +366,66 @@ func (blobStore *remoteSftp) initialize() (err error) {
 			}
 			err = nil
 		}
+		blobStore.dirsKnown.Store(currentPath, struct{}{})
 	}
 
 	return err
+}
+
+// startKeepalive pings the SSH server on a fixed cadence so a long
+// upload or idle gap does not get torn down by servers or stateful
+// network gear that drop quiet connections. The goroutine exits on
+// context completion or on the first SendRequest error (the connection
+// is dead at that point and close() will surface the actual error).
+func (blobStore *remoteSftp) startKeepalive() {
+	sshClient := blobStore.sshClient
+	if sshClient == nil {
+		return
+	}
+	done := blobStore.ctx.Done()
+	go func() {
+		ticker := time.NewTicker(sftpKeepaliveInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if _, _, err := sshClient.SendRequest(
+					"keepalive@openssh.com", true, nil,
+				); err != nil {
+					return
+				}
+			}
+		}
+	}()
+}
+
+// ensureRemoteDir runs MkdirAll on dir unless the store has already
+// confirmed its existence in this process. On success it caches dir
+// and every parent prefix up to the store's remote root so subsequent
+// uploads to neighboring buckets skip the round trips.
+func (blobStore *remoteSftp) ensureRemoteDir(dir string) (err error) {
+	if _, ok := blobStore.dirsKnown.Load(dir); ok {
+		return nil
+	}
+	if err = blobStore.sftpClient.MkdirAll(dir); err != nil {
+		return err
+	}
+	rootPath := blobStore.config.GetRemotePath()
+	cur := dir
+	for cur != "" && cur != "." && cur != "/" {
+		blobStore.dirsKnown.Store(cur, struct{}{})
+		if cur == rootPath {
+			break
+		}
+		parent := path.Dir(cur)
+		if parent == cur {
+			break
+		}
+		cur = parent
+	}
+	return nil
 }
 
 func (blobStore *remoteSftp) GetBlobStoreDescription() string {
@@ -466,56 +566,200 @@ func shouldSkipBlobWalkEntry(name string) bool {
 // format-id segment — see allBlobsMultiHash. The walker yields paths
 // relative to the SFTP server root (no leading `/`), so we re-base
 // them via filepath.Rel before reconstructing the id.
+//
+// Implementation: ReadDir on basePath discovers the top-level bucket
+// directories; sftpAllBlobsWorkerCount workers walk those subtrees
+// concurrently (the single *sftp.Client is goroutine-safe and
+// pipelines RPCs over the one SSH channel). Yield order is preserved
+// per the BlobStore.AllBlobs contract — buckets are dispatched in
+// sorted order, each bucket's ids are sorted internally, and the
+// reader drains a per-bucket result channel in order so output is a
+// total lex-byte-order stream of MarklId.GetBytes() values. The
+// pre-pass single-thread Walk did not sort (pkg/sftp's server-side
+// Readdir returns entries in directory order, not alphabetical), so
+// this also closes that latent contract gap.
 func (blobStore *remoteSftp) allBlobsForBase(
 	basePath string,
 	hashType markl.FormatHash,
 ) interfaces.SeqError[domain_interfaces.MarklId] {
 	return func(yield func(domain_interfaces.MarklId, error) bool) {
-		walker := blobStore.sftpClient.Walk(basePath)
+		topEntries, err := blobStore.sftpClient.ReadDir(basePath)
+		if err != nil {
+			yield(nil, errors.Wrapf(err, "BasePath: %q", basePath))
+			return
+		}
 
-		digest, repool := hashType.GetBlobId()
-		defer repool()
+		bucketNames := make([]string, 0, len(topEntries))
+		for _, entry := range topEntries {
+			if !entry.IsDir() {
+				continue
+			}
+			if shouldSkipBlobWalkEntry(entry.Name()) {
+				continue
+			}
+			bucketNames = append(bucketNames, entry.Name())
+		}
+		sort.Strings(bucketNames)
 
-		for walker.Step() {
-			if err := walker.Err(); err != nil {
-				if !yield(nil, errors.Wrapf(err, "BasePath: %q", basePath)) {
+		if len(bucketNames) == 0 {
+			return
+		}
+
+		type bucketResult struct {
+			ids []domain_interfaces.MarklId
+			err error
+		}
+
+		// One result channel per bucket, buffered to 1 so the worker
+		// that finishes a bucket can hand off its slice and pick up
+		// the next task without waiting for the reader. The reader
+		// drains channels in order, which both preserves lex order
+		// and bounds in-flight memory to ~workerCount buckets.
+		results := make([]chan bucketResult, len(bucketNames))
+		for i := range results {
+			results[i] = make(chan bucketResult, 1)
+		}
+
+		tasks := make(chan int, len(bucketNames))
+		done := make(chan struct{})
+
+		workerCount := sftpAllBlobsWorkerCount
+		if workerCount > len(bucketNames) {
+			workerCount = len(bucketNames)
+		}
+
+		var wg sync.WaitGroup
+		for w := 0; w < workerCount; w++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				digest, repool := hashType.GetBlobId()
+				defer repool()
+				for idx := range tasks {
+					select {
+					case <-done:
+						return
+					default:
+					}
+					subPath := filepath.Join(basePath, bucketNames[idx])
+					ids, walkErr := walkBucketCollect(
+						blobStore.sftpClient,
+						subPath,
+						basePath,
+						digest,
+					)
+					select {
+					case results[idx] <- bucketResult{ids: ids, err: walkErr}:
+					case <-done:
+						return
+					}
+				}
+			}()
+		}
+
+		go func() {
+			defer close(tasks)
+			for i := range bucketNames {
+				select {
+				case tasks <- i:
+				case <-done:
 					return
 				}
-				continue
 			}
+		}()
 
-			if walker.Stat().IsDir() {
-				continue
+		closed := false
+		closeDone := func() {
+			if !closed {
+				closed = true
+				close(done)
 			}
-
-			if shouldSkipBlobWalkEntry(filepath.Base(walker.Path())) {
-				continue
-			}
-
-			relPath, err := filepath.Rel(basePath, walker.Path())
-			if err != nil {
-				if !yield(nil, errors.Wrapf(err, "BasePath: %q", basePath)) {
-					return
+		}
+		defer func() {
+			closeDone()
+			// Drain unread results so the buffered-1 sends in workers
+			// complete and the worker goroutines can return.
+			for i := range results {
+				select {
+				case <-results[i]:
+				default:
 				}
-				continue
 			}
+			wg.Wait()
+		}()
 
-			if err := markl.SetHexStringFromRelPath(digest, relPath); err != nil {
-				if !yield(nil, errors.Wrap(err)) {
-					return
-				}
-				continue
-			}
-
-			blobStore.blobCacheLock.Lock()
-			blobStore.blobCache[string(digest.GetBytes())] = struct{}{}
-			blobStore.blobCacheLock.Unlock()
-
-			if !yield(digest, nil) {
+		for i := range bucketNames {
+			var r bucketResult
+			select {
+			case r = <-results[i]:
+			case <-done:
 				return
+			}
+			if r.err != nil {
+				if !yield(nil, errors.Wrapf(
+					r.err, "BasePath: %q",
+					filepath.Join(basePath, bucketNames[i]),
+				)) {
+					closeDone()
+					return
+				}
+				continue
+			}
+			for _, id := range r.ids {
+				blobStore.blobCacheLock.Lock()
+				blobStore.blobCache[string(id.GetBytes())] = struct{}{}
+				blobStore.blobCacheLock.Unlock()
+				if !yield(id, nil) {
+					closeDone()
+					return
+				}
 			}
 		}
 	}
+}
+
+// walkBucketCollect walks subPath (one bucket subtree) and returns
+// every leaf reconstructed as a MarklId, sorted by raw bytes. Used by
+// the parallel allBlobsForBase fan-out; each worker calls this in
+// turn and posts the resulting slice to its bucket's result channel.
+// The digest is per-worker pooled; clones are emitted because callers
+// retain the ids past the next walk step.
+func walkBucketCollect(
+	client *sftp.Client,
+	subPath string,
+	basePath string,
+	digest domain_interfaces.MarklIdMutable,
+) (ids []domain_interfaces.MarklId, err error) {
+	walker := client.Walk(subPath)
+	for walker.Step() {
+		if stepErr := walker.Err(); stepErr != nil {
+			err = errors.Wrap(stepErr)
+			return ids, err
+		}
+		if walker.Stat().IsDir() {
+			continue
+		}
+		if shouldSkipBlobWalkEntry(filepath.Base(walker.Path())) {
+			continue
+		}
+		relPath, relErr := filepath.Rel(basePath, walker.Path())
+		if relErr != nil {
+			err = errors.Wrap(relErr)
+			return ids, err
+		}
+		if hexErr := markl.SetHexStringFromRelPath(
+			digest, relPath,
+		); hexErr != nil {
+			err = errors.Wrap(hexErr)
+			return ids, err
+		}
+		cloned, _ := markl.Clone(digest) //repool:owned
+		ids = append(ids, cloned)
+	}
+	sort.Slice(ids, func(i, j int) bool {
+		return bytes.Compare(ids[i].GetBytes(), ids[j].GetBytes()) < 0
+	})
+	return ids, nil
 }
 
 func (blobStore *remoteSftp) MakeBlobWriter(
@@ -754,9 +998,12 @@ func (mover *sftpMover) Close() (err error) {
 	blobDigest := mover.writer.GetDigest()
 	finalPath := mover.store.remotePathForMerkleId(blobDigest)
 
-	// Ensure the target directory exists (Git-like bucketing)
+	// Ensure the target directory exists (Git-like bucketing). The
+	// store caches dirs it has already confirmed so repeat uploads to
+	// the same bucket — by far the common case once the tree is warm
+	// — skip the MkdirAll round trips entirely.
 	finalDir := path.Dir(finalPath)
-	if err = mover.store.sftpClient.MkdirAll(finalDir); err != nil {
+	if err = mover.store.ensureRemoteDir(finalDir); err != nil {
 		err = errors.Wrap(err)
 		return err
 	}
@@ -820,7 +1067,7 @@ func newSftpWriter(
 ) (writer *sftpWriter, err error) {
 	writer = &sftpWriter{}
 
-	writer.wBuf = bufio.NewWriter(ioWriter)
+	writer.wBuf = bufio.NewWriterSize(ioWriter, sftpWriterBufferSize)
 
 	if writer.wAge, err = config.GetBlobEncryption().WrapWriter(writer.wBuf); err != nil {
 		err = errors.Wrap(err)

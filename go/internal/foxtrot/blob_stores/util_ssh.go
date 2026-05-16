@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
@@ -16,6 +17,12 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
+
+// defaultSSHDialTimeout bounds ssh.Dial when ssh.ClientConfig.Timeout is
+// otherwise unset, so a wedged remote does not block CLI commands
+// indefinitely. ssh.Dial honors ClientConfig.Timeout via its default
+// net.Dialer.
+const defaultSSHDialTimeout = 30 * time.Second
 
 // sshConfigResolution holds the subset of ssh_config fields we care
 // about. Fields are populated by resolveSSHConfig from `ssh -G`
@@ -356,6 +363,10 @@ func sshDial(
 	configClient *ssh.ClientConfig,
 	addr string,
 ) (sshClient *ssh.Client, err error) {
+	if configClient.Timeout == 0 {
+		configClient.Timeout = defaultSSHDialTimeout
+	}
+
 	uiPrinter.Printf("dialing %q...", addr)
 	if sshClient, err = ssh.Dial("tcp", addr, configClient); err != nil {
 		err = errors.Wrapf(err, "failed to connect to SSH server")
