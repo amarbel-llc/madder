@@ -601,6 +601,16 @@ func (cmd *Init) ensureS3RemoteConfigExists(
 	blobStoreId blob_store_id.Id,
 	s3Config blob_store_configs.ConfigS3,
 ) bool {
+	// Validate credential state before any HTTP work so init-s3's
+	// session-token-without-access-key check surfaces here too, not
+	// just at first store use. Without this, init succeeds locally
+	// and the inconsistency only manifests when something tries to
+	// open the store.
+	if err := blob_stores.ValidateS3Auth(s3Config); err != nil {
+		errors.ContextCancelWithBadRequestError(req, err)
+		return false
+	}
+
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
 		fmt.Sprintf("# (blob_store: %s) ", blobStoreId),

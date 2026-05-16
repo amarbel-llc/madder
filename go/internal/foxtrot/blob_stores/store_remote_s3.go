@@ -86,6 +86,11 @@ func makeS3Store(
 		return blobStore, err
 	}
 
+	if err = ValidateS3Auth(config); err != nil {
+		err = deweyerrors.Wrap(err)
+		return blobStore, err
+	}
+
 	var defaultHashType markl.FormatHash
 
 	if defaultHashType, err = markl.GetFormatHashOrError(
@@ -691,21 +696,20 @@ func (mover *s3Mover) Close() (err error) {
 	}
 	mover.closed = true
 
-	defer func() {
-		var cerr, rerr error
-		if mover.tempFile != nil {
-			cerr = mover.tempFile.Close()
-			rerr = os.Remove(mover.tempFile.Name())
-			mover.tempFile = nil
-		}
-		if joined := errors.Join(err, cerr, rerr); joined != nil {
-			err = joined
-		}
-	}()
-
 	if mover.writer == nil {
 		return nil
 	}
+
+	// mover.tempFile is set by mover.initialize concurrent with
+	// mover.writer; the writer-nil check above also gates tempFile-nil.
+	// LIFO defer order — os.Remove registered first, runs last — so
+	// the tempfile is closed before its path is removed.
+	defer func() {
+		if rerr := os.Remove(mover.tempFile.Name()); rerr != nil {
+			err = errors.Join(err, rerr)
+		}
+	}()
+	defer deweyerrors.DeferredCloser(&err, mover.tempFile)
 
 	if err = mover.writer.Close(); err != nil {
 		err = deweyerrors.Wrap(err)
@@ -721,31 +725,25 @@ func (mover *s3Mover) Close() (err error) {
 	key := mover.store.keyForMarklId(blobDigest)
 	bucket := mover.store.config.GetBucket()
 
-	// Skip PUT if the object already exists (content-addressed: same
-	// key → same bytes). Matches the SFTP store's idempotent-rename
-	// behavior.
-	_, headErr := mover.store.s3Client.HeadObject(mover.store.ctx, &s3.HeadObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-	})
-	if headErr == nil {
-		mover.store.blobCacheLock.Lock()
-		mover.store.blobCache[string(blobDigest.GetBytes())] = struct{}{}
-		mover.store.blobCacheLock.Unlock()
-		return nil
-	}
-	if !isS3NotFound(headErr) {
-		err = deweyerrors.Wrapf(headErr, "head s3://%s/%s", bucket, key)
-		return err
-	}
-
+	// Content-addressed CAS: same key → same bytes, so PUT with
+	// If-None-Match: * lets the server reject a concurrent overwrite
+	// in a single round-trip. A HEAD-then-PUT shape would race: two
+	// writers can both pass the HEAD then collide on PUT. The
+	// PreconditionFailed error from a duplicate is treated as success
+	// — content-equivalence is the invariant we care about.
 	if _, err = mover.store.s3Client.PutObject(mover.store.ctx, &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
-		Body:   mover.tempFile,
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		Body:        mover.tempFile,
+		IfNoneMatch: aws.String("*"),
 	}); err != nil {
-		err = deweyerrors.Wrapf(err, "put s3://%s/%s", bucket, key)
-		return err
+		if !isS3PreconditionFailed(err) {
+			err = deweyerrors.Wrapf(err, "put s3://%s/%s", bucket, key)
+			return err
+		}
+		// Object already exists at the same key. Treat as a
+		// duplicate-write success and fall through to cache update.
+		err = nil
 	}
 
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, mover.bytesWritten)
@@ -933,6 +931,46 @@ func isS3NotFound(err error) bool {
 	if errors.As(err, &apiErr) {
 		code := apiErr.ErrorCode()
 		if code == "NotFound" || code == "NoSuchKey" || code == "404" {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateS3Auth enforces credential-state invariants the AWS SDK
+// would otherwise discover only on the first API call. Today's only
+// rule: session-token is meaningless without access-key-id (the
+// session token is a temporary credential tied to specific
+// access/secret-key pairs; the SDK's credential chain would either
+// ignore it or fail confusingly).
+//
+// Anonymous / IMDS-driven configs (none of the explicit fields set)
+// are valid — the SDK's default credential chain handles those.
+// Exported so init-s3's bootstrap path can validate before opening
+// any HTTP connections.
+func ValidateS3Auth(config blob_store_configs.ConfigS3) error {
+	if config.GetSessionToken() != "" && config.GetAccessKeyId() == "" {
+		return deweyerrors.Errorf(
+			"s3 auth: session-token set without access-key-id",
+		)
+	}
+	return nil
+}
+
+// isS3PreconditionFailed recognizes a PutObject's "object already
+// exists" response from PreconditionFailed (HTTP 412) raised when
+// the request carries `If-None-Match: *` and the target key is
+// already populated. AWS S3 returns smithy APIError with code
+// "PreconditionFailed"; compatible servers may use the same code or
+// surface the 412 status directly.
+func isS3PreconditionFailed(err error) bool {
+	if err == nil {
+		return false
+	}
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		code := apiErr.ErrorCode()
+		if code == "PreconditionFailed" || code == "412" {
 			return true
 		}
 	}

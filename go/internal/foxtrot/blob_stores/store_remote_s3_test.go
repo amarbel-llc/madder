@@ -185,3 +185,54 @@ func TestIsS3NotFound_RawHttpStatusNotEnough(t *testing.T) {
 	}
 	_ = http.StatusNotFound
 }
+
+// TestValidateS3Auth_RejectsSessionTokenWithoutAccessKey pins the
+// single S3 auth-state invariant: SessionToken is a temporary
+// credential that requires an AccessKeyId. Surfacing this at init
+// time means the user gets a clear error instead of an opaque AWS
+// SDK credential-chain failure on first request.
+func TestValidateS3Auth_RejectsSessionTokenWithoutAccessKey(t *testing.T) {
+	config := &blob_store_configs.TomlS3V0{
+		Bucket:       "test",
+		SessionToken: "session-token-secret",
+	}
+	err := ValidateS3Auth(config)
+	if err == nil {
+		t.Fatal("session-token without access-key-id validated; want rejection")
+	}
+}
+
+// TestValidateS3Auth_AcceptsValidShapes covers the auth-mode
+// configurations the SDK's default credential chain handles cleanly.
+func TestValidateS3Auth_AcceptsValidShapes(t *testing.T) {
+	cases := []struct {
+		name   string
+		config blob_store_configs.TomlS3V0
+	}{
+		{"anonymous", blob_store_configs.TomlS3V0{Bucket: "b"}},
+		{
+			"static-creds",
+			blob_store_configs.TomlS3V0{
+				Bucket:          "b",
+				AccessKeyId:     "AKIA0000",
+				SecretAccessKey: "secret",
+			},
+		},
+		{
+			"static-creds + session-token",
+			blob_store_configs.TomlS3V0{
+				Bucket:          "b",
+				AccessKeyId:     "AKIA0000",
+				SecretAccessKey: "secret",
+				SessionToken:    "sess",
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := ValidateS3Auth(&tc.config); err != nil {
+				t.Errorf("%s rejected: %v", tc.name, err)
+			}
+		})
+	}
+}

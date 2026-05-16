@@ -92,6 +92,32 @@ func ConfigKeyValues(config Config) map[string]string {
 		}
 	}
 
+	// S3: surface endpoint, region, bucket, prefix, use-path-style,
+	// and insecure-skip-tls-verify; access-key-id surfaces because
+	// it's effectively a username; secret-access-key and session-token
+	// NEVER surface. Redaction is unit-pinned.
+	if configS3, ok := config.(ConfigS3); ok {
+		if v := configS3.GetEndpoint(); v != "" {
+			keyValues["endpoint"] = v
+		}
+		if v := configS3.GetRegion(); v != "" {
+			keyValues["region"] = v
+		}
+		keyValues["bucket"] = configS3.GetBucket()
+		if v := configS3.GetPrefix(); v != "" {
+			keyValues["prefix"] = v
+		}
+		if v := configS3.GetAccessKeyId(); v != "" {
+			keyValues["access-key-id"] = v
+		}
+		if configS3.GetUsePathStyle() {
+			keyValues["use-path-style"] = "true"
+		}
+		if configS3.GetInsecureSkipVerify() {
+			keyValues["insecure-skip-tls-verify"] = "true"
+		}
+	}
+
 	return keyValues
 }
 
