@@ -92,7 +92,7 @@ func readBlob(
 		t.Fatalf("MakeBlobReader(%s): %v", id, err)
 	}
 
-	defer reader.Close()
+	defer reader.Close() //defer:err-checked
 
 	var buf bytes.Buffer
 	if _, err := io.Copy(&buf, reader); err != nil {
