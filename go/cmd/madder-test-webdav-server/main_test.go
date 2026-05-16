@@ -67,10 +67,22 @@ func TestCookieMismatchExitsOne(t *testing.T) {
 // exactly one line on stdout, fields pipe-delimited, starts with the
 // cookie, version 1, transport tcp, 127.0.0.1:PORT, empty metadata
 // (WebDAV has no reserved keys today), subprotocol http.
+//
+// Holds stdin open via a pipe so the server's stdin-EOF-driven
+// shutdown doesn't race with the Stat call on the advertised root
+// path. Without this, exec's default of attaching the child's stdin
+// to /dev/null causes the server to receive immediate EOF, cancel
+// its context, and remove the root directory before the test reads
+// it. Surfaces reliably under the nix sandbox.
 func TestHandshakeLineFormat(t *testing.T) {
 	const cookie = "0123456789abcdef0123456789abcdef"
 	cmd := exec.Command(binaryPath)
 	cmd.Env = append(envWithoutCookie(), "MADDER_PLUGIN_COOKIE="+cookie)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close() //nolint:errcheck
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
