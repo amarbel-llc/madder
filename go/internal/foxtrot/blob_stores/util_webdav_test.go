@@ -71,3 +71,22 @@ func TestValidateWebdavAuth_RejectsMultipleModes(t *testing.T) {
 		})
 	}
 }
+
+// TestValidateWebdavAuth_RejectsKeyWithoutCert pins the asymmetric
+// half of the TLS-cert validation: a key path without a matching cert
+// path would silently no-op (buildTLSConfig only enters the cert
+// branch when certPath is set), producing an anonymous connection the
+// operator didn't ask for. Refuse at construction-time.
+func TestValidateWebdavAuth_RejectsKeyWithoutCert(t *testing.T) {
+	config := blob_store_configs.TomlWebDAVV0{
+		URL:              "https://h/",
+		TLSClientKeyPath: "/etc/madder/client.key",
+	}
+	err := validateWebdavAuth(&config)
+	if err == nil {
+		t.Fatal("tls-client-key-path without tls-client-cert-path validated; want rejection")
+	}
+	if !strings.Contains(err.Error(), "tls-client-key-path set without tls-client-cert-path") {
+		t.Errorf("error %q missing the key-without-cert anchor", err.Error())
+	}
+}

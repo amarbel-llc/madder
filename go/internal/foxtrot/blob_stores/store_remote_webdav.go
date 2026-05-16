@@ -694,9 +694,8 @@ func (mover *webdavMover) Close() (err error) {
 	}
 	mover.closed = true
 
-	// The buffered upload path means the in-memory body must always
-	// be released; deletion of the remote temp is best-effort and
-	// only runs if we PUT it.
+	// tempPosted guards the deferred DELETE: a temp URL we never PUT
+	// would 404 on DELETE and surface as a spurious error.
 	tempPosted := false
 	defer func() {
 		if mover.tempBuf != nil {
@@ -1122,9 +1121,14 @@ func (blobStore *remoteWebdav) propfind(url string, depth string) ([]webdavRespo
 	defer resp.Body.Close() //defer:err-checked
 
 	if resp.StatusCode == http.StatusNotFound {
+		// Drain the body so the underlying connection can be reused
+		// from the keep-alive pool. Closing without draining drops
+		// the connection.
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, nil
 	}
 	if resp.StatusCode != http.StatusMultiStatus && resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, resp.Body)
 		return nil, errors.Errorf(
 			"PROPFIND %q returned %d", url, resp.StatusCode,
 		)

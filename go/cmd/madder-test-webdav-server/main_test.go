@@ -114,16 +114,24 @@ func TestHandshakeLineFormat(t *testing.T) {
 	}
 }
 
-// TestStdinCloseTriggersCleanExit asserts RFC 0001 Lifecycle:
-// closing the child's stdin MUST trigger graceful shutdown with
-// exit 0 within a short grace window.
 // TestHandshakeLineFormat_TLS pins the TLS-mode handshake: subprotocol
 // is "https", metadata is "cert=<path>", and the cert file exists at
 // the advertised path so the bats helper can pass it as -tls-ca-path.
+//
+// Holds stdin open via a pipe so the server's stdin-EOF-driven
+// shutdown doesn't race with the Stat call. Without this, exec's
+// default of attaching the child's stdin to /dev/null causes the
+// server to receive immediate EOF, cancel its context, and remove
+// the cert file before the test reads it.
 func TestHandshakeLineFormat_TLS(t *testing.T) {
 	const cookie = "0123456789abcdef0123456789abcdef"
 	cmd := exec.Command(binaryPath, "-tls")
 	cmd.Env = append(envWithoutCookie(), "MADDER_PLUGIN_COOKIE="+cookie)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stdin.Close() //nolint:errcheck
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -159,6 +167,9 @@ func TestHandshakeLineFormat_TLS(t *testing.T) {
 	}
 }
 
+// TestStdinCloseTriggersCleanExit asserts RFC 0001 Lifecycle:
+// closing the child's stdin MUST trigger graceful shutdown with
+// exit 0 within a short grace window.
 func TestStdinCloseTriggersCleanExit(t *testing.T) {
 	const cookie = "0123456789abcdef0123456789abcdef"
 	cmd := exec.Command(binaryPath)

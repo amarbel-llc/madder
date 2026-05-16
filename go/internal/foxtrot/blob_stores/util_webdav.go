@@ -37,6 +37,17 @@ func validateWebdavAuth(config blob_store_configs.ConfigWebDAV) error {
 			modes,
 		)
 	}
+
+	// tls-client-key-path is meaningless without tls-client-cert-path —
+	// the key would be loaded into TLS material that's never sent. Catch
+	// it here rather than letting it silently no-op into an anonymous
+	// connection.
+	if config.GetTLSClientKeyPath() != "" && config.GetTLSClientCertPath() == "" {
+		return errors.Errorf(
+			"WebDAV auth: tls-client-key-path set without tls-client-cert-path",
+		)
+	}
+
 	return nil
 }
 
