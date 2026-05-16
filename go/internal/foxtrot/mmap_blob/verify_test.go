@@ -65,7 +65,7 @@ func TestVerify_Match(t *testing.T) {
 	marklId := writeBlobAndDigest(t, path, []byte("verify happy path payload"))
 
 	mb := mmapAt(t, path, marklId)
-	defer mb.Close()
+	defer mb.Close() //defer:err-checked
 
 	if err := mb.Verify(); err != nil {
 		t.Fatalf("Verify on intact blob: %v", err)
@@ -84,7 +84,7 @@ func TestVerify_Mismatch(t *testing.T) {
 	}
 
 	mb := mmapAt(t, path, marklId)
-	defer mb.Close()
+	defer mb.Close() //defer:err-checked
 
 	if err := mb.Verify(); !errors.Is(err, ErrDigestMismatch) {
 		t.Fatalf("Verify on tampered blob: got %v, want ErrDigestMismatch", err)
@@ -99,7 +99,7 @@ func TestVerify_NilMarklId(t *testing.T) {
 	}
 
 	mb := mmapAt(t, path, nil)
-	defer mb.Close()
+	defer mb.Close() //defer:err-checked
 
 	if err := mb.Verify(); err != nil {
 		t.Fatalf("Verify with nil MarklId: %v", err)
