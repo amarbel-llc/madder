@@ -11,9 +11,8 @@
 #
 # TMPDIR=/tmp scopes ssh-agent's socket dir to a short path:
 # $BATS_TEST_TMPDIR plus any worktree-rooted session TMPDIR can
-# blow past the 108-char Unix domain socket limit. /tmp is in
-# sandcastle's allowWrite list, and ssh-agent cleans up the socket
-# dir on the SIGTERM that stop_test_ssh_agent sends.
+# blow past the 108-char Unix domain socket limit. ssh-agent cleans
+# up the socket dir on the SIGTERM that stop_test_ssh_agent sends.
 start_test_ssh_agent() {
   local key="$BATS_TEST_TMPDIR/test_ed25519"
 
