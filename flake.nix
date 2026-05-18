@@ -1,7 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:amarbel-llc/nixpkgs";
-    nixpkgs-master.url = "github:NixOS/nixpkgs/ae921939fcbd44874664477bd1d22543c10a8306";
+    nixpkgs-master.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
     utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
 
     tommy = {
@@ -9,8 +9,8 @@
       inputs.utils.follows = "utils";
     };
 
-    bob = {
-      url = "github:amarbel-llc/bob";
+    bats = {
+      url = "github:amarbel-llc/bats";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -31,7 +31,7 @@
       nixpkgs-master,
       utils,
       tommy,
-      bob,
+      bats,
       purse-first,
       ...
     }:
@@ -57,7 +57,7 @@
             nixpkgs
             nixpkgs-master
             tommy
-            bob
+            bats
             purse-first
             system
             ;

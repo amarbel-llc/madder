@@ -22,10 +22,12 @@ test:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} --filter-tags '!net_cap' *.bats
 
-# Run net_cap-tagged tests with --allow-local-binding so sandcastle
-# permits 127.0.0.1 binds, and --allow-unix-sockets so the
-# sftp-analyze harness's per-test ssh-agent can listen on a
-# tmpdir-relative Unix socket. Used for the SFTP test family.
+# Run net_cap-tagged tests (SFTP + WebDAV harnesses) in the devshell
+# for fast iteration. The authoritative CI path runs them via
+# `nix build .#bats-net_cap` (see top-level justfile's
+# `test-bats-net-cap`); this recipe is the same suite invoked
+# directly against $PWD's binaries so devs can iterate without
+# rebuilding the lane.
 #
 # TMPDIR=/tmp pins the per-test tmpdir to a short prefix. macOS's
 # default $TMPDIR is a long per-user path, and our session $TMPDIR is
@@ -36,4 +38,4 @@ test:
 [group("test")]
 test-net-cap:
   TMPDIR=/tmp BATS_TEST_TIMEOUT="{{bats_timeout}}" \
-    bats --allow-local-binding --allow-unix-sockets --jobs {{num_cpus()}} --filter-tags net_cap *.bats
+    bats --jobs {{num_cpus()}} --filter-tags net_cap *.bats

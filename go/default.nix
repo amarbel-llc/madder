@@ -2,7 +2,7 @@
   nixpkgs,
   nixpkgs-master,
   tommy,
-  bob,
+  bats,
   purse-first,
   system,
   man7Src ? null,
@@ -28,30 +28,72 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # mkBatsLane wraps pkgs.testers.batsLane with madder's parameter
-  # shape: vanilla bats, bob's bats-libs on BATS_LIB_PATH, MADDER_BIN
-  # and CG_BIN exported via the binaries-map form, version.env staged
-  # sibling-of-bats, jq for cli_contract.bats's JSON helpers,
-  # BATS_TEST_TIMEOUT=30 to mirror zz-tests_bats/justfile.
+  # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
+  # with madder's parameter shape: vanilla bats, bats-libs on
+  # BATS_LIB_PATH, MADDER_BIN / CG_BIN / HYPHENCE_BIN exported via the
+  # binaries-map form, version.env staged sibling-of-bats, jq for
+  # cli_contract.bats's JSON helpers, git for bats-island's
+  # setup_test_home, BATS_TEST_TIMEOUT=30 to mirror zz-tests_bats/justfile.
   #
   # `filter` is forwarded verbatim to `bats --filter-tags`. Default
-  # `!net_cap` excludes loopback-binding scenarios the nix sandbox
-  # doesn't grant; callers override for per-tag dev-loop selection.
-  mkBatsLane = { filter ? "!net_cap", base ? madder }:
-    pkgs.testers.batsLane {
+  # `!net_cap` excludes loopback-binding scenarios; callers override
+  # for per-tag dev-loop selection.
+  #
+  # `extraBinaries` is an overlay onto the default binaries map. The
+  # net_cap lane uses this to add the devshell-only test-fixture
+  # binaries (madder-test-sftp-server, madder-test-craft-legacy-blob,
+  # madder-test-webdav-server) so `nix build .#bats-net_cap` is
+  # self-sufficient.
+  mkBatsLane = { filter ? "!net_cap", base ? madder, extraBinaries ? { } }:
+    bats.lib.${system}.batsLane {
       inherit base filter batsSrc;
       binaries = {
         MADDER_BIN   = { inherit base; name = "madder"; };
         CG_BIN       = { inherit base; name = "cutting-garden"; };
         HYPHENCE_BIN = { inherit base; name = "hyphence"; };
-      };
-      batsLibPath = [ bob.packages.${system}.bats-libs.batsLibPath ];
+      } // extraBinaries;
+      batsLibPath = [ bats.packages.${system}.bats-libs.batsLibPath ];
       extraStagedFiles = [
         { src = versionEnv; dest = "version.env"; }
       ];
       extraEnv = { BATS_TEST_TIMEOUT = "30"; };
-      nativeBuildInputs = [ pkgs-master.jq ];
+      # git: bats-island's setup_test_home shells out to `git config`.
+      # jq: cli_contract.bats's JSON helpers.
+      # openssh: zz-tests_bats/lib/sftp_legacy.bash spawns ssh-agent
+      #   and shells out to ssh-keygen.
+      # openssl: webdav.bats generates self-signed client certs for
+      #   the TLS-client-cert tests.
+      # unixtools.xxd: sftp.bash / webdav.bash generate per-test
+      #   cookies via `xxd -p`; webdav.bats also reads file magic bytes.
+      nativeBuildInputs = [
+        pkgs-master.jq
+        pkgs-master.git
+        pkgs-master.openssh
+        pkgs-master.openssl
+        pkgs-master.unixtools.xxd
+      ];
     };
+
+  # Test-fixture binaries (madder-test-sftp-server,
+  # madder-test-craft-legacy-blob, madder-test-webdav-server) exported
+  # under env vars the bats helpers read (zz-tests_bats/lib/sftp.bash,
+  # sftp_legacy.bash, webdav.bash). Only attached to the net_cap lane
+  # so non-net_cap lanes don't pay the cache-invalidation cost when a
+  # fixture binary's source changes.
+  netCapExtraBinaries = {
+    MADDER_TEST_SFTP_SERVER = {
+      base = madder-test-sftp-server;
+      name = "madder-test-sftp-server";
+    };
+    MADDER_TEST_CRAFT_LEGACY_BLOB = {
+      base = madder-test-craft-legacy-blob;
+      name = "madder-test-craft-legacy-blob";
+    };
+    MADDER_TEST_WEBDAV_SERVER = {
+      base = madder-test-webdav-server;
+      name = "madder-test-webdav-server";
+    };
+  };
 
   # madder-cli-cover's coverIntegrationCommand is a phase fragment
   # (shell embedded in buildGoCover's own installCheckPhase), not a
@@ -66,7 +108,7 @@ let
     export MADDER_BIN="$out/bin/madder"
     export CG_BIN="$out/bin/cutting-garden"
     export HYPHENCE_BIN="$out/bin/hyphence"
-    export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${bob.packages.${system}.bats-libs.batsLibPath}"
+    export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${bats.packages.${system}.bats-libs.batsLibPath}"
     export BATS_TEST_TIMEOUT=30
 
     cd stage/zz-tests_bats
@@ -300,11 +342,19 @@ let
       in
         pkgs-master.lib.listToAttrs (map
           (tag: pkgs-master.lib.nameValuePair "bats-${tag}"
-            (mkBatsLane { filter = tag; }))
+            (mkBatsLane {
+              filter = tag;
+              # Per-tag binaries overlay: the net_cap lane gets the
+              # SFTP/WebDAV/craft-legacy-blob test-fixture binaries so
+              # `nix build .#bats-net_cap` is self-sufficient.
+              extraBinaries =
+                if tag == "net_cap" then netCapExtraBinaries else { };
+            }))
           allFileTags) // {
           bats-default = mkBatsLane { filter = "!net_cap"; };
-          # No bats-race-net_cap: the net_cap suite needs
-          # madder-test-sftp-server (devshell-only by design).
+          # No bats-race-net_cap: the race-instrumented binary doubles
+          # build time and the SFTP/WebDAV harnesses already exercise
+          # the same data paths under the non-race net_cap lane.
           bats-race = mkBatsLane { filter = "!net_cap"; base = madder-race; };
         };
 
@@ -365,7 +415,7 @@ in
     packages = [
       (pkgs.mkGoEnv { pwd = ./.; })
       tommy.packages.${system}.default
-      bob.packages.${system}.batman
+      bats.packages.${system}.default
       purse-first.packages.${system}.dagnabit
       madder-test-sftp-server
       madder-test-craft-legacy-blob
