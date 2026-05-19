@@ -275,10 +275,13 @@ func readBlobFile(
 	if err != nil {
 		tb.Fatalf("Open(%q): %v", remoteFile, err)
 	}
-	defer f.Close()
 	n, err := io.Copy(io.Discard, f)
 	if err != nil {
+		_ = f.Close()
 		tb.Fatalf("Copy from %q: %v", remoteFile, err)
+	}
+	if err := f.Close(); err != nil {
+		tb.Fatalf("Close(%q): %v", remoteFile, err)
 	}
 	return n
 }
