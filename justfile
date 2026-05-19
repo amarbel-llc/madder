@@ -92,6 +92,13 @@ test: vet-go-analyzers test-go-race test-bats test-bats-net-cap
 test-go *flags:
   cd go && go test -tags test {{flags}} ./...
 
+# Run Go benchmarks. Usage: just bench-go ./internal/foxtrot/blob_stores
+# Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
+# in flags for real timing. -run=^$ suppresses test functions.
+[group("test")]
+bench-go pkg="./..." *flags="-benchtime=1x":
+  cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
+
 # Run `go vet` across the module with the test build tag, which gates
 # several internal test-only symbols. Without -tags test, vet reports
 # false positives on test-tagged source files.
