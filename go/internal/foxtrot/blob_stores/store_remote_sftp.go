@@ -549,8 +549,6 @@ func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_inte
 	}
 }
 
-// allBlobsForBase walks `basePath` and yields a markl id reconstructed
-// from each leaf path, using `hashType` as the format. Caller is
 // shouldSkipBlobWalkEntry returns true when the named entry is not a
 // blob file and the bucket-tree walker should ignore it. Filters
 // out the `blob_store-config` sibling and `tmp_*` upload artifacts
@@ -562,6 +560,8 @@ func shouldSkipBlobWalkEntry(name string) bool {
 		strings.HasPrefix(name, "tmp_")
 }
 
+// allBlobsForBase walks `basePath` and yields a markl id reconstructed
+// from each leaf path, using `hashType` as the format. Caller is
 // responsible for choosing a basePath that does NOT contain the
 // format-id segment — see allBlobsMultiHash. The walker yields paths
 // relative to the SFTP server root (no leading `/`), so we re-base
@@ -620,7 +620,18 @@ func (blobStore *remoteSftp) allBlobsForBase(
 			results[i] = make(chan bucketResult, 1)
 		}
 
+		// tasks is buffered to exactly len(bucketNames), so the
+		// synchronous fill below cannot block — no dispatcher
+		// goroutine is needed.
 		tasks := make(chan int, len(bucketNames))
+		for i := range bucketNames {
+			tasks <- i
+		}
+		close(tasks)
+
+		// done lets workers bail out early when the reader has
+		// returned (yield returned false or function exits). Closed
+		// exactly once by the defer below.
 		done := make(chan struct{})
 
 		workerCount := sftpAllBlobsWorkerCount
@@ -648,59 +659,25 @@ func (blobStore *remoteSftp) allBlobsForBase(
 						basePath,
 						digest,
 					)
-					select {
-					case results[idx] <- bucketResult{ids: ids, err: walkErr}:
-					case <-done:
-						return
-					}
+					// Send is non-blocking: each results[idx] is a
+					// buffer-of-1 that only ever receives this one send.
+					results[idx] <- bucketResult{ids: ids, err: walkErr}
 				}
 			}()
 		}
 
-		go func() {
-			defer close(tasks)
-			for i := range bucketNames {
-				select {
-				case tasks <- i:
-				case <-done:
-					return
-				}
-			}
-		}()
-
-		closed := false
-		closeDone := func() {
-			if !closed {
-				closed = true
-				close(done)
-			}
-		}
 		defer func() {
-			closeDone()
-			// Drain unread results so the buffered-1 sends in workers
-			// complete and the worker goroutines can return.
-			for i := range results {
-				select {
-				case <-results[i]:
-				default:
-				}
-			}
+			close(done)
 			wg.Wait()
 		}()
 
 		for i := range bucketNames {
-			var r bucketResult
-			select {
-			case r = <-results[i]:
-			case <-done:
-				return
-			}
+			r := <-results[i]
 			if r.err != nil {
 				if !yield(nil, errors.Wrapf(
 					r.err, "BasePath: %q",
 					filepath.Join(basePath, bucketNames[i]),
 				)) {
-					closeDone()
 					return
 				}
 				continue
@@ -710,7 +687,6 @@ func (blobStore *remoteSftp) allBlobsForBase(
 				blobStore.blobCache[string(id.GetBytes())] = struct{}{}
 				blobStore.blobCacheLock.Unlock()
 				if !yield(id, nil) {
-					closeDone()
 					return
 				}
 			}
