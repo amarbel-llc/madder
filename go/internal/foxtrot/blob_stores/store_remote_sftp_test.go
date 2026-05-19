@@ -3,6 +3,7 @@
 package blob_stores
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -255,6 +257,51 @@ func (c *spyActiveContext) Must(_ interfaces.FuncActiveContext)    {}
 // only as type evidence; the methods above implement the interface
 // without delegating to a real context.Context.
 var _ context.Context = (*spyActiveContext)(nil)
+
+// TestAllBlobsForBase_YieldsLexByteOrder pins the BlobStore.AllBlobs
+// ordering contract over the parallel-walk fan-out introduced in PR
+// #192. The pre-PR Walk did not sort; the fan-out sorts each bucket's
+// ids internally AND consumes buckets in sorted name order, so the
+// full cross-bucket stream is in lex byte order. Without this test
+// the fan-out machinery could silently regress to per-bucket-only
+// order (or, after the simplification that removed the dispatcher
+// goroutine + close-once guards, to no order at all).
+func TestAllBlobsForBase_YieldsLexByteOrder(t *testing.T) {
+	h := newSFTPBenchHarness(t, 0)
+	defer h.Close()
+	wantCount := populateBuckets(t, h.client, h.remotePath)
+
+	store := newBenchStore(t, h.client, h.remotePath)
+
+	var got []domain_interfaces.MarklId
+	for id, err := range store.allBlobsForBase(
+		h.remotePath,
+		markl.FormatHashSha256,
+	) {
+		if err != nil {
+			t.Fatalf("allBlobsForBase: %v", err)
+		}
+		got = append(got, id)
+	}
+
+	if len(got) != wantCount {
+		t.Fatalf(
+			"yielded %d blobs, populateBuckets created %d",
+			len(got), wantCount,
+		)
+	}
+
+	for i := 1; i < len(got); i++ {
+		prev := got[i-1].GetBytes()
+		cur := got[i].GetBytes()
+		if bytes.Compare(prev, cur) > 0 {
+			t.Fatalf(
+				"ids not in lex byte order: got[%d]=%x > got[%d]=%x",
+				i-1, prev, i, cur,
+			)
+		}
+	}
+}
 
 // TestShouldSkipBlobWalkEntry pins #148: the blob walker must skip
 // blob_store-config and tmp_* entries so they're not yielded as
