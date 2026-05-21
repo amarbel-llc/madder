@@ -466,31 +466,44 @@ incubate-dewey-pkg subpath dest:
   chmod -R u+w "$dst"
   echo "copied $src -> $dst"
 
-# Rewrite dewey internal-path imports to pkgs/ facades for the 15 packages
-# that already have facades in dewey v0.1.1. Remaining 14 are blocked on
-# purse-first#93 (missing facades). Part of the dewey v0.1.1 bump.
+# Rewrite all dewey internal-path imports to pkgs/ facades (29 packages total).
+# All facades present since dewey v0.1.2 (purse-first#93 resolved).
 [group("debug")]
 debug-rewrite-dewey-pkgs-facades:
   #!/usr/bin/env bash
   set -euo pipefail
   cd {{justfile_directory()}}
   find go -name '*.go' -type f -print0 | xargs -0 sed -i \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/0/bech32"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/bech32"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/alfa/cmp"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/cmp"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"|g' \
-    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/alfa/unicorn"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/unicorn"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"|g' \
-    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/quiter"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/quiter"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/catgut"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/catgut"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/cli"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/cli"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/collections_value"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_value"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/delim_io"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/delim_io"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/fd"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/fd"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/files"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/format"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/format"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pivy"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/age"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/age"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/thyme"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/thyme"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/config_cli"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/golf/server"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"|g' \
     -e 's|github.com/amarbel-llc/purse-first/libs/dewey/golf/transport"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/transport"|g'
-  echo "done: rewrote 15 dewey pkgs/ facades"
+  echo "done: rewrote 29 dewey pkgs/ facades"
 
 # Rewrite an import path and its unqualified package identifier across
 # every .go file in the module. Skips files whose path matches any of the

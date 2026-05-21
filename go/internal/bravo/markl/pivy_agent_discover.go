@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pivy"
 
 	"golang.org/x/crypto/ssh/agent"
 )

@@ -12,11 +12,11 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/quiter"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/quiter"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/delim_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"
 )
 
 func init() {

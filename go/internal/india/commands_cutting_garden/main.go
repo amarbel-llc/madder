@@ -2,7 +2,7 @@ package commands_cutting_garden
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
 )
 
 var utility = futility.NewUtility("cutting-garden", "filesystem-tree capture and restore over content-addressable blob stores")

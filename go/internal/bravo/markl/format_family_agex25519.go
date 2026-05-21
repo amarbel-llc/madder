@@ -5,10 +5,10 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/bech32"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/bech32"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/age"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/age"
 )
 
 func AgeX25519Generate(_ io.Reader) (bites []byte, err error) {

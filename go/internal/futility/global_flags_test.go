@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
 )
 
 // testGlobals is a synthetic utility-side globals struct used by the tests

@@ -33,7 +33,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	deweyerrors "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 )
 

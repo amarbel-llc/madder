@@ -5,7 +5,7 @@ package none
 import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 )
 
 const Reference = "madder-codec-none-v1@none"

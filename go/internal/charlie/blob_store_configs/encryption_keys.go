@@ -7,7 +7,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/age"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/age"
 )
 
 type EncryptionKeys []markl.Id

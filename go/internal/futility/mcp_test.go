@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"
 )
 
 func TestAppRegisterMCPTools(t *testing.T) {

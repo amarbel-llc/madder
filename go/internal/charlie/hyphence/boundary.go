@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/catgut"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/catgut"
 )
 
 const (

@@ -22,7 +22,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/transport"
 )
 

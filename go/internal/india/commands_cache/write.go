@@ -17,7 +17,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/script_value"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"
 )
 
 func init() {

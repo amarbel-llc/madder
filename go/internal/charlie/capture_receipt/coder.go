@@ -23,7 +23,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/format"
 )
 

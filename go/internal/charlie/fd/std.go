@@ -4,7 +4,7 @@ import (
 	"io"
 	"os"
 
-	lib_fd "github.com/amarbel-llc/purse-first/libs/dewey/delta/fd"
+	lib_fd "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/fd"
 )
 
 type Std = lib_fd.Std

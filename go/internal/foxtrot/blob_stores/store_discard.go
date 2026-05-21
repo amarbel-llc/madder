@@ -8,7 +8,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 )
 
 // discard is a virtual blob store whose MakeBlobWriter feeds raw bytes

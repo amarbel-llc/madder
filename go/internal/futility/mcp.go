@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"
 )
 
 // RegisterMCPTools registers all non-hidden commands as MCP tools
