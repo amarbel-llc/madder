@@ -3,9 +3,9 @@ package env_dir
 import (
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
 )
 
 // TODO only call reset temp when actually not resetting temp

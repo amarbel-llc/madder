@@ -3,7 +3,7 @@ package markl
 import (
 	"io"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 func NonceGenerate(rand io.Reader, size int) (bites []byte, err error) {

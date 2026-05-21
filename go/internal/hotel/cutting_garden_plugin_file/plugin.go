@@ -19,7 +19,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_sink"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Plugin is the filesystem capture/restore backend.

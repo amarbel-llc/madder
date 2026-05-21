@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // TestMakeDefault_XDGUserLocationOnlyDisablesCwdWalkUp proves that

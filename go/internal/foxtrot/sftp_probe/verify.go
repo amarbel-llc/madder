@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	markl_io_alfa "github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // SampleResult is the verdict for one (sample, candidate) pair.

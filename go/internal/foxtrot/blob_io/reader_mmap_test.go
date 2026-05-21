@@ -11,7 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
 )
 
 func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {

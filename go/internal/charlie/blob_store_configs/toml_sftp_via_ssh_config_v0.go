@@ -1,6 +1,6 @@
 package blob_store_configs
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+import "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 
 //go:generate tommy generate
 type TomlSFTPViaSSHConfigV0 struct {

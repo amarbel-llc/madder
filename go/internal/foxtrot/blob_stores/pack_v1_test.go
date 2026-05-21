@@ -20,7 +20,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 func TestPackV1WithDelta(t *testing.T) {

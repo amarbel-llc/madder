@@ -2,7 +2,7 @@ package inventory_log
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Codec serializes one LogEvent shape to and from one NDJSON line.

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
 )
 

@@ -10,6 +10,8 @@ github.com/MakeNowJust/heredoc v1.0.0 h1:cXCdzVdstXyiTqTvfqk9SDHpKNjxuom+DOlyEeQ
 github.com/MakeNowJust/heredoc v1.0.0/go.mod h1:mG5amYoWBHf8vpLOuehzbGGw0EHxpZZ6lCpQ4fNJ8LE=
 github.com/amarbel-llc/purse-first/libs/dewey v0.1.1-0.20260516125550-eac862321b10 h1:xCvGHs67uLqa+G6wsuEeUvkiNBa+EE0d7TmUdJMjr0I=
 github.com/amarbel-llc/purse-first/libs/dewey v0.1.1-0.20260516125550-eac862321b10/go.mod h1:Z2O4fGt0BRR8wB5c1HpMRd/XG6Ymx4Ch7g4RfQmqnbI=
+github.com/amarbel-llc/purse-first/libs/dewey v0.1.1 h1:klM22tvqCDawPUu/Vg3qtx4z9ideaRPO8dMzyChdIYI=
+github.com/amarbel-llc/purse-first/libs/dewey v0.1.1/go.mod h1:zhf7U0L8ZNAAwrSdWSHUDadxu0Q6NaY49tnK3MzRfjo=
 github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.12 h1:vAuX5weS0oDmbA4d+Y+FQdIKjFZDInUtANnZmFOqR9c=
 github.com/amarbel-llc/purse-first/libs/go-mcp v0.0.12/go.mod h1:4QNwpEtQWg+aF++9BpxQq93cnj6puQfsARZ0Z4fHIHk=
 github.com/amarbel-llc/tap/go v0.1.2 h1:tBIB/1tUsq49CnynWPvSUzFGx1HsA6nmZWlLRs553uM=

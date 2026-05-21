@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"

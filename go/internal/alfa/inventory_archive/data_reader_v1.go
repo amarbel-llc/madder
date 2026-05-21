@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 type DataReaderV1 struct {

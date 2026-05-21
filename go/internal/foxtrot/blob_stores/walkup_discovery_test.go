@@ -14,7 +14,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	delta_blob_store_configs "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // writeStoreConfig writes a minimal V3 hash-bucketed config to

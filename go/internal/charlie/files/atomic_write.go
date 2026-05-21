@@ -14,7 +14,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // ImmutableFileMode is the permission applied to an immutable file

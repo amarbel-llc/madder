@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
 )
 

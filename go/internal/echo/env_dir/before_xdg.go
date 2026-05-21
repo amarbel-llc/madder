@@ -1,9 +1,9 @@
 package env_dir
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
 )
 
 type beforeXDG struct {

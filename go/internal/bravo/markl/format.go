@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"golang.org/x/crypto/curve25519"
 )
 

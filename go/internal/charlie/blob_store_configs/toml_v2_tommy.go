@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 	"github.com/amarbel-llc/tommy/pkg/cst"
 	"github.com/amarbel-llc/tommy/pkg/document"
 )

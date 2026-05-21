@@ -2,7 +2,7 @@ package env_dir
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 type RepoId struct {

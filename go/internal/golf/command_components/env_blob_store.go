@@ -9,7 +9,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
 )
 

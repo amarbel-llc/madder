@@ -7,7 +7,7 @@ import (
 	"crypto/sha512"
 	"hash"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"golang.org/x/crypto/blake2b"
 )
 

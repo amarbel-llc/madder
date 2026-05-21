@@ -3,7 +3,7 @@ package ids
 import (
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 type typeStruct struct {

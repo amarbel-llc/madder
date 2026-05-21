@@ -3,7 +3,7 @@ package inventory_log
 import (
 	"sync"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Registry maps event type-string to Codec. Native types are reserved;

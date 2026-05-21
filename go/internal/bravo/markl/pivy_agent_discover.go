@@ -5,7 +5,7 @@ import (
 	"crypto/ecdsa"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/pivy"
 
 	"golang.org/x/crypto/ssh/agent"

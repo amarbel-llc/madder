@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 var poolWriter = pool.Make[writer](nil, nil)

@@ -1,7 +1,7 @@
 package plugins
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // legacyCompressionTable maps on-disk compression-type strings to

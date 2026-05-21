@@ -4,7 +4,7 @@ package domain_interfaces
 
 import (
 	internal "github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 type (

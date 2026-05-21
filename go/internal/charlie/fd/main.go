@@ -10,9 +10,9 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/thyme"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/thyme"
 )
 
 type FD struct {

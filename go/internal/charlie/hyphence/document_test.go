@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
 )
 
 func TestDocument_Zero(t *testing.T) {

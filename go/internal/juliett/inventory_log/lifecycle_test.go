@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // TestFileObserver_ClosedByContextAfter is the regression test for

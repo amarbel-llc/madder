@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blech32"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // blech32Charset duplicates internal/alfa/blech32's unexported

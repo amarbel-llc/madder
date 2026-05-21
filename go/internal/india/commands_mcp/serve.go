@@ -20,10 +20,10 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 	"github.com/amarbel-llc/purse-first/libs/dewey/golf/server"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/transport"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/transport"
 )
 
 // URI scheme served by this MCP server.

@@ -11,7 +11,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // bodyTypeNDJSON is the on-disk hyphence `! type-string` for inventory-log

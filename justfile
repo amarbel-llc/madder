@@ -466,6 +466,32 @@ incubate-dewey-pkg subpath dest:
   chmod -R u+w "$dst"
   echo "copied $src -> $dst"
 
+# Rewrite dewey internal-path imports to pkgs/ facades for the 15 packages
+# that already have facades in dewey v0.1.1. Remaining 14 are blocked on
+# purse-first#93 (missing facades). Part of the dewey v0.1.1 bump.
+[group("debug")]
+debug-rewrite-dewey-pkgs-facades:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}
+  find go -name '*.go' -type f -print0 | xargs -0 sed -i \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/alfa/cmp"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/cmp"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/alfa/pool"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/collections_value"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_value"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/delim_io"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/delim_io"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/files"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/delta/format"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/format"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/debug"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/thyme"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/thyme"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"|g' \
+    -e 's|github.com/amarbel-llc/purse-first/libs/dewey/golf/transport"|github.com/amarbel-llc/purse-first/libs/dewey/pkgs/transport"|g'
+  echo "done: rewrote 15 dewey pkgs/ facades"
+
 # Rewrite an import path and its unqualified package identifier across
 # every .go file in the module. Skips files whose path matches any of the
 # optional `skip` arguments (find's -path form, trailing /* for subtrees).

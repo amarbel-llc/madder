@@ -4,7 +4,7 @@ package mmap_blob
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Verify recomputes the digest of the mmap'd bytes through the recorded

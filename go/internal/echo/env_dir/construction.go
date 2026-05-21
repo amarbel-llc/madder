@@ -3,8 +3,8 @@ package env_dir
 import (
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/echo/xdg"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
 )
 
 // TODO separate read-only from write

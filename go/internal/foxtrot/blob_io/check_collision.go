@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	perrors "github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	perrors "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // ErrCollisionContentMismatch signals that two readers claimed to represent

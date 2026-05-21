@@ -7,7 +7,7 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 const Reference = "madder-codec-zlib-v1@zlib"

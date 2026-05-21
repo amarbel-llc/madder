@@ -6,8 +6,8 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
 	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/golf/protocol"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 )
 
 func init() {

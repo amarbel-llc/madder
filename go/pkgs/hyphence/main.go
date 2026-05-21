@@ -4,7 +4,7 @@ package hyphence
 
 import (
 	internal "github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 type (

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 func TestTypedMetadataCoderRoundtripWithBlobDigest(t *testing.T) {

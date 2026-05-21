@@ -4,7 +4,7 @@ import (
 	"hash/fnv"
 	"io"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 // GearCDCMinHashComputer splits blob content into variable-length

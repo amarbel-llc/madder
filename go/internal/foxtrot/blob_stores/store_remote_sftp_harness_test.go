@@ -16,7 +16,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // The benchmarks in this file target the specific knobs the SFTP-perf

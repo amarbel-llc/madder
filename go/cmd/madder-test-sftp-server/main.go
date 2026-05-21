@@ -15,7 +15,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
