@@ -24,19 +24,23 @@ var (
 	CopyBlobIfNecessary            = internal.CopyBlobIfNecessary
 	CopyReaderToWriter             = internal.CopyReaderToWriter
 	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
+	IsRemoteConfigAlreadyExists    = internal.IsRemoteConfigAlreadyExists
 	MakeBlobStore                  = internal.MakeBlobStore
 	MakeBlobStoreMap               = internal.MakeBlobStoreMap
 	MakeBlobStores                 = internal.MakeBlobStores
 	MakeHTTPClientForWebDAVConfig  = internal.MakeHTTPClientForWebDAVConfig
 	MakeRemoteBlobStore            = internal.MakeRemoteBlobStore
+	MakeS3Client                   = internal.MakeS3Client
 	MakeSSHAgent                   = internal.MakeSSHAgent
 	MakeSSHClientForExplicitConfig = internal.MakeSSHClientForExplicitConfig
 	MakeSSHClientFromSSHConfig     = internal.MakeSSHClientFromSSHConfig
 	NewDiscardBlobStore            = internal.NewDiscardBlobStore
 	NewMulti                       = internal.NewMulti
 	NopDeletionPrecondition        = internal.NopDeletionPrecondition
+	ValidateS3Auth                 = internal.ValidateS3Auth
 	VerifyBlob                     = internal.VerifyBlob
 	WriteRemoteConfig              = internal.WriteRemoteConfig
+	WriteRemoteConfigS3            = internal.WriteRemoteConfigS3
 )
 
 const (

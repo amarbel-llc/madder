@@ -15,6 +15,7 @@ type (
 	ConfigMutable               = internal.ConfigMutable
 	ConfigNamed                 = internal.ConfigNamed
 	ConfigPointer               = internal.ConfigPointer
+	ConfigS3                    = internal.ConfigS3
 	ConfigSFTPConfigExplicit    = internal.ConfigSFTPConfigExplicit
 	ConfigSFTPRemotePath        = internal.ConfigSFTPRemotePath
 	ConfigSFTPUri               = internal.ConfigSFTPUri
@@ -37,6 +38,7 @@ type (
 	TomlLocalHashBucketedV2     = internal.TomlLocalHashBucketedV2
 	TomlPointerV0               = internal.TomlPointerV0
 	TomlPointerV1               = internal.TomlPointerV1
+	TomlS3V0                    = internal.TomlS3V0
 	TomlSFTPV0                  = internal.TomlSFTPV0
 	TomlSFTPViaSSHConfigV0      = internal.TomlSFTPViaSSHConfigV0
 	TomlUriV0                   = internal.TomlUriV0
@@ -57,6 +59,7 @@ var (
 	DecodeTomlLocalHashBucketedV2    = internal.DecodeTomlLocalHashBucketedV2
 	DecodeTomlPointerV0              = internal.DecodeTomlPointerV0
 	DecodeTomlPointerV1              = internal.DecodeTomlPointerV1
+	DecodeTomlS3V0                   = internal.DecodeTomlS3V0
 	DecodeTomlSFTPV0                 = internal.DecodeTomlSFTPV0
 	DecodeTomlSFTPViaSSHConfigV0     = internal.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlUriV0                  = internal.DecodeTomlUriV0

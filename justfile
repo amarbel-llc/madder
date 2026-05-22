@@ -22,6 +22,15 @@ build-go:
 generate-facades:
   cd go && dagnabit export
 
+# Regenerate facades and show what dewey imports landed in pkgs/domain_interfaces.
+# Used to debug dagnabit import resolution (e.g. internal/ vs pkgs/ path choice).
+[group("debug")]
+debug-check-facade-imports:
+  cd go && dagnabit export
+  grep purse-first go/pkgs/domain_interfaces/main.go || true
+  grep purse-first go/pkgs/hyphence/main.go || true
+  grep purse-first go/pkgs/markl/main.go || true
+
 # Regenerate tommy codegen output for the blob_store_configs package.
 # Deletes all *_tommy.go files first so that tommy's analyze step sees
 # only the hand-written structs as source of truth — decoupling
