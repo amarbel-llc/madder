@@ -4,7 +4,6 @@ package hyphence
 
 import (
 	internal "github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	hyphence "github.com/amarbel-llc/madder/go/pkgs/hyphence"
 	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
@@ -51,16 +50,16 @@ var (
 // Generic function wrappers — Go does not support assigning
 // generic functions to variables without instantiation.
 // See https://github.com/golang/go/issues/52654
-func DecodeFromFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders hyphence.CoderToTypedBlob[BLOB], path string) (typedBlob hyphence.TypedBlob[BLOB], err error) {
+func DecodeFromFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], path string) (typedBlob internal.TypedBlob[BLOB], err error) {
 	return internal.DecodeFromFile[BLOB, BLOB_PTR](coders, path)
 }
-func DecodeFromFileInto[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](typedBlob *hyphence.TypedBlob[BLOB], coders hyphence.CoderToTypedBlob[BLOB], path string) (err error) {
+func DecodeFromFileInto[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](typedBlob *internal.TypedBlob[BLOB], coders internal.CoderToTypedBlob[BLOB], path string) (err error) {
 	return internal.DecodeFromFileInto[BLOB, BLOB_PTR](typedBlob, coders, path)
 }
-func DecodeFromFileOrEmptyBuffer[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders hyphence.CoderToTypedBlob[BLOB], path string, permitNotExist bool) (typedBlob hyphence.TypedBlob[BLOB], err error) {
+func DecodeFromFileOrEmptyBuffer[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], path string, permitNotExist bool) (typedBlob internal.TypedBlob[BLOB], err error) {
 	return internal.DecodeFromFileOrEmptyBuffer[BLOB, BLOB_PTR](coders, path, permitNotExist)
 }
-func EncodeToFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders hyphence.CoderToTypedBlob[BLOB], typedBlob *hyphence.TypedBlob[BLOB], path string) (err error) {
+func EncodeToFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], typedBlob *internal.TypedBlob[BLOB], path string) (err error) {
 	return internal.EncodeToFile[BLOB, BLOB_PTR](coders, typedBlob, path)
 }
 

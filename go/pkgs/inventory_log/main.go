@@ -5,7 +5,6 @@ package inventory_log
 import (
 	internal "github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
 	domaininterfaces "github.com/amarbel-llc/madder/go/pkgs/domain_interfaces"
-	inventorylog "github.com/amarbel-llc/madder/go/pkgs/inventory_log"
 )
 
 type (
@@ -31,6 +30,6 @@ var (
 // Generic function wrappers — Go does not support assigning
 // generic functions to variables without instantiation.
 // See https://github.com/golang/go/issues/52654
-func MakeCodec[E domaininterfaces.LogEvent](typeStr string, encode func(E) ([]byte, error), decode func([]byte) (E, error)) inventorylog.Codec {
+func MakeCodec[E domaininterfaces.LogEvent](typeStr string, encode func(E) ([]byte, error), decode func([]byte) (E, error)) internal.Codec {
 	return internal.MakeCodec[E](typeStr, encode, decode)
 }

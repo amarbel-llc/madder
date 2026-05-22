@@ -5,7 +5,6 @@ package markl
 import (
 	internal "github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	domaininterfaces "github.com/amarbel-llc/madder/go/pkgs/domain_interfaces"
-	markl "github.com/amarbel-llc/madder/go/pkgs/markl"
 	interfaces "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	constraints "golang.org/x/exp/constraints"
 )
@@ -122,25 +121,25 @@ func LockEquals[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](left dom
 func MakeErrLength[INTEGER constraints.Integer](expected INTEGER, actual INTEGER) error {
 	return internal.MakeErrLength[INTEGER](expected, actual)
 }
-func MakeLock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]() markl.Lock[KEY, KEY_PTR] {
+func MakeLock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]() internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLock[KEY, KEY_PTR]()
 }
-func MakeLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR], requireValue bool) markl.LockBinaryMarshaler[KEY, KEY_PTR] {
+func MakeLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR], requireValue bool) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeLockCoder[KEY, KEY_PTR](lock, requireValue)
 }
-func MakeLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR]) markl.LockBinaryMarshaler[KEY, KEY_PTR] {
+func MakeLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR]) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeLockCoderValueNotRequired[KEY, KEY_PTR](lock)
 }
-func MakeLockWith[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](key KEY, value domaininterfaces.MarklId) markl.Lock[KEY, KEY_PTR] {
+func MakeLockWith[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](key KEY, value domaininterfaces.MarklId) internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLockWith[KEY, KEY_PTR](key, value)
 }
-func MakeMutableLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR], requireValue bool) markl.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+func MakeMutableLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR], requireValue bool) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoder[KEY, KEY_PTR](lock, requireValue)
 }
-func MakeMutableLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) markl.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+func MakeMutableLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoderValueNotRequired[KEY, KEY_PTR](lock)
 }
-func MakeMutableLockCoderValueRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) markl.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
+func MakeMutableLockCoderValueRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoderValueRequired[KEY, KEY_PTR](lock)
 }
 
