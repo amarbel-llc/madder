@@ -29,17 +29,20 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # Bridge the `github.com/amarbel-llc/tap/go` go.mod require onto the
-  # local `tap` flake input via the gomod2nix goFlakeInputs feature
-  # (amarbel-llc/nixpkgs#32 / FDR-0002). Wired into every
-  # buildGoApplication and mkGoEnv call that consumes ./gomod2nix.toml,
-  # so a `nix flake update inputs/tap` collapses to a single edit point
-  # (madder#208). Keep all gomod2nix.toml consumers in sync — a missing
-  # site sees the unmerged module graph and resurrects the lockstep.
+  # Bridge go.mod requires onto local flake inputs via the gomod2nix
+  # goFlakeInputs feature (amarbel-llc/nixpkgs#32 / FDR-0002). Wired
+  # into every buildGoApplication and mkGoEnv call that consumes
+  # ./gomod2nix.toml, so a `nix flake update inputs/<dep>` collapses
+  # to a single edit point (madder#208 for tap, madder#211 for tommy).
+  # Keep all gomod2nix.toml consumers in sync — a missing site sees
+  # the unmerged module graph and resurrects the lockstep.
   goFlakeInputs = {
     "github.com/amarbel-llc/tap/go" = {
       src = tap;
       subPath = "go";
+    };
+    "github.com/amarbel-llc/tommy" = {
+      src = tommy.packages.${system}.go-pkgs;
     };
   };
 
