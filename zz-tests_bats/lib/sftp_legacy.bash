@@ -9,58 +9,44 @@
 # with stop_test_ssh_agent in teardown. madder's
 # MakeSSHClientFromSSHConfig uses pubkey-via-agent auth.
 #
-# TMPDIR=/tmp scopes ssh-agent's socket dir to a short path:
-# $BATS_TEST_TMPDIR plus any worktree-rooted session TMPDIR can
-# blow past the 108-char Unix domain socket limit. ssh-agent cleans
-# up the socket dir on the SIGTERM that stop_test_ssh_agent sends.
+# The agent socket is bound under a fresh /tmp/-rooted dir via
+# `ssh-agent -a`. We cannot rely on $TMPDIR for the socket location:
+# inside the macOS nix build sandbox bats sits under a long $TMPDIR
+# (/nix/var/nix/builds/nix-NNNNN-NNNNNNNNN) and $BATS_TEST_TMPDIR
+# inherits that prefix, so the agent's default listener dir
+# overruns darwin's 104-byte AF_UNIX sun_path limit. The kernel
+# stores the literal path passed to bind(2), so an explicit
+# `-a /tmp/.../agent.sock` keeps the bound path short regardless of
+# where bats's per-test tree lives. See madder#207.
 start_test_ssh_agent() {
   local key="$BATS_TEST_TMPDIR/test_ed25519"
 
   ssh-keygen -t ed25519 -N '' -f "$key" -q
 
-  # DEBUG (madder#207): on the darwin nix sandbox the TMPDIR=/tmp prefix
-  # below does not actually shorten the agent socket path — every test
-  # fails with `unix_listener_tmp: ... too long for Unix domain socket`.
-  # These probes write to stderr so bats captures them in the TAP output
-  # for the next macOS-15 CI run, letting us tell apart "ssh-agent on
-  # darwin ignores $TMPDIR", "bats reset TMPDIR before this helper ran",
-  # and "/tmp is not writable inside the macOS sandbox". Drop once the
-  # real fix lands.
-  {
-    printf 'debug-#207: uname=%s TMPDIR=%s BATS_TEST_TMPDIR=%s\n' \
-      "$(uname)" "${TMPDIR:-<unset>}" "${BATS_TEST_TMPDIR:-<unset>}"
-    for cand in /tmp /var/tmp /private/tmp; do
-      if touch "$cand/m207-probe.$$" 2>/dev/null; then
-        printf 'debug-#207: %s writable\n' "$cand"
-        rm -f "$cand/m207-probe.$$"
-      else
-        printf 'debug-#207: %s NOT writable\n' "$cand"
-      fi
-    done
-  } >&2
+  local sock_dir
+  sock_dir=$(mktemp -d /tmp/mdr.XXXXXX)
+  TEST_SSH_AGENT_SOCK_DIR="$sock_dir"
 
-  local agent_output agent_rc=0
-  agent_output="$(TMPDIR=/tmp ssh-agent -s 2>&1)" || agent_rc=$?
-  printf 'debug-#207: ssh-agent rc=%d output:\n%s\n' "$agent_rc" "$agent_output" >&2
-  if [[ "$agent_rc" -ne 0 ]]; then
-    return "$agent_rc"
-  fi
+  local agent_output
+  agent_output="$(ssh-agent -a "$sock_dir/agent.sock" -s)"
   eval "$agent_output" >/dev/null
-
-  printf 'debug-#207: SSH_AUTH_SOCK=%s SSH_AGENT_PID=%s\n' \
-    "${SSH_AUTH_SOCK:-<unset>}" "${SSH_AGENT_PID:-<unset>}" >&2
 
   ssh-add "$key" 2>/dev/null
 
   export SSH_AUTH_SOCK
   export SSH_AGENT_PID
   export TEST_SSH_AGENT_KEY="$key"
+  export TEST_SSH_AGENT_SOCK_DIR
 }
 
 stop_test_ssh_agent() {
   if [[ -n ${SSH_AGENT_PID:-} ]]; then
     kill "$SSH_AGENT_PID" 2>/dev/null || true
     unset SSH_AGENT_PID
+  fi
+  if [[ -n ${TEST_SSH_AGENT_SOCK_DIR:-} ]]; then
+    rm -rf "$TEST_SSH_AGENT_SOCK_DIR"
+    unset TEST_SSH_AGENT_SOCK_DIR
   fi
   unset SSH_AUTH_SOCK TEST_SSH_AGENT_KEY
 }
