@@ -18,9 +18,37 @@ start_test_ssh_agent() {
 
   ssh-keygen -t ed25519 -N '' -f "$key" -q
 
-  local agent_output
-  agent_output="$(TMPDIR=/tmp ssh-agent -s)"
+  # DEBUG (madder#207): on the darwin nix sandbox the TMPDIR=/tmp prefix
+  # below does not actually shorten the agent socket path — every test
+  # fails with `unix_listener_tmp: ... too long for Unix domain socket`.
+  # These probes write to stderr so bats captures them in the TAP output
+  # for the next macOS-15 CI run, letting us tell apart "ssh-agent on
+  # darwin ignores $TMPDIR", "bats reset TMPDIR before this helper ran",
+  # and "/tmp is not writable inside the macOS sandbox". Drop once the
+  # real fix lands.
+  {
+    printf 'debug-#207: uname=%s TMPDIR=%s BATS_TEST_TMPDIR=%s\n' \
+      "$(uname)" "${TMPDIR:-<unset>}" "${BATS_TEST_TMPDIR:-<unset>}"
+    for cand in /tmp /var/tmp /private/tmp; do
+      if touch "$cand/m207-probe.$$" 2>/dev/null; then
+        printf 'debug-#207: %s writable\n' "$cand"
+        rm -f "$cand/m207-probe.$$"
+      else
+        printf 'debug-#207: %s NOT writable\n' "$cand"
+      fi
+    done
+  } >&2
+
+  local agent_output agent_rc=0
+  agent_output="$(TMPDIR=/tmp ssh-agent -s 2>&1)" || agent_rc=$?
+  printf 'debug-#207: ssh-agent rc=%d output:\n%s\n' "$agent_rc" "$agent_output" >&2
+  if [[ "$agent_rc" -ne 0 ]]; then
+    return "$agent_rc"
+  fi
   eval "$agent_output" >/dev/null
+
+  printf 'debug-#207: SSH_AUTH_SOCK=%s SSH_AGENT_PID=%s\n' \
+    "${SSH_AUTH_SOCK:-<unset>}" "${SSH_AGENT_PID:-<unset>}" >&2
 
   ssh-add "$key" 2>/dev/null
 
