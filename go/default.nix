@@ -29,22 +29,12 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # Bridge go.mod requires onto local flake inputs via the gomod2nix
-  # goFlakeInputs feature (amarbel-llc/nixpkgs#32 / FDR-0002). Wired
-  # into every buildGoApplication and mkGoEnv call that consumes
-  # ./gomod2nix.toml, so a `nix flake update inputs/<dep>` collapses
-  # to a single edit point (madder#208 for tap, madder#211 for tommy).
-  # Keep all gomod2nix.toml consumers in sync — a missing site sees
-  # the unmerged module graph and resurrects the lockstep.
-  goFlakeInputs = {
-    "github.com/amarbel-llc/tap/go" = {
-      src = tap;
-      subPath = "go";
-    };
-    "github.com/amarbel-llc/tommy" = {
-      src = tommy.packages.${system}.go-pkgs;
-    };
-  };
+  # Bridge table for go.mod requires routed onto flake inputs via the
+  # gomod2nix goFlakeInputs feature (amarbel-llc/nixpkgs#32 / FDR-0002).
+  # Wired into every buildGoApplication and mkGoEnv call that consumes
+  # ./gomod2nix.toml; see ./gomod.nix for the entries and the rationale
+  # for keeping all consumers in sync.
+  goFlakeInputs = import ./gomod.nix { inherit tap tommy system; };
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
