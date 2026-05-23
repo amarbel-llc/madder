@@ -7,7 +7,7 @@ import (
 	"io"
 	"os"
 
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
@@ -160,11 +160,11 @@ func (s *syncTapSink) listError(err error) {
 }
 
 func (s *syncTapSink) notice(msg string) {
-	s.tw.Comment(msg)
+	s.tw.Comment("%s", msg)
 }
 
 func (s *syncTapSink) bailOut(msg string) {
-	s.tw.BailOut(msg)
+	s.tw.BailOut("%s", msg)
 }
 
 func (s *syncTapSink) finalize() {

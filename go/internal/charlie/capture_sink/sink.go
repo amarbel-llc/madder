@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
 )
@@ -94,7 +94,7 @@ func (s *tapSink) StoreGroupReceipt(receiptID string, count int) {
 }
 
 func (s *tapSink) Notice(msg string) {
-	s.tw.Comment(msg)
+	s.tw.Comment("%s", msg)
 }
 
 func (s *tapSink) Failure(source string, err error) {

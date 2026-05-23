@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"

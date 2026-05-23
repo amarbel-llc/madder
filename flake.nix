@@ -22,6 +22,15 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
     };
+
+    # Sourced via goFlakeInputs (see madder#208) so a tap bump only
+    # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
+    tap = {
+      url = "github:amarbel-llc/tap";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+    };
   };
 
   outputs =
@@ -33,6 +42,7 @@
       tommy,
       bats,
       purse-first,
+      tap,
       ...
     }:
     let
@@ -59,6 +69,7 @@
             tommy
             bats
             purse-first
+            tap
             system
             ;
           man7Src = ./docs/man.7;

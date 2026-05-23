@@ -16,7 +16,7 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 )
@@ -72,11 +72,11 @@ func (s *tapSink) ReadError(_ string, err error) {
 }
 
 func (s *tapSink) Notice(msg string) {
-	s.tw.Comment(msg)
+	s.tw.Comment("%s", msg)
 }
 
 func (s *tapSink) BailOut(msg string) {
-	s.tw.BailOut(msg)
+	s.tw.BailOut("%s", msg)
 }
 
 func (s *tapSink) Finalize() {

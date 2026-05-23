@@ -18,7 +18,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -482,7 +482,7 @@ func (cmd *Init) runDiscover(
 		}
 	}
 
-	tw.Comment(fmt.Sprintf("verified %d blobs", verifiedCount))
+	tw.Comment("verified %d blobs", verifiedCount)
 	tw.Plan()
 }
 

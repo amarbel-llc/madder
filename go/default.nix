@@ -4,6 +4,7 @@
   tommy,
   bats,
   purse-first,
+  tap,
   system,
   man7Src ? null,
   # Test-only inputs consumed by the bats installCheckPhase shared
@@ -27,6 +28,20 @@ let
   # compose the overlay twice.
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
+
+  # Bridge the `github.com/amarbel-llc/tap/go` go.mod require onto the
+  # local `tap` flake input via the gomod2nix goFlakeInputs feature
+  # (amarbel-llc/nixpkgs#32 / FDR-0002). Wired into every
+  # buildGoApplication and mkGoEnv call that consumes ./gomod2nix.toml,
+  # so a `nix flake update inputs/tap` collapses to a single edit point
+  # (madder#208). Keep all gomod2nix.toml consumers in sync — a missing
+  # site sees the unmerged module graph and resurrects the lockstep.
+  goFlakeInputs = {
+    "github.com/amarbel-llc/tap/go" = {
+      src = tap;
+      subPath = "go";
+    };
+  };
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
@@ -125,7 +140,7 @@ let
   # from-source rebuild. See amarbel-llc/eng#62.
   madder = pkgs.buildGoApplication ({
     pname = "madder";
-    inherit version commit;
+    inherit version commit goFlakeInputs;
     src = ./.;
     pwd = ./.;
     subPackages = [
@@ -194,7 +209,7 @@ let
   # package, and the cross-test consumer only needs the binary itself.
   cutting-garden = pkgs.buildGoApplication {
     pname = "cutting-garden";
-    inherit version commit;
+    inherit version commit goFlakeInputs;
     src = ./.;
     pwd = ./.;
     subPackages = [
@@ -368,6 +383,7 @@ let
   madder-test-sftp-server = pkgs.buildGoApplication {
     pname = "madder-test-sftp-server";
     version = "0.0.0";
+    inherit goFlakeInputs;
     src = ./.;
     pwd = ./.;
     subPackages = [ "cmd/madder-test-sftp-server" ];
@@ -383,6 +399,7 @@ let
   madder-test-craft-legacy-blob = pkgs.buildGoApplication {
     pname = "madder-test-craft-legacy-blob";
     version = "0.0.0";
+    inherit goFlakeInputs;
     src = ./.;
     pwd = ./.;
     subPackages = [ "cmd/madder-test-craft-legacy-blob" ];
@@ -397,6 +414,7 @@ let
   madder-test-webdav-server = pkgs.buildGoApplication {
     pname = "madder-test-webdav-server";
     version = "0.0.0";
+    inherit goFlakeInputs;
     src = ./.;
     pwd = ./.;
     subPackages = [ "cmd/madder-test-webdav-server" ];
@@ -413,7 +431,7 @@ in
 
   devShells.default = pkgs-master.mkShell {
     packages = [
-      (pkgs.mkGoEnv { pwd = ./.; })
+      (pkgs.mkGoEnv { pwd = ./.; inherit goFlakeInputs; })
       tommy.packages.${system}.default
       bats.packages.${system}.default
       purse-first.packages.${system}.dagnabit

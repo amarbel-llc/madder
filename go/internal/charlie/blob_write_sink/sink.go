@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 )
@@ -92,7 +92,7 @@ func (s *tapSink) Skip(source, reason string) {
 }
 
 func (s *tapSink) Notice(msg string) {
-	s.tw.Comment(msg)
+	s.tw.Comment("%s", msg)
 }
 
 func (s *tapSink) Finalize() {

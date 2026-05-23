@@ -1,7 +1,7 @@
 package blob_stores
 
 import (
-	tap "github.com/amarbel-llc/tap/go"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -76,6 +76,6 @@ func tapNotOk(tw *tap.Writer, desc string, err error) {
 
 func tapComment(tw *tap.Writer, msg string) {
 	if tw != nil {
-		tw.Comment(msg)
+		tw.Comment("%s", msg)
 	}
 }
