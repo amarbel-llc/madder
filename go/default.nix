@@ -4,16 +4,19 @@
   tommy,
   bats,
   purse-first,
-  tap,
   system,
   # Filtered Go source tree (test-superset shape) produced by
-  # flake.nix's inline mkGoPkgs equivalent. Threaded in here so every
-  # buildGoApplication can self-consume the same artifact downstream
-  # bridges against — contract test for the go-pkgs / go-pkgs-test
-  # split (#212, amarbel-llc/nixpkgs#46). Defaulted to ./. so
-  # non-flake callers (`import ./go/default.nix` without flake
-  # context) still work — they just build from the live worktree.
+  # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
+  # buildGoApplication self-consumes this as `src`/`pwd` so madder
+  # builds itself from the same artifact downstream consumers see —
+  # contract test for the go-pkgs / go-pkgs-test split (#212).
+  # Defaulted to ./. so non-flake callers (`import ./go/default.nix`
+  # without flake context) still work — they just build from the
+  # live worktree.
   goPkgsTest ? ./.,
+  # Flake-input bridge table (see ./gomod.nix). Defaulted to {} so
+  # non-flake callers degrade to organic gomod2nix.toml resolution.
+  goFlakeInputs ? { },
   man7Src ? null,
   # Test-only inputs consumed by the bats installCheckPhase shared
   # between `madder` and `madder-race`. Defaulted to null so direct
@@ -36,13 +39,6 @@ let
   # compose the overlay twice.
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
-
-  # Bridge table for go.mod requires routed onto flake inputs via the
-  # gomod2nix goFlakeInputs feature (amarbel-llc/nixpkgs#32 / FDR-0002).
-  # Wired into every buildGoApplication and mkGoEnv call that consumes
-  # ./gomod2nix.toml; see ./gomod.nix for the entries and the rationale
-  # for keeping all consumers in sync.
-  goFlakeInputs = import ./gomod.nix { inherit tap tommy system; };
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
