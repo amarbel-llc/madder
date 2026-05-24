@@ -6,6 +6,14 @@
   purse-first,
   tap,
   system,
+  # Filtered Go source tree (test-superset shape) produced by
+  # flake.nix's inline mkGoPkgs equivalent. Threaded in here so every
+  # buildGoApplication can self-consume the same artifact downstream
+  # bridges against — contract test for the go-pkgs / go-pkgs-test
+  # split (#212, amarbel-llc/nixpkgs#46). Defaulted to ./. so
+  # non-flake callers (`import ./go/default.nix` without flake
+  # context) still work — they just build from the live worktree.
+  goPkgsTest ? ./.,
   man7Src ? null,
   # Test-only inputs consumed by the bats installCheckPhase shared
   # between `madder` and `madder-race`. Defaulted to null so direct
@@ -134,8 +142,8 @@ let
   madder = pkgs.buildGoApplication ({
     pname = "madder";
     inherit version commit goFlakeInputs;
-    src = ./.;
-    pwd = ./.;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
     subPackages = [
       "cmd/madder"
       "cmd/madder-cache"
@@ -203,8 +211,8 @@ let
   cutting-garden = pkgs.buildGoApplication {
     pname = "cutting-garden";
     inherit version commit goFlakeInputs;
-    src = ./.;
-    pwd = ./.;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
     subPackages = [
       "cmd/cutting-garden"
       "cmd/cg"
@@ -377,8 +385,8 @@ let
     pname = "madder-test-sftp-server";
     version = "0.0.0";
     inherit goFlakeInputs;
-    src = ./.;
-    pwd = ./.;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-sftp-server" ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
@@ -393,8 +401,8 @@ let
     pname = "madder-test-craft-legacy-blob";
     version = "0.0.0";
     inherit goFlakeInputs;
-    src = ./.;
-    pwd = ./.;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-craft-legacy-blob" ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;
@@ -408,8 +416,8 @@ let
     pname = "madder-test-webdav-server";
     version = "0.0.0";
     inherit goFlakeInputs;
-    src = ./.;
-    pwd = ./.;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-webdav-server" ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;

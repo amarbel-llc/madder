@@ -62,6 +62,86 @@
     (utils.lib.eachDefaultSystem (
       system:
       let
+        # Only needed for the inline mkGoPkgs equivalent below.
+        # buildGoApplication / mkGoEnv consumers live in go/default.nix.
+        pkgs = import nixpkgs { inherit system; };
+
+        # Producer half of RFC 0001's flake-input-go_mod protocol
+        # (#212). Splits madder's Go source tree into two outputs:
+        #
+        #   - go-pkgs: prod-shape — *.go excluding *_test.go, plus
+        #     go.mod / go.sum / gomod2nix.toml. What downstream
+        #     consumers (e.g. dodder) bridge against via goFlakeInputs
+        #     when they only compile madder's code.
+        #
+        #   - go-pkgs-test: superset adding *_test.go and testdata/**.
+        #     What madder's own derivations consume as `src` (so
+        #     checkPhase can run `go test ./...`), and what downstream
+        #     consumers bridge against if they need to run madder's
+        #     tests.
+        #
+        # Inlined here (rather than calling pkgs.goSourceFilter twice)
+        # because goSourceFilter's default keep-set matches *_test.go
+        # via `.*\.go$`, so a naive `go-pkgs` would leak test files
+        # into prod consumers. amarbel-llc/nixpkgs#46 proposes hoisting
+        # this split into an `mkGoPkgs` helper plus an RFC 0001
+        # amendment; once that lands, this whole block collapses to:
+        #
+        #   inherit (pkgs.mkGoPkgs { src = self + "/go"; })
+        #     go-pkgs go-pkgs-test;
+        goPkgsSrc = self + "/go";
+
+        mkFilteredGoTree = { name, predicate }:
+          let
+            filteredPath = builtins.path {
+              inherit name;
+              path = goPkgsSrc;
+              filter = path: type:
+                let
+                  relPath = pkgs.lib.removePrefix
+                    (toString goPkgsSrc + "/") (toString path);
+                in
+                type == "directory" || predicate relPath;
+            };
+          in
+          pkgs.runCommand name {
+            preferLocalBuild = true;
+            allowSubstitutes = false;
+          } ''
+            cp -r ${filteredPath} $out
+          '';
+
+        isModuleFile = relPath:
+          relPath == "go.mod"
+          || relPath == "go.sum"
+          || relPath == "gomod2nix.toml";
+
+        isProdGoFile = relPath:
+          pkgs.lib.hasSuffix ".go" relPath
+          && !pkgs.lib.hasSuffix "_test.go" relPath;
+
+        isTestGoFile = relPath:
+          pkgs.lib.hasSuffix "_test.go" relPath;
+
+        isTestdataFile = relPath:
+          builtins.match ".*/testdata/.*" relPath != null
+          || builtins.match "^testdata/.*" relPath != null;
+
+        go-pkgs = mkFilteredGoTree {
+          name = "madder-go-pkgs";
+          predicate = relPath:
+            isProdGoFile relPath || isModuleFile relPath;
+        };
+
+        go-pkgs-test = mkFilteredGoTree {
+          name = "madder-go-pkgs-test";
+          predicate = relPath:
+            isProdGoFile relPath
+            || isModuleFile relPath
+            || isTestGoFile relPath
+            || isTestdataFile relPath;
+        };
+
         result = import ./go/default.nix {
           inherit
             nixpkgs
@@ -72,6 +152,13 @@
             tap
             system
             ;
+          # Pivot self-consumption onto the published artifact: every
+          # buildGoApplication in go/default.nix uses this as `src`,
+          # so the same closure downstream consumers receive via
+          # go-pkgs-test is what madder builds itself from. Contract
+          # test for the producer-side split — if the filter ever
+          # drops a file the build needs, this build breaks.
+          goPkgsTest = go-pkgs-test;
           man7Src = ./docs/man.7;
           # Test-only inputs for the bats lanes' installCheckPhase.
           # Kept out of the build-time `src` closure so test-only
@@ -85,7 +172,7 @@
         };
       in
       {
-        inherit (result) packages;
+        packages = result.packages // { inherit go-pkgs go-pkgs-test; };
         devShells.default = result.devShells.default;
       }
     ));
