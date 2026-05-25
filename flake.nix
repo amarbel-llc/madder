@@ -30,8 +30,9 @@
 
     bats = {
       url = "github:amarbel-llc/bats";
-      inputs.nixpkgs.follows = "nixpkgs";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
     };
 
