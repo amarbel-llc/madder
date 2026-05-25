@@ -21,8 +21,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 )
@@ -52,7 +52,7 @@ type remoteWebdav struct {
 	// blobIOWrapper holds the remote config's compression / encryption
 	// view per ADR 0005. Populated by readRemoteConfig; nil before
 	// initializeOnce runs.
-	blobIOWrapper        domain_interfaces.BlobIOWrapper
+	blobIOWrapper         domain_interfaces.BlobIOWrapper
 	httpClientInitializer func() (*http.Client, error)
 	httpClient            *http.Client
 
@@ -567,7 +567,7 @@ func (blobStore *remoteWebdav) MakeBlobReader(
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		resp.Body.Close() //nolint:errcheck
+		resp.Body.Close()                      //nolint:errcheck
 		clonedDigest, _ := markl.Clone(digest) //repool:owned
 		err = blob_io.ErrBlobMissing{
 			BlobId: clonedDigest,

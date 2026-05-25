@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -13,6 +12,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 func init() {
@@ -78,7 +78,8 @@ func (cmd *Pack) SetFlagDefinitions(
 		"skip unreadable loose blobs instead of aborting")
 	flagSet.BoolVar(&cmd.Delta, "delta", false,
 		"enable delta compression during packing")
-	flagSet.Var(&cmd.MaxPackSize, "max-pack-size",
+	flagSet.Var(
+		&cmd.MaxPackSize, "max-pack-size",
 		"override max pack size (e.g. 100M, 1G, 0 = unlimited)",
 	)
 }

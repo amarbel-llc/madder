@@ -67,9 +67,11 @@ func DecodeSignatureConfig(input []byte) (*SignatureConfigDocument, error) {
 	}
 	return d, nil
 }
+
 func (d *SignatureConfigDocument) Data() *SignatureConfig {
 	return &d.data
 }
+
 func (d *SignatureConfigDocument) Encode() ([]byte, error) {
 	if d.data.Type != "" || cst.HasValue(d.cstDoc.Root(), "type") {
 		if err := cst.SetAny(d.cstDoc.Root(), "type", d.data.Type); err != nil {
@@ -98,21 +100,27 @@ func (d *SignatureConfigDocument) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *SignatureConfigDocument) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *SignatureConfigDocument) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *SignatureConfigDocument) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *SignatureConfigDocument) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *SignatureConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeSignatureConfigInto(data *SignatureConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -148,6 +156,7 @@ func DecodeSignatureConfigInto(data *SignatureConfig, doc *document.Document, co
 	}
 	return nil
 }
+
 func EncodeSignatureConfigFrom(data *SignatureConfig, doc *document.Document, container *cst.Node) error {
 	if data.Type != "" || cst.HasValue(container, "type") {
 		if err := cst.SetAny(container, "type", data.Type); err != nil {
@@ -228,9 +237,11 @@ func DecodeSelectorConfig(input []byte) (*SelectorConfigDocument, error) {
 	}
 	return d, nil
 }
+
 func (d *SelectorConfigDocument) Data() *SelectorConfig {
 	return &d.data
 }
+
 func (d *SelectorConfigDocument) Encode() ([]byte, error) {
 	if d.data.Type != "" || cst.HasValue(d.cstDoc.Root(), "type") {
 		if err := cst.SetAny(d.cstDoc.Root(), "type", d.data.Type); err != nil {
@@ -259,21 +270,27 @@ func (d *SelectorConfigDocument) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *SelectorConfigDocument) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *SelectorConfigDocument) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *SelectorConfigDocument) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *SelectorConfigDocument) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *SelectorConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeSelectorConfigInto(data *SelectorConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -309,6 +326,7 @@ func DecodeSelectorConfigInto(data *SelectorConfig, doc *document.Document, cont
 	}
 	return nil
 }
+
 func EncodeSelectorConfigFrom(data *SelectorConfig, doc *document.Document, container *cst.Node) error {
 	if data.Type != "" || cst.HasValue(container, "type") {
 		if err := cst.SetAny(container, "type", data.Type); err != nil {
@@ -465,9 +483,11 @@ func DecodeDeltaConfig(input []byte) (*DeltaConfigDocument, error) {
 	}
 	return d, nil
 }
+
 func (d *DeltaConfigDocument) Data() *DeltaConfig {
 	return &d.data
 }
+
 func (d *DeltaConfigDocument) Encode() ([]byte, error) {
 	if d.data.Enabled != false || cst.HasValue(d.cstDoc.Root(), "enabled") {
 		if err := cst.SetAny(d.cstDoc.Root(), "enabled", d.data.Enabled); err != nil {
@@ -552,21 +572,27 @@ func (d *DeltaConfigDocument) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *DeltaConfigDocument) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *DeltaConfigDocument) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *DeltaConfigDocument) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *DeltaConfigDocument) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *DeltaConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeDeltaConfigInto(data *DeltaConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -678,6 +704,7 @@ func DecodeDeltaConfigInto(data *DeltaConfig, doc *document.Document, container 
 	}
 	return nil
 }
+
 func EncodeDeltaConfigFrom(data *DeltaConfig, doc *document.Document, container *cst.Node) error {
 	if data.Enabled != false || cst.HasValue(container, "enabled") {
 		if err := cst.SetAny(container, "enabled", data.Enabled); err != nil {
@@ -934,9 +961,11 @@ func DecodeTomlInventoryArchiveV1(input []byte) (*TomlInventoryArchiveV1Document
 	}
 	return d, nil
 }
+
 func (d *TomlInventoryArchiveV1Document) Data() *TomlInventoryArchiveV1 {
 	return &d.data
 }
+
 func (d *TomlInventoryArchiveV1Document) Encode() ([]byte, error) {
 	{
 		v, err := d.data.HashTypeId.MarshalText()
@@ -1061,21 +1090,27 @@ func (d *TomlInventoryArchiveV1Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlInventoryArchiveV1Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlInventoryArchiveV1Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlInventoryArchiveV1Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlInventoryArchiveV1Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlInventoryArchiveV1Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlInventoryArchiveV1Into(data *TomlInventoryArchiveV1, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -1231,6 +1266,7 @@ func DecodeTomlInventoryArchiveV1Into(data *TomlInventoryArchiveV1, doc *documen
 	}
 	return nil
 }
+
 func EncodeTomlInventoryArchiveV1From(data *TomlInventoryArchiveV1, doc *document.Document, container *cst.Node) error {
 	{
 		v, err := data.HashTypeId.MarshalText()

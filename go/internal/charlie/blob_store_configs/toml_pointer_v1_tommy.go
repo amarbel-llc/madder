@@ -47,9 +47,11 @@ func DecodeTomlPointerV1(input []byte) (*TomlPointerV1Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlPointerV1Document) Data() *TomlPointerV1 {
 	return &d.data
 }
+
 func (d *TomlPointerV1Document) Encode() ([]byte, error) {
 	if d.data.BasePath != "" || cst.HasValue(d.cstDoc.Root(), "base-path") {
 		if err := cst.SetAny(d.cstDoc.Root(), "base-path", d.data.BasePath); err != nil {
@@ -58,21 +60,27 @@ func (d *TomlPointerV1Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlPointerV1Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlPointerV1Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlPointerV1Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlPointerV1Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlPointerV1Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlPointerV1Into(data *TomlPointerV1, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -88,6 +96,7 @@ func DecodeTomlPointerV1Into(data *TomlPointerV1, doc *document.Document, contai
 	}
 	return nil
 }
+
 func EncodeTomlPointerV1From(data *TomlPointerV1, doc *document.Document, container *cst.Node) error {
 	if data.BasePath != "" || cst.HasValue(container, "base-path") {
 		if err := cst.SetAny(container, "base-path", data.BasePath); err != nil {

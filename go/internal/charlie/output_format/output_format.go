@@ -29,7 +29,9 @@ import (
 // auto (default): ndjson when stdout is not a TTY, TAP otherwise.
 // tap:            TAP format regardless of stdout.
 // json:           single JSON document (command-specific shape).
-//                 For streaming commands this is an alias for ndjson.
+//
+//	For streaming commands this is an alias for ndjson.
+//
 // ndjson:         one JSON object per line.
 type Format string
 

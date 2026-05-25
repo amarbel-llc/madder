@@ -182,24 +182,42 @@ func TestVerifySample_FailureClassification(t *testing.T) {
 		candidate combo
 		wantStage Stage
 	}{
-		{"row7-zstd-as-gzip",
-			combo{"zstd", nil}, combo{"gzip", nil},
-			StageDecompress},
-		{"row8-zstd-as-none",
-			combo{"zstd", nil}, combo{"none", nil},
-			StageHashMismatch},
-		{"row9-ageK1-as-ageK2",
-			combo{"none", &keyA}, combo{"none", &keyB},
-			StageDecrypt},
-		{"row10-zstd-ageK1-as-zstd-ageK2",
-			combo{"zstd", &keyA}, combo{"zstd", &keyB},
-			StageDecrypt},
-		{"row11-plain-as-ageK1",
-			combo{"none", nil}, combo{"none", &keyA},
-			StageDecrypt},
-		{"row12-zstd-ageK1-as-none-none",
-			combo{"zstd", &keyA}, combo{"none", nil},
-			StageHashMismatch},
+		{
+			"row7-zstd-as-gzip",
+			combo{"zstd", nil},
+			combo{"gzip", nil},
+			StageDecompress,
+		},
+		{
+			"row8-zstd-as-none",
+			combo{"zstd", nil},
+			combo{"none", nil},
+			StageHashMismatch,
+		},
+		{
+			"row9-ageK1-as-ageK2",
+			combo{"none", &keyA},
+			combo{"none", &keyB},
+			StageDecrypt,
+		},
+		{
+			"row10-zstd-ageK1-as-zstd-ageK2",
+			combo{"zstd", &keyA},
+			combo{"zstd", &keyB},
+			StageDecrypt,
+		},
+		{
+			"row11-plain-as-ageK1",
+			combo{"none", nil},
+			combo{"none", &keyA},
+			StageDecrypt,
+		},
+		{
+			"row12-zstd-ageK1-as-none-none",
+			combo{"zstd", &keyA},
+			combo{"none", nil},
+			StageHashMismatch,
+		},
 	}
 
 	for _, tc := range cases {

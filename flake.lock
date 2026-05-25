@@ -83,7 +83,6 @@
           "nixpkgs-master"
         ],
         "treefmt-nix": [
-          "nixpkgs",
           "treefmt-nix"
         ],
         "utils": [
@@ -158,7 +157,9 @@
           "nixpkgs-master"
         ],
         "systems": "systems",
-        "treefmt-nix": "treefmt-nix"
+        "treefmt-nix": [
+          "treefmt-nix"
+        ]
       },
       "locked": {
         "lastModified": 1779669115,
@@ -228,6 +229,7 @@
         "purse-first": "purse-first",
         "tap": "tap",
         "tommy": "tommy",
+        "treefmt-nix": "treefmt-nix",
         "utils": "utils"
       }
     },
@@ -291,7 +293,6 @@
           "rust-overlay"
         ],
         "treefmt-nix": [
-          "nixpkgs",
           "treefmt-nix"
         ],
         "utils": [
@@ -347,8 +348,7 @@
     "treefmt-nix": {
       "inputs": {
         "nixpkgs": [
-          "nixpkgs",
-          "nixpkgs-master"
+          "nixpkgs"
         ]
       },
       "locked": {

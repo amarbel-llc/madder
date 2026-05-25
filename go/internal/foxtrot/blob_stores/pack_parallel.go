@@ -8,10 +8,10 @@ import (
 	"sort"
 	"sync"
 
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 // TODO(near-future): Add BlobSizer capability interface. Local

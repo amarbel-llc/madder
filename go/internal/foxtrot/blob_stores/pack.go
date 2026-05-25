@@ -1,10 +1,10 @@
 package blob_stores
 
 import (
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 // PackOptions controls the behavior of the Pack operation.

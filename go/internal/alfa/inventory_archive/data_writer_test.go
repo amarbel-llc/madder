@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/age"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 func TestRoundTripNoCompression(t *testing.T) {

@@ -61,19 +61,39 @@ let
   # binaries (madder-test-sftp-server, madder-test-craft-legacy-blob,
   # madder-test-webdav-server) so `nix build .#bats-net_cap` is
   # self-sufficient.
-  mkBatsLane = { filter ? "!net_cap", base ? madder, extraBinaries ? { } }:
+  mkBatsLane =
+    {
+      filter ? "!net_cap",
+      base ? madder,
+      extraBinaries ? { },
+    }:
     bats.lib.${system}.batsLane {
       inherit base filter batsSrc;
       binaries = {
-        MADDER_BIN   = { inherit base; name = "madder"; };
-        CG_BIN       = { inherit base; name = "cutting-garden"; };
-        HYPHENCE_BIN = { inherit base; name = "hyphence"; };
-      } // extraBinaries;
+        MADDER_BIN = {
+          inherit base;
+          name = "madder";
+        };
+        CG_BIN = {
+          inherit base;
+          name = "cutting-garden";
+        };
+        HYPHENCE_BIN = {
+          inherit base;
+          name = "hyphence";
+        };
+      }
+      // extraBinaries;
       batsLibPath = [ bats.packages.${system}.bats-libs.batsLibPath ];
       extraStagedFiles = [
-        { src = versionEnv; dest = "version.env"; }
+        {
+          src = versionEnv;
+          dest = "version.env";
+        }
       ];
-      extraEnv = { BATS_TEST_TIMEOUT = "30"; };
+      extraEnv = {
+        BATS_TEST_TIMEOUT = "30";
+      };
       # git: bats-island's setup_test_home shells out to `git config`.
       # jq: cli_contract.bats's JSON helpers.
       # openssh: zz-tests_bats/lib/sftp_legacy.bash spawns ssh-agent
@@ -125,7 +145,9 @@ let
     export MADDER_BIN="$out/bin/madder"
     export CG_BIN="$out/bin/cutting-garden"
     export HYPHENCE_BIN="$out/bin/hyphence"
-    export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${bats.packages.${system}.bats-libs.batsLibPath}"
+    export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${
+      bats.packages.${system}.bats-libs.batsLibPath
+    }"
     export BATS_TEST_TIMEOUT=30
 
     cd stage/zz-tests_bats
@@ -160,7 +182,8 @@ let
 
     nativeBuildInputs = [
       purse-first.packages.${system}.dagnabit
-    ] ++ pkgs-master.lib.optionals (man7Src != null) [
+    ]
+    ++ pkgs-master.lib.optionals (man7Src != null) [
       pkgs-master.pandoc
     ];
 
@@ -313,7 +336,10 @@ let
   # picture.
   madder-cli-cover = pkgs.buildGoCover {
     base = madder;
-    extraNativeInstallCheckInputs = [ pkgs-master.jq pkgs.parallel ];
+    extraNativeInstallCheckInputs = [
+      pkgs-master.jq
+      pkgs.parallel
+    ];
     coverIntegrationCommand = cliCoverIntegrationCommand;
   };
 
@@ -334,46 +360,52 @@ let
   # `import ./go/default.nix` callers without a flake context stay
   # working — they just don't get the bats lane outputs.
   batsLaneOutputs =
-    if batsSrc == null then { }
+    if batsSrc == null then
+      { }
     else
       let
-        batsFiles = builtins.filter
-          (f: pkgs-master.lib.hasSuffix ".bats" f)
-          (builtins.attrNames (builtins.readDir batsSrc));
+        batsFiles = builtins.filter (f: pkgs-master.lib.hasSuffix ".bats" f) (
+          builtins.attrNames (builtins.readDir batsSrc)
+        );
 
-        extractFileTags = file:
+        extractFileTags =
+          file:
           let
             content = builtins.readFile (batsSrc + "/${file}");
             lines = pkgs-master.lib.splitString "\n" content;
-            tagLines = builtins.filter
-              (l: pkgs-master.lib.hasPrefix "# bats file_tags=" l)
-              lines;
+            tagLines = builtins.filter (l: pkgs-master.lib.hasPrefix "# bats file_tags=" l) lines;
           in
-            if tagLines == [ ] then [ ]
-            else pkgs-master.lib.splitString ","
-              (pkgs-master.lib.removePrefix "# bats file_tags="
-                (builtins.head tagLines));
+          if tagLines == [ ] then
+            [ ]
+          else
+            pkgs-master.lib.splitString "," (
+              pkgs-master.lib.removePrefix "# bats file_tags=" (builtins.head tagLines)
+            );
 
-        allFileTags = pkgs-master.lib.unique
-          (pkgs-master.lib.concatMap extractFileTags batsFiles);
+        allFileTags = pkgs-master.lib.unique (pkgs-master.lib.concatMap extractFileTags batsFiles);
       in
-        pkgs-master.lib.listToAttrs (map
-          (tag: pkgs-master.lib.nameValuePair "bats-${tag}"
-            (mkBatsLane {
-              filter = tag;
-              # Per-tag binaries overlay: the net_cap lane gets the
-              # SFTP/WebDAV/craft-legacy-blob test-fixture binaries so
-              # `nix build .#bats-net_cap` is self-sufficient.
-              extraBinaries =
-                if tag == "net_cap" then netCapExtraBinaries else { };
-            }))
-          allFileTags) // {
-          bats-default = mkBatsLane { filter = "!net_cap"; };
-          # No bats-race-net_cap: the race-instrumented binary doubles
-          # build time and the SFTP/WebDAV harnesses already exercise
-          # the same data paths under the non-race net_cap lane.
-          bats-race = mkBatsLane { filter = "!net_cap"; base = madder-race; };
+      pkgs-master.lib.listToAttrs (
+        map (
+          tag:
+          pkgs-master.lib.nameValuePair "bats-${tag}" (mkBatsLane {
+            filter = tag;
+            # Per-tag binaries overlay: the net_cap lane gets the
+            # SFTP/WebDAV/craft-legacy-blob test-fixture binaries so
+            # `nix build .#bats-net_cap` is self-sufficient.
+            extraBinaries = if tag == "net_cap" then netCapExtraBinaries else { };
+          })
+        ) allFileTags
+      )
+      // {
+        bats-default = mkBatsLane { filter = "!net_cap"; };
+        # No bats-race-net_cap: the race-instrumented binary doubles
+        # build time and the SFTP/WebDAV harnesses already exercise
+        # the same data paths under the non-race net_cap lane.
+        bats-race = mkBatsLane {
+          filter = "!net_cap";
+          base = madder-race;
         };
+      };
 
   # SFTP test harness (RFC 0001). Exposed as a named package output so
   # downstream test harnesses (e.g. dodder's haustoria_orgmode bats
@@ -427,13 +459,25 @@ let
 in
 {
   packages = {
-    inherit madder madder-race madder-cover madder-cli-cover madder-clown-plugin cutting-garden madder-test-sftp-server;
+    inherit
+      madder
+      madder-race
+      madder-cover
+      madder-cli-cover
+      madder-clown-plugin
+      cutting-garden
+      madder-test-sftp-server
+      ;
     default = madder;
-  } // batsLaneOutputs;
+  }
+  // batsLaneOutputs;
 
   devShells.default = pkgs-master.mkShell {
     packages = [
-      (pkgs.mkGoEnv { pwd = ./.; inherit goFlakeInputs; })
+      (pkgs.mkGoEnv {
+        pwd = ./.;
+        inherit goFlakeInputs;
+      })
       tommy.packages.${system}.default
       bats.packages.${system}.default
       purse-first.packages.${system}.dagnabit

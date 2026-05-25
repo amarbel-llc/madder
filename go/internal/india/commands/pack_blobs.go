@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
@@ -17,10 +16,11 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 func init() {
@@ -93,7 +93,8 @@ func (cmd *PackBlobs) SetFlagDefinitions(
 	flagSet.BoolVar(&cmd.Delta, "delta", false,
 		"enable delta compression during packing")
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
-	flagSet.Var(&cmd.MaxPackSize, "max-pack-size",
+	flagSet.Var(
+		&cmd.MaxPackSize, "max-pack-size",
 		"override max pack size (e.g. 100M, 1G, 0 = unlimited)",
 	)
 }

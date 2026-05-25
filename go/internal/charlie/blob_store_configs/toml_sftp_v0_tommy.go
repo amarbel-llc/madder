@@ -77,9 +77,11 @@ func DecodeTomlSFTPV0(input []byte) (*TomlSFTPV0Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlSFTPV0Document) Data() *TomlSFTPV0 {
 	return &d.data
 }
+
 func (d *TomlSFTPV0Document) Encode() ([]byte, error) {
 	if d.data.Host != "" || cst.HasValue(d.cstDoc.Root(), "host") {
 		if err := cst.SetAny(d.cstDoc.Root(), "host", d.data.Host); err != nil {
@@ -126,21 +128,27 @@ func (d *TomlSFTPV0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlSFTPV0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlSFTPV0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlSFTPV0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlSFTPV0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlSFTPV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlSFTPV0Into(data *TomlSFTPV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -186,6 +194,7 @@ func DecodeTomlSFTPV0Into(data *TomlSFTPV0, doc *document.Document, container *c
 	}
 	return nil
 }
+
 func EncodeTomlSFTPV0From(data *TomlSFTPV0, doc *document.Document, container *cst.Node) error {
 	if data.Host != "" || cst.HasValue(container, "host") {
 		if err := cst.SetAny(container, "host", data.Host); err != nil {

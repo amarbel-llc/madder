@@ -8,6 +8,4 @@ type (
 	Env = internal.Env
 )
 
-var (
-	Make = internal.Make
-)
+var Make = internal.Make

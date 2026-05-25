@@ -3,8 +3,8 @@ package hyphence
 import (
 	"io"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/catgut"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
 const (

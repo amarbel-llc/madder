@@ -54,9 +54,11 @@ func DecodeTomlSFTPViaSSHConfigV0(input []byte) (*TomlSFTPViaSSHConfigV0Document
 	}
 	return d, nil
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) Data() *TomlSFTPViaSSHConfigV0 {
 	return &d.data
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) Encode() ([]byte, error) {
 	{
 		v, err := d.data.Uri.MarshalText()
@@ -76,21 +78,27 @@ func (d *TomlSFTPViaSSHConfigV0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlSFTPViaSSHConfigV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlSFTPViaSSHConfigV0Into(data *TomlSFTPViaSSHConfigV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -113,6 +121,7 @@ func DecodeTomlSFTPViaSSHConfigV0Into(data *TomlSFTPViaSSHConfigV0, doc *documen
 	}
 	return nil
 }
+
 func EncodeTomlSFTPViaSSHConfigV0From(data *TomlSFTPViaSSHConfigV0, doc *document.Document, container *cst.Node) error {
 	{
 		v, err := data.Uri.MarshalText()

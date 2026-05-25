@@ -86,9 +86,11 @@ func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlV3Document) Data() *TomlV3 {
 	return &d.data
 }
+
 func (d *TomlV3Document) Encode() ([]byte, error) {
 	{
 		if err := cst.SetAny(d.cstDoc.Root(), "hash_buckets", []int(d.data.HashBuckets)); err != nil {
@@ -143,21 +145,27 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlV3Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlV3Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlV3Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlV3Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlV3Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -210,6 +218,7 @@ func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node,
 	}
 	return nil
 }
+
 func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node) error {
 	{
 		if err := cst.SetAny(container, "hash_buckets", []int(data.HashBuckets)); err != nil {

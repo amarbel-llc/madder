@@ -4,8 +4,8 @@ package directory_layout
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
 )
 

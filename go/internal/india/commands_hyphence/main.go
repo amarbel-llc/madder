@@ -29,7 +29,8 @@ func init() {
 		)
 	}
 
-	utility.Examples = append(utility.Examples,
+	utility.Examples = append(
+		utility.Examples,
 		futility.Example{
 			Description: "Validate a capture-receipt file against RFC 0001.",
 			Command:     "hyphence validate receipt.hyphence",

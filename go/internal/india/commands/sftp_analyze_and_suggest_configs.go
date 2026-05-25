@@ -30,8 +30,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	huhwrap "github.com/amarbel-llc/madder/go/internal/futility/huh"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 )
@@ -219,8 +219,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) Run(req futility.Request) {
 	// downstream consumer that trusts the declared layout (fsck,
 	// info-repo, sync), so we surface it as a layout_mismatch
 	// stage failure on the existing candidate.
-	existingHas, existingCandidate, existingLayoutMismatch :=
-		cmd.tryReadExistingConfig(env, sftpClient, layout)
+	existingHas, existingCandidate, existingLayoutMismatch := cmd.tryReadExistingConfig(env, sftpClient, layout)
 	if existingHas {
 		candidates = append([]sftp_probe.Candidate{existingCandidate}, candidates...)
 	}
@@ -462,7 +461,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) validateRemotePath(
 	if !stat.IsDir() {
 		return errors.Errorf(
 			"-remote-path must be a directory; got file at %q",
-			cmd.remotePath)
+			cmd.remotePath,
+		)
 	}
 	return nil
 }
@@ -506,7 +506,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) scatterSample(
 	}
 	if len(topBuckets) == 0 {
 		return nil, errors.Errorf(
-			"no bucket-shaped entries at %q; not a blob store?", basePath)
+			"no bucket-shaped entries at %q; not a blob store?", basePath,
+		)
 	}
 
 	out := make([]sample, 0, cmd.limit)
@@ -734,7 +735,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 	); err != nil {
 		env.GetUI().Printf(
 			"existing remote config at %s did not decode: %v",
-			configPath, err)
+			configPath, err,
+		)
 		return false, sftp_probe.Candidate{}, false
 	}
 
@@ -742,7 +744,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 	if !ok {
 		env.GetUI().Printf(
 			"existing remote config at %s does not provide an IOWrapper",
-			configPath)
+			configPath,
+		)
 		return false, sftp_probe.Candidate{}, false
 	}
 
@@ -767,7 +770,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 			layoutMismatch = true
 			env.GetUI().Printf(
 				"existing remote config at %s declares multi-hash=%t but probed layout is multi-hash=%t",
-				configPath, declared, layout.MultiHash)
+				configPath, declared, layout.MultiHash,
+			)
 		}
 	}
 
@@ -834,7 +838,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runInteractiveFlow(
 
 	// Deep-verify prompt.
 	wantDeep, err := cmd.confirm(fmt.Sprintf(
-		"Deep-verify %s against the full store?", top.Candidate.Label))
+		"Deep-verify %s against the full store?", top.Candidate.Label,
+	))
 	if err != nil {
 		env.GetUI().Printf("deep-verify prompt: %v", err)
 		return
@@ -851,7 +856,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runInteractiveFlow(
 		if deepFailed > 0 {
 			wantAnyway, err := cmd.confirm(fmt.Sprintf(
 				"Deep-verify found %d failures of %d. Bootstrap anyway?",
-				deepFailed, deepWalked))
+				deepFailed, deepWalked,
+			))
 			if err != nil {
 				env.GetUI().Printf("bootstrap-anyway prompt: %v", err)
 				return
@@ -865,7 +871,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runInteractiveFlow(
 	// Bootstrap prompt.
 	wantBootstrap, err := cmd.confirm(fmt.Sprintf(
 		"Bootstrap %s to %s:%s?",
-		top.Candidate.Label, cmd.sshHost, cmd.remotePath))
+		top.Candidate.Label, cmd.sshHost, cmd.remotePath,
+	))
 	if err != nil {
 		env.GetUI().Printf("bootstrap prompt: %v", err)
 		return
@@ -911,7 +918,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runDeepVerify(
 		}
 		// Skip the blob_store-config itself if present.
 		if walker.Path() == path.Join(
-			cmd.remotePath, directory_layout.FileNameBlobStoreConfig) {
+			cmd.remotePath, directory_layout.FileNameBlobStoreConfig,
+		) {
 			continue
 		}
 
@@ -941,7 +949,8 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runDeepVerify(
 		}
 		if walked%100 == 0 {
 			env.GetUI().Printf(
-				"deep-verify progress: walked=%d failed=%d", walked, failed)
+				"deep-verify progress: walked=%d failed=%d", walked, failed,
+			)
 		}
 	}
 	return walked, failed

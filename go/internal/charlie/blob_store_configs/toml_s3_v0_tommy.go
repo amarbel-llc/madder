@@ -87,9 +87,11 @@ func DecodeTomlS3V0(input []byte) (*TomlS3V0Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlS3V0Document) Data() *TomlS3V0 {
 	return &d.data
 }
+
 func (d *TomlS3V0Document) Encode() ([]byte, error) {
 	if d.data.Endpoint != "" {
 		if err := cst.SetAny(d.cstDoc.Root(), "endpoint", d.data.Endpoint); err != nil {
@@ -154,21 +156,27 @@ func (d *TomlS3V0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlS3V0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlS3V0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlS3V0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlS3V0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlS3V0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlS3V0Into(data *TomlS3V0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -224,6 +232,7 @@ func DecodeTomlS3V0Into(data *TomlS3V0, doc *document.Document, container *cst.N
 	}
 	return nil
 }
+
 func EncodeTomlS3V0From(data *TomlS3V0, doc *document.Document, container *cst.Node) error {
 	if data.Endpoint != "" {
 		if err := cst.SetAny(container, "endpoint", data.Endpoint); err != nil {

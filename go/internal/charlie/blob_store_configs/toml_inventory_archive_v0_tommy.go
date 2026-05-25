@@ -68,9 +68,11 @@ func DecodeTomlInventoryArchiveV0(input []byte) (*TomlInventoryArchiveV0Document
 	}
 	return d, nil
 }
+
 func (d *TomlInventoryArchiveV0Document) Data() *TomlInventoryArchiveV0 {
 	return &d.data
 }
+
 func (d *TomlInventoryArchiveV0Document) Encode() ([]byte, error) {
 	{
 		v, err := d.data.HashTypeId.MarshalText()
@@ -106,21 +108,27 @@ func (d *TomlInventoryArchiveV0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlInventoryArchiveV0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlInventoryArchiveV0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlInventoryArchiveV0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlInventoryArchiveV0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlInventoryArchiveV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlInventoryArchiveV0Into(data *TomlInventoryArchiveV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -157,6 +165,7 @@ func DecodeTomlInventoryArchiveV0Into(data *TomlInventoryArchiveV0, doc *documen
 	}
 	return nil
 }
+
 func EncodeTomlInventoryArchiveV0From(data *TomlInventoryArchiveV0, doc *document.Document, container *cst.Node) error {
 	{
 		v, err := data.HashTypeId.MarshalText()

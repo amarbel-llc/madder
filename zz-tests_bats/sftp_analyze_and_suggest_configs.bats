@@ -39,7 +39,7 @@ function existing_verifies_when_init_then_analyze { # @test
 # Snapshot every regular file under $1 as one line per file:
 # "<relative-path> <size> <mtime-seconds>". Sorted for stable diff.
 snapshot_tree() {
-  ( cd "$1" && find . -type f -printf '%P %s %T@\n' | sort )
+  (cd "$1" && find . -type f -printf '%P %s %T@\n' | sort)
 }
 
 # --- bad inputs / boundaries (#11, #12) ----------------------------------
@@ -98,7 +98,7 @@ function probing_phase_is_read_only { # @test
   local after="$BATS_TEST_TMPDIR/snap-after"
   snapshot_tree "$remote_root" >"$after"
 
-  diff "$before" "$after" || \
+  diff "$before" "$after" ||
     fail "remote tree changed during default (no -yes-to-all) probe"
 }
 
@@ -224,7 +224,7 @@ function bootstrap_yes_to_all_writes_remote_config { # @test
 
   # No remote config exists; -yes-to-all should auto-confirm bootstrap
   # and write one via blob_stores.WriteRemoteConfig.
-  [[ ! -e "$remote_root/blob_store-config" ]] || \
+  [[ ! -e "$remote_root/blob_store-config" ]] ||
     fail "test fixture pre-condition: blob_store-config must not pre-exist"
 
   TMPDIR="$BATS_TEST_TMPDIR/suggest" run_madder sftp-analyze-and-suggest-configs \
@@ -235,13 +235,13 @@ function bootstrap_yes_to_all_writes_remote_config { # @test
     -yes-to-all
   assert_success
 
-  [[ -e "$remote_root/blob_store-config" ]] || \
+  [[ -e "$remote_root/blob_store-config" ]] ||
     fail "blob_store-config not written to remote"
 
   assert_equal "$(file_mode "$remote_root/blob_store-config")" '444'
 
   # Config should have single_hash = true (legacy single-hash layout)
   # so subsequent reads walk the bucket tree correctly per #149.
-  grep -q 'single_hash = true' "$remote_root/blob_store-config" || \
+  grep -q 'single_hash = true' "$remote_root/blob_store-config" ||
     fail "blob_store-config missing 'single_hash = true' for legacy layout: $(cat "$remote_root/blob_store-config")"
 }

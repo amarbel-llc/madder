@@ -10,8 +10,8 @@ import (
 	"strconv"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // HeaderV1 is the literal byte sequence that precedes the NDJSON body
@@ -109,7 +109,8 @@ func (v1BodyCoder) EncodeTo(
 	v1, ok := (*blobPtr).(*V1)
 	if !ok {
 		return 0, errors.ErrorWithStackf(
-			"capture_receipt: v1BodyCoder.EncodeTo: expected *V1, got %T", *blobPtr)
+			"capture_receipt: v1BodyCoder.EncodeTo: expected *V1, got %T", *blobPtr,
+		)
 	}
 
 	entries := append([]EntryV1(nil), v1.Entries...)

@@ -501,8 +501,8 @@ function webdav_init_with_tls_client_cert { # @test
   local client_crt="$BATS_TEST_TMPDIR/client.crt"
   openssl req -x509 -newkey ed25519 \
     -keyout "$client_key" -out "$client_crt" \
-    -days 1 -nodes -subj '/CN=test-client' >/dev/null 2>&1 \
-    || fail "openssl could not generate a self-signed client cert+key pair"
+    -days 1 -nodes -subj '/CN=test-client' >/dev/null 2>&1 ||
+    fail "openssl could not generate a self-signed client cert+key pair"
 
   run_madder init-webdav \
     -url "${WEBDAV_URL}store-tls-cert/" \

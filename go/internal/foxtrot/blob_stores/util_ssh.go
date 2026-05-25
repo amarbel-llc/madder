@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
@@ -193,9 +193,11 @@ func hostKeyAlgorithmsForKnownHosts(
 // — exposing the list of trusted keys via *knownhosts.KeyError.Want.
 type hostKeyAlgorithmsProbe struct{}
 
-func (hostKeyAlgorithmsProbe) Type() string                          { return "madder-host-key-algorithms-probe" }
-func (hostKeyAlgorithmsProbe) Marshal() []byte                       { return nil }
-func (hostKeyAlgorithmsProbe) Verify([]byte, *ssh.Signature) error   { return errors.Errorf("probe key cannot verify signatures") }
+func (hostKeyAlgorithmsProbe) Type() string    { return "madder-host-key-algorithms-probe" }
+func (hostKeyAlgorithmsProbe) Marshal() []byte { return nil }
+func (hostKeyAlgorithmsProbe) Verify([]byte, *ssh.Signature) error {
+	return errors.Errorf("probe key cannot verify signatures")
+}
 
 // TODO refactor `blob_store_configs.ConfigSFTP` for ssh-client-specific methods
 func MakeSSHClientForExplicitConfig(

@@ -1,8 +1,8 @@
 package blob_stores
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // modeConfused is the poison-mode marker set when two mutually

@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 func DecodeFromFileInto[
@@ -113,4 +113,3 @@ func DecodeFromFileOrEmptyBuffer[
 
 	return typedBlob, err
 }
-

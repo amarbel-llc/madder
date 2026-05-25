@@ -76,6 +76,7 @@ type stubNonIdentity struct{}
 func (stubNonIdentity) WrapWriter(w io.Writer) (io.WriteCloser, error) {
 	return nil, nil
 }
+
 func (stubNonIdentity) WrapReader(r io.Reader) (io.ReadCloser, error) {
 	return nil, nil
 }

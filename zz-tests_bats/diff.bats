@@ -373,9 +373,9 @@ function diff_reports_multiple_differences_sorted_by_path { # @test
   run_cg restore "$rid" out
   assert_success
 
-  echo "modified" >out/a.txt       # M  a.txt
-  rm out/b.txt                     # D  b.txt
-  echo "extra" >out/extra.txt      # A  extra.txt
+  echo "modified" >out/a.txt  # M  a.txt
+  rm out/b.txt                # D  b.txt
+  echo "extra" >out/extra.txt # A  extra.txt
 
   run_cg diff "$rid" out
   assert_failure

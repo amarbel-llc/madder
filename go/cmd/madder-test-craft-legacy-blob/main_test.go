@@ -49,7 +49,8 @@ func TestRun_CompressionMagicBytes(t *testing.T) {
 			out := filepath.Join(dir, "blob.bin")
 
 			stdin := bytes.NewReader([]byte(
-				"hello craft — non-trivial content for compression to chew on"))
+				"hello craft — non-trivial content for compression to chew on",
+			))
 			if err := run(tc.comp, "none", "", "-", out, stdin); err != nil {
 				t.Fatalf("run: %v", err)
 			}

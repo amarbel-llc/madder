@@ -20,7 +20,8 @@ func (layout v3Cache) MakePathBlobStore(
 	targets ...string,
 ) interfaces.DirectoryLayoutPath {
 	return layout.xdg.GetDirCache().MakePath(
-		stringSliceJoin("blob_stores", targets)...)
+		stringSliceJoin("blob_stores", targets)...,
+	)
 }
 
 func (layout v3Cache) GetLocationType() blob_store_id.LocationType {

@@ -53,12 +53,15 @@ var (
 func DecodeFromFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], path string) (typedBlob internal.TypedBlob[BLOB], err error) {
 	return internal.DecodeFromFile[BLOB, BLOB_PTR](coders, path)
 }
+
 func DecodeFromFileInto[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](typedBlob *internal.TypedBlob[BLOB], coders internal.CoderToTypedBlob[BLOB], path string) (err error) {
 	return internal.DecodeFromFileInto[BLOB, BLOB_PTR](typedBlob, coders, path)
 }
+
 func DecodeFromFileOrEmptyBuffer[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], path string, permitNotExist bool) (typedBlob internal.TypedBlob[BLOB], err error) {
 	return internal.DecodeFromFileOrEmptyBuffer[BLOB, BLOB_PTR](coders, path, permitNotExist)
 }
+
 func EncodeToFile[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]](coders internal.CoderToTypedBlob[BLOB], typedBlob *internal.TypedBlob[BLOB], path string) (err error) {
 	return internal.EncodeToFile[BLOB, BLOB_PTR](coders, typedBlob, path)
 }

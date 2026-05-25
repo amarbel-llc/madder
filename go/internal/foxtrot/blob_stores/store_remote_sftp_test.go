@@ -14,8 +14,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // recordingObserver captures every event handed to OnBlobPublished so
@@ -243,15 +243,15 @@ type spyActiveContext struct {
 
 var _ interfaces.ActiveContext = (*spyActiveContext)(nil)
 
-func (c *spyActiveContext) Deadline() (time.Time, bool)            { return time.Time{}, false }
-func (c *spyActiveContext) Done() <-chan struct{}                  { return nil }
-func (c *spyActiveContext) Err() error                             { return nil }
-func (c *spyActiveContext) Value(_ any) any                        { return nil }
-func (c *spyActiveContext) Cause() error                           { return nil }
-func (c *spyActiveContext) GetState() interfaces.ContextState      { return interfaces.ContextStateStarted }
-func (c *spyActiveContext) Cancel(_ error)                         { c.cancelCalls++ }
-func (c *spyActiveContext) After(_ interfaces.FuncActiveContext)   {}
-func (c *spyActiveContext) Must(_ interfaces.FuncActiveContext)    {}
+func (c *spyActiveContext) Deadline() (time.Time, bool)          { return time.Time{}, false }
+func (c *spyActiveContext) Done() <-chan struct{}                { return nil }
+func (c *spyActiveContext) Err() error                           { return nil }
+func (c *spyActiveContext) Value(_ any) any                      { return nil }
+func (c *spyActiveContext) Cause() error                         { return nil }
+func (c *spyActiveContext) GetState() interfaces.ContextState    { return interfaces.ContextStateStarted }
+func (c *spyActiveContext) Cancel(_ error)                       { c.cancelCalls++ }
+func (c *spyActiveContext) After(_ interfaces.FuncActiveContext) {}
+func (c *spyActiveContext) Must(_ interfaces.FuncActiveContext)  {}
 
 // Compile-time guard for the "context" stdlib import the spy uses
 // only as type evidence; the methods above implement the interface

@@ -4,9 +4,7 @@ package madder_env
 
 import internal "github.com/amarbel-llc/madder/go/internal/echo/madder_env"
 
-var (
-	DefaultEnvVarNames = internal.DefaultEnvVarNames
-)
+var DefaultEnvVarNames = internal.DefaultEnvVarNames
 
 const (
 	EnvBin                 = internal.EnvBin

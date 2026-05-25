@@ -143,7 +143,7 @@ func TestIsRemoteConfigAlreadyExists(t *testing.T) {
 // mover must call observer.OnBlobPublished exactly once per
 // successful upload with op = "written".
 func TestS3MoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
-	var id = mustParseBlobStoreId(t, "s3-default")
+	id := mustParseBlobStoreId(t, "s3-default")
 	observer := &recordingObserver{}
 
 	store := &remoteS3{
@@ -166,7 +166,7 @@ func TestS3MoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 }
 
 func TestS3MoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
-	var id = mustParseBlobStoreId(t, "s3-default")
+	id := mustParseBlobStoreId(t, "s3-default")
 	store := &remoteS3{id: id, observer: nil}
 	mover := &s3Mover{store: store}
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, 1) // must not panic

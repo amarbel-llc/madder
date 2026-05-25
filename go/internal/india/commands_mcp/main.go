@@ -8,14 +8,16 @@ var utility = futility.NewUtility(
 )
 
 func init() {
-	utility.Examples = append(utility.Examples,
+	utility.Examples = append(
+		utility.Examples,
 		futility.Example{
 			Description: "Run the MCP server (used as a clown stdioServer command).",
 			Command:     "madder-mcp serve",
 		},
 	)
 
-	utility.Files = append(utility.Files,
+	utility.Files = append(
+		utility.Files,
 		futility.FilePath{
 			Path: "$XDG_DATA_HOME/madder/blob_stores/",
 			Description: "Root directory for the madder XDG blob stores read " +
@@ -25,7 +27,8 @@ func init() {
 		},
 	)
 
-	utility.EnvVars = append(utility.EnvVars,
+	utility.EnvVars = append(
+		utility.EnvVars,
 		futility.EnvVar{
 			Name: "MADDER_CEILING_DIRECTORIES",
 			Description: "Colon-separated list of absolute directories above " +

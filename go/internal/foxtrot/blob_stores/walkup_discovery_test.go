@@ -138,7 +138,8 @@ func keysOf(m BlobStoreMap) []string {
 // stores. Same-name stores at shallower ancestors get extra `.`
 // prefixes (`..rsync_dot_net` for depth-1).
 func TestMakeAncestorOverrideStores_DiscoversAllAncestors(t *testing.T) {
-	ceiling, leaf := setupAncestorTree(t,
+	ceiling, leaf := setupAncestorTree(
+		t,
 		map[string][]string{
 			".":   {"default", "rsync_dot_net"},
 			"sub": {"default"},
@@ -168,7 +169,8 @@ func TestMakeAncestorOverrideStores_DiscoversAllAncestors(t *testing.T) {
 // "minimal disambiguation" rule: a name that exists at only one
 // ancestor — even a shallow one — uses a single dot.
 func TestMakeAncestorOverrideStores_UniqueNamesGetSingleDot(t *testing.T) {
-	ceiling, leaf := setupAncestorTree(t,
+	ceiling, leaf := setupAncestorTree(
+		t,
 		map[string][]string{
 			".":   {"home_only"},
 			"sub": {"sub_only"},

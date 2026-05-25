@@ -10,13 +10,13 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/delim_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/quiter"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/delim_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"
 )
 
 func init() {

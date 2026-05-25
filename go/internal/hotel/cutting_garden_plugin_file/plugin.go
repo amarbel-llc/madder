@@ -391,7 +391,8 @@ func materializeEntries(
 
 		default:
 			return errors.ErrorWithStackf(
-				"%s: unknown entry type %q", materialized, e.Type)
+				"%s: unknown entry type %q", materialized, e.Type,
+			)
 		}
 	}
 

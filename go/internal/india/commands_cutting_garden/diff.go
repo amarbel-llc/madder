@@ -14,8 +14,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -192,7 +192,8 @@ func (cmd *Diff) runDiff(
 	if !ok {
 		return errors.ErrorWithStackf(
 			"receipt %s: unexpected blob shape %T (expected *V1)",
-			&receiptId, blob)
+			&receiptId, blob,
+		)
 	}
 
 	// TODO(amarbel-llc/cutting-garden#18) cross-scheme diffs. Same constraint as restore:

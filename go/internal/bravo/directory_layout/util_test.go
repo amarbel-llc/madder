@@ -112,4 +112,3 @@ func TestFindAllCwdOverridePaths_FileMarker(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
-

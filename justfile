@@ -329,10 +329,12 @@ test-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
+# Format all source files via treefmt-nix (goimports → gofumpt for Go,
+# nixfmt for Nix, shfmt for shell/bats). Config lives in ./treefmt.nix;
+# `nix fmt` runs the same wrapper.
 [group("codemod")]
 fmt:
-  cd go && goimports -w .
-  cd go && gofumpt -w .
+  nix fmt
 
 #   _     _       _
 #  | |   (_)_ __ | |_
@@ -342,7 +344,7 @@ fmt:
 #
 
 [group("pre-build")]
-lint: lint-flake
+lint: lint-flake lint-fmt
 
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). `--no-closure` skips the build-graph pass so
@@ -351,6 +353,19 @@ lint: lint-flake
 [group("pre-build")]
 lint-flake:
   doppelgang lint --flake . --no-closure
+
+# Check that all source files match treefmt's expected formatting.
+# Sandboxed check derivation (no working-tree side effects); exits 1
+# on drift. `just fmt` is the corresponding write mode. Resolving the
+# system tuple via `nix eval` keeps the recipe portable across linux /
+# darwin without depending on just's `os()` (which returns `macos`,
+# not nix's `darwin`).
+[group("pre-build")]
+lint-fmt:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  system=$(nix eval --raw --impure --expr 'builtins.currentSystem')
+  nix build --print-build-logs --no-link ".#checks.${system}.treefmt"
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_

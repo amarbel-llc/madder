@@ -184,18 +184,18 @@ function inventory_log_session_file_has_hyphence_header { # @test
 
   local first_line
   first_line="$(head -n 1 "$log")"
-  [[ "$first_line" == "---" ]] || fail "session file must start with --- (got $first_line)"
+  [[ $first_line == "---" ]] || fail "session file must start with --- (got $first_line)"
 
   local type_line
   type_line="$(sed -n '2p' "$log")"
-  [[ "$type_line" == "! madder-inventory_log-ndjson-v1" ]] ||
+  [[ $type_line == "! madder-inventory_log-ndjson-v1" ]] ||
     fail "session file metadata type must be madder-inventory_log-ndjson-v1, got: $type_line"
 
   local close_line
   close_line="$(sed -n '3p' "$log")"
-  [[ "$close_line" == "---" ]] || fail "session file must close metadata with --- on line 3 (got: $close_line)"
+  [[ $close_line == "---" ]] || fail "session file must close metadata with --- on line 3 (got: $close_line)"
 
   local separator
   separator="$(sed -n '4p' "$log")"
-  [[ -z "$separator" ]] || fail "line 4 must be the empty separator (got: $separator)"
+  [[ -z $separator ]] || fail "line 4 must be the empty separator (got: $separator)"
 }

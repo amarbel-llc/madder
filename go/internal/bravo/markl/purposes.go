@@ -99,7 +99,8 @@ func RegisterPurpose(opts RegisterPurposeOpts) Purpose {
 	for _, formatId := range opts.FormatIds {
 		if _, ok := purpose.formatIds[formatId]; ok {
 			panic(
-				fmt.Sprintf("format id (%q) registered for purpose (%q) more than once",
+				fmt.Sprintf(
+					"format id (%q) registered for purpose (%q) more than once",
 					formatId,
 					opts.Id,
 				),

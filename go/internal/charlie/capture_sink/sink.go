@@ -16,9 +16,9 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/charlie/capture_receipt"
+	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 // summaryRecordType is the wire `type` value the NDJSON sink writes on

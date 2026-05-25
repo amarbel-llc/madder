@@ -13,9 +13,9 @@ import (
 	"fmt"
 	"io"
 
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 // Sink abstracts write's output stream so Run can stay format-agnostic.

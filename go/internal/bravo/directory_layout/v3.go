@@ -20,7 +20,8 @@ func (layout v3) MakePathBlobStore(
 	targets ...string,
 ) interfaces.DirectoryLayoutPath {
 	return layout.xdg.GetDirData().MakePath(
-		stringSliceJoin("blob_stores", targets)...)
+		stringSliceJoin("blob_stores", targets)...,
+	)
 }
 
 func (layout v3) GetLocationType() blob_store_id.LocationType {

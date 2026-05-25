@@ -8,7 +8,8 @@ var utility = futility.NewUtility(
 )
 
 func init() {
-	utility.Examples = append(utility.Examples,
+	utility.Examples = append(
+		utility.Examples,
 		futility.Example{
 			Description: "Initialize a cache store under XDG_CACHE_HOME.",
 			Command:     "madder-cache init scratch",
@@ -19,7 +20,8 @@ func init() {
 		},
 	)
 
-	utility.Files = append(utility.Files,
+	utility.Files = append(
+		utility.Files,
 		futility.FilePath{
 			Path: "$XDG_CACHE_HOME/madder-cache/blob_stores/",
 			Description: "Root directory for cache blob stores. Purgeable — " +
@@ -32,7 +34,8 @@ func init() {
 		},
 	)
 
-	utility.EnvVars = append(utility.EnvVars,
+	utility.EnvVars = append(
+		utility.EnvVars,
 		futility.EnvVar{
 			Name: "MADDER_CEILING_DIRECTORIES",
 			Description: "Colon-separated list of absolute directories above " +

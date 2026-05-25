@@ -72,9 +72,11 @@ func DecodeTomlLocalHashBucketedV2(input []byte) (*TomlLocalHashBucketedV2Docume
 	}
 	return d, nil
 }
+
 func (d *TomlLocalHashBucketedV2Document) Data() *TomlLocalHashBucketedV2 {
 	return &d.data
 }
+
 func (d *TomlLocalHashBucketedV2Document) Encode() ([]byte, error) {
 	{
 		if err := cst.SetAny(d.cstDoc.Root(), "hash_buckets", []int(d.data.HashBuckets)); err != nil {
@@ -113,21 +115,27 @@ func (d *TomlLocalHashBucketedV2Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlLocalHashBucketedV2Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlLocalHashBucketedV2Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlLocalHashBucketedV2Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlLocalHashBucketedV2Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlLocalHashBucketedV2Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlLocalHashBucketedV2Into(data *TomlLocalHashBucketedV2, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -167,6 +175,7 @@ func DecodeTomlLocalHashBucketedV2Into(data *TomlLocalHashBucketedV2, doc *docum
 	}
 	return nil
 }
+
 func EncodeTomlLocalHashBucketedV2From(data *TomlLocalHashBucketedV2, doc *document.Document, container *cst.Node) error {
 	{
 		if err := cst.SetAny(container, "hash_buckets", []int(data.HashBuckets)); err != nil {

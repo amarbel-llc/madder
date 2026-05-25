@@ -14,8 +14,8 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/madder/go/internal/hotel/cutting_garden_plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 )
 
@@ -146,7 +146,8 @@ func (cmd *Restore) runRestore(
 	if !ok {
 		return errors.ErrorWithStackf(
 			"receipt %s: unexpected blob shape %T (expected *V1)",
-			&receiptId, blob)
+			&receiptId, blob,
+		)
 	}
 
 	// TODO(amarbel-llc/cutting-garden#18) cross-scheme restores. Today the receipt's
@@ -233,7 +234,8 @@ func readReceiptBlob(
 	}
 
 	return nil, ids.TypeStruct{}, errors.ErrorWithStackf(
-		"receipt %s not found in any configured store", receiptId)
+		"receipt %s not found in any configured store", receiptId,
+	)
 }
 
 // resolveMaterializationStore implements FDR §Store-Hint Resolution
@@ -290,7 +292,8 @@ func resolveMaterializationStore(
 		return hintedStore, nil
 	}
 
-	fmt.Fprintf(os.Stderr,
+	fmt.Fprintf(
+		os.Stderr,
 		"warning: store %s has been re-configured since this receipt was written\n"+
 			"  receipt config-hash: %s\n"+
 			"  current config-hash: %s\n",
@@ -325,4 +328,3 @@ func resolveStoreById(
 	}
 	return store, nil
 }
-

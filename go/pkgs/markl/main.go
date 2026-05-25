@@ -118,27 +118,35 @@ var (
 func LockEquals[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](left domaininterfaces.Lock[KEY, KEY_PTR], right domaininterfaces.Lock[KEY, KEY_PTR]) bool {
 	return internal.LockEquals[KEY, KEY_PTR](left, right)
 }
+
 func MakeErrLength[INTEGER constraints.Integer](expected INTEGER, actual INTEGER) error {
 	return internal.MakeErrLength[INTEGER](expected, actual)
 }
+
 func MakeLock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]() internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLock[KEY, KEY_PTR]()
 }
+
 func MakeLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR], requireValue bool) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeLockCoder[KEY, KEY_PTR](lock, requireValue)
 }
+
 func MakeLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.Lock[KEY, KEY_PTR]) internal.LockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeLockCoderValueNotRequired[KEY, KEY_PTR](lock)
 }
+
 func MakeLockWith[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](key KEY, value domaininterfaces.MarklId) internal.Lock[KEY, KEY_PTR] {
 	return internal.MakeLockWith[KEY, KEY_PTR](key, value)
 }
+
 func MakeMutableLockCoder[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR], requireValue bool) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoder[KEY, KEY_PTR](lock, requireValue)
 }
+
 func MakeMutableLockCoderValueNotRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoderValueNotRequired[KEY, KEY_PTR](lock)
 }
+
 func MakeMutableLockCoderValueRequired[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]](lock domaininterfaces.LockMutable[KEY, KEY_PTR]) internal.MutableLockBinaryMarshaler[KEY, KEY_PTR] {
 	return internal.MakeMutableLockCoderValueRequired[KEY, KEY_PTR](lock)
 }

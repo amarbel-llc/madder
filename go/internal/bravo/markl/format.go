@@ -250,4 +250,3 @@ func RegisterFormat(format domain_interfaces.MarklFormat) domain_interfaces.Mark
 	formats[formatId] = format
 	return format
 }
-

@@ -87,9 +87,11 @@ func DecodeTomlWebDAVV0(input []byte) (*TomlWebDAVV0Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlWebDAVV0Document) Data() *TomlWebDAVV0 {
 	return &d.data
 }
+
 func (d *TomlWebDAVV0Document) Encode() ([]byte, error) {
 	if d.data.URL != "" || cst.HasValue(d.cstDoc.Root(), "url") {
 		if err := cst.SetAny(d.cstDoc.Root(), "url", d.data.URL); err != nil {
@@ -154,21 +156,27 @@ func (d *TomlWebDAVV0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlWebDAVV0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlWebDAVV0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlWebDAVV0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlWebDAVV0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlWebDAVV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlWebDAVV0Into(data *TomlWebDAVV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -224,6 +232,7 @@ func DecodeTomlWebDAVV0Into(data *TomlWebDAVV0, doc *document.Document, containe
 	}
 	return nil
 }
+
 func EncodeTomlWebDAVV0From(data *TomlWebDAVV0, doc *document.Document, container *cst.Node) error {
 	if data.URL != "" || cst.HasValue(container, "url") {
 		if err := cst.SetAny(container, "url", data.URL); err != nil {

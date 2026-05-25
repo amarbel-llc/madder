@@ -13,15 +13,15 @@ import "testing"
 // output.
 func TestConfigKeyValues_S3RedactsSecrets(t *testing.T) {
 	config := &TomlS3V0{
-		Endpoint:               "https://s3.example.com",
-		Region:                 "us-east-1",
-		Bucket:                 "madder-blobs",
-		Prefix:                 "store-1",
-		AccessKeyId:            "AKIA0000000000000000",
-		SecretAccessKey:        "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
-		SessionToken:           "session-token-secret",
-		UsePathStyle:           true,
-		InsecureSkipVerify:     true,
+		Endpoint:           "https://s3.example.com",
+		Region:             "us-east-1",
+		Bucket:             "madder-blobs",
+		Prefix:             "store-1",
+		AccessKeyId:        "AKIA0000000000000000",
+		SecretAccessKey:    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+		SessionToken:       "session-token-secret",
+		UsePathStyle:       true,
+		InsecureSkipVerify: true,
 	}
 
 	keyValues := ConfigKeyValues(config)
