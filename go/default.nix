@@ -4,6 +4,11 @@
   tommy,
   bats,
   purse-first,
+  # `doppelgang lint` runs in the `default` lane as a CI gate against
+  # flake.lock duplication (madder#214). Defaulted to null so direct
+  # `import ./go/default.nix` callers without a flake context still
+  # work — the devShell just won't carry doppelgang in that mode.
+  doppelgang ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -435,6 +440,9 @@ in
       madder-test-sftp-server
       madder-test-craft-legacy-blob
       madder-test-webdav-server
+    ]
+    ++ pkgs-master.lib.optionals (doppelgang != null) [
+      doppelgang.packages.${system}.default
     ]
     ++ (with pkgs-master; [
       delve

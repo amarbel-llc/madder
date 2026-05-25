@@ -1,6 +1,6 @@
 set dotenv-load
 
-default: build test
+default: build test lint
 
 #   ____        _ _     _
 #  | __ ) _   _(_) | __| |
@@ -333,6 +333,24 @@ test-bats-tags *tags:
 fmt:
   cd go && goimports -w .
   cd go && gofumpt -w .
+
+#   _     _       _
+#  | |   (_)_ __ | |_
+#  | |   | | '_ \| __|
+#  | |___| | | | | |_
+#  |_____|_|_| |_|\__|
+#
+
+# Lint flake.lock for reducible input duplication (madder#214,
+# doppelgang FDR-0002). `--no-closure` skips the build-graph pass so
+# the recipe runs offline; the `default` chain still exercises the
+# build via `build`. Exits 1 on findings, so CI surfaces drift.
+[group("lint")]
+lint: lint-flake
+
+[group("lint")]
+lint-flake:
+  doppelgang lint --flake . --no-closure
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_
