@@ -3,13 +3,13 @@ bats_timeout := "30"
 default: test
 
 # Run all bats test files.
-[group("test")]
+[group("post-build")]
 test-targets *targets="*.bats":
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} {{targets}}
 
 # Run bats tests filtered by tag.
-[group("test")]
+[group("post-build")]
 test-tags *tags:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} --filter-tags {{tags}} *.bats
@@ -17,7 +17,7 @@ test-tags *tags:
 # Run the default integration test suite. Excludes net_cap-tagged
 # tests (loopback-binding scenarios) — those run under `test-net-cap`
 # with sandcastle's --allow-local-binding granted.
-[group("test")]
+[group("post-build")]
 test:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} --filter-tags '!net_cap' *.bats
@@ -35,7 +35,7 @@ test:
 # sun_path limit once bats appends bats-run-XXX/test/NN/home/.ssh/
 # agent/s.<rand>.agent.<rand>, breaking the ssh-agent harness used
 # by sftp_analyze_and_suggest_configs.bats.
-[group("test")]
+[group("post-build")]
 test-net-cap:
   TMPDIR=/tmp BATS_TEST_TIMEOUT="{{bats_timeout}}" \
     bats --jobs {{num_cpus()}} --filter-tags net_cap *.bats

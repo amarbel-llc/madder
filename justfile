@@ -54,23 +54,23 @@ generate-tommy:
 
 # Wipe Go's build cache. Useful when bisecting a stale-build mystery
 # or recovering from a corrupted cache entry.
-[group("clean")]
+[group("maintenance")]
 clean-go-cache:
   cd go && go clean -cache
 
 # Wipe Go's module cache (~/go/pkg/mod). Forces re-download of every
 # module on the next build. Heavier than clean-go-cache.
-[group("clean")]
+[group("maintenance")]
 clean-go-modcache:
   cd go && go clean -modcache
 
 # Both Go cleans together.
-[group("clean")]
+[group("maintenance")]
 clean-go: clean-go-cache clean-go-modcache
 
 # Remove the nix-build symlink. Forces the next `nix build` to
 # refresh the symlink even if its store path is reachable from cache.
-[group("clean")]
+[group("maintenance")]
 clean-nix-result:
   rm -f {{justfile_directory()}}/result
 
@@ -79,7 +79,7 @@ clean-nix-result:
 # store (use `nix store gc` for the latter). Does NOT wipe .tmp/
 # — long-running clients (Clown, devshell tools) hold open files
 # there and rely on $TMPDIR pointing at it.
-[group("clean")]
+[group("maintenance")]
 clean: clean-go clean-nix-result
 
 #   _____         _
@@ -95,25 +95,25 @@ clean: clean-go clean-nix-result
 # vet-go-analyzers runs first because it's cheap and catches issues
 # the test suites would not (deferred error drops, pool leaks,
 # discarded iter.Seq2 errors).
-[group("test")]
+[group("post-build")]
 test: vet-go-analyzers test-go-race test-bats test-bats-net-cap
 
 # Run Go unit tests only.
-[group("test")]
+[group("post-build")]
 test-go *flags:
   cd go && go test -tags test {{flags}} ./...
 
 # Run Go benchmarks. Usage: just bench-go ./internal/foxtrot/blob_stores
 # Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
 # in flags for real timing. -run=^$ suppresses test functions.
-[group("test")]
+[group("post-build")]
 bench-go pkg="./..." *flags="-benchtime=1x":
   cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
 
 # Run `go vet` across the module with the test build tag, which gates
 # several internal test-only symbols. Without -tags test, vet reports
 # false positives on test-tagged source files.
-[group("test")]
+[group("post-build")]
 vet-go *flags:
   cd go && go vet -tags test {{flags}} ./...
 
@@ -122,7 +122,7 @@ vet-go *flags:
 # `go vet -vettool`. Strict: any analyzer finding fails the recipe.
 # The analyzer cmds are pinned via go.mod `tool` directives so
 # `go mod tidy` does not drop their transitive deps.
-[group("test")]
+[group("post-build")]
 vet-go-analyzer name:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -135,14 +135,14 @@ vet-go-analyzer name:
 # Run every dewey analyzer in sequence. Wired into the top-level
 # `test` aggregate; runs first so analyzer findings break the loop
 # before the slower bats lanes start.
-[group("test")]
+[group("post-build")]
 vet-go-analyzers: (vet-go-analyzer "seqerror") (vet-go-analyzer "repool") (vet-go-analyzer "defererr")
 
 # Build, vet, and test a single internal subpackage tree — the standard
 # verification triple, but scoped to ./internal/<subpath>/... so we don't
 # wait for the whole module when iterating on one package.
 # Usage: just verify-internal-pkg futility
-[group("test")]
+[group("post-build")]
 verify-internal-pkg subpath:
   cd go && go build ./internal/{{subpath}}/...
   cd go && go vet -tags test ./internal/{{subpath}}/...
@@ -150,7 +150,7 @@ verify-internal-pkg subpath:
 
 # Run Go unit tests under the race detector. Invoked by the default
 # `test` target; kept as a standalone recipe for flag-passing use cases.
-[group("test")]
+[group("post-build")]
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
 
@@ -159,7 +159,7 @@ test-go-race *flags:
 # and a textfmt profile to .tmp/go-cover.out (the legacy interface).
 # View the full HTML report with
 # `cd go && go tool cover -html=../.tmp/go-cover.out`.
-[group("test")]
+[group("post-build")]
 test-go-cover *flags:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -176,7 +176,7 @@ test-go-cover *flags:
 
 # Run bats integration tests. Excludes net_cap-tagged tests (loopback-
 # binding scenarios) — those run under `test-bats-net-cap`.
-[group("test")]
+[group("post-build")]
 test-bats: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
@@ -194,7 +194,7 @@ test-bats: build
 # which is everything the SFTP/WebDAV harnesses need — no sandcastle
 # `--allow-local-binding` / `--allow-unix-sockets` escape hatch
 # required. See clown ADR-0007 for the empirical sandbox survey.
-[group("test")]
+[group("post-build")]
 test-bats-net-cap:
   nix build .#bats-net_cap --no-link --print-build-logs
 
@@ -205,7 +205,7 @@ test-bats-net-cap:
 # bats suite against `madder-race`'s `$out/bin/madder`. net_cap-tagged
 # scenarios are filtered out — the SFTP harness those tests need is
 # a devshell-only derivation not exposed to nix-driven bats lanes.
-[group("test")]
+[group("post-build")]
 test-bats-race:
   nix build .#bats-race --print-build-logs --no-link
 
@@ -221,7 +221,7 @@ test-bats-race:
 #
 # net_cap-tagged scenarios are filtered out by the derivation — they
 # need loopback binding the nix sandbox doesn't grant.
-[group("test")]
+[group("post-build")]
 test-bats-cover:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -245,7 +245,7 @@ test-bats-cover:
 # having produced fragments under .tmp/cover-data/{unit,bats}/. Use this
 # to see the full coverage picture across both lanes — anything still
 # uncovered after both passes is a real gap.
-[group("test")]
+[group("post-build")]
 cover-merged: test-go-cover test-bats-cover
   #!/usr/bin/env bash
   set -euo pipefail
@@ -264,7 +264,7 @@ cover-merged: test-go-cover test-bats-cover
 # merged %, and bats-delta (how much bats adds beyond unit). Sorted
 # ascending by merged % so the worst-covered packages surface first.
 # Depends on cover-merged so all three profiles exist.
-[group("test")]
+[group("post-build")]
 cover-summary: cover-merged
   #!/usr/bin/env bash
   set -euo pipefail
@@ -305,7 +305,7 @@ cover-summary: cover-merged
     | awk -F $'\t' '{ printf "%-72s %6.1f%% %6.1f%% %7.1f%% %+9.1f\n", $1, $2, $3, $4, $3-$2 }'
 
 # Run specific bats test files.
-[group("test")]
+[group("post-build")]
 test-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
@@ -318,7 +318,7 @@ test-bats-targets *targets: build
 # sandbox against the same `$out/bin/madder` `.#madder` produces, so
 # dev-loop and release share one cache. `nix flake show` lists every
 # available bats lane.
-[group("test")]
+[group("post-build")]
 test-bats-tags *tags:
   nix build --print-build-logs --no-link .#bats-{{tags}}
 
@@ -329,7 +329,7 @@ test-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
-[group("fmt")]
+[group("codemod")]
 fmt:
   cd go && goimports -w .
   cd go && gofumpt -w .
@@ -359,19 +359,19 @@ lint-flake:
 #  |_|  |_|\__,_|_|_| |_|\__|
 #
 
-[group("maint")]
+[group("maintenance")]
 tidy:
   cd go && go mod tidy
 
 # Update dewey to a version (e.g. just update-dewey v0.0.3).
-[group("maint")]
+[group("maintenance")]
 update-dewey version:
   cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
   just gomod2nix
 
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
 # the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
-[group("maint")]
+[group("maintenance")]
 tag version message:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -393,7 +393,7 @@ tag version message:
 # reads it directly, and the binary picks it up via -ldflags injection
 # (see go/internal/0/buildinfo). No-op if already at the target.
 # Usage: just bump-version 0.0.2
-[group("maint")]
+[group("maintenance")]
 bump-version new_version:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -417,7 +417,7 @@ bump-version new_version:
 # recipe boundaries was unreliable — the inner recipe saw a malformed
 # argument and `git tag -s` would fail in a way that didn't surface
 # until much later (see madder release-v0.3.0 incident).
-[group("maint")]
+[group("maintenance")]
 release version:
   #!/usr/bin/env bash
   set -euo pipefail
@@ -455,7 +455,7 @@ release version:
   git push origin "$tag"
   gum log --level info "Pushed $tag"
 
-[group("maint")]
+[group("maintenance")]
 gomod2nix:
   cd go && gomod2nix
 
