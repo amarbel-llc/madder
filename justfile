@@ -1,6 +1,6 @@
 set dotenv-load
 
-default: build test lint
+default: lint build test
 
 #   ____        _ _     _
 #  | __ ) _   _(_) | __| |
@@ -341,14 +341,14 @@ fmt:
 #  |_____|_|_| |_|\__|
 #
 
+[group("pre-build")]
+lint: lint-flake
+
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). `--no-closure` skips the build-graph pass so
 # the recipe runs offline; the `default` chain still exercises the
 # build via `build`. Exits 1 on findings, so CI surfaces drift.
-[group("lint")]
-lint: lint-flake
-
-[group("lint")]
+[group("pre-build")]
 lint-flake:
   doppelgang lint --flake . --no-closure
 
