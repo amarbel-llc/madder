@@ -1,10 +1,16 @@
 {
   inputs = {
-    nixpkgs.url = "github:amarbel-llc/nixpkgs";
-    nixpkgs.inputs.nixpkgs-master.follows = "nixpkgs-master";
+    nixpkgs = {
+      url = "github:amarbel-llc/nixpkgs";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+    };
+
     nixpkgs-master.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
-    utils.url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
-    utils.inputs.systems.follows = "nixpkgs/systems";
+
+    utils = {
+      url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
+      inputs.systems.follows = "nixpkgs/systems";
+    };
 
     tommy = {
       url = "github:amarbel-llc/tommy";
@@ -43,11 +49,7 @@
       inputs.rust-overlay.follows = "purse-first/rust-overlay";
     };
 
-    # doppelgang ships `lint`, which madder runs in the `default` lane
-    # as a CI gate against flake.lock duplication (madder#214,
-    # doppelgang FDR-0002). treefmt-nix follows nixpkgs's copy so
-    # doppelgang's inclusion does not reintroduce duplication we just
-    # removed.
+    # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "github:amarbel-llc/doppelgang";
       inputs.nixpkgs.follows = "nixpkgs";
