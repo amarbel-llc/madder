@@ -574,6 +574,122 @@ func TestMulti_AllBlobs_PropagatesErrors(t *testing.T) {
 	}
 }
 
+// TestMulti_AllBlobs_TwoSourcesErrorAtDifferentSteps tightens the
+// multi-source error-interleaving contract (Task 7 carry-forward).
+// storeA errors after d1; storeB errors after d2. The merge must
+// surface both errors and continue past each, yielding the remaining
+// good ids from each source.
+func TestMulti_AllBlobs_TwoSourcesErrorAtDifferentSteps(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+	d3 := makeMultiAllBlobsTestId(t, 0x33)
+	d4 := makeMultiAllBlobsTestId(t, 0x44)
+
+	errA := errors.New("storeA mid-sequence boom")
+	errB := errors.New("storeB mid-sequence boom")
+
+	storeA := &multiModeStub{
+		allBlobsSeq: func(
+			yield func(domain_interfaces.MarklId, error) bool,
+		) {
+			if !yield(d1, nil) {
+				return
+			}
+			if !yield(nil, errA) {
+				return
+			}
+			if !yield(d3, nil) {
+				return
+			}
+		},
+	}
+	storeB := &multiModeStub{
+		allBlobsSeq: func(
+			yield func(domain_interfaces.MarklId, error) bool,
+		) {
+			if !yield(d2, nil) {
+				return
+			}
+			if !yield(nil, errB) {
+				return
+			}
+			if !yield(d4, nil) {
+				return
+			}
+		},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		Mirror(
+			BlobStoreInitialized{BlobStore: storeA},
+			BlobStoreInitialized{BlobStore: storeB},
+		).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+
+	if len(gotErrs) != 2 {
+		t.Fatalf("AllBlobs errors: got %d, want 2: %v", len(gotErrs), gotErrs)
+	}
+	errSet := map[error]bool{gotErrs[0]: true, gotErrs[1]: true}
+	if !errSet[errA] || !errSet[errB] {
+		t.Fatalf("AllBlobs errors: got %v, want both %v and %v", gotErrs, errA, errB)
+	}
+
+	wantIds := []string{d1.String(), d2.String(), d3.String(), d4.String()}
+	gotIdsSorted := append([]string(nil), gotIds...)
+	sort.Strings(gotIdsSorted)
+	wantIdsSorted := append([]string(nil), wantIds...)
+	sort.Strings(wantIdsSorted)
+	if !reflect.DeepEqual(gotIdsSorted, wantIdsSorted) {
+		t.Fatalf("AllBlobs ids (sorted): got %v, want %v", gotIdsSorted, wantIdsSorted)
+	}
+}
+
+// TestMulti_AllBlobs_BothSourcesErrorImmediately pins behavior when
+// every source's first head is an error. Both errors must surface
+// and the merge terminates with no ids.
+func TestMulti_AllBlobs_BothSourcesErrorImmediately(t *testing.T) {
+	errA := errors.New("storeA initial boom")
+	errB := errors.New("storeB initial boom")
+
+	storeA := &multiModeStub{
+		allBlobsSeq: func(yield func(domain_interfaces.MarklId, error) bool) {
+			yield(nil, errA)
+		},
+	}
+	storeB := &multiModeStub{
+		allBlobsSeq: func(yield func(domain_interfaces.MarklId, error) bool) {
+			yield(nil, errB)
+		},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		Mirror(
+			BlobStoreInitialized{BlobStore: storeA},
+			BlobStoreInitialized{BlobStore: storeB},
+		).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotIds) != 0 {
+		t.Fatalf("AllBlobs ids: got %v, want []", gotIds)
+	}
+	if len(gotErrs) != 2 {
+		t.Fatalf("AllBlobs errors: got %d, want 2: %v", len(gotErrs), gotErrs)
+	}
+	errSet := map[error]bool{gotErrs[0]: true, gotErrs[1]: true}
+	if !errSet[errA] || !errSet[errB] {
+		t.Fatalf("AllBlobs errors: got %v, want both %v and %v", gotErrs, errA, errB)
+	}
+}
+
 // TestMulti_AllBlobs_CrossHashPassesThrough pins that ids under
 // different hash formats never compare equal and therefore pass through
 // the merge as separate entries. storeA yields blake2b256 ids and
