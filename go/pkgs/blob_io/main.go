@@ -7,13 +7,33 @@ import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 type (
 	Config               = internal.Config
 	ErrBlobAlreadyExists = internal.ErrBlobAlreadyExists
-	ErrBlobMissing       = internal.ErrBlobMissing
-	MoveOptions          = internal.MoveOptions
-	TemporaryFS          = internal.TemporaryFS
 )
 
+// TODO create a constructor function to enable debugging
+type (
+	ErrBlobMissing = internal.ErrBlobMissing
+	MoveOptions    = internal.MoveOptions
+)
+
+// TemporaryFS is the temp-fs handle MoveOptions embeds. Aliased
+// from dewey/delta/files so callers may pass an env_dir.TemporaryFS
+// (also a files.TemporaryFS alias) directly into a blob_io.MoveOptions
+// without conversion.
+type TemporaryFS = internal.TemporaryFS
+
+var DefaultConfig = internal.DefaultConfig
+
+// ErrCollisionContentMismatch signals that two readers claimed to represent
+// the same blob (same digest, same target path) but their byte streams
+// diverged. For a collision-resistant hash the only way this fires is a
+// true hash collision; for a weak-hash mode (hypothetical, see #31) it
+// fires on any mid-air content divergence.
+//
+// This is exploratory infrastructure — not yet wired into the publish
+// path. See docs/decisions/0003-blob-store-hardlink-writes.md for the
+// EEXIST branch that will eventually call into this. Caller rationale
+// tracked in https://github.com/amarbel-llc/madder/issues/31.
 var (
-	DefaultConfig                                = internal.DefaultConfig
 	ErrCollisionContentMismatch                  = internal.ErrCollisionContentMismatch
 	IsErrBlobAlreadyExists                       = internal.IsErrBlobAlreadyExists
 	IsErrBlobMissing                             = internal.IsErrBlobMissing

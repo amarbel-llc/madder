@@ -12,8 +12,25 @@ type (
 )
 
 var (
-	CloneBlobStoreWithXDG         = internal.CloneBlobStoreWithXDG
-	DirBlobStore                  = internal.DirBlobStore
+	CloneBlobStoreWithXDG = internal.CloneBlobStoreWithXDG
+	DirBlobStore          = internal.DirBlobStore
+)
+
+// FindAllCwdOverridePaths walks up from cwd and returns every ancestor
+// that contains `.<utilityName>/` (file or directory), deepest-first.
+// Honors `<UTILITYNAME>_CEILING_DIRECTORIES` (parsed via dewey's
+// xdg.ParseCeilingDirectories + xdg.IsAboveCeiling).
+//
+// Multi-match counterpart of dewey's xdg.getCwdXDGOverridePath, which
+// returns only the deepest match. Loop shape mirrors the post-#75
+// dewey: the ceiling dir is the LAST dir checked, not the first
+// excluded — match git's GIT_CEILING_DIRECTORIES semantics. See #145
+// and amarbel-llc/purse-first#75.
+//
+// xdg.IsAboveCeiling symlink-resolves both dir and each ceiling before
+// comparison (amarbel-llc/purse-first#80), so this wrapper no longer
+// needs to canonicalize either side.
+var (
 	FindAllCwdOverridePaths       = internal.FindAllCwdOverridePaths
 	GetBlobStoreConfigPaths       = internal.GetBlobStoreConfigPaths
 	GetBlobStorePath              = internal.GetBlobStorePath
@@ -26,6 +43,4 @@ var (
 	PathBlobStore                 = internal.PathBlobStore
 )
 
-const (
-	FileNameBlobStoreConfig = internal.FileNameBlobStoreConfig
-)
+const FileNameBlobStoreConfig = internal.FileNameBlobStoreConfig

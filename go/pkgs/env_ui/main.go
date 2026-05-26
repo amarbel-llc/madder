@@ -4,6 +4,7 @@ package env_ui
 
 import internal "github.com/amarbel-llc/madder/go/internal/delta/env_ui"
 
+// TODO explore storing buffered writer and reader
 type (
 	Env            = internal.Env
 	Options        = internal.Options

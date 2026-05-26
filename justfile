@@ -17,10 +17,17 @@ build:
 build-go:
   cd go && go build ./...
 
-# Regenerate pkgs/ facades from internal/ packages via dagnabit.
+# Regenerate pkgs/ facades from internal/ packages via dagnabit, then
+# run nix fmt so the output passes lint-fmt. dagnabit emits per-symbol
+# declarations; treefmt's gofmt rule folds consecutive same-kind decls
+# into grouped blocks. Chaining the formatter keeps `just generate-facades`
+# a one-step process and prevents merge-hook surprises. Tracked upstream:
+# amarbel-llc/purse-first#108 (dagnabit should emit treefmt-compatible
+# output directly).
 [group("build")]
 generate-facades:
   cd go && dagnabit export
+  nix fmt
 
 # Regenerate facades and show what dewey imports landed in the three
 # facades that import dewey directly (domain_interfaces, hyphence,

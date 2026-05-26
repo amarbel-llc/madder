@@ -4,10 +4,34 @@ package madder_env
 
 import internal "github.com/amarbel-llc/madder/go/internal/echo/madder_env"
 
+// DefaultEnvVarNames is madder's env-var contract bundled for
+// passing into `env_dir.Config.EnvVarNames`. Wrapper utilities that
+// want to honor madder's env-var contract (e.g. when constructing
+// an env_dir at madder's scope to operate against madder's blob
+// stores) pass this directly:
+//
+//	cfg := env_dir.Config{EnvVarNames: madder_env.DefaultEnvVarNames}
+//	madderScopedEnv := env_dir.MakeDefault(ctx, cfg, "madder")
+//
+// Wrapper utilities that want their OWN env-var contract for their
+// OWN scope define their own `EnvVarNames` bundle in their own
+// application layer.
+//
+// XDGUtilityOverride is intentionally empty — see the package
+// doc-comment for why madder doesn't honor any such env var.
 var DefaultEnvVarNames = internal.DefaultEnvVarNames
 
-const (
-	EnvBin                 = internal.EnvBin
-	EnvVerifyOnCollision   = internal.EnvVerifyOnCollision
-	EnvXDGUserLocationOnly = internal.EnvXDGUserLocationOnly
-)
+// EnvBin is the env-var name madder publishes to subprocesses so
+// they can locate the binary that spawned them. Read by external
+// scripts that wrap madder; never read by madder itself.
+const EnvBin = internal.EnvBin
+
+// EnvVerifyOnCollision is the env-var name that, when truthy, flips
+// `env_dir.Env.GetVerifyOnCollisionOverride()` to true. See ADR
+// 0003 for rationale and #38 for the eventual migration to a CLI
+// flag.
+const EnvVerifyOnCollision = internal.EnvVerifyOnCollision
+
+// EnvXDGUserLocationOnly is the env-var name madder_env publishes to
+// env_dir; see env_dir.EnvVarNames.XDGUserLocationOnly for behavior.
+const EnvXDGUserLocationOnly = internal.EnvXDGUserLocationOnly

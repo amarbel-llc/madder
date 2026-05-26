@@ -4,6 +4,11 @@ package blob_store_id
 
 import internal "github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 
+// Id is a blob-store id. cwdDepth is a runtime CLI-rendering concern,
+// only meaningful when location == Cwd: 0 = single-dot prefix (the
+// deepest `.<utility>/` ancestor on the walk-up), 1 = `..`, etc. Wire-
+// format serialization via MarshalText always emits the canonical
+// single-dot form so on-disk refs stay stable across CWDs (#145).
 type (
 	Id                 = internal.Id
 	LocationType       = internal.LocationType

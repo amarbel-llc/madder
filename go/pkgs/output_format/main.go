@@ -4,12 +4,23 @@ package output_format
 
 import internal "github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 
-type (
-	Format = internal.Format
-)
+// Format selects the encoding of a command's per-record result stream.
+//
+// auto (default): ndjson when stdout is not a TTY, TAP otherwise.
+// tap:            TAP format regardless of stdout.
+// json:           single JSON document (command-specific shape).
+//
+//	For streaming commands this is an alias for ndjson.
+//
+// ndjson:         one JSON object per line.
+type Format = internal.Format
 
+// Default is the value to initialize a flag field with.
+const Default = internal.Default
+
+// FlagDescription is a suggested description for use with flag.Var so all
+// commands present the same help text.
 const (
-	Default         = internal.Default
 	FlagDescription = internal.FlagDescription
 	FormatAuto      = internal.FormatAuto
 	FormatJSON      = internal.FormatJSON

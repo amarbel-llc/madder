@@ -4,44 +4,148 @@ package blob_stores
 
 import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 
+// ArchiveIndex is implemented by blob stores backed by archive files.
+// It exposes the in-memory index for listing archives and their blob IDs.
+type ArchiveIndex = internal.ArchiveIndex
+
+// BlobDeleter is implemented by blob stores that support removing individual
+// blobs by their content address. Used by Pack to delete loose blobs after
+// they have been safely written to an archive.
 type (
-	ArchiveIndex         = internal.ArchiveIndex
 	BlobDeleter          = internal.BlobDeleter
 	BlobStoreInitialized = internal.BlobStoreInitialized
 	BlobStoreMap         = internal.BlobStoreMap
 	CopyResult           = internal.CopyResult
 	CopyResultState      = internal.CopyResultState
+)
+
+// DeletionPrecondition checks whether blobs are safe to delete from the
+// loose store. The default implementation always returns nil (safe).
+// Future implementations can verify off-host replication before allowing
+// deletion.
+type (
 	DeletionPrecondition = internal.DeletionPrecondition
 	DiscoveredConfig     = internal.DiscoveredConfig
 	Multi                = internal.Multi
-	MultiBuilder         = internal.MultiBuilder
-	PackOptions          = internal.PackOptions
-	PackableArchive      = internal.PackableArchive
 )
 
+// MultiBuilder constructs a Multi blob store with one of two modes:
+// Mirror (broadcast writes across all child stores) or WriteThrough
+// (single write store + N read stores). Each mode-selecting method
+// (Mirror, WriteTo, ...) sets the mode field; Build() validates and
+// returns the configured Multi.
+type MultiBuilder = internal.MultiBuilder
+
+// PackOptions controls the behavior of the Pack operation.
+type PackOptions = internal.PackOptions
+
+// PackableArchive is implemented by blob stores that support packing loose
+// blobs into archive files.
+type PackableArchive = internal.PackableArchive
+
+// BootstrapWebdavRemoteConfig is the WebDAV analogue of WriteRemoteConfig
+// for the fresh-bootstrap path: HEAD checks that no remote config
+// exists, MKCOL ensures the base URL is a collection, and PUT writes
+// a default TomlV3 config built from `discovered`. Unlike the SFTP
+// counterpart it does not use a tmp + atomic-rename dance — init is
+// single-threaded and the remote config file is not content-addressed,
+// so a direct PUT is enough.
+//
+// Returns an error if a remote `blob_store-config` already exists at
+// `<url>/blob_store-config`; callers that want overwrite semantics
+// must DELETE first.
 var (
-	BootstrapWebdavRemoteConfig    = internal.BootstrapWebdavRemoteConfig
-	CopyBlobIfNecessary            = internal.CopyBlobIfNecessary
-	CopyReaderToWriter             = internal.CopyReaderToWriter
-	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
-	IsRemoteConfigAlreadyExists    = internal.IsRemoteConfigAlreadyExists
-	MakeBlobStore                  = internal.MakeBlobStore
-	MakeBlobStoreMap               = internal.MakeBlobStoreMap
-	MakeBlobStores                 = internal.MakeBlobStores
-	MakeHTTPClientForWebDAVConfig  = internal.MakeHTTPClientForWebDAVConfig
-	MakeRemoteBlobStore            = internal.MakeRemoteBlobStore
-	MakeS3Client                   = internal.MakeS3Client
-	MakeSSHAgent                   = internal.MakeSSHAgent
+	BootstrapWebdavRemoteConfig = internal.BootstrapWebdavRemoteConfig
+	CopyBlobIfNecessary         = internal.CopyBlobIfNecessary
+	CopyReaderToWriter          = internal.CopyReaderToWriter
+	DiscoverRemoteConfig        = internal.DiscoverRemoteConfig
+)
+
+// IsRemoteConfigAlreadyExists reports whether err signals that the
+// remote blob_store-config object already exists in the target bucket.
+var IsRemoteConfigAlreadyExists = internal.IsRemoteConfigAlreadyExists
+
+// NOTE: blobStores parameter added to support inventory archive's
+// loose-blob-store-id resolution. This couples MakeBlobStore to the
+// store map, which may not scale well if more store types need
+// cross-references. If this becomes a problem, switch to two-pass
+// initialization: first pass creates all stores without cross-refs,
+// second pass wires them up.
+//
+// TODO describe base path agnostically
+var (
+	MakeBlobStore    = internal.MakeBlobStore
+	MakeBlobStoreMap = internal.MakeBlobStoreMap
+)
+
+// TODO pass in custom UI context for printing
+// TODO consolidated envDir and ctx arguments
+var MakeBlobStores = internal.MakeBlobStores
+
+// MakeHTTPClientForWebDAVConfig builds an http.Client for a WebDAV
+// blob-store config. TLS material is wired here (cert/key, CA bundle,
+// ServerName, InsecureSkipVerify); per-request auth (basic, bearer)
+// is applied in applyWebdavAuth.
+var (
+	MakeHTTPClientForWebDAVConfig = internal.MakeHTTPClientForWebDAVConfig
+	MakeRemoteBlobStore           = internal.MakeRemoteBlobStore
+)
+
+// MakeS3Client builds a configured *s3.Client from a ConfigS3. Exported
+// so the init-s3 command can write the remote blob_store-config object
+// without standing up a full remoteS3 store.
+var (
+	MakeS3Client = internal.MakeS3Client
+	MakeSSHAgent = internal.MakeSSHAgent
+)
+
+// TODO refactor `blob_store_configs.ConfigSFTP` for ssh-client-specific methods
+var (
 	MakeSSHClientForExplicitConfig = internal.MakeSSHClientForExplicitConfig
 	MakeSSHClientFromSSHConfig     = internal.MakeSSHClientFromSSHConfig
-	NewDiscardBlobStore            = internal.NewDiscardBlobStore
-	NewMulti                       = internal.NewMulti
-	NopDeletionPrecondition        = internal.NopDeletionPrecondition
-	ValidateS3Auth                 = internal.ValidateS3Auth
-	VerifyBlob                     = internal.VerifyBlob
-	WriteRemoteConfig              = internal.WriteRemoteConfig
-	WriteRemoteConfigS3            = internal.WriteRemoteConfigS3
 )
+
+// NewDiscardBlobStore returns a BlobStoreInitialized whose MakeBlobWriter
+// produces hash-only writers at the given hashFormat. Reads and HasBlob
+// probes return as if the store is empty. The embedded ConfigNamed is
+// zero-valued; callers that need an id-bearing handle (e.g. for
+// command_components lookups) should not use this.
+var NewDiscardBlobStore = internal.NewDiscardBlobStore
+
+// NewMulti starts a builder bound to ctx. readFill defaults to true so
+// the WriteThrough path enables tee-during-read (Task 10) unless
+// callers opt out via ReadFill(false).
+var (
+	NewMulti                = internal.NewMulti
+	NopDeletionPrecondition = internal.NopDeletionPrecondition
+)
+
+// ValidateS3Auth enforces credential-state invariants the AWS SDK
+// would otherwise discover only on the first API call. Today's only
+// rule: session-token is meaningless without access-key-id (the
+// session token is a temporary credential tied to specific
+// access/secret-key pairs; the SDK's credential chain would either
+// ignore it or fail confusingly).
+//
+// Anonymous / IMDS-driven configs (none of the explicit fields set)
+// are valid — the SDK's default credential chain handles those.
+// Exported so init-s3's bootstrap path can validate before opening
+// any HTTP connections.
+var ValidateS3Auth = internal.ValidateS3Auth
+
+// TODO offer options like just checking the existence of the blob, getting its
+// size, or full verification
+var (
+	VerifyBlob        = internal.VerifyBlob
+	WriteRemoteConfig = internal.WriteRemoteConfig
+)
+
+// WriteRemoteConfigS3 PUTs a default blob_store-config object at
+// <prefix>/blob_store-config in the bucket, mirroring the SFTP-side
+// WriteRemoteConfig. Returns errS3RemoteConfigExists when the object
+// already exists (callers can decide whether that's an error).
+// Used by the init-s3 command's bootstrap path.
+var WriteRemoteConfigS3 = internal.WriteRemoteConfigS3
 
 const (
 	CopyResultStateError                    = internal.CopyResultStateError

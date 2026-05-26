@@ -4,14 +4,32 @@ package markl_registrations
 
 import internal "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 
-type (
-	PurposeIdAlias = internal.PurposeIdAlias
-)
+// PurposeIdAlias names a purposeId-shaped string that
+// markl.GetFormatOrError should resolve as if it were the named
+// formatId. See markl.RegisterPurposeIdAlias for the registration call.
+type PurposeIdAlias = internal.PurposeIdAlias
 
 var (
-	AliasDodderRepoPrivateKeyV1           = internal.AliasDodderRepoPrivateKeyV1
-	AliasZitRepoPrivateKeyV1              = internal.AliasZitRepoPrivateKeyV1
-	AllAliases                            = internal.AllAliases
+	AliasDodderRepoPrivateKeyV1 = internal.AliasDodderRepoPrivateKeyV1
+	AliasZitRepoPrivateKeyV1    = internal.AliasZitRepoPrivateKeyV1
+)
+
+// AllAliases is the canonical, ordered list of purpose-id → format-id
+// aliases madder registers. Order is deterministic but consumers must
+// not depend on it.
+//
+// TODO(#108) codegen this slice from the per-alias vars (same shape
+// as AllPurposes).
+var AllAliases = internal.AllAliases
+
+// AllPurposes is the canonical, ordered list of purposes madder
+// registers. Order is deterministic but consumers must not depend on
+// it — registration is order-independent under markl's lazy Related
+// validation (ADR 0006).
+//
+// TODO(#108) codegen this slice from the per-purpose vars so adding
+// a new Purpose*Opts entry doesn't require a manual append.
+var (
 	AllPurposes                           = internal.AllPurposes
 	PurposeBlobDigestV1Opts               = internal.PurposeBlobDigestV1Opts
 	PurposeMadderPrivateKeyV0Opts         = internal.PurposeMadderPrivateKeyV0Opts

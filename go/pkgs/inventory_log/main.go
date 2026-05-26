@@ -7,29 +7,104 @@ import (
 	domaininterfaces "github.com/amarbel-llc/madder/go/pkgs/domain_interfaces"
 )
 
-type (
-	Codec             = internal.Codec
-	DescriptionSetter = internal.DescriptionSetter
-	FileObserver      = internal.FileObserver
-	NopObserver       = internal.NopObserver
-	Observer          = internal.Observer
-	Registry          = internal.Registry
-)
+// Codec serializes one LogEvent shape to and from one NDJSON line.
+// Constructed via MakeCodec[E]; the registry holds the type-erased form.
+// One codec per type-string. Native types are reserved; see Registry.
+type Codec = internal.Codec
 
-var (
-	AsBlobWriteObserver   = internal.AsBlobWriteObserver
-	Global                = internal.Global
-	MadderInventoryLogDir = internal.MadderInventoryLogDir
-	MadderLogDir          = internal.MadderLogDir
-	NewFileObserver       = internal.NewFileObserver
-	ResolveLogHome        = internal.ResolveLogHome
-	WireDefault           = internal.WireDefault
-	WireWithCleanup       = internal.WireWithCleanup
-)
+// DescriptionSetter is the narrow capability interface callers use to
+// attach per-invocation intent to every event the observer produces.
+// FileObserver implements it; NopObserver does not — type assertions at
+// the call site naturally no-op when logging is disabled.
+type DescriptionSetter = internal.DescriptionSetter
+
+// FileObserver writes a hyphence-wrapped NDJSON stream per session to
+// $XDG_LOG_HOME/madder/inventory_log/YYYY-MM-DD/<tai>-<hex4>.hyphence.
+// Lazy-opens its file on first Emit so a session that publishes zero
+// events produces no file.
+//
+// Errors are swallowed per xdg_log_home(7).
+type FileObserver = internal.FileObserver
+
+// NopObserver is a no-op Observer / BlobWriteObserver. Used when the
+// inventory-log is disabled so call sites can avoid nil checks.
+type NopObserver = internal.NopObserver
+
+// Observer is the pluggable inventory-log sink. FileObserver and
+// NopObserver implement it; importer-defined observers (test-capture
+// shims, multi-sink fan-outs, etc.) implement it directly.
+type Observer = internal.Observer
+
+// Registry maps event type-string to Codec. Native types are reserved;
+// importers register only new types. Registration of a reserved type
+// panics at both Global and per-Observer scope.
+type Registry = internal.Registry
+
+// AsBlobWriteObserver wraps an Observer so it satisfies the existing
+// domain_interfaces.BlobWriteObserver contract. Stores keep calling
+// OnBlobPublished; the adapter forwards to Observer.Emit.
+var AsBlobWriteObserver = internal.AsBlobWriteObserver
+
+// Global is the package-level registry. Importers MAY register codecs
+// from init(); FileObserver consults Global at Emit time after its own
+// per-Observer overrides.
+var Global = internal.Global
+
+// MadderInventoryLogDir returns the inventory-log root directory:
+// $XDG_LOG_HOME/madder/inventory_log/. FileObserver creates per-day
+// subdirectories under this path.
+var MadderInventoryLogDir = internal.MadderInventoryLogDir
+
+// MadderLogDir returns the madder-scoped subdirectory of $XDG_LOG_HOME.
+// Apps should namespace their logs per xdg_log_home(7) NOTES.
+var MadderLogDir = internal.MadderLogDir
+
+// NewFileObserver returns a FileObserver rooted at rootDir (typically
+// MadderInventoryLogDir()). The file is opened on first Emit, not now,
+// so a no-op session produces no file.
+var NewFileObserver = internal.NewFileObserver
+
+// ResolveLogHome returns the user's $XDG_LOG_HOME directory per the
+// xdg_log_home(7) extension, falling back to $HOME/.local/log when
+// unset or empty. If $HOME is also unset (unusual), falls back to
+// ".local/log" relative to the cwd so callers never receive an empty
+// string.
+var ResolveLogHome = internal.ResolveLogHome
+
+// WireDefault constructs a FileObserver rooted at MadderInventoryLogDir
+// and registers its Close on ctx via errors.ContextCloseAfter, so the
+// trailing hyphence buffer is flushed when ctx.Run completes. Returns
+// the observer (it satisfies BlobWriteObserver via AsBlobWriteObserver,
+// or directly via type assertion since *FileObserver implements both).
+//
+// Honors MADDER_INVENTORY_LOG=0 (exactly "0", trim-space tolerant) by
+// returning a NopObserver — same disable contract the CLI's --no-
+// inventory-log flag uses, so importers can opt out the same way.
+//
+// Use this when you have an errors.Context (the common case for code
+// running inside a futility command). For callers without a context,
+// use WireWithCleanup.
+var WireDefault = internal.WireDefault
+
+// WireWithCleanup constructs a FileObserver rooted at
+// MadderInventoryLogDir and returns it alongside a cleanup function
+// the caller must invoke (typically `defer cleanup()`) to flush the
+// hyphence buffer at shutdown.
+//
+// Honors MADDER_INVENTORY_LOG=0 the same way as WireDefault. When
+// disabled, the returned cleanup is a no-op.
+//
+// Use this when you don't have an errors.Context — for embedded
+// libraries, test harnesses, or non-futility-driven entry points.
+// Most callers should prefer WireDefault.
+var WireWithCleanup = internal.WireWithCleanup
 
 // Generic function wrappers — Go does not support assigning
 // generic functions to variables without instantiation.
 // See https://github.com/golang/go/issues/52654
+// MakeCodec binds a concrete event type E to a type-string and returns
+// the type-erased Codec the registry stores. Type assertion happens once
+// inside Encode; callers see typed encode/decode signatures.
 func MakeCodec[E domaininterfaces.LogEvent](typeStr string, encode func(E) ([]byte, error), decode func([]byte) (E, error)) internal.Codec {
 	return internal.MakeCodec[E](typeStr, encode, decode)
 }

@@ -4,18 +4,37 @@ package arg_resolver
 
 import internal "github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 
-type (
-	Kind     = internal.Kind
-	Mode     = internal.Mode
-	Resolved = internal.Resolved
-)
+// Kind tags the successful resolution (or the error) for a given arg.
+type Kind = internal.Kind
 
-var (
-	DetectShadow            = internal.DetectShadow
-	FormatShadowWarning     = internal.FormatShadowWarning
-	FormatStoreSwitchNotice = internal.FormatStoreSwitchNotice
-	Resolve                 = internal.Resolve
-)
+// Mode is a bitmask declaring which argument shapes a command accepts.
+type Mode = internal.Mode
+
+// Resolved carries the outcome of resolving one positional argument.
+// Only the field corresponding to Kind is meaningful.
+type Resolved = internal.Resolved
+
+// DetectShadow reports whether arg, when it resolves to a file in CWD,
+// shares a bare name with one of the candidate blob-store-ids. Prefixed
+// names never shadow (the prefix bypasses the filesystem probe in
+// blob_store_id.Id.Set). Returns the shadowed id and true on a hit.
+//
+// Callers should invoke this only when both ModeFile and ModeStoreSwitch
+// are accepted — it has no meaning otherwise.
+var DetectShadow = internal.DetectShadow
+
+// FormatShadowWarning builds the canonical message for a file arg that
+// shadows a configured blob-store-id. Centralized so every caller of
+// DetectShadow emits the same phrasing and disambiguation hint.
+var FormatShadowWarning = internal.FormatShadowWarning
+
+// FormatStoreSwitchNotice builds the canonical message callers emit when
+// a KindStoreSwitch arg rebinds the active store.
+var FormatStoreSwitchNotice = internal.FormatStoreSwitchNotice
+
+// Resolve classifies arg according to the modes the caller accepts.
+// Callers own the BlobReader when Kind == KindFile and must close it.
+var Resolve = internal.Resolve
 
 const (
 	KindBlobId      = internal.KindBlobId

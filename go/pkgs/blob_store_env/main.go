@@ -4,12 +4,22 @@ package blob_store_env
 
 import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_store_env"
 
-type (
-	BlobStoreEnv = internal.BlobStoreEnv
-)
+// BlobStoreEnv bundles env_local.Env + directory_layout.BlobStore +
+// the discovered BlobStoreMap with default-store and ordering machinery.
+//
+// Constructors live alongside (MakeBlobStoreEnv, MakeBlobStoreEnvWithoutStores,
+// MakeBlobStoreEnvWithOrder); methods provide default-store, lookup,
+// ordering, and "default + remaining" helpers commands typically need.
+type BlobStoreEnv = internal.BlobStoreEnv
 
 var (
-	MakeBlobStoreEnv              = internal.MakeBlobStoreEnv
-	MakeBlobStoreEnvWithOrder     = internal.MakeBlobStoreEnvWithOrder
-	MakeBlobStoreEnvWithoutStores = internal.MakeBlobStoreEnvWithoutStores
+	MakeBlobStoreEnv          = internal.MakeBlobStoreEnv
+	MakeBlobStoreEnvWithOrder = internal.MakeBlobStoreEnvWithOrder
 )
+
+// MakeBlobStoreEnvWithoutStores returns a BlobStoreEnv with the directory
+// layout wired up but no blob stores discovered or initialized. Use this from
+// commands that operate on the on-disk layout directly and must not trigger
+// blob store discovery (e.g. the legacy-config migration command, which needs
+// to run before discovery would succeed).
+var MakeBlobStoreEnvWithoutStores = internal.MakeBlobStoreEnvWithoutStores

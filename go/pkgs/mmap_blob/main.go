@@ -4,12 +4,31 @@ package mmap_blob
 
 import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/mmap_blob"
 
-type (
-	MmapBlob = internal.MmapBlob
-)
+// MmapBlob is a zero-copy view of a blob's bytes. Bytes() returns a
+// slice valid until Close(). Close is idempotent.
+type MmapBlob = internal.MmapBlob
 
-var (
-	ErrDigestMismatch          = internal.ErrDigestMismatch
-	ErrMmapUnsupported         = internal.ErrMmapUnsupported
-	MakeMmapBlobFromBlobReader = internal.MakeMmapBlobFromBlobReader
-)
+// ErrDigestMismatch is returned only from MmapBlob.Verify() when
+// the recomputed digest does not match the recorded MarklId.
+var ErrDigestMismatch = internal.ErrDigestMismatch
+
+// ErrMmapUnsupported is returned when MakeMmapBlobFromBlobReader
+// cannot promote the reader — wrong store, non-file backing, or
+// wrappers preclude byte-identity.
+var ErrMmapUnsupported = internal.ErrMmapUnsupported
+
+// MakeMmapBlobFromBlobReader inspects reader. If it implements
+// MmapSource and reports ok=true, returns an MmapBlob mapping the
+// reported file region. Otherwise returns ErrMmapUnsupported —
+// reserved for capability mismatch (wrong store, non-file backing,
+// non-identity wrappers). OS errors from inspecting the file (e.g.
+// stat or mmap failure) bubble up unwrapped, not as
+// ErrMmapUnsupported.
+//
+// On success, ownership of the underlying file transfers to the
+// returned MmapBlob. Caller MUST NOT also Close reader for the file
+// portion — but reader.Close() is still safe to call (the
+// implementation makes the file-close a no-op after handoff).
+//
+// On failure, reader is unchanged and remains the caller's to Close.
+var MakeMmapBlobFromBlobReader = internal.MakeMmapBlobFromBlobReader

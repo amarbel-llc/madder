@@ -4,38 +4,92 @@ package inventory_archive
 
 import internal "github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 
+// BaseSelector chooses which blobs become deltas and which become bases.
+// It reads from blobs and writes results to assignments.
 type (
-	BaseSelector            = internal.BaseSelector
-	BaseSelectorParams      = internal.BaseSelectorParams
-	BlobMetadata            = internal.BlobMetadata
-	BlobSet                 = internal.BlobSet
-	Bsdiff                  = internal.Bsdiff
-	CacheEntry              = internal.CacheEntry
-	CacheEntryV1            = internal.CacheEntryV1
-	CacheReader             = internal.CacheReader
-	CacheReaderV1           = internal.CacheReaderV1
-	DataEntry               = internal.DataEntry
-	DataEntryV1             = internal.DataEntryV1
-	DataReader              = internal.DataReader
-	DataReaderV1            = internal.DataReaderV1
-	DataWriter              = internal.DataWriter
-	DataWriterV1            = internal.DataWriterV1
-	DeltaAlgorithm          = internal.DeltaAlgorithm
-	DeltaAssignments        = internal.DeltaAssignments
-	GearCDCMinHashComputer  = internal.GearCDCMinHashComputer
-	IndexEntry              = internal.IndexEntry
-	IndexEntryV1            = internal.IndexEntryV1
-	IndexReader             = internal.IndexReader
-	IndexReaderV1           = internal.IndexReaderV1
-	LSHBandingSelector      = internal.LSHBandingSelector
-	SignatureComputer       = internal.SignatureComputer
-	SignatureComputerParams = internal.SignatureComputerParams
-	SizeBasedSelector       = internal.SizeBasedSelector
+	BaseSelector       = internal.BaseSelector
+	BaseSelectorParams = internal.BaseSelectorParams
 )
 
+// BlobMetadata describes a blob candidate for delta packing.
+type BlobMetadata = internal.BlobMetadata
+
+// BlobSet provides indexed access to blob metadata without requiring all
+// blobs in memory simultaneously.
+type BlobSet = internal.BlobSet
+
+// Bsdiff implements DeltaAlgorithm using the bsdiff4 binary delta algorithm.
+type (
+	Bsdiff        = internal.Bsdiff
+	CacheEntry    = internal.CacheEntry
+	CacheEntryV1  = internal.CacheEntryV1
+	CacheReader   = internal.CacheReader
+	CacheReaderV1 = internal.CacheReaderV1
+	DataEntry     = internal.DataEntry
+	DataEntryV1   = internal.DataEntryV1
+	DataReader    = internal.DataReader
+	DataReaderV1  = internal.DataReaderV1
+	DataWriter    = internal.DataWriter
+	DataWriterV1  = internal.DataWriterV1
+)
+
+// DeltaAlgorithm computes and applies binary deltas between blobs.
+type DeltaAlgorithm = internal.DeltaAlgorithm
+
+// DeltaAssignments receives base selection results. The packer passes this
+// to the strategy, which calls Assign for each blob that should be
+// delta-encoded.
+type DeltaAssignments = internal.DeltaAssignments
+
+// GearCDCMinHashComputer splits blob content into variable-length
+// chunks using Gear hash CDC, hashes each chunk with FNV-1a, and
+// computes a MinHash signature over the chunk hash set.
+type (
+	GearCDCMinHashComputer = internal.GearCDCMinHashComputer
+	IndexEntry             = internal.IndexEntry
+	IndexEntryV1           = internal.IndexEntryV1
+	IndexReader            = internal.IndexReader
+	IndexReaderV1          = internal.IndexReaderV1
+)
+
+// LSHBandingSelector finds similar blobs via Locality-Sensitive Hashing
+// over MinHash signatures stored in BlobMetadata.Signature. It divides
+// each signature into Bands bands of RowsPerBand rows and hashes each
+// band into a bucket. Blobs sharing any bucket are candidates. The best
+// candidate (highest estimated Jaccard) becomes the delta base.
+type LSHBandingSelector = internal.LSHBandingSelector
+
+// SignatureComputer produces a fixed-length similarity signature from
+// blob content. Signatures from the same computer are comparable:
+// the fraction of matching positions estimates content similarity.
+type (
+	SignatureComputer       = internal.SignatureComputer
+	SignatureComputerParams = internal.SignatureComputerParams
+)
+
+// SizeBasedSelector groups blobs by similar size and assigns deltas within
+// each group against the largest blob as the base.
+//
+// TODO: Content-type base selection strategy — madder queries dodder for
+// blob type info (binary flag), groups text blobs separately from binary.
+//
+// TODO: Object-history base selection strategy — dodder provides
+// related-object hash chains, packer deltas successive versions of the
+// same object against each other.
+type SizeBasedSelector = internal.SizeBasedSelector
+
+var BaseSelectorForName = internal.BaseSelectorForName
+
+// ByteToCompressionRef maps an on-disk inventory_archive compression
+// byte back to a plugin reference. Used by data_reader to instantiate
+// the correct decoder for each entry.
+var ByteToCompressionRef = internal.ByteToCompressionRef
+
+// CompressionRefToByte maps a plugin reference to the on-disk
+// compression byte used in inventory_archive entries. Returns an
+// error for plugin references this archive format doesn't know
+// about (e.g. parametric variants like zstd-with-dict).
 var (
-	BaseSelectorForName       = internal.BaseSelectorForName
-	ByteToCompressionRef      = internal.ByteToCompressionRef
 	CompressionRefToByte      = internal.CompressionRefToByte
 	DeltaAlgorithmByteForName = internal.DeltaAlgorithmByteForName
 	DeltaAlgorithmForByte     = internal.DeltaAlgorithmForByte
@@ -51,6 +105,10 @@ var (
 	NewIndexReader            = internal.NewIndexReader
 	NewIndexReaderV1          = internal.NewIndexReaderV1
 	RegisterBaseSelector      = internal.RegisterBaseSelector
+)
+
+// RegisterDeltaAlgorithm adds a DeltaAlgorithm to the registry.
+var (
 	RegisterDeltaAlgorithm    = internal.RegisterDeltaAlgorithm
 	RegisterSignatureComputer = internal.RegisterSignatureComputer
 	SignatureComputerForName  = internal.SignatureComputerForName

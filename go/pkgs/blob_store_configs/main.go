@@ -69,8 +69,18 @@ var (
 	DefaultHashBuckets               = internal.DefaultHashBuckets
 	DefaultHashType                  = internal.DefaultHashType
 	SetMultiEncryptionFlagDefinition = internal.SetMultiEncryptionFlagDefinition
-	TypeStructForConfig              = internal.TypeStructForConfig
 )
+
+// TypeStructForConfig returns the wire type-id (TypeStruct) that the
+// hyphence Coder uses to decode/encode the given Config. Inverts the
+// type-id → coder map in coding.go. Panics if the concrete Config
+// type is not one of the registered variants — keep this in sync with
+// the Coder map when adding a new on-disk config type.
+//
+// Used by callers that need to wrap a freestanding Config back into a
+// TypedBlob for encoding (e.g. info-repo's config-immutable encoder
+// per ADR 0005).
+var TypeStructForConfig = internal.TypeStructForConfig
 
 const (
 	DefaultHashTypeId  = internal.DefaultHashTypeId

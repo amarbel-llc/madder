@@ -4,16 +4,39 @@ package plugins
 
 import internal "github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 
-type (
-	Factory = internal.Factory
-)
+// Factory constructs a plugin instance. v0 plugins are non-parametric;
+// future parametric plugins (e.g. zstd-with-dict in FDR 0006) accept
+// configuration via a separate side-data interface.
+type Factory = internal.Factory
 
-var (
-	Default                     = internal.Default
-	ErrAlreadyRegistered        = internal.ErrAlreadyRegistered
-	ErrUnknownLegacyCompression = internal.ErrUnknownLegacyCompression
-	ErrUnknownPlugin            = internal.ErrUnknownPlugin
-	LegacyCompressionRef        = internal.LegacyCompressionRef
-	MustRegister                = internal.MustRegister
-	Resolve                     = internal.Resolve
-)
+// Default is the package-level registry, populated by plugin
+// subpackages at init time.
+var Default = internal.Default
+
+// ErrAlreadyRegistered is returned by Registry.Register when the
+// reference is already registered.
+var ErrAlreadyRegistered = internal.ErrAlreadyRegistered
+
+// ErrUnknownLegacyCompression is returned by LegacyCompressionRef
+// when the input string is not one of the known on-disk values
+// (`""`, `"none"`, `"gzip"`, `"zlib"`, `"zstd"`).
+var ErrUnknownLegacyCompression = internal.ErrUnknownLegacyCompression
+
+// ErrUnknownPlugin is returned by Registry.Resolve when the
+// reference is not registered.
+var ErrUnknownPlugin = internal.ErrUnknownPlugin
+
+// LegacyCompressionRef returns the plugin reference equivalent to a
+// legacy on-disk compression-type string. Used when loading V1/V2/V3
+// store configs to bridge their string-typed field into the plugin
+// abstraction.
+var LegacyCompressionRef = internal.LegacyCompressionRef
+
+// MustRegister registers a plugin in the Default registry; panics on
+// failure. Used from plugin subpackage init() functions where a
+// duplicate registration is a programming error.
+var MustRegister = internal.MustRegister
+
+// Resolve looks up reference in the Default registry. Returns
+// (nil, error wrapping ErrUnknownPlugin) when absent.
+var Resolve = internal.Resolve

@@ -4,8 +4,6 @@ package env_local
 
 import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 
-type (
-	Env = internal.Env
-)
+type Env = internal.Env
 
 var Make = internal.Make

@@ -8,20 +8,58 @@ import (
 )
 
 type (
-	BlobAccess                                                          = internal.BlobAccess
-	BlobForeignDigestAdder                                              = internal.BlobForeignDigestAdder
-	BlobIOWrapper                                                       = internal.BlobIOWrapper
-	BlobIOWrapperGetter                                                 = internal.BlobIOWrapperGetter
-	BlobPool[BLOB any]                                                  = internal.BlobPool[BLOB]
-	BlobReader                                                          = internal.BlobReader
-	BlobReaderFactory                                                   = internal.BlobReaderFactory
-	BlobStore                                                           = internal.BlobStore
-	BlobStoreConfig                                                     = internal.BlobStoreConfig
-	BlobWriteEvent                                                      = internal.BlobWriteEvent
-	BlobWriteObserver                                                   = internal.BlobWriteObserver
-	BlobWriteOp                                                         = internal.BlobWriteOp
-	BlobWriter                                                          = internal.BlobWriter
-	BlobWriterFactory                                                   = internal.BlobWriterFactory
+	BlobAccess             = internal.BlobAccess
+	BlobForeignDigestAdder = internal.BlobForeignDigestAdder
+	BlobIOWrapper          = internal.BlobIOWrapper
+	BlobIOWrapperGetter    = internal.BlobIOWrapperGetter
+)
+
+// Blobs represent persisted files, like blobs in Git. Blobs are used by
+// Zettels, types, tags, config, and inventory lists.
+type (
+	BlobPool[BLOB any] = internal.BlobPool[BLOB]
+	BlobReader         = internal.BlobReader
+	BlobReaderFactory  = internal.BlobReaderFactory
+	BlobStore          = internal.BlobStore
+)
+
+// BlobStoreConfig is the layer-0 marker for blob-store configuration
+// objects. Per ADR 0005, the config returned here describes blob-store
+// properties (hash type, buckets, compression, encryption); transport
+// configuration for remote stores lives elsewhere
+// (BlobStoreInitialized.Config).
+type BlobStoreConfig = internal.BlobStoreConfig
+
+// BlobWriteEvent is emitted once per blob publish. StoreId is the
+// blob-store-id.Id stringified at the call site (interface lives at layer
+// 0 and cannot import alfa/blob_store_id). Size is the byte length of the
+// temp file at the moment of link(2), stat'd before file.Close().
+type BlobWriteEvent = internal.BlobWriteEvent
+
+// BlobWriteObserver is called from concrete blob-store publish paths once
+// per attempt. Implementations must not fail the blob write — errors are
+// captured out-of-band (debug.Options, etc.) per xdg_log_home(7).
+type BlobWriteObserver = internal.BlobWriteObserver
+
+// BlobWriteOp is the disposition of a single blob publish attempt, as
+// determined in the env_dir mover's link(2) branch. Four values are defined
+// to cover the ADR 0002 / 0003 / issue #31 interaction:
+//
+//   - BlobWriteOpWritten: link(2) returned nil, a new inode was published.
+//   - BlobWriteOpExists: link(2) returned EEXIST, verify-on-collision was off.
+//   - BlobWriteOpVerifyMatch: EEXIST + verify enabled + bytes matched.
+//   - BlobWriteOpVerifyMismatch: EEXIST + verify enabled + bytes differed
+//     (reported on the way out; the mismatch error is still returned).
+type (
+	BlobWriteOp       = internal.BlobWriteOp
+	BlobWriter        = internal.BlobWriter
+	BlobWriterFactory = internal.BlobWriterFactory
+)
+
+// CLIConfigProvider provides base CLI configuration.
+// Note: debug.Options is not included because this package cannot import
+// delta/debug. Pass debug.Options separately where needed.
+type (
 	CLIConfigProvider                                                   = internal.CLIConfigProvider
 	Config                                                              = internal.Config
 	ConfigDryRunGetter                                                  = internal.ConfigDryRunGetter
@@ -32,20 +70,46 @@ type (
 	Hash                                                                = internal.Hash
 	Lock[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]]        = internal.Lock[KEY, KEY_PTR]
 	LockMutable[KEY interfaces.Value, KEY_PTR interfaces.ValuePtr[KEY]] = internal.LockMutable[KEY, KEY_PTR]
-	LogEvent                                                            = internal.LogEvent
-	MarklFormat                                                         = internal.MarklFormat
-	MarklFormatGetter                                                   = internal.MarklFormatGetter
-	MarklId                                                             = internal.MarklId
-	MarklIdGetter                                                       = internal.MarklIdGetter
-	MarklIdMutable                                                      = internal.MarklIdMutable
-	MmapSource                                                          = internal.MmapSource
-	MutableConfig                                                       = internal.MutableConfig
-	MutableConfigDryRun                                                 = internal.MutableConfigDryRun
-	NamedBlobAccess                                                     = internal.NamedBlobAccess
-	ReadAtSeeker                                                        = internal.ReadAtSeeker
-	RepoCLIConfigProvider                                               = internal.RepoCLIConfigProvider
-	SavedBlobFormatter                                                  = internal.SavedBlobFormatter
-	TypedStore[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]]                 = internal.TypedStore[BLOB, BLOB_PTR]
+)
+
+// LogEvent is the discriminator interface for every event written to the
+// inventory log. The returned string identifies the event type both in
+// the on-disk JSON payload (the top-level `"type"` field) and in the
+// inventory_log codec registry. Stable, public — once shipped, a
+// `! type-string` cannot change without breaking on-disk readers.
+type (
+	LogEvent          = internal.LogEvent
+	MarklFormat       = internal.MarklFormat
+	MarklFormatGetter = internal.MarklFormatGetter
+	MarklId           = internal.MarklId
+	MarklIdGetter     = internal.MarklIdGetter
+	MarklIdMutable    = internal.MarklIdMutable
+)
+
+// MmapSource is implemented by a BlobReader whose bytes equal a
+// contiguous file region. Only the local hash-bucketed store's
+// reader implements this in v1; non-local stores (SFTP, in-memory)
+// and stores wrapping the file with non-identity encoding return
+// ok=false from MmapSource().
+//
+// On ok=true, ownership of file transfers to the caller; the caller
+// is responsible for closing it (typically the MmapBlob does this).
+// MmapSource is a one-shot transfer: subsequent calls return
+// ok=false because the source no longer holds the file.
+type (
+	MmapSource          = internal.MmapSource
+	MutableConfig       = internal.MutableConfig
+	MutableConfigDryRun = internal.MutableConfigDryRun
+	NamedBlobAccess     = internal.NamedBlobAccess
+	ReadAtSeeker        = internal.ReadAtSeeker
+)
+
+// RepoCLIConfigProvider extends CLIConfigProvider with repository-specific
+// fields for dodder.
+type (
+	RepoCLIConfigProvider                               = internal.RepoCLIConfigProvider
+	SavedBlobFormatter                                  = internal.SavedBlobFormatter
+	TypedStore[BLOB any, BLOB_PTR interfaces.Ptr[BLOB]] = internal.TypedStore[BLOB, BLOB_PTR]
 )
 
 const (
