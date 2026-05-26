@@ -4,6 +4,10 @@ package blob_stores
 
 import (
 	"testing"
+
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 )
 
 // TestBuilder_Mirror_HappyPath is the Task 3 tracer test: NewMulti(ctx)
@@ -91,5 +95,88 @@ func TestBuilder_Build_WriteToTwice_DifferentStores(t *testing.T) {
 	_, err := NewMulti(&spyActiveContext{}).WriteTo(a).WriteTo(b).Build()
 	if err == nil {
 		t.Fatal("expected error for WriteTo called twice (different stores); got nil")
+	}
+}
+
+// TestBuilder_Build_MirrorWithNoStores pins the "Mirror: no stores
+// given" branch — Mirror() with no varargs sets the mode to modeMirror
+// but doesn't populate childStores. Build() must reject the empty set.
+func TestBuilder_Build_MirrorWithNoStores(t *testing.T) {
+	_, err := NewMulti(&spyActiveContext{}).Mirror().Build()
+	if err == nil {
+		t.Fatal("expected error for Mirror with no stores; got nil")
+	}
+}
+
+// TestBuilder_Build_WriteToWithNoStore exercises the
+// "WriteTo: no write store given" branch via a zero-value
+// BlobStoreInitialized. The builder sets mode=modeWriteThrough but
+// writeStore.BlobStore stays nil, so Build() must reject.
+func TestBuilder_Build_WriteToWithNoStore(t *testing.T) {
+	_, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{}).
+		Build()
+	if err == nil {
+		t.Fatal("expected error for WriteTo with zero-value store; got nil")
+	}
+}
+
+// TestBuilder_WriteTo_AfterPoison_IsNoop pins that once the builder is
+// in modeConfused (e.g. Read() called before WriteTo), a subsequent
+// WriteTo short-circuits and preserves the first violation. Build()
+// must still return the mode-confusion error.
+func TestBuilder_WriteTo_AfterPoison_IsNoop(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).
+		Read(s).    // poisons to modeConfused (Read outside write-through)
+		WriteTo(s). // short-circuits, mode stays modeConfused
+		Build()
+	if err == nil {
+		t.Fatal("expected mode-confusion error; got nil")
+	}
+}
+
+// TestBuilder_WriteTo_AfterMirrorWithStores pins the WriteTo "default"
+// branch: when Mirror has populated mirrorStores, a follow-up WriteTo
+// sets mode=modeConfused. (Distinct from the Read-then-WriteTo path
+// above, which uses the modeConfused short-circuit at the top of
+// WriteTo's switch.)
+func TestBuilder_WriteTo_AfterMirrorWithStores(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).
+		Mirror(s). // mode=modeMirror, mirrorStores=[s]
+		WriteTo(s).
+		Build()
+	if err == nil {
+		t.Fatal("expected mode-confusion error; got nil")
+	}
+}
+
+// TestBuilder_Build_WriteStoreInReadList_WithPaths pins that
+// sameStore's id-based comparison fires when both stores carry a
+// Path: two BlobStoreInitialized values sharing the same Path id
+// are treated as the same store regardless of the embedded
+// BlobStore interface value, so Build() must reject.
+func TestBuilder_Build_WriteStoreInReadList_WithPaths(t *testing.T) {
+	id := blob_store_id.Make("dup-id")
+	path := directory_layout.MakeBlobStorePath(id, "/base", "/config")
+
+	// Two BlobStore interface values that differ — same Path id, distinct
+	// underlying stubs. sameStore must collapse them.
+	writeStore := BlobStoreInitialized{
+		ConfigNamed: blob_store_configs.ConfigNamed{Path: path},
+		BlobStore:   &stubBlobStore{},
+	}
+	readStore := BlobStoreInitialized{
+		ConfigNamed: blob_store_configs.ConfigNamed{Path: path},
+		BlobStore:   &stubBlobStore{},
+	}
+
+	_, err := NewMulti(&spyActiveContext{}).
+		WriteTo(writeStore).
+		Read(readStore).
+		Build()
+	if err == nil {
+		t.Fatal("expected duplicate-store error; got nil")
 	}
 }

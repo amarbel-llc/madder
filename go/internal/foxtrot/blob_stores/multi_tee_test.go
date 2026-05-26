@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"sync"
 	"testing"
@@ -450,5 +451,149 @@ func TestTee_CrossHash_RegistersForeignDigestMapping(t *testing.T) {
 	}
 	if calls[0].native != native.String() {
 		t.Fatalf("native digest: got %s, want %s", calls[0].native, native)
+	}
+}
+
+// erroringWriter returns a fixed error from Write. Used to exercise
+// the tee's WriteTo werr-not-nil branch.
+type erroringWriter struct {
+	boom error
+}
+
+func (w erroringWriter) Write(_ []byte) (int, error) { return 0, w.boom }
+
+// shortWriter reports writing fewer bytes than were given without
+// returning an error. Used to exercise the tee's WriteTo nw<n branch,
+// which surfaces io.ErrShortWrite.
+type shortWriter struct{}
+
+func (shortWriter) Write(p []byte) (int, error) { return len(p) - 1, nil }
+
+// readErrSource is a BlobReader that returns a non-EOF error on Read.
+// Used to exercise the tee's WriteTo "err != nil && err != EOF" branch.
+type readErrSource struct {
+	*controllableBlobReader
+	readErr error
+}
+
+func (r *readErrSource) Read(_ []byte) (int, error) { return 0, r.readErr }
+
+// TestTee_WriteTo_DownstreamWriteError pins that an error from the
+// destination writer surfaces from WriteTo (the werr-not-nil branch).
+func TestTee_WriteTo_DownstreamWriteError(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-writeto-werr")
+	src := newControllableBlobReader(id)
+	src.Feed([]byte("hello"))
+	src.Close()
+
+	sink := &spyBlobWriter{}
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
+
+	boom := errors.New("downstream boom")
+	_, err := tee.WriteTo(erroringWriter{boom: boom})
+	if !errors.Is(err, boom) {
+		t.Fatalf("WriteTo error: got %v, want %v", err, boom)
+	}
+}
+
+// TestTee_WriteTo_ShortWrite pins that a destination writer reporting
+// nw < n surfaces io.ErrShortWrite from WriteTo.
+func TestTee_WriteTo_ShortWrite(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-writeto-short")
+	src := newControllableBlobReader(id)
+	src.Feed([]byte("hello"))
+	src.Close()
+
+	sink := &spyBlobWriter{}
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
+
+	_, err := tee.WriteTo(shortWriter{})
+	if !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("WriteTo error: got %v, want io.ErrShortWrite", err)
+	}
+}
+
+// TestTee_WriteTo_SourceReadError pins that a non-EOF error from the
+// source's Read surfaces from WriteTo (the err != nil && err != EOF
+// branch).
+func TestTee_WriteTo_SourceReadError(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-writeto-read-err")
+	inner := newControllableBlobReader(id)
+	boom := errors.New("source read boom")
+	src := &readErrSource{controllableBlobReader: inner, readErr: boom}
+
+	sink := &spyBlobWriter{}
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
+
+	var w bytes.Buffer
+	_, err := tee.WriteTo(&w)
+	if !errors.Is(err, boom) {
+		t.Fatalf("WriteTo error: got %v, want %v", err, boom)
+	}
+}
+
+// readAtSeekSource extends controllableBlobReader with stub ReadAt /
+// Seek implementations that return distinguishable sentinel values so
+// the tee's passthrough can be observed end-to-end.
+type readAtSeekSource struct {
+	*controllableBlobReader
+	readAtN     int
+	readAtErr   error
+	readAtCalls int
+	seekOff     int64
+	seekErr     error
+	seekCalls   int
+}
+
+func (r *readAtSeekSource) ReadAt(_ []byte, _ int64) (int, error) {
+	r.readAtCalls++
+	return r.readAtN, r.readAtErr
+}
+
+func (r *readAtSeekSource) Seek(_ int64, _ int) (int64, error) {
+	r.seekCalls++
+	return r.seekOff, r.seekErr
+}
+
+// TestTee_ReadAt_DelegatesToSource pins that ReadAt is a thin
+// passthrough that returns the source's (n, err) verbatim.
+func TestTee_ReadAt_DelegatesToSource(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-readat-delegate")
+	inner := newControllableBlobReader(id)
+	src := &readAtSeekSource{
+		controllableBlobReader: inner,
+		readAtN:                7,
+		readAtErr:              io.EOF,
+	}
+
+	tee := newTeeBlobReader(&spyActiveContext{}, src, &spyBlobWriter{}, id, nil)
+
+	buf := make([]byte, 8)
+	n, err := tee.ReadAt(buf, 42)
+	if n != 7 || !errors.Is(err, io.EOF) {
+		t.Fatalf("ReadAt: got (%d, %v), want (7, EOF)", n, err)
+	}
+	if src.readAtCalls != 1 {
+		t.Fatalf("source ReadAt calls: got %d, want 1", src.readAtCalls)
+	}
+}
+
+// TestTee_Seek_DelegatesToSource pins that Seek is a thin passthrough.
+func TestTee_Seek_DelegatesToSource(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-seek-delegate")
+	inner := newControllableBlobReader(id)
+	src := &readAtSeekSource{
+		controllableBlobReader: inner,
+		seekOff:                99,
+	}
+
+	tee := newTeeBlobReader(&spyActiveContext{}, src, &spyBlobWriter{}, id, nil)
+
+	off, err := tee.Seek(42, io.SeekStart)
+	if off != 99 || err != nil {
+		t.Fatalf("Seek: got (%d, %v), want (99, nil)", off, err)
+	}
+	if src.seekCalls != 1 {
+		t.Fatalf("source Seek calls: got %d, want 1", src.seekCalls)
 	}
 }

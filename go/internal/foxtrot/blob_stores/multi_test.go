@@ -43,6 +43,16 @@ type multiModeStub struct {
 	// pin that read sources never have their writer constructed.
 	makeWriterCount int
 
+	// makeWriterErr, when non-nil, is returned in place of a writer
+	// from MakeBlobWriter. Used to exercise the mirror writer
+	// fan-out error path and the write-through ReadFill failure path.
+	makeWriterErr error
+
+	// makeReaderErr, when non-nil, is returned in place of a reader
+	// from MakeBlobReader. Used to exercise the write-through read
+	// source MakeBlobReader-fails branch.
+	makeReaderErr error
+
 	// allBlobsSeq, when non-nil, is the SeqError the stub yields from
 	// AllBlobs(). Tests construct it via makeMarklIdSeq or inline.
 	allBlobsSeq interfaces.SeqError[domain_interfaces.MarklId]
@@ -79,6 +89,9 @@ func (s *multiModeStub) HasBlob(id domain_interfaces.MarklId) bool {
 func (s *multiModeStub) MakeBlobReader(
 	id domain_interfaces.MarklId,
 ) (domain_interfaces.BlobReader, error) {
+	if s.makeReaderErr != nil {
+		return nil, s.makeReaderErr
+	}
 	data := s.readerBytes[id.String()]
 	hash, _ := markl.FormatHashSha256.Get() //repool:owned
 	return markl_io.MakeReadCloser(hash, bytes.NewReader(data)), nil
@@ -88,6 +101,9 @@ func (s *multiModeStub) MakeBlobWriter(
 	_ domain_interfaces.FormatHash,
 ) (domain_interfaces.BlobWriter, error) {
 	s.makeWriterCount++
+	if s.makeWriterErr != nil {
+		return nil, s.makeWriterErr
+	}
 	w := s.writerToHand
 	if w == nil {
 		w = &spyBlobWriter{}
@@ -1092,5 +1108,470 @@ func TestMulti_WriteThrough_DefaultHashType_FromWriteStore(t *testing.T) {
 			got.GetMarklFormatId(),
 			markl.FormatHashSha256.GetMarklFormatId(),
 		)
+	}
+}
+
+// TestMulti_Mirror_MakeBlobReader_AllMiss pins that with no child
+// reporting HasBlob, Mirror's MakeBlobReader returns ErrBlobMissing
+// (covering the clonedId/ErrBlobMissing return after the loop).
+func TestMulti_Mirror_MakeBlobReader_AllMiss(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-reader-all-miss")
+
+	storeA := &multiModeStub{hasIds: map[string]bool{}}
+	storeB := &multiModeStub{hasIds: map[string]bool{}}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader, want nil on all-miss")
+	}
+	if !errors.Is(gotErr, blob_io.ErrBlobMissing{}) {
+		t.Fatalf("MakeBlobReader error: got %v, want ErrBlobMissing", gotErr)
+	}
+}
+
+// TestMulti_Mirror_MakeBlobWriter_ChildError pins that an error from a
+// child's MakeBlobWriter aborts the fan-out and surfaces the error.
+func TestMulti_Mirror_MakeBlobWriter_ChildError(t *testing.T) {
+	boom := errors.New("child writer boom")
+	storeA := &multiModeStub{}
+	storeB := &multiModeStub{makeWriterErr: boom}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	writer, gotErr := m.MakeBlobWriter(markl.FormatHashSha256)
+	if writer != nil {
+		t.Fatalf("MakeBlobWriter: got non-nil writer, want nil on child error")
+	}
+	if gotErr == nil {
+		t.Fatalf("MakeBlobWriter: got nil error, want non-nil")
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_ReadSourceError pins that an
+// error from the read source's MakeBlobReader propagates up rather
+// than being silently swallowed.
+func TestMulti_WriteThrough_MakeBlobReader_ReadSourceError(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-readsource-err")
+	idKey := id.String()
+
+	boom := errors.New("read source boom")
+	writeStore := &multiModeStub{hasIds: map[string]bool{idKey: false}}
+	readSrc := &multiModeStub{
+		hasIds:        map[string]bool{idKey: true},
+		makeReaderErr: boom,
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader, want nil on read error")
+	}
+	if !errors.Is(gotErr, boom) {
+		t.Fatalf("MakeBlobReader error: got %v, want %v", gotErr, boom)
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_ReadFill_WriterError pins that
+// when ReadFill is on but the write store's MakeBlobWriter fails, the
+// caller still receives the source reader (the tee is skipped, but
+// the read itself is not disrupted).
+func TestMulti_WriteThrough_MakeBlobReader_ReadFill_WriterError(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-readfill-writer-err")
+	idKey := id.String()
+
+	payload := []byte("read-source-bytes")
+	writeStore := &multiModeStub{
+		hasIds:        map[string]bool{idKey: false},
+		defaultHash:   markl.FormatHashSha256,
+		makeWriterErr: errors.New("write store writer boom"),
+	}
+	readSrc := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: payload},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(true).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if gotErr != nil {
+		t.Fatalf("MakeBlobReader: %v (writer failure should not disrupt read)", gotErr)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+	if writeStore.makeWriterCount != 1 {
+		t.Fatalf(
+			"write store MakeBlobWriter count: got %d, want 1 (attempted but failed)",
+			writeStore.makeWriterCount,
+		)
+	}
+}
+
+// TestMulti_WriteThrough_GetBlobStoreConfig_FromWriteStore pins
+// delegation of GetBlobStoreConfig to the write store in WriteThrough.
+func TestMulti_WriteThrough_GetBlobStoreConfig_FromWriteStore(t *testing.T) {
+	wantConfig := stubBlobStoreConfig{storeType: "write-store"}
+	writeStore := &multiModeStub{config: wantConfig}
+	readSrc := &multiModeStub{
+		config: stubBlobStoreConfig{storeType: "read-source"},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	got := m.GetBlobStoreConfig()
+	if got != wantConfig {
+		t.Fatalf("GetBlobStoreConfig: got %#v, want %#v", got, wantConfig)
+	}
+}
+
+// TestMulti_WriteThrough_GetBlobIOWrapper_FromWriteStore pins
+// delegation of GetBlobIOWrapper to the write store in WriteThrough.
+func TestMulti_WriteThrough_GetBlobIOWrapper_FromWriteStore(t *testing.T) {
+	wantWrapper := stubBlobIOWrapper{tag: "write-store"}
+	writeStore := &multiModeStub{ioWrapper: wantWrapper}
+	readSrc := &multiModeStub{ioWrapper: stubBlobIOWrapper{tag: "read-source"}}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	got := m.GetBlobIOWrapper()
+	if got != wantWrapper {
+		t.Fatalf("GetBlobIOWrapper: got %#v, want %#v", got, wantWrapper)
+	}
+}
+
+// TestMulti_WriteThrough_AllBlobs_MergesWriteAndReadSources pins that
+// AllBlobs in WriteThrough mode merges the write store's sequence
+// with each read source's sequence. Exercises the allBlobSources
+// modeWriteThrough branch.
+func TestMulti_WriteThrough_AllBlobs_MergesWriteAndReadSources(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+	d3 := makeMultiAllBlobsTestId(t, 0x33)
+
+	writeStore := &multiModeStub{allBlobsSeq: makeMarklIdSeq(d1)}
+	readSrc := &multiModeStub{allBlobsSeq: makeMarklIdSeq(d2, d3)}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	gotIds, gotErrs := drainAllBlobs(m.AllBlobs())
+	if len(gotErrs) != 0 {
+		t.Fatalf("AllBlobs: unexpected errors: %v", gotErrs)
+	}
+
+	wantIds := []string{d1.String(), d2.String(), d3.String()}
+	if !reflect.DeepEqual(gotIds, wantIds) {
+		t.Fatalf("AllBlobs: got %v, want %v", gotIds, wantIds)
+	}
+}
+
+// TestMulti_AllBlobs_CallerEarlyCancel_StopsAfterFirstYield pins that
+// when the caller breaks out of the range loop on the very first
+// yield, the merge returns immediately rather than continuing. This
+// covers the `!yield(minId, nil) { return }` early-out in the merge
+// main loop.
+func TestMulti_AllBlobs_CallerEarlyCancel_StopsAfterFirstYield(t *testing.T) {
+	d1 := makeMultiAllBlobsTestId(t, 0x11)
+	d2 := makeMultiAllBlobsTestId(t, 0x22)
+
+	storeA := &multiModeStub{allBlobsSeq: makeMarklIdSeq(d1, d2)}
+	storeB := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	var seen []string
+	for id, err := range m.AllBlobs() {
+		if err != nil {
+			t.Fatalf("AllBlobs: unexpected error: %v", err)
+		}
+		seen = append(seen, id.String())
+		break // cancel after first yield
+	}
+
+	if len(seen) != 1 || seen[0] != d1.String() {
+		t.Fatalf("AllBlobs early-cancel: got %v, want [%s]", seen, d1.String())
+	}
+}
+
+// TestMulti_AllBlobs_CallerEarlyCancel_OnError stops the merge on the
+// first error yield. Covers `!yield(nil, h.err) { return }`.
+func TestMulti_AllBlobs_CallerEarlyCancel_OnError(t *testing.T) {
+	boom := errors.New("immediate boom")
+
+	storeA := &multiModeStub{
+		allBlobsSeq: func(yield func(domain_interfaces.MarklId, error) bool) {
+			yield(nil, boom)
+		},
+	}
+	storeB := &multiModeStub{allBlobsSeq: makeMarklIdSeq()}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	var seenErrs []error
+	for _, e := range m.AllBlobs() {
+		if e != nil {
+			seenErrs = append(seenErrs, e)
+			break // cancel on first error
+		}
+	}
+
+	if len(seenErrs) != 1 || !errors.Is(seenErrs[0], boom) {
+		t.Fatalf("AllBlobs early-cancel-on-error: got %v, want [%v]", seenErrs, boom)
+	}
+}
+
+// errorOnCloseWriter is a spyBlobWriter that always returns an error
+// from Close. Used to exercise the mirror writer Close fan-out error
+// path.
+type errorOnCloseWriter struct {
+	spyBlobWriter
+}
+
+func (w *errorOnCloseWriter) Close() error {
+	w.closed.Store(true)
+	w.closeCount.Add(1)
+	return errors.New("close boom")
+}
+
+// TestMulti_Mirror_MultiStoreBlobWriter_CloseChildError pins that an
+// error from a child writer's Close surfaces from the multiStoreBlobWriter's
+// Close (the err-from-childWriter.Close branch).
+func TestMulti_Mirror_MultiStoreBlobWriter_CloseChildError(t *testing.T) {
+	failing := &errorOnCloseWriter{}
+	good := &spyBlobWriter{}
+
+	storeA := &multiModeStub{writerToHand: good}
+	storeB := &multiModeStub{}
+	storeB.writerToHand = nil
+	// Wire storeB.MakeBlobWriter to return the failing writer directly
+	// without spyBlobWriter wrapping.
+	storeBWrap := &writerOverrideStub{
+		multiModeStub:  storeB,
+		overrideWriter: failing,
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeBWrap},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	writer, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	if _, err := writer.Write([]byte("payload")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if err := writer.Close(); err == nil {
+		t.Fatal("Close: got nil, want error from failing child Close")
+	}
+}
+
+// writerOverrideStub wraps multiModeStub so MakeBlobWriter returns a
+// pre-built BlobWriter (e.g. errorOnCloseWriter) rather than the
+// stub's spyBlobWriter. Defined here so it can reference the failing
+// writer concrete type from the same _test.go file.
+type writerOverrideStub struct {
+	*multiModeStub
+	overrideWriter domain_interfaces.BlobWriter
+}
+
+func (s *writerOverrideStub) MakeBlobWriter(
+	_ domain_interfaces.FormatHash,
+) (domain_interfaces.BlobWriter, error) {
+	s.makeWriterCount++
+	return s.overrideWriter, nil
+}
+
+// markIdGetterWriter is a BlobWriter that returns a fixed MarklId.
+// Used to exercise multiStoreBlobWriter.GetMarklId aggregation.
+type markIdGetterWriter struct {
+	id domain_interfaces.MarklId
+}
+
+func (w *markIdGetterWriter) Write(p []byte) (int, error) { return len(p), nil }
+func (w *markIdGetterWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(struct{ io.Writer }{w}, r)
+}
+func (w *markIdGetterWriter) Close() error                          { return nil }
+func (w *markIdGetterWriter) GetMarklId() domain_interfaces.MarklId { return w.id }
+
+// TestMulti_Mirror_MultiStoreBlobWriter_GetMarklId_FirstAndEqual pins
+// that the aggregated GetMarklId returns the first child's id when all
+// children agree on the same id. Exercises the first-time-set and
+// markl.AssertEqual happy-path branches.
+func TestMulti_Mirror_MultiStoreBlobWriter_GetMarklId_FirstAndEqual(t *testing.T) {
+	// Use real markl ids so AssertEqual takes the bytes-equal path.
+	id := makeMultiMirrorTestId(t, "mwriter-getmarklid")
+
+	writerA := &markIdGetterWriter{id: id}
+	writerB := &markIdGetterWriter{id: id}
+
+	storeA := &writerOverrideStub{multiModeStub: &multiModeStub{}, overrideWriter: writerA}
+	storeB := &writerOverrideStub{multiModeStub: &multiModeStub{}, overrideWriter: writerB}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	mw, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	got := mw.GetMarklId()
+	if got == nil || got.String() != id.String() {
+		t.Fatalf("GetMarklId: got %v, want %v", got, id)
+	}
+}
+
+// TestMulti_Mirror_MultiStoreBlobWriter_ReadFrom pins that calling
+// ReadFrom on the multi writer copies the source bytes through to the
+// io.MultiWriter sink (exercises the ReadFrom Copy path).
+func TestMulti_Mirror_MultiStoreBlobWriter_ReadFrom(t *testing.T) {
+	writerA := &spyBlobWriter{}
+	writerB := &spyBlobWriter{}
+
+	storeA := &multiModeStub{writerToHand: writerA}
+	storeB := &multiModeStub{writerToHand: writerB}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	mw, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	rf, ok := mw.(io.ReaderFrom)
+	if !ok {
+		t.Fatalf("multi writer does not implement io.ReaderFrom")
+	}
+
+	payload := []byte("read-from-payload")
+	n, err := rf.ReadFrom(bytes.NewReader(payload))
+	if err != nil {
+		t.Fatalf("ReadFrom: %v", err)
+	}
+	if n != int64(len(payload)) {
+		t.Fatalf("ReadFrom n: got %d, want %d", n, len(payload))
+	}
+
+	if !bytes.Equal(writerA.received, payload) {
+		t.Errorf("storeA bytes: got %q, want %q", writerA.received, payload)
+	}
+	if !bytes.Equal(writerB.received, payload) {
+		t.Errorf("storeB bytes: got %q, want %q", writerB.received, payload)
+	}
+}
+
+// TestMulti_Mirror_MultiStoreBlobWriter_ReadFrom_ChildWriteError pins
+// that an error from a child writer during the io.Copy fan-out
+// surfaces from ReadFrom (the err-wrap branch in ReadFrom).
+func TestMulti_Mirror_MultiStoreBlobWriter_ReadFrom_ChildWriteError(t *testing.T) {
+	good := &spyBlobWriter{}
+	failing := &spyBlobWriter{failAfterBytes: 1}
+
+	storeA := &multiModeStub{writerToHand: good}
+	storeB := &multiModeStub{writerToHand: failing}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	mw, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	rf := mw.(io.ReaderFrom)
+	_, err = rf.ReadFrom(bytes.NewReader([]byte("payload bigger than 1 byte")))
+	if err == nil {
+		t.Fatal("ReadFrom: got nil, want error from failing child write")
 	}
 }

@@ -55,6 +55,7 @@ func (parentStore Multi) HasBlob(id domain_interfaces.MarklId) bool {
 		return false
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return false
 }
 
@@ -111,6 +112,7 @@ func (parentStore Multi) MakeBlobReader(
 		}
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
 }
 
@@ -149,6 +151,7 @@ func (parentStore Multi) MakeBlobWriter(
 		return parentStore.writeStore.MakeBlobWriter(marklHashType)
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil, errors.Errorf("Multi: unknown mode %d", parentStore.mode)
 }
 
@@ -181,6 +184,7 @@ func (parentStore Multi) GetBlobStoreDescription() string {
 		return fmt.Sprintf("multi/write-through(%s)", strings.Join(parts, ", "))
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return ""
 }
 
@@ -191,6 +195,8 @@ func (parentStore Multi) GetBlobStoreDescription() string {
 func (parentStore Multi) GetDefaultHashType() domain_interfaces.FormatHash {
 	switch parentStore.mode {
 	case modeMirror:
+		// unreachable empty-Mirror guard: Build() rejects empty Mirror
+		// via "Mirror: no stores given".
 		if len(parentStore.childStores) == 0 {
 			return nil
 		}
@@ -200,6 +206,7 @@ func (parentStore Multi) GetDefaultHashType() domain_interfaces.FormatHash {
 		return parentStore.writeStore.GetDefaultHashType()
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil
 }
 
@@ -209,6 +216,7 @@ func (parentStore Multi) GetDefaultHashType() domain_interfaces.FormatHash {
 func (parentStore Multi) GetBlobStoreConfig() domain_interfaces.BlobStoreConfig {
 	switch parentStore.mode {
 	case modeMirror:
+		// unreachable empty-Mirror guard: Build() rejects empty Mirror.
 		if len(parentStore.childStores) == 0 {
 			return nil
 		}
@@ -218,6 +226,7 @@ func (parentStore Multi) GetBlobStoreConfig() domain_interfaces.BlobStoreConfig 
 		return parentStore.writeStore.GetBlobStoreConfig()
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil
 }
 
@@ -227,6 +236,7 @@ func (parentStore Multi) GetBlobStoreConfig() domain_interfaces.BlobStoreConfig 
 func (parentStore Multi) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper {
 	switch parentStore.mode {
 	case modeMirror:
+		// unreachable empty-Mirror guard: Build() rejects empty Mirror.
 		if len(parentStore.childStores) == 0 {
 			return nil
 		}
@@ -236,6 +246,7 @@ func (parentStore Multi) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper {
 		return parentStore.writeStore.GetBlobIOWrapper()
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil
 }
 
@@ -404,6 +415,7 @@ func (parentStore Multi) allBlobSources() []BlobStoreInitialized {
 		return sources
 	}
 
+	// unreachable: Build() rejects any mode outside the switch arms above.
 	return nil
 }
 
@@ -443,6 +455,11 @@ func (parentWriter multiStoreBlobWriter) GetMarklId() (first domain_interfaces.M
 		if first == nil {
 			first = next
 		} else if err := markl.AssertEqual(first, next); err != nil {
+			// unreachable in normal use: every child consumed the same
+			// bytes via io.MultiWriter and was created with the same
+			// hash type, so their MarklIds must agree. A mismatch is a
+			// contract violation we'd rather crash on than silently
+			// hide.
 			panic(err)
 		}
 	}
