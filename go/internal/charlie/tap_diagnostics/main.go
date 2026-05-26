@@ -1,5 +1,7 @@
 package tap_diagnostics
 
+//go:generate dagnabit export
+
 import (
 	"errors"
 	"fmt"
