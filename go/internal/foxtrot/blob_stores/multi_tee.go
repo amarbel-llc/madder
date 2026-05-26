@@ -18,11 +18,12 @@ import (
 // without disrupting the read; the caller still gets the full source
 // bytes.
 type teeBlobReader struct {
-	src      domain_interfaces.BlobReader
-	sink     domain_interfaces.BlobWriter
-	expected domain_interfaces.MarklId
-	sinkDead atomic.Bool
-	done     atomic.Bool
+	src        domain_interfaces.BlobReader
+	sink       domain_interfaces.BlobWriter
+	writeStore domain_interfaces.BlobStore
+	expected   domain_interfaces.MarklId
+	sinkDead   atomic.Bool
+	done       atomic.Bool
 }
 
 var _ domain_interfaces.BlobReader = (*teeBlobReader)(nil)
@@ -32,8 +33,14 @@ func newTeeBlobReader(
 	src domain_interfaces.BlobReader,
 	sink domain_interfaces.BlobWriter,
 	expected domain_interfaces.MarklId,
+	writeStore domain_interfaces.BlobStore,
 ) *teeBlobReader {
-	t := &teeBlobReader{src: src, sink: sink, expected: expected}
+	t := &teeBlobReader{
+		src:        src,
+		sink:       sink,
+		writeStore: writeStore,
+		expected:   expected,
+	}
 	ctx.After(errors.MakeFuncContextFromFuncErr(func() error {
 		return t.flushAndCommit()
 	}))
@@ -91,11 +98,13 @@ func (t *teeBlobReader) Close() error {
 }
 
 // flushAndCommit drains any unread bytes through the tee, closes both
-// sides, and detect-and-reports a same-hash digest mismatch when
-// expected is set. ActiveContext.After runs after the context is
-// complete, so the caller's read goroutine has terminated by the time
-// this fires via the After path; the drain cannot race a live Read.
-// Cross-hash mismatches are deferred to Task 12 (BlobForeignDigestAdder).
+// sides, and reconciles expected vs. the sink's computed MarklId.
+// Same-hash mismatches are detect-and-reported; cross-hash mismatches
+// register a foreign-digest mapping on the write store when it
+// implements BlobForeignDigestAdder (mirrors CopyBlobIfNecessary).
+// ActiveContext.After runs after the context is complete, so the
+// caller's read goroutine has terminated by the time this fires via
+// the After path; the drain cannot race a live Read.
 func (t *teeBlobReader) flushAndCommit() error {
 	if t.done.Swap(true) {
 		return nil
@@ -106,15 +115,19 @@ func (t *teeBlobReader) flushAndCommit() error {
 	var digestErr error
 	if t.expected != nil && !t.sinkDead.Load() {
 		writerDigest := t.sink.GetMarklId()
-		if writerDigest != nil &&
-			t.expected.GetMarklFormat().GetMarklFormatId() ==
-				writerDigest.GetMarklFormat().GetMarklFormatId() &&
-			!markl.Equals(t.expected, writerDigest) {
-			digestErr = errors.Errorf(
-				"tee digest mismatch: expected %s, sink produced %s",
-				t.expected,
-				writerDigest,
-			)
+		if writerDigest != nil {
+			if t.expected.GetMarklFormat().GetMarklFormatId() ==
+				writerDigest.GetMarklFormat().GetMarklFormatId() {
+				if !markl.Equals(t.expected, writerDigest) {
+					digestErr = errors.Errorf(
+						"tee digest mismatch: expected %s, sink produced %s",
+						t.expected,
+						writerDigest,
+					)
+				}
+			} else if adder, ok := t.writeStore.(domain_interfaces.BlobForeignDigestAdder); ok {
+				_ = adder.AddForeignBlobDigestForNativeDigest(t.expected, writerDigest)
+			}
 		}
 	}
 	return errors.Join(srcErr, sinkErr, digestErr)

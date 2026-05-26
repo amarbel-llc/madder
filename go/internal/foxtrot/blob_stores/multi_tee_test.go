@@ -4,9 +4,14 @@ package blob_stores
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
+	"sync"
 	"testing"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
@@ -39,7 +44,7 @@ func TestTee_ReadCopiesToSink(t *testing.T) {
 
 	sink := &spyBlobWriter{}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	got, err := io.ReadAll(tee)
 	if err != nil {
@@ -66,7 +71,7 @@ func TestTee_CallerClose_CommitsSink(t *testing.T) {
 
 	sink := &spyBlobWriter{}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	if _, err := io.ReadAll(tee); err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -89,7 +94,7 @@ func TestTee_SinkWriteError_PoisonsButReadContinues(t *testing.T) {
 
 	sink := &spyBlobWriter{failAfterBytes: 3}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	got, err := io.ReadAll(tee)
 	if err != nil {
@@ -110,7 +115,7 @@ func TestTee_GetMarklId_DelegatesToSource(t *testing.T) {
 	src := newControllableBlobReader(id)
 	sink := &spyBlobWriter{}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	got := tee.GetMarklId()
 	if got == nil || got.String() != id.String() {
@@ -131,7 +136,7 @@ func TestTee_PartialRead_FlushAndCommitDrainsRest(t *testing.T) {
 
 	sink := &spyBlobWriter{}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	buf := make([]byte, 5)
 	if _, err := tee.Read(buf); err != nil {
@@ -177,7 +182,7 @@ func TestTee_DigestMismatch_SameHash_ReturnsError(t *testing.T) {
 
 	sink := &spyBlobWriter{computedId: actual}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, expected)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, expected, nil)
 	if _, err := io.ReadAll(tee); err != nil {
 		t.Fatalf("ReadAll: %v", err)
 	}
@@ -197,7 +202,7 @@ func TestTee_PartialDrain_CtxAfterDrainsRest(t *testing.T) {
 	sink := &spyBlobWriter{}
 	ctx := &firingActiveContext{}
 
-	tee := newTeeBlobReader(ctx, src, sink, id)
+	tee := newTeeBlobReader(ctx, src, sink, id, nil)
 
 	buf := make([]byte, 3)
 	if _, err := tee.Read(buf); err != nil {
@@ -227,7 +232,7 @@ func TestTee_CallerCloseFirst_CtxAfterIsNoop(t *testing.T) {
 	sink := &spyBlobWriter{}
 	ctx := &firingActiveContext{}
 
-	tee := newTeeBlobReader(ctx, src, sink, id)
+	tee := newTeeBlobReader(ctx, src, sink, id, nil)
 
 	if _, err := io.ReadAll(tee); err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -255,7 +260,7 @@ func TestTee_CallerNeverCloses_CtxAfterDrainsAndCloses(t *testing.T) {
 	sink := &spyBlobWriter{}
 	ctx := &firingActiveContext{}
 
-	tee := newTeeBlobReader(ctx, src, sink, id)
+	tee := newTeeBlobReader(ctx, src, sink, id, nil)
 
 	ctx.FireAfter()
 
@@ -279,7 +284,7 @@ func TestTee_DoubleClose_IsNoop(t *testing.T) {
 
 	sink := &spyBlobWriter{}
 
-	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id)
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, id, nil)
 
 	if _, err := io.ReadAll(tee); err != nil {
 		t.Fatalf("ReadAll: %v", err)
@@ -356,5 +361,94 @@ func TestMulti_WriteThrough_MakeBlobReader_ReadFill_WiresTee(t *testing.T) {
 
 	if !writeStoreWriter.closed.Load() {
 		t.Fatalf("write store sink closed: got false, want true (Close commits)")
+	}
+}
+
+// foreignDigestAdderStub wraps multiModeStub with a BlobForeignDigestAdder
+// implementation that records every (foreign, native) call. Lives in this
+// _test.go file because it embeds multiModeStub, which is defined in
+// multi_test.go.
+type foreignDigestAdderStub struct {
+	*multiModeStub
+
+	mu    sync.Mutex
+	calls []foreignDigestCall
+}
+
+type foreignDigestCall struct {
+	foreign string
+	native  string
+}
+
+func (s *foreignDigestAdderStub) AddForeignBlobDigestForNativeDigest(
+	foreign, native domain_interfaces.MarklId,
+) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls = append(s.calls, foreignDigestCall{
+		foreign: foreign.String(),
+		native:  native.String(),
+	})
+	return nil
+}
+
+func makeBlake2b256TestId(t *testing.T, seed string) domain_interfaces.MarklId {
+	t.Helper()
+	raw := sha256.Sum256([]byte(seed))
+	id, repool := markl.FormatHashBlake2b256.GetBlobIdForHexString(
+		hex.EncodeToString(raw[:]),
+	)
+	t.Cleanup(repool)
+	return id
+}
+
+// TestTee_CrossHash_RegistersForeignDigestMapping pins that when the
+// expected id (from the read source) and the sink's computed id are in
+// different hash formats, flushAndCommit registers the cross-hash
+// mapping with the write store via BlobForeignDigestAdder. Without the
+// mapping a later lookup by either digest would not resolve the same
+// physical blob.
+func TestTee_CrossHash_RegistersForeignDigestMapping(t *testing.T) {
+	expected := makeMultiMirrorTestId(t, "tee-cross-hash-expected") // sha256
+	native := makeBlake2b256TestId(t, "tee-cross-hash-native")      // blake2b256
+
+	if expected.GetMarklFormat().GetMarklFormatId() ==
+		native.GetMarklFormat().GetMarklFormatId() {
+		t.Fatalf(
+			"test setup: expected and native must have different hash formats; both are %s",
+			expected.GetMarklFormat().GetMarklFormatId(),
+		)
+	}
+
+	src := newControllableBlobReader(expected)
+	src.Feed([]byte("cross-hash-payload"))
+	src.Close()
+
+	sink := &spyBlobWriter{computedId: native}
+
+	adder := &foreignDigestAdderStub{
+		multiModeStub: &multiModeStub{writerToHand: sink},
+	}
+
+	tee := newTeeBlobReader(&spyActiveContext{}, src, sink, expected, adder)
+	if _, err := io.ReadAll(tee); err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := tee.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	adder.mu.Lock()
+	calls := append([]foreignDigestCall(nil), adder.calls...)
+	adder.mu.Unlock()
+
+	if len(calls) != 1 {
+		t.Fatalf("adder calls: got %d, want 1 (calls=%v)", len(calls), calls)
+	}
+	if calls[0].foreign != expected.String() {
+		t.Fatalf("foreign digest: got %s, want %s", calls[0].foreign, expected)
+	}
+	if calls[0].native != native.String() {
+		t.Fatalf("native digest: got %s, want %s", calls[0].native, native)
 	}
 }

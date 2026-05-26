@@ -96,7 +96,13 @@ func (parentStore Multi) MakeBlobReader(
 			if werr != nil {
 				return reader, nil
 			}
-			return newTeeBlobReader(parentStore.ctx, reader, writer, id), nil
+			return newTeeBlobReader(
+				parentStore.ctx,
+				reader,
+				writer,
+				id,
+				parentStore.writeStore.BlobStore,
+			), nil
 		}
 
 		clonedId, _ := markl.Clone(id) //repool:owned
