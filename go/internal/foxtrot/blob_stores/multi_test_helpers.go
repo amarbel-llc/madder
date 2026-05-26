@@ -104,6 +104,7 @@ type spyBlobWriter struct {
 	mu             sync.Mutex
 	received       []byte
 	closed         atomic.Bool
+	closeCount     atomic.Int32
 	closeErr       error
 	failAfterBytes int
 	bytesWritten   int
@@ -127,6 +128,7 @@ func (w *spyBlobWriter) ReadFrom(r io.Reader) (int64, error) {
 
 func (w *spyBlobWriter) Close() error {
 	w.closed.Store(true)
+	w.closeCount.Add(1)
 	return w.closeErr
 }
 

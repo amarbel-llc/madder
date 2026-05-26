@@ -6,7 +6,30 @@ import (
 	"bytes"
 	"io"
 	"testing"
+
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
+
+// firingActiveContext is a spyActiveContext that actually invokes its
+// registered After callbacks when FireAfter is called. Lives in this
+// _test.go file (not multi_test_helpers.go) because spyActiveContext
+// is itself defined in a _test.go file — embedding it from a
+// build-tag-gated regular package file breaks non-test compilation
+// of the package under -tags test.
+type firingActiveContext struct {
+	spyActiveContext
+	afterFuncs []interfaces.FuncActiveContext
+}
+
+func (c *firingActiveContext) After(f interfaces.FuncActiveContext) {
+	c.afterFuncs = append(c.afterFuncs, f)
+}
+
+func (c *firingActiveContext) FireAfter() {
+	for _, f := range c.afterFuncs {
+		_ = f(c)
+	}
+}
 
 func TestTee_ReadCopiesToSink(t *testing.T) {
 	id := makeMultiMirrorTestId(t, "tee-read-copies")
@@ -163,6 +186,89 @@ func TestTee_DigestMismatch_SameHash_ReturnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected digest mismatch error; got nil")
 	}
+}
+
+func TestTee_PartialDrain_CtxAfterDrainsRest(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-partial-ctx-after")
+	src := newControllableBlobReader(id)
+	src.Feed([]byte("hello world"))
+	src.Close()
+
+	sink := &spyBlobWriter{}
+	ctx := &firingActiveContext{}
+
+	tee := newTeeBlobReader(ctx, src, sink, id)
+
+	buf := make([]byte, 3)
+	if _, err := tee.Read(buf); err != nil {
+		t.Fatalf("partial Read: %v", err)
+	}
+
+	ctx.FireAfter()
+
+	sink.mu.Lock()
+	received := append([]byte(nil), sink.received...)
+	sink.mu.Unlock()
+	if !bytes.Equal(received, []byte("hello world")) {
+		t.Fatalf("sink bytes after ctx.After: got %q, want %q", received, "hello world")
+	}
+	if !sink.closed.Load() {
+		t.Fatalf("sink closed after ctx.After: got false, want true")
+	}
+	_ = tee
+}
+
+func TestTee_CallerCloseFirst_CtxAfterIsNoop(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-close-first-after-noop")
+	src := newControllableBlobReader(id)
+	src.Feed([]byte("payload"))
+	src.Close()
+
+	sink := &spyBlobWriter{}
+	ctx := &firingActiveContext{}
+
+	tee := newTeeBlobReader(ctx, src, sink, id)
+
+	if _, err := io.ReadAll(tee); err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := tee.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	ctx.FireAfter()
+
+	if !sink.closed.Load() {
+		t.Fatalf("sink closed: got false, want true")
+	}
+	if got := sink.closeCount.Load(); got != 1 {
+		t.Fatalf("sink Close call count: got %d, want 1 (ctx.After must be a no-op after caller Close)", got)
+	}
+}
+
+func TestTee_CallerNeverCloses_CtxAfterDrainsAndCloses(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "tee-never-close-after-drains")
+	src := newControllableBlobReader(id)
+	src.Feed([]byte("hello world"))
+	src.Close()
+
+	sink := &spyBlobWriter{}
+	ctx := &firingActiveContext{}
+
+	tee := newTeeBlobReader(ctx, src, sink, id)
+
+	ctx.FireAfter()
+
+	sink.mu.Lock()
+	received := append([]byte(nil), sink.received...)
+	sink.mu.Unlock()
+	if !bytes.Equal(received, []byte("hello world")) {
+		t.Fatalf("sink bytes after ctx.After: got %q, want %q", received, "hello world")
+	}
+	if !sink.closed.Load() {
+		t.Fatalf("sink closed after ctx.After: got false, want true")
+	}
+	_ = tee
 }
 
 func TestTee_DoubleClose_IsNoop(t *testing.T) {
