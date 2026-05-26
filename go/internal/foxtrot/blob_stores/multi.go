@@ -83,13 +83,20 @@ func (parentStore Multi) MakeBlobReader(
 			if !readStore.HasBlob(id) {
 				continue
 			}
-			if !parentStore.readFill {
-				return readStore.MakeBlobReader(id)
+			reader, err := readStore.MakeBlobReader(id)
+			if err != nil {
+				return nil, err
 			}
-			// Task 10 will replace this branch with the tee-during-read
-			// wrapper. Until then, fall back to the source reader so the
-			// call still works end-to-end.
-			return readStore.MakeBlobReader(id)
+			if !parentStore.readFill {
+				return reader, nil
+			}
+			writer, werr := parentStore.writeStore.MakeBlobWriter(
+				parentStore.writeStore.GetDefaultHashType(),
+			)
+			if werr != nil {
+				return reader, nil
+			}
+			return newTeeBlobReader(parentStore.ctx, reader, writer, id), nil
 		}
 
 		clonedId, _ := markl.Clone(id) //repool:owned
