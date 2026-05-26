@@ -2,30 +2,28 @@
 
 Madder is a content-addressable blob storage CLI. The entry point is
 `go/cmd/madder/`; the build also produces sibling binaries
-`madder-cache` and `cutting-garden` (aliased `cg` via a postInstall
-symlink) from the same Go module, plus their man pages.
+`madder-cache`, `madder-mcp`, and `hyphence` from the same Go module,
+plus their man pages.
 
-## Sibling binaries
+## External consumer: cutting-garden
 
-`cutting-garden` (`go/cmd/cutting-garden/`,
-`go/internal/india/commands_cutting_garden/`) is the filesystem-tree
-capture/restore CLI. It has its own utility identity for CLI purposes
-but consumes madder's blob-store machinery as a library —
-`command_components.EnvBlobStore`'s `BlobStoreXDGScope = "madder"` on
-its commands resolves blob stores against madder's
-`$XDG_*_HOME/madder/blob_stores/` paths. The capture-receipt
-wire-format type tag is `cutting_garden-capture_receipt-fs-v1`;
-cutting-garden owns the format and uses its own
-`<utility>-<artifact>-<subtype>-<version>` shape rather than madder's
-vocabulary, so the tag is not in #16's locked-strings bucket.
+`amarbel-llc/cutting-garden` is the standalone filesystem-tree
+capture/restore CLI. It used to live in-tree under
+`go/cmd/cutting-garden/` + `go/internal/india/commands_cutting_garden/`
+but moved out as part of madder#216 (Phase 6 cutover, 2026-05-26).
+Cutting-garden now consumes madder as a library via the public
+`pkgs/` substrate — `pkgs/blob_store_env`, `pkgs/env_dir`,
+`pkgs/madder_env`, `pkgs/tap_diagnostics`, `pkgs/arg_resolver`,
+`pkgs/output_format` — and ships its own binary + receipt-format
+spec. The capture-receipt wire-format type tag
+`cutting_garden-capture_receipt-fs-v1` is now owned entirely by
+cutting-garden; madder no longer reads or writes it.
 
-The current extraction design is recorded at
-`docs/plans/2026-05-10-extract-cutting-garden-design.md`. It pivots
-the strategy: cutting-garden moves to its own repo
-(`amarbel-llc/cutting-garden`) atop madder's public `pkgs/` substrate
-rather than being lifted out of `go/internal/india/`. Until that work
-lands, madder keeps building `cutting-garden` from
-`go/internal/india/commands_cutting_garden/` unchanged.
+The extraction design is recorded at
+`docs/plans/2026-05-10-extract-cutting-garden-design.md` (historical
+reference). When updating madder's public `pkgs/` surface, consider
+that cutting-garden is a downstream consumer; breaking changes there
+should be coordinated.
 
 ## History: madder was extracted from dodder
 

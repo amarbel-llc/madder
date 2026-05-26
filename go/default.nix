@@ -47,7 +47,7 @@ let
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
-  # BATS_LIB_PATH, MADDER_BIN / CG_BIN / HYPHENCE_BIN exported via the
+  # BATS_LIB_PATH, MADDER_BIN / HYPHENCE_BIN exported via the
   # binaries-map form, version.env staged sibling-of-bats, jq for
   # cli_contract.bats's JSON helpers, git for bats-island's
   # setup_test_home, BATS_TEST_TIMEOUT=30 to mirror zz-tests_bats/justfile.
@@ -73,10 +73,6 @@ let
         MADDER_BIN = {
           inherit base;
           name = "madder";
-        };
-        CG_BIN = {
-          inherit base;
-          name = "cutting-garden";
         };
         HYPHENCE_BIN = {
           inherit base;
@@ -143,7 +139,6 @@ let
     cp ${versionEnv} stage/version.env
 
     export MADDER_BIN="$out/bin/madder"
-    export CG_BIN="$out/bin/cutting-garden"
     export HYPHENCE_BIN="$out/bin/hyphence"
     export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${
       bats.packages.${system}.bats-libs.batsLibPath
@@ -172,8 +167,6 @@ let
       "cmd/madder-cache"
       "cmd/madder-gen_man"
       "cmd/madder-mcp"
-      "cmd/cutting-garden"
-      "cmd/cg"
       "cmd/hyphence"
     ];
     modules = ./gomod2nix.toml;
@@ -216,45 +209,6 @@ let
       done
     '';
   });
-
-  # cutting-garden is the standalone flake-package form of the
-  # cmd/cutting-garden binary (plus its `cg` alias). The `madder`
-  # derivation already builds both as part of its subPackages list, so
-  # the binaries also live at `${madder}/bin/{cutting-garden,cg}`. This
-  # standalone package exists so downstream `amarbel-llc/cutting-garden`
-  # can `nix build github:amarbel-llc/madder#cutting-garden` for the
-  # Phase 6 receipt-identity cross-test (madder#176) without pulling
-  # the rest of the madder toolchain.
-  #
-  # `doCheck = false` because the full Go test suite is already run by
-  # the `madder` derivation's checkPhase; re-running it here would
-  # double-pay the cost on every downstream consumer. Man pages are
-  # intentionally not generated — `madder-gen_man` emits pages for
-  # every utility at once, which is the wrong shape for a single-binary
-  # package, and the cross-test consumer only needs the binary itself.
-  cutting-garden = pkgs.buildGoApplication {
-    pname = "cutting-garden";
-    inherit version commit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
-    subPackages = [
-      "cmd/cutting-garden"
-      "cmd/cg"
-    ];
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
-
-    nativeBuildInputs = [
-      purse-first.packages.${system}.dagnabit
-    ];
-
-    preBuild = ''
-      dagnabit export
-    '';
-
-    doCheck = false;
-  };
 
   # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)
   # / clown-json(5)) that exposes madder blobs as MCP resources at
@@ -465,7 +419,6 @@ in
       madder-cover
       madder-cli-cover
       madder-clown-plugin
-      cutting-garden
       madder-test-sftp-server
       ;
     default = madder;

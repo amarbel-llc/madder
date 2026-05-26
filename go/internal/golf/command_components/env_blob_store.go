@@ -36,8 +36,9 @@ var DefaultConfig = config_cli.Default()
 // (req.Utility.GetName()). The field is nest-level agnostic: a command
 // in a wrapper of a wrapper of madder still sets it to "madder" if
 // that's where the blob stores ultimately live, regardless of how many
-// layers of wrapping intervene. cutting-garden sets it to "madder";
-// madder and madder-cache leave it empty (each owns its own scope).
+// layers of wrapping intervene. madder-mcp sets it to "madder" so the
+// MCP server reads from madder's stores; madder and madder-cache leave
+// it empty (each owns its own scope).
 type EnvBlobStore struct {
 	BlobStoreXDGScope string
 }
@@ -96,46 +97,6 @@ func (cmd EnvBlobStore) makeEnvLocal(
 	)
 
 	return env_local.Make(envUI, dir)
-}
-
-// MakeEnvDirForScope builds a bare env_dir at the given xdgScope using
-// the same DefaultConfig (debug.Options) plumbing that
-// EnvBlobStore.makeEnvLocal uses internally. Useful for wrapper
-// utilities (cutting-garden, future others) that need a second env_dir
-// alongside their BlobStoreEnv — e.g. cg writing a cg-scoped
-// captures.log under $XDG_STATE_HOME/cutting-garden/ alongside
-// madder-scoped blob writes.
-//
-// The returned env_dir is independent of the BlobStoreEnv: it shares
-// only ctx and debug.Options; XDG paths are entirely disjoint by
-// construction (proven by env_dir.TestMakeDefault_DistinctScopesAreIndependent).
-//
-// For "the calling utility's own scope" pass req.Utility.GetName();
-// for an explicit other scope pass that string directly.
-//
-// Does NOT wire a BlobWriteObserver — that's blob-store-specific and
-// stays internal to makeEnvLocal. This helper is for env_dirs that
-// don't participate in the blob-publish audit log.
-func MakeEnvDirForScope(
-	req futility.Request,
-	xdgScope string,
-) env_dir.Env {
-	config := DefaultConfig
-
-	var debugOptions debug.Options
-
-	if config != nil {
-		debugOptions = config.Debug
-	}
-
-	return env_dir.MakeDefault(
-		req,
-		env_dir.Config{
-			EnvVarNames:  madder_env.DefaultEnvVarNames,
-			DebugOptions: debugOptions,
-		},
-		xdgScope,
-	)
 }
 
 // makeBlobWriteObserver returns the observer to wire into env_dir for

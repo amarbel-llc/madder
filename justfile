@@ -186,7 +186,6 @@ test-go-cover *flags:
 [group("post-build")]
 test-bats: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
-    CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
     HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test
 
@@ -315,7 +314,6 @@ cover-summary: cover-merged
 [group("post-build")]
 test-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
-    CG_BIN={{justfile_directory()}}/result/bin/cutting-garden \
     HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test-targets {{targets}}
 
@@ -677,10 +675,9 @@ debug-issue-145-multi-ancestor-repro:
 # Exercise tap-dancer-backed TAP emitters and assert no `# Output` comment
 # directives appear in the output. Catches regressions where a writer
 # falls back to legacy bats-style `# Output: ...` lines instead of the
-# tap-dancer YAMLish diagnostic block. Drives `cg capture` (capture_sink),
-# `madder write` (blob_write_sink), and `madder fsck` (blob_verify_sink)
-# in -format tap mode against an isolated tmp home, so a real TTY is not
-# required.
+# tap-dancer YAMLish diagnostic block. Drives `madder write`
+# (blob_write_sink) and `madder fsck` (blob_verify_sink) in -format tap
+# mode against an isolated tmp home, so a real TTY is not required.
 [group("debug")]
 debug-tap-output:
   #!/usr/bin/env bash
@@ -688,7 +685,6 @@ debug-tap-output:
   cd {{justfile_directory()}}
   just build >/dev/null
   madder_bin="{{justfile_directory()}}/result/bin/madder"
-  cg_bin="{{justfile_directory()}}/result/bin/cutting-garden"
 
   home=$(mktemp -d)
   workdir=$(mktemp -d)
@@ -716,7 +712,6 @@ debug-tap-output:
     echo | tee -a "$combined"
   }
 
-  run_case "cg capture -format tap tree" "$cg_bin" capture -format tap tree
   run_case "madder write -format tap tree/a.txt" "$madder_bin" write -format tap tree/a.txt
   run_case "madder fsck -format tap .default" "$madder_bin" fsck -format tap .default
 

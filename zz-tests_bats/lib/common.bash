@@ -29,16 +29,10 @@ bats_load_library bats-island
 setup_test_home
 export MADDER_CEILING_DIRECTORIES="$BATS_TEST_TMPDIR"
 require_bin MADDER_BIN madder
-require_bin CG_BIN cutting-garden
 require_bin HYPHENCE_BIN hyphence
 
 run_madder() {
   local bin="${MADDER_BIN:-madder}"
-  run timeout --preserve-status 2s "$bin" "$@"
-}
-
-run_cg() {
-  local bin="${CG_BIN:-cutting-garden}"
   run timeout --preserve-status 2s "$bin" "$@"
 }
 
@@ -75,16 +69,6 @@ write_blob_id() {
   fi
   assert_success
   echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
-}
-
-# capture_receipt_id captures the directory under PWD into the active
-# store and echoes the receipt blob-id from the JSON sink record.
-capture_receipt_id() {
-  local dir="$1"
-  run_cg capture -format json "$dir"
-  assert_success
-  echo "$output" | grep -F '"type":"store_group_receipt"' |
-    sed -E 's/.*"receipt_id":"([^"]+)".*/\1/' | head -n 1
 }
 
 # today_session_file echoes the path of the (first) hyphence session
