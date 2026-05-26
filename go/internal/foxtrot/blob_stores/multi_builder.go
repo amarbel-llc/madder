@@ -11,6 +11,13 @@ import (
 // mode-confusion error via the default branch in its switch.
 const modeConfused multiMode = -1
 
+// modeWriteToTwice is the poison-mode marker set when WriteTo is
+// called more than once on the same builder. Mirror and Read may be
+// called multiple times to extend the store list, but WriteTo selects
+// a single write target — a second call would silently drop the first
+// store's plumbing.
+const modeWriteToTwice multiMode = -2
+
 // MultiBuilder constructs a Multi blob store with one of two modes:
 // Mirror (broadcast writes across all child stores) or WriteThrough
 // (single write store + N read stores). Each mode-selecting method
@@ -46,13 +53,24 @@ func (b *MultiBuilder) Mirror(stores ...BlobStoreInitialized) *MultiBuilder {
 }
 
 // WriteTo configures the builder for write-through mode with store as
-// the single write target. Multiple WriteTo calls overwrite the prior
-// write store; mixing with Mirror enters confused-mode.
+// the single write target. Calling WriteTo more than once enters the
+// modeWriteToTwice poison state — the second call would otherwise
+// silently drop the first store's plumbing. Mixing with Mirror enters
+// modeConfused. Once any poison state is set, subsequent calls do not
+// reset or downgrade it (first-violation-wins).
 func (b *MultiBuilder) WriteTo(store BlobStoreInitialized) *MultiBuilder {
-	if b.mode == modeUnset || b.mode == modeWriteThrough {
+	switch {
+	case b.mode == modeConfused || b.mode == modeWriteToTwice:
+		// already poisoned; preserve the first violation.
+		return b
+	case b.writeStore.BlobStore != nil:
+		b.mode = modeWriteToTwice
+		return b
+	case b.mode == modeUnset || b.mode == modeWriteThrough:
 		b.mode = modeWriteThrough
-	} else {
+	default:
 		b.mode = modeConfused
+		return b
 	}
 	b.writeStore = store
 	return b
@@ -119,6 +137,11 @@ func (b *MultiBuilder) Build() (Multi, error) {
 	case modeUnset:
 		return Multi{}, errors.Errorf(
 			"MultiBuilder: no mode selected; call Mirror or WriteTo",
+		)
+
+	case modeWriteToTwice:
+		return Multi{}, errors.Errorf(
+			"MultiBuilder: WriteTo called more than once; only one write store is allowed",
 		)
 
 	default:

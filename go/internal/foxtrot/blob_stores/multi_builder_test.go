@@ -67,3 +67,29 @@ func TestBuilder_Build_ReadFillAfterMirror(t *testing.T) {
 		t.Fatal("expected error for ReadFill after Mirror; got nil")
 	}
 }
+
+// TestBuilder_Build_WriteToTwice_SameStore pins the rule decided in
+// #182's carry-forward: calling WriteTo more than once must surface an
+// error at Build(), even when the second call passes the same store.
+// Before this rule, the second call silently overwrote the prior write
+// store with no signal to the caller.
+func TestBuilder_Build_WriteToTwice_SameStore(t *testing.T) {
+	s := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).WriteTo(s).WriteTo(s).Build()
+	if err == nil {
+		t.Fatal("expected error for WriteTo called twice (same store); got nil")
+	}
+}
+
+// TestBuilder_Build_WriteToTwice_DifferentStores exercises the more
+// dangerous variant: a helper pre-configures WriteTo(a), then a caller
+// chains WriteTo(b). Silent overwrite would drop a's plumbing without
+// warning; Build() must reject the configuration.
+func TestBuilder_Build_WriteToTwice_DifferentStores(t *testing.T) {
+	a := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	b := BlobStoreInitialized{BlobStore: &stubBlobStore{}}
+	_, err := NewMulti(&spyActiveContext{}).WriteTo(a).WriteTo(b).Build()
+	if err == nil {
+		t.Fatal("expected error for WriteTo called twice (different stores); got nil")
+	}
+}
