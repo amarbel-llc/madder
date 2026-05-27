@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: experimental
 date: 2026-05-17
 promotion-criteria: |
   Promote to `experimental` once Phase 1 (config self-check) lands and

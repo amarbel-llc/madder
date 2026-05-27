@@ -173,6 +173,24 @@ Two on-disk wire formats exist:
     Retained for existing on-disk configs and callers that need the
     explicit shape.
 
+# CONFIG TAMPER DETECTION
+
+Every blob_store-config carries an `@` line in its hyphence metadata
+header recording a `blake2b256` digest of the config's body bytes
+(purpose `madder-blob_store-config-digest-v1`). On read, madder
+recomputes the digest from the on-disk body and refuses to use a
+config whose body does not match. Legacy configs (no `@` line) are
+trusted silently for backward compatibility; **madder list** flags
+them with `(unmigrated)` and prints a copy-pasteable
+**madder config-pin_digest** command to migrate.
+
+The digest covers the config's body bytes only \(everything after the
+`---` metadata-boundary plus the blank separator line\). Filesystem
+permissions, the parent directory's identity, and the blob contents
+the config points at are out of scope.
+
+See FDR-0008 for the full design.
+
 # CONCURRENCY AND DURABILITY
 
 ## Concurrent writes
