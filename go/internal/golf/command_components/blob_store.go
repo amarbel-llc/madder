@@ -4,7 +4,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -23,8 +22,7 @@ func (cmd *BlobStore) MakeBlobStoreFromConfigPath(
 	{
 		var err error
 
-		if typedConfig, err = hyphence.DecodeFromFile(
-			blob_store_configs.Coder,
+		if typedConfig, err = blob_store_configs.DecodeAndVerifyFromFile(
 			configPath,
 		); err != nil {
 			envBlobStore.Cancel(errors.Wrapf(
@@ -76,8 +74,7 @@ func (cmd *BlobStore) MakeBlobStoreFromIdOrConfigPath(
 		{
 			var err error
 
-			if typedConfig, err = hyphence.DecodeFromFile(
-				blob_store_configs.Coder,
+			if typedConfig, err = blob_store_configs.DecodeAndVerifyFromFile(
 				configPath,
 			); err != nil {
 				if errors.IsNotExist(err) {

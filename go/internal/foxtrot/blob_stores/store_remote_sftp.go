@@ -252,7 +252,7 @@ func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 
 	var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
 
-	if _, err = blob_store_configs.Coder.DecodeFrom(
+	if _, err = blob_store_configs.DecodeAndVerify(
 		&typedConfig,
 		configFile,
 	); err != nil {

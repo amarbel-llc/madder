@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
@@ -21,23 +22,25 @@ var DigestHash = markl.FormatHashBlake2b256
 // covering the body bytes. It is the only sanctioned write path for
 // blob_store-config files after FDR-0008 Phase 1.
 //
-// Mechanism: render the body to a scratch buffer via the inner Blob
-// coder, hash those bytes, stamp typedConfig.BlobDigest, then re-render
-// through the full Coder so the @ line + metadata wrap surround the
-// same body bytes. The double-encode keeps the hash input well-defined
-// (body bytes only) and avoids reworking the hyphence coder's
-// metadata-first emission order.
+// Mechanism: encode the body to a scratch buffer via the inner Blob
+// coder, hash those bytes, stamp typedConfig.BlobDigest with the
+// resulting markl-id, then assemble the on-disk output as
+// `Boundary + metadata + Boundary + blank + bodyBuf` — the on-disk
+// body is the exact byte sequence that was hashed. This avoids any
+// dependency on the inner coder being deterministic across two calls
+// (e.g. randomized encryption-key generation in the
+// inventory_archive variants).
 func EncodeWithDigest(
 	typedConfig *TypedConfig,
 	w io.Writer,
 ) (n int64, err error) {
 	var bodyBuf bytes.Buffer
-	bw := bufio.NewWriter(&bodyBuf)
-	if _, err = Coder.Blob.EncodeTo(typedConfig, bw); err != nil {
+	bodyWriter := bufio.NewWriter(&bodyBuf)
+	if _, err = Coder.Blob.EncodeTo(typedConfig, bodyWriter); err != nil {
 		err = errors.Wrap(err)
 		return n, err
 	}
-	if err = bw.Flush(); err != nil {
+	if err = bodyWriter.Flush(); err != nil {
 		err = errors.Wrap(err)
 		return n, err
 	}
@@ -60,9 +63,35 @@ func EncodeWithDigest(
 		return n, err
 	}
 
-	if n, err = Coder.EncodeTo(typedConfig, w); err != nil {
+	out := bufio.NewWriter(w)
+	defer errors.DeferredFlusher(&err, out)
+
+	var n1 int
+	var n2 int64
+
+	if n1, err = out.WriteString(hyphence.Boundary + "\n"); err != nil {
 		err = errors.Wrap(err)
 		return n, err
 	}
+	n += int64(n1)
+
+	if n2, err = Coder.Metadata.EncodeTo(typedConfig, out); err != nil {
+		err = errors.Wrap(err)
+		return n, err
+	}
+	n += n2
+
+	if n1, err = out.WriteString(hyphence.Boundary + "\n\n"); err != nil {
+		err = errors.Wrap(err)
+		return n, err
+	}
+	n += int64(n1)
+
+	if n1, err = out.Write(bodyBuf.Bytes()); err != nil {
+		err = errors.Wrap(err)
+		return n, err
+	}
+	n += int64(n1)
+
 	return n, err
 }

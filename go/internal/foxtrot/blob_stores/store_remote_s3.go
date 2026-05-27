@@ -231,7 +231,7 @@ func (blobStore *remoteS3) readRemoteConfig() (err error) {
 
 	var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
 
-	if _, err = blob_store_configs.Coder.DecodeFrom(&typedConfig, out.Body); err != nil {
+	if _, err = blob_store_configs.DecodeAndVerify(&typedConfig, out.Body); err != nil {
 		err = deweyerrors.Wrapf(err, "failed to decode remote blob store config at s3://%s/%s", bucket, key)
 		return err
 	}

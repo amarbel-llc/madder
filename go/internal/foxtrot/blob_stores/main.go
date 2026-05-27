@@ -58,8 +58,7 @@ func makeBlobStoreConfigs(
 		blobStore := blobStores[blobStoreIdString]
 		blobStore.Path = blobStorePath
 
-		if typedConfig, err := hyphence.DecodeFromFile(
-			blob_store_configs.Coder,
+		if typedConfig, err := blob_store_configs.DecodeAndVerifyFromFile(
 			configPath,
 		); err != nil {
 			ctx.Cancel(errors.Wrapf(
@@ -412,8 +411,7 @@ func MakeBlobStore(
 		var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
 		otherStorePath := config.GetPath()
 
-		if typedConfig, err = hyphence.DecodeFromFile(
-			blob_store_configs.Coder,
+		if typedConfig, err = blob_store_configs.DecodeAndVerifyFromFile(
 			otherStorePath.GetConfig(),
 		); err != nil {
 			err = errors.Wrapf(

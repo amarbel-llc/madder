@@ -730,7 +730,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 	defer configFile.Close() //defer:err-checked
 
 	var typedConfig hyphence.TypedBlob[delta_blob_store_configs.Config]
-	if _, err := delta_blob_store_configs.Coder.DecodeFrom(
+	if _, err := delta_blob_store_configs.DecodeAndVerify(
 		&typedConfig, configFile,
 	); err != nil {
 		env.GetUI().Printf(

@@ -6,7 +6,6 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -94,8 +93,7 @@ func (cmd *InitFrom) Run(req futility.Request) {
 	{
 		var err error
 
-		if typedConfig, err = hyphence.DecodeFromFile(
-			blob_store_configs.Coder,
+		if typedConfig, err = blob_store_configs.DecodeAndVerifyFromFile(
 			configPathFD.String(),
 		); err != nil {
 			tw.NotOk(
