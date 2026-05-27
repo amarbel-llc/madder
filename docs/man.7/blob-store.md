@@ -191,6 +191,24 @@ the config points at are out of scope.
 
 See FDR-0008 for the full design.
 
+## ID DIGEST SUFFIX (Phase 2)
+
+Blob-store-ids accept an optional `@<markl-id>` suffix that pins the
+expected on-disk config digest:
+
+    default@blake2b256-9ft3m74l...
+    .archive@blake2b256-7q3w5h2x...
+
+Resolution succeeds only when the suffix matches the store's on-disk
+`@` digest line. A mismatch surfaces **markl.ErrNotEqual** with both
+digests. A digest supplied against a legacy (un-migrated) config is a
+hard error — run **madder config-pin_digest** to migrate first.
+
+The bare `[prefix]name` form (no `@`) continues to work as before;
+the suffix is purely additive. Filenames containing a literal `@`
+character can be disambiguated by an explicit `./` prefix, the same
+convention used today for store IDs that look like filenames.
+
 # CONCURRENCY AND DURABILITY
 
 ## Concurrent writes
