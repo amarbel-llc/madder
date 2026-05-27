@@ -57,7 +57,7 @@ func (cmd Init) InitBlobStore(
 	if err := files.WriteImmutable(
 		path.GetConfig(),
 		func(w io.Writer) error {
-			_, err := blob_store_configs.Coder.EncodeTo(config, w)
+			_, err := blob_store_configs.EncodeWithDigest(config, w)
 			return err
 		},
 	); err != nil {

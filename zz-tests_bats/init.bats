@@ -62,6 +62,34 @@ function init_inventory_archive_with_encryption { # @test
   assert_output --regexp '.+'
 }
 
+function init_default_config_has_digest_line { # @test
+  # FDR-0008 Phase 1: every fresh config carries an @ line in its
+  # hyphence metadata header with a blake2b256 digest. The hyphence
+  # metadata coder emits the @ line as `format-data` without the
+  # purpose prefix (the purpose is stamped only on the in-memory Id),
+  # so the on-disk form is `@ blake2b256-<blech32>`.
+  init_store
+
+  local config=".madder/local/share/blob_stores/default/blob_store-config"
+  [[ -f $config ]] || fail "expected config at $config"
+
+  run grep -E '^@ blake2b256-' "$config"
+  assert_success
+}
+
+function init_inventory_archive_config_has_digest_line { # @test
+  # Same as above for the inventory-archive init path.
+  init_store
+  run_madder init-inventory-archive -encryption none .archive
+  assert_success
+
+  local config=".madder/local/share/blob_stores/archive/blob_store-config"
+  [[ -f $config ]] || fail "expected config at $config"
+
+  run grep -E '^@ blake2b256-' "$config"
+  assert_success
+}
+
 function init_error_includes_store_id_and_path { # @test
   # Regression for #21: when store discovery hits an invalid config on
   # disk, the error must identify which store and which config file.
