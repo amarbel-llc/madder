@@ -3,6 +3,7 @@
 package blob_store_id
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
@@ -270,6 +271,43 @@ func TestId_MarshalText_RoundTrip(t *testing.T) {
 	if dst.Canonical() != src.Canonical() {
 		t.Errorf("round-trip: got %q, want %q",
 			dst.Canonical(), src.Canonical())
+	}
+}
+
+func TestId_Less_DigestTieBreaker(t *testing.T) {
+	var d1, d2 markl.Id
+	bytes1 := make([]byte, 32)
+	bytes1[0] = 0x01
+	bytes2 := make([]byte, 32)
+	bytes2[0] = 0x02
+
+	if err := d1.SetMarklId(markl.FormatIdHashBlake2b256, bytes1); err != nil {
+		t.Fatal(err)
+	}
+	if err := d2.SetMarklId(markl.FormatIdHashBlake2b256, bytes2); err != nil {
+		t.Fatal(err)
+	}
+
+	a := Make("default").WithDigest(d1)
+	b := Make("default").WithDigest(d2)
+
+	if a.Less(b) == b.Less(a) {
+		t.Fatal("Less is not antisymmetric for digest-only-differing ids")
+	}
+
+	want := bytes.Compare(bytes1, bytes2) < 0
+	if a.Less(b) != want {
+		t.Errorf("Less direction: a.Less(b) = %v, want %v",
+			a.Less(b), want)
+	}
+}
+
+func TestId_Less_BareIdsUnchanged(t *testing.T) {
+	a := Make("alpha")
+	b := Make("bravo")
+	if !a.Less(b) || b.Less(a) {
+		t.Errorf("bare-id ordering regressed: a.Less(b)=%v b.Less(a)=%v",
+			a.Less(b), b.Less(a))
 	}
 }
 

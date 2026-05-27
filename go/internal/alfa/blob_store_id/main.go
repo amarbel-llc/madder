@@ -3,6 +3,7 @@ package blob_store_id
 //go:generate dagnabit export
 
 import (
+	"bytes"
 	"encoding"
 	"fmt"
 	"strings"
@@ -170,7 +171,14 @@ func (id Id) Less(otherId Id) bool {
 		return id.id < otherId.id
 	}
 
-	return id.cwdDepth < otherId.cwdDepth
+	if id.cwdDepth != otherId.cwdDepth {
+		return id.cwdDepth < otherId.cwdDepth
+	}
+
+	// FDR-0008 Phase 2: digest as the final tie-breaker. Compares
+	// the data bytes of the markl.Id lexicographically; null digests
+	// sort first.
+	return bytes.Compare(id.digest.GetBytes(), otherId.digest.GetBytes()) < 0
 }
 
 // WithCwdDepth returns a copy of id with the cwdDepth set. Caller is
