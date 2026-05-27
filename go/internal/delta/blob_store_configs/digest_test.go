@@ -4,6 +4,7 @@ package blob_store_configs
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
@@ -43,10 +44,9 @@ func TestEncodeWithDigestRoundTrip(t *testing.T) {
 	}
 }
 
-// TestEncodeWithDigestDetectsTamper exercises the tamper detection
-// scaffold. Mutate one byte of an encoded config; Task 3 will wire the
-// read-side AssertEqual that surfaces the mismatch. This test only
-// documents the encoded shape today; gain teeth once Task 3 lands.
+// TestEncodeWithDigestDetectsTamper: mutate one byte of an encoded
+// config; DecodeAndVerify surfaces the mismatch as markl.ErrNotEqual
+// carrying both Expected and Actual digests.
 func TestEncodeWithDigestDetectsTamper(t *testing.T) {
 	typedConfig := defaultTypedConfigForTest(t)
 
@@ -68,8 +68,55 @@ func TestEncodeWithDigestDetectsTamper(t *testing.T) {
 	bs[bodyStart] ^= 0x01
 
 	decoded := &TypedConfig{}
-	// Intentionally no assertion: Task 3 adds the failure mode.
-	_, _ = Coder.DecodeFrom(decoded, bytes.NewReader(bs))
+	_, err := DecodeAndVerify(decoded, bytes.NewReader(bs))
+	if err == nil {
+		t.Fatal("expected mismatch error, got nil")
+	}
+	var notEqual markl.ErrNotEqual
+	if !errors.As(err, &notEqual) {
+		t.Fatalf("expected markl.ErrNotEqual, got %T: %v", err, err)
+	}
+	if notEqual.Expected.IsNull() || notEqual.Actual.IsNull() {
+		t.Fatal("expected both Expected and Actual to be populated")
+	}
+}
+
+// TestDecodeAndVerifyAcceptsLegacy: a config with no @ line
+// (pre-FDR-0008) is trusted silently.
+func TestDecodeAndVerifyAcceptsLegacy(t *testing.T) {
+	typedConfig := defaultTypedConfigForTest(t)
+
+	var buf bytes.Buffer
+	if _, err := Coder.EncodeTo(typedConfig, &buf); err != nil {
+		t.Fatalf("Coder.EncodeTo: %v", err)
+	}
+
+	decoded := &TypedConfig{}
+	if _, err := DecodeAndVerify(decoded, bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("DecodeAndVerify on legacy config: %v", err)
+	}
+	if !decoded.BlobDigest.IsNull() {
+		t.Fatal("legacy config should not have BlobDigest populated")
+	}
+}
+
+// TestDecodeAndVerifyRoundTrip: encode via EncodeWithDigest, decode via
+// DecodeAndVerify, no error, BlobDigest populated after round-trip.
+func TestDecodeAndVerifyRoundTrip(t *testing.T) {
+	typedConfig := defaultTypedConfigForTest(t)
+
+	var buf bytes.Buffer
+	if _, err := EncodeWithDigest(typedConfig, &buf); err != nil {
+		t.Fatalf("EncodeWithDigest: %v", err)
+	}
+
+	decoded := &TypedConfig{}
+	if _, err := DecodeAndVerify(decoded, bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("DecodeAndVerify: %v", err)
+	}
+	if decoded.BlobDigest.IsNull() {
+		t.Fatal("BlobDigest should be populated after round-trip")
+	}
 }
 
 func defaultTypedConfigForTest(t *testing.T) *TypedConfig {
