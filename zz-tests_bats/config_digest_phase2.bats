@@ -18,8 +18,8 @@ function phase2_matching_digest_resolves { # @test
   assert_success
 }
 
-# A digest that doesn't match the on-disk config fails with the
-# wrapped markl.ErrNotEqual.
+# A digest that doesn't match the on-disk config fails with
+# markl.ErrNotEqual ("expected digest ... but got ...").
 function phase2_mismatched_digest_refuses { # @test
   init_store
 
