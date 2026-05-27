@@ -46,6 +46,30 @@ func WriteImmutable(
 		return err
 	}
 
+	return writeImmutableUnchecked(path, write)
+}
+
+// WriteImmutableReplace atomically replaces an existing immutable
+// file. Same tmp-write + chmod + atomic-rename discipline as
+// WriteImmutable, but does NOT refuse when path already exists; the
+// rename overwrites in place.
+//
+// This is the deliberate escape hatch from the "immutable artifact"
+// invariant, used only by the FDR-0008 Phase 1 config-pin_digest
+// migration command, which re-emits an existing blob_store-config
+// to attach its `@` digest line. Do not call from new write paths
+// — prefer WriteImmutable.
+func WriteImmutableReplace(
+	path string,
+	write func(io.Writer) error,
+) (err error) {
+	return writeImmutableUnchecked(path, write)
+}
+
+func writeImmutableUnchecked(
+	path string,
+	write func(io.Writer) error,
+) (err error) {
 	tmpPath, err := TmpSibling(path)
 	if err != nil {
 		err = errors.Wrap(err)
