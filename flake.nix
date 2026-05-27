@@ -38,8 +38,9 @@
 
     purse-first = {
       url = "github:amarbel-llc/purse-first";
-      inputs.nixpkgs.follows = "nixpkgs";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
     };
 
