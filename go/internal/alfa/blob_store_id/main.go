@@ -105,7 +105,8 @@ func (id *Id) Set(value string) (err error) {
 	if hasDigest {
 		if len(left) == 0 {
 			err = errors.Errorf(
-				"blob_store_id is empty before `@`: %q", value)
+				"blob_store_id is empty before `@`: %q", value,
+			)
 			return err
 		}
 		if err = id.digest.Set(digestText); err != nil {
