@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
+	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -59,10 +61,12 @@ func (cmd *List) SetFlagDefinitions(
 }
 
 type listRecord struct {
-	Id          string `json:"id"`
-	Description string `json:"description"`
-	ConfigPath  string `json:"config_path"`
-	Base        string `json:"base"`
+	Id            string `json:"id"`
+	Description   string `json:"description"`
+	ConfigPath    string `json:"config_path"`
+	Base          string `json:"base"`
+	Digest        string `json:"digest,omitempty"`
+	DigestMissing bool   `json:"digest_missing,omitempty"`
 }
 
 func (cmd List) Run(req futility.Request) {
@@ -93,12 +97,36 @@ func emitListText(
 	envBlobStore command_components.BlobStoreEnv,
 	blobStores blob_stores.BlobStoreMap,
 ) {
+	var unmigrated []string
+
 	for _, blobStore := range stableOrder(blobStores) {
+		idStr := blobStore.Path.GetId().String()
+		bd := blobStore.Config.BlobDigest
+		if !bd.IsNull() {
+			idStr += "@" + bd.String()
+		} else {
+			idStr += " (unmigrated)"
+			unmigrated = append(unmigrated, blobStore.Path.GetId().String())
+		}
 		envBlobStore.GetUI().Printf(
 			"%s: %s # path: %s",
-			blobStore.Path.GetId(),
+			idStr,
 			blobStore.GetBlobStoreDescription(),
 			envBlobStore.RelToCwdOrSame(blobStore.Path.GetConfig()),
+		)
+	}
+
+	if len(unmigrated) > 0 {
+		envBlobStore.GetUI().Printf("")
+		envBlobStore.GetUI().Printf(
+			"NOTE: %d store(s) above are missing tamper-detection digests.",
+			len(unmigrated),
+		)
+		envBlobStore.GetUI().Printf("      Run this to migrate them:")
+		envBlobStore.GetUI().Printf("")
+		envBlobStore.GetUI().Printf(
+			"        madder config-pin_digest %s",
+			strings.Join(unmigrated, " "),
 		)
 	}
 }
@@ -133,10 +161,17 @@ func emitListJSONObject(blobStores blob_stores.BlobStoreMap) (err error) {
 }
 
 func makeListRecord(blobStore blob_stores.BlobStoreInitialized) listRecord {
-	return listRecord{
+	rec := listRecord{
 		Id:          blobStore.Path.GetId().String(),
 		Description: blobStore.GetBlobStoreDescription(),
 		ConfigPath:  blobStore.Path.GetConfig(),
 		Base:        blobStore.Path.GetBase(),
 	}
+	bd := blobStore.Config.BlobDigest
+	if !bd.IsNull() {
+		rec.Digest = blob_store_configs.DigestPurpose + "@" + bd.String()
+	} else {
+		rec.DigestMissing = true
+	}
+	return rec
 }
