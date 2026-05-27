@@ -1387,6 +1387,265 @@ func TestMulti_AllBlobs_CallerEarlyCancel_OnError(t *testing.T) {
 	}
 }
 
+// hasBlobCountingStub is a multiModeStub variant whose HasBlob also
+// counts how many times it was probed. Used by short-circuit tests
+// that need to assert later children are never asked.
+type hasBlobCountingStub struct {
+	*multiModeStub
+	probeCount int
+}
+
+func (s *hasBlobCountingStub) HasBlob(id domain_interfaces.MarklId) bool {
+	s.probeCount++
+	return s.multiModeStub.HasBlob(id)
+}
+
+// TestMulti_Mirror_HasBlob_ShortCircuitsOnFirstHit pins the
+// manpage's HASBLOB claim: in Mirror mode, a positive answer from
+// the first child must terminate the scan; the second child must
+// never see a probe.
+func TestMulti_Mirror_HasBlob_ShortCircuitsOnFirstHit(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-hasblob-short-circuit")
+	idKey := id.String()
+
+	storeA := &hasBlobCountingStub{
+		multiModeStub: &multiModeStub{hasIds: map[string]bool{idKey: true}},
+	}
+	storeB := &hasBlobCountingStub{
+		multiModeStub: &multiModeStub{hasIds: map[string]bool{idKey: true}},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if !m.HasBlob(id) {
+		t.Fatal("HasBlob: got false, want true (first child has it)")
+	}
+	if storeA.probeCount != 1 {
+		t.Fatalf("storeA probe count: got %d, want 1", storeA.probeCount)
+	}
+	if storeB.probeCount != 0 {
+		t.Fatalf(
+			"storeB probe count: got %d, want 0 (short-circuit after first hit)",
+			storeB.probeCount,
+		)
+	}
+}
+
+// TestMulti_WriteThrough_HasBlob_ShortCircuitsOnWriteStore pins the
+// write-through variant: a hit on the write store must terminate the
+// scan before any read source is probed.
+func TestMulti_WriteThrough_HasBlob_ShortCircuitsOnWriteStore(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-hasblob-short-circuit-write")
+	idKey := id.String()
+
+	writeStore := &hasBlobCountingStub{
+		multiModeStub: &multiModeStub{hasIds: map[string]bool{idKey: true}},
+	}
+	readSrc := &hasBlobCountingStub{
+		multiModeStub: &multiModeStub{hasIds: map[string]bool{idKey: true}},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if !m.HasBlob(id) {
+		t.Fatal("HasBlob: got false, want true (write store has it)")
+	}
+	if writeStore.probeCount != 1 {
+		t.Fatalf("write store probe count: got %d, want 1", writeStore.probeCount)
+	}
+	if readSrc.probeCount != 0 {
+		t.Fatalf(
+			"read source probe count: got %d, want 0 (short-circuit on write hit)",
+			readSrc.probeCount,
+		)
+	}
+}
+
+// mismatchedIdWriter returns whatever MarklId it was constructed with.
+// Two of these with different ids drive the
+// multiStoreBlobWriter.GetMarklId panic-on-mismatch contract.
+type mismatchedIdWriter struct {
+	id domain_interfaces.MarklId
+}
+
+func (w *mismatchedIdWriter) Write(p []byte) (int, error) { return len(p), nil }
+func (w *mismatchedIdWriter) ReadFrom(r io.Reader) (int64, error) {
+	return io.Copy(struct{ io.Writer }{w}, r)
+}
+func (w *mismatchedIdWriter) Close() error                          { return nil }
+func (w *mismatchedIdWriter) GetMarklId() domain_interfaces.MarklId { return w.id }
+
+// TestMulti_Mirror_MultiStoreBlobWriter_GetMarklId_PanicsOnMismatch
+// pins the manpage's contract that GetMarklId panics when children
+// disagree on the computed id — every child consumed the same bytes
+// via io.MultiWriter and was created with the same hash type, so a
+// mismatch is a contract violation rather than a recoverable state.
+func TestMulti_Mirror_MultiStoreBlobWriter_GetMarklId_PanicsOnMismatch(t *testing.T) {
+	idA := makeMultiMirrorTestId(t, "mwriter-getmarklid-mismatch-A")
+	idB := makeMultiMirrorTestId(t, "mwriter-getmarklid-mismatch-B")
+	if idA.String() == idB.String() {
+		t.Fatal("test setup: mismatched ids must differ")
+	}
+
+	writerA := &mismatchedIdWriter{id: idA}
+	writerB := &mismatchedIdWriter{id: idB}
+
+	storeA := &writerOverrideStub{
+		multiModeStub:  &multiModeStub{},
+		overrideWriter: writerA,
+	}
+	storeB := &writerOverrideStub{
+		multiModeStub:  &multiModeStub{},
+		overrideWriter: writerB,
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	mw, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("GetMarklId: got no panic, want panic on child mismatch")
+		}
+	}()
+	_ = mw.GetMarklId()
+}
+
+// TestMulti_Mirror_SingleChild_RoundTrip pins the degenerate-case
+// claim: Mirror with one child Builds, reads, writes, and merges
+// AllBlobs as a thin pass-through.
+func TestMulti_Mirror_SingleChild_RoundTrip(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-single-child")
+	idKey := id.String()
+	payload := []byte("single-mirror-payload")
+	storeWriter := &spyBlobWriter{}
+
+	store := &multiModeStub{
+		hasIds:       map[string]bool{idKey: true},
+		readerBytes:  map[string][]byte{idKey: payload},
+		writerToHand: storeWriter,
+		allBlobsSeq:  makeMarklIdSeq(id),
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		Mirror(BlobStoreInitialized{BlobStore: store}).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if !m.HasBlob(id) {
+		t.Fatal("HasBlob: got false, want true")
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v", err)
+	}
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("reader.Close: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+
+	writer, err := m.MakeBlobWriter(markl.FormatHashSha256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter: %v", err)
+	}
+	if _, err := writer.Write(payload); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("writer.Close: %v", err)
+	}
+	if !bytes.Equal(storeWriter.received, payload) {
+		t.Fatalf("written bytes: got %q, want %q", storeWriter.received, payload)
+	}
+
+	ids, errs := drainAllBlobs(m.AllBlobs())
+	if len(errs) != 0 {
+		t.Fatalf("AllBlobs errors: %v", errs)
+	}
+	if len(ids) != 1 || ids[0] != id.String() {
+		t.Fatalf("AllBlobs ids: got %v, want [%s]", ids, id.String())
+	}
+}
+
+// TestMulti_WriteThrough_ZeroReadStores_Build pins the degenerate
+// case claim: WriteTo(store).Build() with no Read calls succeeds and
+// behaves as a single-store wrapper — reads come from the write
+// store, all-miss returns ErrBlobMissing.
+func TestMulti_WriteThrough_ZeroReadStores_Build(t *testing.T) {
+	idHit := makeMultiMirrorTestId(t, "wt-zero-reads-hit")
+	idMiss := makeMultiMirrorTestId(t, "wt-zero-reads-miss")
+	hitKey := idHit.String()
+	payload := []byte("zero-reads-payload")
+
+	writeStore := &multiModeStub{
+		hasIds:      map[string]bool{hitKey: true},
+		readerBytes: map[string][]byte{hitKey: payload},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if !m.HasBlob(idHit) {
+		t.Fatal("HasBlob(idHit): got false, want true")
+	}
+
+	reader, err := m.MakeBlobReader(idHit)
+	if err != nil {
+		t.Fatalf("MakeBlobReader(idHit): %v", err)
+	}
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if err := reader.Close(); err != nil {
+		t.Fatalf("reader.Close: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+
+	if _, gotErr := m.MakeBlobReader(idMiss); !errors.Is(
+		gotErr, blob_io.ErrBlobMissing{},
+	) {
+		t.Fatalf("MakeBlobReader(idMiss): got %v, want ErrBlobMissing", gotErr)
+	}
+}
+
 // errorOnCloseWriter is a spyBlobWriter that always returns an error
 // from Close. Used to exercise the mirror writer Close fan-out error
 // path.
