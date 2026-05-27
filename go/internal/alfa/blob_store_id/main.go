@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
@@ -21,6 +22,7 @@ type Id struct {
 	location xdg_location_type.Typee
 	id       string
 	cwdDepth uint
+	digest   markl.Id // FDR-0008 Phase 2; zero value = no digest
 }
 
 var (
@@ -156,6 +158,19 @@ func (id Id) WithCwdDepth(depth uint) Id {
 // non-Cwd locations.
 func (id Id) GetCwdDepth() uint {
 	return id.cwdDepth
+}
+
+func (id Id) GetDigest() markl.Id {
+	return id.digest
+}
+
+func (id Id) HasDigest() bool {
+	return !id.digest.IsNull()
+}
+
+func (id Id) WithDigest(digest markl.Id) Id {
+	id.digest = digest
+	return id
 }
 
 func (id Id) MarshalText() ([]byte, error) {

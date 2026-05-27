@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 )
 
 func TestId_Set_String_RoundTrip(t *testing.T) {
@@ -129,5 +131,31 @@ func TestId_Less_DepthAsTiebreaker(t *testing.T) {
 	xdgUser := MakeWithLocation("default", LocationTypeXDGUser)
 	if !deepest.Less(xdgUser) {
 		t.Errorf("Cwd should sort before XDGUser regardless of depth")
+	}
+}
+
+func TestId_WithDigest_RoundTrip(t *testing.T) {
+	var digest markl.Id
+	if err := digest.SetMarklId(
+		markl.FormatIdHashBlake2b256,
+		make([]byte, 32),
+	); err != nil {
+		t.Fatalf("SetMarklId: %v", err)
+	}
+
+	id := Make("default").WithDigest(digest)
+
+	if !id.HasDigest() {
+		t.Fatal("HasDigest = false, want true")
+	}
+
+	got := id.GetDigest()
+	if got.GetMarklFormat().GetMarklFormatId() != markl.FormatIdHashBlake2b256 {
+		t.Errorf("digest format = %v, want blake2b256",
+			got.GetMarklFormat().GetMarklFormatId())
+	}
+
+	if Make("default").HasDigest() {
+		t.Error("zero-value digest should report HasDigest = false")
 	}
 }
