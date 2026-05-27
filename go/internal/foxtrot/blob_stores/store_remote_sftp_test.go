@@ -14,6 +14,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
@@ -231,6 +232,73 @@ func TestSftpInitializeOnce_DoesNotPoisonContext(t *testing.T) {
 			tracker.cancelCalls,
 		)
 	}
+}
+
+// TestSftpHasBlob_UnavailableReturnsFalse pins the #209 fix: when the
+// SSH dial / handshake / auth fails, HasBlob must return false rather
+// than panic out of the caller's Run frame. Multi-store fallbacks and
+// the per-command blobFromRemainingStores walk rely on this signal to
+// skip a degraded backend and continue probing the rest.
+func TestSftpHasBlob_UnavailableReturnsFalse(t *testing.T) {
+	sentinelErr := errors.Errorf("ssh: handshake failed")
+
+	store := &remoteSftp{
+		sshClientInitializer: func() (*ssh.Client, error) {
+			return nil, sentinelErr
+		},
+	}
+
+	// nullId triggers the early-return branch normally, so use a
+	// non-null id to make sure we reach the init path. The
+	// implementation calls tryInitialize before checking the null
+	// guard, so even the null-id case must observe false.
+	id := makeSftpFallbackTestId(t)
+
+	if got := store.HasBlob(id); got != false {
+		t.Fatalf("HasBlob: got %v, want false on init failure", got)
+	}
+}
+
+// TestSftpMakeBlobReader_UnavailableReturnsClassifiableError pins the
+// other half of the #209 fix: MakeBlobReader on an unreachable backend
+// must return an error that blob_io.IsBlobStoreUnavailable classifies
+// as unavailable, so Multi.MakeBlobReader and the per-command fallback
+// can treat the error as miss-equivalent and continue.
+func TestSftpMakeBlobReader_UnavailableReturnsClassifiableError(t *testing.T) {
+	sentinelErr := errors.Errorf("ssh: handshake failed")
+
+	store := &remoteSftp{
+		sshClientInitializer: func() (*ssh.Client, error) {
+			return nil, sentinelErr
+		},
+	}
+
+	id := makeSftpFallbackTestId(t)
+
+	reader, err := store.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader on init failure")
+	}
+	if err == nil {
+		t.Fatal("MakeBlobReader: got nil error on init failure")
+	}
+	if !blob_io.IsBlobStoreUnavailable(err) {
+		t.Fatalf("MakeBlobReader error %v is not classified unavailable", err)
+	}
+	// Cause must be reachable via errors.Unwrap for callers that
+	// want the raw transport error.
+	if !errors.Is(err, sentinelErr) {
+		t.Fatalf("MakeBlobReader: unwrap chain does not reach root cause %v", err)
+	}
+}
+
+// makeSftpFallbackTestId returns a deterministic sha256 markl id with
+// a stable hex pattern; reused by the #209 fallback tests above.
+func makeSftpFallbackTestId(t *testing.T) domain_interfaces.MarklId {
+	t.Helper()
+	id, repool := markl.FormatHashSha256.GetMarklIdForString("sftp-fallback")
+	t.Cleanup(repool)
+	return id
 }
 
 // spyActiveContext is a minimal interfaces.ActiveContext stub used by

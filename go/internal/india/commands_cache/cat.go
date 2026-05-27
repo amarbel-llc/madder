@@ -7,6 +7,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
+	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -212,7 +213,16 @@ func (cmd Cat) blobFromRemainingStores(
 		blobWriter := cmd.makeBlobWriter(envBlobStore, blobStore)
 
 		if err = cmd.blob(blobStore, blobId, blobWriter); err != nil {
-			continue
+			// #209: an unavailable remote (SSH dial/handshake/auth
+			// failure) is miss-equivalent. Continue to the next
+			// store so a single offline archive does not block
+			// reads served from other configured backends.
+			if blob_io.IsBlobStoreUnavailable(err) {
+				continue
+			}
+			// Other errors are real; surface them rather than
+			// silently masking corruption as "not found".
+			return err
 		}
 
 		return nil

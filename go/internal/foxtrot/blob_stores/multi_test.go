@@ -1834,3 +1834,227 @@ func TestMulti_Mirror_MultiStoreBlobWriter_ReadFrom_ChildWriteError(t *testing.T
 		t.Fatal("ReadFrom: got nil, want error from failing child write")
 	}
 }
+
+// TestMulti_Mirror_MakeBlobReader_UnavailableFallsThrough pins the
+// #209 contract: a child that returns blob_io.ErrBlobStoreUnavailable
+// from MakeBlobReader is miss-equivalent and the next child must be
+// consulted. Without the fix Multi propagates the error and the
+// caller never sees the available sibling's bytes.
+func TestMulti_Mirror_MakeBlobReader_UnavailableFallsThrough(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-reader-unavailable-fallthrough")
+	idKey := id.String()
+
+	payload := []byte("from-available-store")
+
+	// storeA claims the blob but returns an unavailability error on
+	// reader open (simulating a dial/handshake/auth failure that
+	// passed HasBlob's cheap probe but failed when reaching for
+	// actual bytes).
+	storeA := &multiModeStub{
+		hasIds: map[string]bool{idKey: true},
+		makeReaderErr: blob_io.ErrBlobStoreUnavailable{
+			StoreId: "remote-archive",
+			Reason:  "ssh dial",
+			Cause:   errors.New("ssh: handshake failed"),
+		},
+	}
+	storeB := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: payload},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v (want fallthrough to available sibling)", err)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+}
+
+// TestMulti_Mirror_MakeBlobReader_AllUnavailable_ReturnsMissing pins
+// that when every child is unavailable, Multi reports ErrBlobMissing
+// (not the underlying unavailability error) — the contract is "no
+// store can serve this blob," and the caller layer above handles the
+// miss case uniformly.
+func TestMulti_Mirror_MakeBlobReader_AllUnavailable_ReturnsMissing(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-reader-all-unavailable")
+	idKey := id.String()
+
+	storeA := &multiModeStub{
+		hasIds: map[string]bool{idKey: true},
+		makeReaderErr: blob_io.ErrBlobStoreUnavailable{
+			StoreId: "remote-A",
+			Cause:   errors.New("ssh: handshake failed"),
+		},
+	}
+	storeB := &multiModeStub{
+		hasIds: map[string]bool{idKey: true},
+		makeReaderErr: blob_io.ErrBlobStoreUnavailable{
+			StoreId: "remote-B",
+			Cause:   errors.New("dial tcp: connection refused"),
+		},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader, want nil on all-unavailable")
+	}
+	if !errors.Is(gotErr, blob_io.ErrBlobMissing{}) {
+		t.Fatalf("MakeBlobReader error: got %v, want ErrBlobMissing", gotErr)
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_UnavailableReadSource_FallsThrough
+// pins the same #209 contract on the WriteThrough read-source loop:
+// an unavailable read source falls through to the next configured
+// source.
+func TestMulti_WriteThrough_MakeBlobReader_UnavailableReadSource_FallsThrough(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-unavailable-fallthrough")
+	idKey := id.String()
+
+	payload := []byte("from-second-read-source")
+
+	writeStore := &multiModeStub{hasIds: map[string]bool{idKey: false}}
+	readA := &multiModeStub{
+		hasIds: map[string]bool{idKey: true},
+		makeReaderErr: blob_io.ErrBlobStoreUnavailable{
+			StoreId: "remote-A",
+			Cause:   errors.New("ssh: unable to authenticate"),
+		},
+	}
+	readB := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: payload},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(
+			BlobStoreInitialized{BlobStore: readA},
+			BlobStoreInitialized{BlobStore: readB},
+		).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v (want fallthrough to readB)", err)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+}
+
+// TestMulti_WriteThrough_MakeBlobReader_UnavailableWriteStore_FallsThrough
+// pins that an unavailable write store (HasBlob succeeded as a
+// best-effort, then MakeBlobReader fails with unavailability) falls
+// through to the read sources rather than hard-failing the read.
+func TestMulti_WriteThrough_MakeBlobReader_UnavailableWriteStore_FallsThrough(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "wt-reader-unavailable-write-store")
+	idKey := id.String()
+
+	payload := []byte("from-read-source")
+
+	writeStore := &multiModeStub{
+		hasIds: map[string]bool{idKey: true},
+		makeReaderErr: blob_io.ErrBlobStoreUnavailable{
+			StoreId: "write-store",
+			Cause:   errors.New("ssh: handshake failed"),
+		},
+	}
+	readSrc := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: payload},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).
+		WriteTo(BlobStoreInitialized{BlobStore: writeStore}).
+		Read(BlobStoreInitialized{BlobStore: readSrc}).
+		ReadFill(false).
+		Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, err := m.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v (want fallthrough to read source)", err)
+	}
+	defer reader.Close() //defer:err-checked
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("reader bytes: got %q, want %q", got, payload)
+	}
+}
+
+// TestMulti_Mirror_MakeBlobReader_NonUnavailableErrorPropagates pins
+// that errors which are NOT unavailability (e.g. I/O corruption,
+// permission denied, unexpected schema) still surface as-is and do
+// NOT silently swallow into a miss. Guards against the classifier
+// being broadened too far in a future change.
+func TestMulti_Mirror_MakeBlobReader_NonUnavailableErrorPropagates(t *testing.T) {
+	id := makeMultiMirrorTestId(t, "mirror-reader-real-error")
+	idKey := id.String()
+
+	realErr := errors.New("blob corruption detected at offset 17")
+	storeA := &multiModeStub{
+		hasIds:        map[string]bool{idKey: true},
+		makeReaderErr: realErr,
+	}
+	storeB := &multiModeStub{
+		hasIds:      map[string]bool{idKey: true},
+		readerBytes: map[string][]byte{idKey: []byte("never-reached")},
+	}
+
+	m, err := NewMulti(&spyActiveContext{}).Mirror(
+		BlobStoreInitialized{BlobStore: storeA},
+		BlobStoreInitialized{BlobStore: storeB},
+	).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	reader, gotErr := m.MakeBlobReader(id)
+	if reader != nil {
+		t.Fatalf("MakeBlobReader: got non-nil reader, want nil on real error")
+	}
+	if !errors.Is(gotErr, realErr) {
+		t.Fatalf("MakeBlobReader error: got %v, want %v", gotErr, realErr)
+	}
+}

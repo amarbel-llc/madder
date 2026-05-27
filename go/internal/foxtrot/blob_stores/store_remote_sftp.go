@@ -198,6 +198,34 @@ func (blobStore *remoteSftp) initializeOnce() {
 	}
 }
 
+// tryInitialize is the error-returning sibling of initializeOnce.
+// HasBlob and MakeBlobReader use it so an unreachable remote does
+// not abort the caller via the panic-through-Run-frame path:
+// returning a typed ErrBlobStoreUnavailable lets multi-store
+// callers (Multi, the per-command blobFromRemainingStores walks)
+// treat the failure as miss-equivalent and continue probing other
+// stores. Closes #209.
+//
+// Mirrors initializeOnce's caching contract: sync.Once.Do runs
+// initialize exactly once, the resulting initErr sticks on the
+// struct, and every subsequent call sees the same wrapped error
+// instead of re-dialing.
+func (blobStore *remoteSftp) tryInitialize() error {
+	blobStore.once.Do(func() {
+		if err := blobStore.initialize(); err != nil {
+			blobStore.initErr = errors.Wrap(err)
+		}
+	})
+	if blobStore.initErr != nil {
+		return blob_io.ErrBlobStoreUnavailable{
+			StoreId: blobStore.id.String(),
+			Reason:  "sftp initialize",
+			Cause:   blobStore.initErr,
+		}
+	}
+	return nil
+}
+
 func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 	remotePath := blobStore.config.GetRemotePath()
 	configPath := path.Join(remotePath, directory_layout.FileNameBlobStoreConfig)
@@ -464,7 +492,15 @@ func (blobStore *remoteSftp) remotePathForMerkleId(
 func (blobStore *remoteSftp) HasBlob(
 	merkleId domain_interfaces.MarklId,
 ) (ok bool) {
-	blobStore.initializeOnce()
+	// #209: An unreachable remote (SSH dial/handshake/auth fail)
+	// must not panic the calling Run frame — it should look like a
+	// miss so multi-store callers (Multi, the per-command
+	// blobFromRemainingStores walks) can continue probing other
+	// stores. tryInitialize captures the same init error
+	// initializeOnce caches; we return false on any of those.
+	if err := blobStore.tryInitialize(); err != nil {
+		return false
+	}
 
 	if merkleId.IsNull() {
 		ok = true
@@ -764,7 +800,14 @@ func (blobStore *remoteSftp) MakeBlobWriter(
 func (blobStore *remoteSftp) MakeBlobReader(
 	digest domain_interfaces.MarklId,
 ) (readCloser domain_interfaces.BlobReader, err error) {
-	blobStore.initializeOnce()
+	// #209: Return the unavailability error rather than panicking
+	// through the caller's Run frame. Multi.MakeBlobReader and the
+	// per-command blobFromRemainingStores fallback paths use
+	// blob_io.IsBlobStoreUnavailable on the returned error to know
+	// whether to treat this as miss-equivalent and continue.
+	if err = blobStore.tryInitialize(); err != nil {
+		return readCloser, err
+	}
 
 	if digest.IsNull() {
 		hash, _ := blobStore.defaultHashType.Get() //repool:owned

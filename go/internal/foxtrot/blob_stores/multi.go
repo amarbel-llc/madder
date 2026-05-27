@@ -65,9 +65,23 @@ func (parentStore Multi) MakeBlobReader(
 	switch parentStore.mode {
 	case modeMirror:
 		for _, childStore := range parentStore.childStores {
-			if childStore.HasBlob(id) {
-				return childStore.MakeBlobReader(id)
+			if !childStore.HasBlob(id) {
+				continue
 			}
+			reader, err := childStore.MakeBlobReader(id)
+			if err != nil {
+				// #209: a child that hands back an unavailability
+				// error after claiming HasBlob (or whose HasBlob
+				// itself probe-failed and silently returned false
+				// — see TODO below) must not short-circuit the
+				// fallback walk. Treat as miss-equivalent and try
+				// the next sibling.
+				if blob_io.IsBlobStoreUnavailable(err) {
+					continue
+				}
+				return nil, err
+			}
+			return reader, nil
 		}
 
 		clonedId, _ := markl.Clone(id) //repool:owned
@@ -78,7 +92,18 @@ func (parentStore Multi) MakeBlobReader(
 
 	case modeWriteThrough:
 		if parentStore.writeStore.HasBlob(id) {
-			return parentStore.writeStore.MakeBlobReader(id)
+			reader, err := parentStore.writeStore.MakeBlobReader(id)
+			if err != nil {
+				// Same #209 treatment for the write store: if its
+				// MakeBlobReader fails because the backend is
+				// unreachable, fall through to read sources rather
+				// than hard-failing the read.
+				if !blob_io.IsBlobStoreUnavailable(err) {
+					return nil, err
+				}
+			} else {
+				return reader, nil
+			}
 		}
 		for _, readStore := range parentStore.readStores {
 			if !readStore.HasBlob(id) {
@@ -86,6 +111,9 @@ func (parentStore Multi) MakeBlobReader(
 			}
 			reader, err := readStore.MakeBlobReader(id)
 			if err != nil {
+				if blob_io.IsBlobStoreUnavailable(err) {
+					continue
+				}
 				return nil, err
 			}
 			if !parentStore.readFill {

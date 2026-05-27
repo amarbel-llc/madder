@@ -313,12 +313,17 @@ by one or more remote archives.
     cap. **ReadFill** trusts the **WriteTo** store's own admission
     policy.
 
-**no SFTP-unreachable fallback**
-:   An unreachable remote child (SFTP host down, missing agent key)
-    surfaces its handshake / auth error rather than being treated as
-    a miss. Tracked in #209; until it lands, callers composing a
-    chain that includes a remote store should expect remote
-    unavailability to short-circuit the read.
+**backend-unavailable fallback narrowness**
+:   A backend that returns **blob\_io.ErrBlobStoreUnavailable** from
+    **HasBlob** (as false) or **MakeBlobReader** (as the typed error)
+    is treated as miss-equivalent and the next child is probed. The
+    SFTP store routes SSH dial / handshake / auth failures through
+    this path. Backends that surface unavailability via untyped
+    errors (e.g. raw **\*net.OpError**, **net.Error.Timeout()**, or
+    the documented SSH error strings) are also recognised by the
+    classifier, but new backends SHOULD wrap unavailability in
+    **ErrBlobStoreUnavailable** at the dial boundary for precision.
+    See **blob\_io.IsBlobStoreUnavailable** and #209.
 
 # SEE ALSO
 
@@ -330,4 +335,4 @@ config-file wrapper around this primitive.
 
 Issue **#196**: Multi reader two-pass to single-pass migration.
 
-Issue **#209**: SFTP store unavailability fallback.
+Issue **#209**: SFTP store unavailability fallback (resolved).
