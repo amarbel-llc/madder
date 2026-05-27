@@ -10,6 +10,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -182,23 +183,54 @@ func (env BlobStoreEnv) GetBlobStoresSorted() []blob_stores.BlobStoreInitialized
 func (env BlobStoreEnv) GetBlobStore(
 	blobStoreId blob_store_id.Id,
 ) blob_stores.BlobStoreInitialized {
+	// FDR-0008 Phase 2 note: the map is keyed by the bare String()
+	// form. Discovery never produces digest-bearing IDs, and String()
+	// always returns the bare form even when blobStoreId carries a
+	// digest. Lookup is unchanged from Phase 1.
 	key := blobStoreId.String()
 
-	if blobStore, ok := env.blobStores[key]; ok {
-		return blobStore
+	blobStore, ok := env.blobStores[key]
+	if !ok {
+		available := slices.Collect(maps.Keys(env.blobStores))
+		sort.Strings(available)
+
+		errors.ContextCancelWithBadRequestf(
+			env,
+			"blob store not found: %q (available: %v)",
+			key,
+			available,
+		)
+
+		return blob_stores.BlobStoreInitialized{}
 	}
 
-	available := slices.Collect(maps.Keys(env.blobStores))
-	sort.Strings(available)
+	// FDR-0008 Phase 2: if the ID carries a digest, assert it against
+	// the resolved config's Phase 1 digest. A legacy config
+	// (BlobDigest is null) with an ID-supplied digest is a hard typed
+	// error pointing the user at `madder config-pin_digest`.
+	if blobStoreId.HasDigest() {
+		configDigest := blobStore.Config.BlobDigest
+		if configDigest.IsNull() {
+			errors.ContextCancelWithBadRequestError(
+				env,
+				blob_store_id.ErrIdDigestVsLegacyConfig{Id: key},
+			)
+			return blob_stores.BlobStoreInitialized{}
+		}
+		idDigest := blobStoreId.GetDigest()
+		if err := markl.AssertEqual(&idDigest, &configDigest); err != nil {
+			errors.ContextCancelWithBadRequestError(
+				env,
+				errors.Wrapf(err,
+					"blob-store-id digest does not match resolved store %q",
+					key,
+				),
+			)
+			return blob_stores.BlobStoreInitialized{}
+		}
+	}
 
-	errors.ContextCancelWithBadRequestf(
-		env,
-		"blob store not found: %q (available: %v)",
-		key,
-		available,
-	)
-
-	return blob_stores.BlobStoreInitialized{}
+	return blobStore
 }
 
 func (env BlobStoreEnv) GetDefaultBlobStoreAndRemaining() (blob_stores.BlobStoreInitialized, blob_stores.BlobStoreMap) {
