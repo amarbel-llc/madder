@@ -13,6 +13,9 @@ const (
 	// Blob Digests
 	PurposeBlobDigestV1 = "dodder-blob-digest-sha256-v1"
 
+	// Blob-Store-Config Digests
+	PurposeBlobStoreConfigDigestV1 = "madder-blob_store-config-digest-v1"
+
 	// Object Digests
 	PurposeObjectDigestV1             = "dodder-object-digest-sha256-v1"
 	PurposeObjectDigestV2             = "dodder-object-digest-v2"

@@ -134,6 +134,20 @@ func TestAllAliases_ResolveViaGetFormatOrError(t *testing.T) {
 	}
 }
 
+// PurposeBlobStoreConfigDigestV1 is the new vocabulary entry FDR-0008
+// Phase 1 introduces for the `@ <markl-id>` line on blob_store-config
+// blobs. Pin the registered Type and the canonical format so a drift
+// in either constant or registration would surface here.
+func TestBlobStoreConfigDigestV1Registered(t *testing.T) {
+	purpose := markl.GetPurpose(markl.PurposeBlobStoreConfigDigestV1)
+	if purpose.GetPurposeType() != markl.PurposeTypeBlobDigest {
+		t.Fatalf(
+			"expected PurposeTypeBlobDigest, got %v",
+			purpose.GetPurposeType(),
+		)
+	}
+}
+
 // End-to-end: Id.GetPublicKey delegates to the registered FormatSec via
 // PurposeRepoPrivateKeyV1, stamps the result with PurposeRepoPubKeyV1,
 // and the result bytes match Go's stdlib ed25519. Originally lived in

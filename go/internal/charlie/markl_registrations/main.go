@@ -46,6 +46,14 @@ var (
 		},
 	}
 
+	PurposeBlobStoreConfigDigestV1Opts = markl.RegisterPurposeOpts{
+		Id:   markl.PurposeBlobStoreConfigDigestV1,
+		Type: markl.PurposeTypeBlobDigest,
+		FormatIds: []string{
+			markl.FormatIdHashBlake2b256,
+		},
+	}
+
 	PurposeObjectDigestV1Opts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeObjectDigestV1,
 		Type: markl.PurposeTypeObjectDigest,
@@ -201,6 +209,7 @@ var (
 // a new Purpose*Opts entry doesn't require a manual append.
 var AllPurposes = []markl.RegisterPurposeOpts{
 	PurposeBlobDigestV1Opts,
+	PurposeBlobStoreConfigDigestV1Opts,
 	PurposeObjectDigestV1Opts,
 	PurposeObjectDigestV2Opts,
 	PurposeV5MetadataDigestWithoutTaiOpts,
