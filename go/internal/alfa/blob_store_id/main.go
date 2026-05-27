@@ -79,15 +79,42 @@ func (id Id) String() string {
 // Canonical returns the wire-format form of an Id: same as String for
 // non-Cwd locations, and always single-dot for Cwd (depth dropped).
 // MarshalText delegates here so on-disk references survive CWD changes.
+// FDR-0008 Phase 2: when a digest suffix is set, it is appended as
+// `@<markl-id>`. String() stays bare to preserve BlobStoreMap-key call
+// sites.
 func (id Id) Canonical() string {
 	id.cwdDepth = 0
-	return id.String()
+	bare := id.String()
+	if id.digest.IsNull() {
+		return bare
+	}
+	return bare + "@" + id.digest.String()
 }
 
 func (id *Id) Set(value string) (err error) {
 	if len(value) == 0 {
 		err = errors.Errorf("empty blob_store_id")
 		return err
+	}
+
+	// FDR-0008 Phase 2: split on the first `@`. The name charset
+	// ([a-zA-Z0-9_-]) excludes `@`, so the first occurrence is
+	// unambiguously the digest separator.
+	left, digestText, hasDigest := strings.Cut(value, "@")
+	if hasDigest {
+		if len(left) == 0 {
+			err = errors.Errorf(
+				"blob_store_id is empty before `@`: %q", value)
+			return err
+		}
+		if err = id.digest.Set(digestText); err != nil {
+			err = errors.Wrapf(err,
+				"blob_store_id digest: %q", digestText)
+			return err
+		}
+		value = left
+	} else {
+		id.digest = markl.Id{}
 	}
 
 	if value[0] == '.' {

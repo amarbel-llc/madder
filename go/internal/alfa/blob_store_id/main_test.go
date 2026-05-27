@@ -134,6 +134,145 @@ func TestId_Less_DepthAsTiebreaker(t *testing.T) {
 	}
 }
 
+// makeTestDigest constructs a valid blake2b256 markl.Id from a stable
+// fixture byte pattern. Returns the Id and its blech32 string form for
+// inline embedding into test inputs.
+func makeTestDigest(t *testing.T, seed byte) (markl.Id, string) {
+	t.Helper()
+	bites := make([]byte, 32)
+	for i := range bites {
+		bites[i] = seed + byte(i)
+	}
+	var id markl.Id
+	if err := id.SetMarklId(markl.FormatIdHashBlake2b256, bites); err != nil {
+		t.Fatalf("SetMarklId: %v", err)
+	}
+	return id, id.String()
+}
+
+func TestId_Set_ParsesDigestSuffix(t *testing.T) {
+	_, digestText := makeTestDigest(t, 0x10)
+
+	cases := []struct {
+		input      string
+		wantName   string
+		wantCwd    bool
+		wantDigest string // expected GetMarklFormatId
+	}{
+		{
+			input:      "default@" + digestText,
+			wantName:   "default",
+			wantDigest: markl.FormatIdHashBlake2b256,
+		},
+		{
+			input:      ".archive@" + digestText,
+			wantName:   "archive",
+			wantCwd:    true,
+			wantDigest: markl.FormatIdHashBlake2b256,
+		},
+		{
+			input:    "default",
+			wantName: "default",
+		},
+	}
+
+	for _, c := range cases {
+		c := c
+		t.Run(c.input, func(t *testing.T) {
+			var id Id
+			if err := id.Set(c.input); err != nil {
+				t.Fatalf("Set(%q): %v", c.input, err)
+			}
+			if id.GetName() != c.wantName {
+				t.Errorf("GetName = %q, want %q", id.GetName(), c.wantName)
+			}
+			gotCwd := id.GetLocationType() == xdg_location_type.Cwd
+			if gotCwd != c.wantCwd {
+				t.Errorf("Cwd = %v, want %v", gotCwd, c.wantCwd)
+			}
+			if c.wantDigest == "" {
+				if id.HasDigest() {
+					t.Errorf("HasDigest = true, want false")
+				}
+				return
+			}
+			if !id.HasDigest() {
+				t.Fatalf("HasDigest = false, want true")
+			}
+			gotFmt := id.GetDigest().GetMarklFormat().GetMarklFormatId()
+			if gotFmt != c.wantDigest {
+				t.Errorf("digest format = %q, want %q", gotFmt, c.wantDigest)
+			}
+		})
+	}
+}
+
+func TestId_Canonical_RoundTripsDigest(t *testing.T) {
+	_, digestText := makeTestDigest(t, 0x20)
+	input := ".archive@" + digestText
+
+	var id Id
+	if err := id.Set(input); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	got := id.Canonical()
+	if got != input {
+		t.Errorf("Canonical round-trip: got %q, want %q", got, input)
+	}
+}
+
+// String() MUST NOT include the digest suffix — it is the
+// BlobStoreMap key and is used as a sort key in many places.
+func TestId_String_OmitsDigest(t *testing.T) {
+	_, digestText := makeTestDigest(t, 0x30)
+	input := ".archive@" + digestText
+
+	var id Id
+	if err := id.Set(input); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	got := id.String()
+	const want = ".archive"
+	if got != want {
+		t.Errorf("String() = %q, want %q (bare form, no digest)", got, want)
+	}
+}
+
+func TestId_Set_RejectsMalformedDigest(t *testing.T) {
+	var id Id
+	err := id.Set("default@not-a-real-markl-id")
+	if err == nil {
+		t.Fatal("Set: expected error on malformed digest, got nil")
+	}
+}
+
+func TestId_MarshalText_RoundTrip(t *testing.T) {
+	_, digestText := makeTestDigest(t, 0x40)
+	input := "default@" + digestText
+
+	var src Id
+	if err := src.Set(input); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	bites, err := src.MarshalText()
+	if err != nil {
+		t.Fatalf("MarshalText: %v", err)
+	}
+
+	var dst Id
+	if err := dst.UnmarshalText(bites); err != nil {
+		t.Fatalf("UnmarshalText: %v", err)
+	}
+
+	if dst.Canonical() != src.Canonical() {
+		t.Errorf("round-trip: got %q, want %q",
+			dst.Canonical(), src.Canonical())
+	}
+}
+
 func TestId_WithDigest_RoundTrip(t *testing.T) {
 	var digest markl.Id
 	if err := digest.SetMarklId(
