@@ -221,7 +221,8 @@ func (env BlobStoreEnv) GetBlobStore(
 		if err := markl.AssertEqual(&idDigest, &configDigest); err != nil {
 			errors.ContextCancelWithBadRequestError(
 				env,
-				errors.Wrapf(err,
+				errors.Wrapf(
+					err,
 					"blob-store-id digest does not match resolved store %q",
 					key,
 				),
