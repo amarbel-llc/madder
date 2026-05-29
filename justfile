@@ -352,12 +352,10 @@ fmt:
 lint: lint-flake lint-fmt
 
 # Lint flake.lock for reducible input duplication (madder#214,
-# doppelgang FDR-0002). `--no-closure` skips the build-graph pass so
-# the recipe runs offline; the `default` chain still exercises the
-# build via `build`. Exits 1 on findings, so CI surfaces drift.
+# doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift.
 [group("pre-build")]
 lint-flake:
-  doppelgang lint --flake . --no-closure
+  doppelgang lint --flake .
 
 # Check that all source files match treefmt's expected formatting.
 # Sandboxed check derivation (no working-tree side effects); exits 1
