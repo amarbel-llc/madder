@@ -1,7 +1,7 @@
 {
   inputs = {
     nixpkgs = {
-      url = "github:amarbel-llc/nixpkgs";
+      url = "github:amarbel-llc/igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.treefmt-nix.follows = "treefmt-nix";
     };
