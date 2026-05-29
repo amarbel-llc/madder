@@ -54,7 +54,6 @@
       inputs.bats.follows = "bats";
       inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.purse-first.follows = "purse-first";
-      inputs.crane.follows = "purse-first/crane";
       inputs.gomod2nix.follows = "purse-first/gomod2nix";
       inputs.rust-overlay.follows = "purse-first/rust-overlay";
     };
