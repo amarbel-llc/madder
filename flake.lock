@@ -275,6 +275,27 @@
         "type": "github"
       }
     },
+    "rust-overlay_2": {
+      "inputs": {
+        "nixpkgs": [
+          "tap",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780024773,
+        "narHash": "sha256-aU9nlrS9S+IJ2EiCzsaxzOXUhggogqTrJojBicE6Oeg=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "40b0a3a193e0840c76174b4a322874c8f6dd0a63",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
     "systems": {
       "locked": {
         "lastModified": 1681028828,
@@ -309,10 +330,7 @@
         "purse-first": [
           "purse-first"
         ],
-        "rust-overlay": [
-          "purse-first",
-          "rust-overlay"
-        ],
+        "rust-overlay": "rust-overlay_2",
         "treefmt-nix": [
           "treefmt-nix"
         ],
