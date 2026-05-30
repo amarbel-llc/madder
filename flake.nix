@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs = {
+    igloo = {
       url = "github:amarbel-llc/igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.treefmt-nix.follows = "treefmt-nix";
@@ -11,17 +11,17 @@
     # `nix fmt` driver. Config lives in ./treefmt.nix.
     treefmt-nix = {
       url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nixpkgs.follows = "igloo";
     };
 
     utils = {
       url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
-      inputs.systems.follows = "nixpkgs/systems";
+      inputs.systems.follows = "igloo/systems";
     };
 
     tommy = {
       url = "github:amarbel-llc/tommy";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
@@ -31,7 +31,7 @@
     bats = {
       url = "github:amarbel-llc/bats";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
     };
@@ -39,7 +39,7 @@
     purse-first = {
       url = "github:amarbel-llc/purse-first";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
     };
@@ -48,7 +48,7 @@
     # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
     tap = {
       url = "github:amarbel-llc/tap";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
@@ -60,7 +60,7 @@
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "github:amarbel-llc/doppelgang";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.treefmt-nix.follows = "treefmt-nix";
@@ -70,7 +70,7 @@
   outputs =
     {
       self,
-      nixpkgs,
+      igloo,
       nixpkgs-master,
       utils,
       tommy,
@@ -100,7 +100,7 @@
       let
         # Needed for the mkGoPkgs producer call in go/gomod.nix.
         # buildGoApplication / mkGoEnv consumers live in go/default.nix.
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import igloo { inherit system; };
 
         gomod = import ./go/gomod.nix {
           inherit
@@ -122,8 +122,8 @@
         treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
 
         result = import ./go/default.nix {
+          nixpkgs = igloo;
           inherit
-            nixpkgs
             nixpkgs-master
             tommy
             bats
