@@ -349,7 +349,7 @@ fmt:
 #
 
 [group("pre-build")]
-lint: lint-flake lint-fmt
+lint: lint-flake lint-fmt lint-facades
 
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift.
@@ -369,6 +369,27 @@ lint-fmt:
   set -euo pipefail
   system=$(nix eval --raw --impure --expr 'builtins.currentSystem')
   nix build --print-build-logs --no-link ".#checks.${system}.treefmt"
+
+# Fail if the committed pkgs/ facades have drifted from what dagnabit
+# regenerates from internal/. The nix build runs `dagnabit export` in
+# preBuild (go/default.nix), so `just build` always compiles against
+# freshly generated facades and CANNOT catch committed drift — this is
+# the only gate that does. Regenerate-and-git-diff is a workaround until
+# dagnabit grows a native, side-effect-free check mode, tracked upstream:
+# amarbel-llc/purse-first#123. `dagnabit export` runs treefmt on its own
+# output, so no separate `nix fmt` is needed for a clean diff.
+[group("pre-build")]
+lint-facades:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd go && dagnabit export
+  if git diff --quiet -- pkgs; then
+    exit 0
+  fi
+  echo "error: pkgs/ facades have drifted from their internal/ sources." >&2
+  echo "       run \`just generate-facades\` and commit the result." >&2
+  git --no-pager diff --stat -- pkgs >&2
+  exit 1
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_
