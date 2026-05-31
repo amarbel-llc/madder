@@ -224,6 +224,35 @@ var Coder = hyphence.CoderToTypedBlob[Config]{
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigMultiV0: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				// FDR-0009: the generated DecodeTomlMultiV0 calls
+				// TomlMultiV0.Validate() internally, so a hand-edited
+				// config with a bare (non-digest-bearing) reference fails
+				// to decode here — no extra Validate() call is needed.
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlMultiV0(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlMultiV0(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlMultiV0:
+						*doc.Data() = *v
+					case TomlMultiV0:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigInventoryArchiveV0: hyphence.CoderTommy[
 				Config,
 				*Config,

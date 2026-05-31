@@ -25,6 +25,7 @@ type (
 	SelectorConfigImmutable     = charlie_bsc.SelectorConfigImmutable
 	ConfigInventoryArchiveDelta = charlie_bsc.ConfigInventoryArchiveDelta
 	ConfigPointer               = charlie_bsc.ConfigPointer
+	ConfigMulti                 = charlie_bsc.ConfigMulti
 	ConfigSFTPRemotePath        = charlie_bsc.ConfigSFTPRemotePath
 	ConfigSFTPUri               = charlie_bsc.ConfigSFTPUri
 	ConfigSFTPConfigExplicit    = charlie_bsc.ConfigSFTPConfigExplicit
@@ -45,6 +46,7 @@ type (
 	TomlS3V0                    = charlie_bsc.TomlS3V0
 	TomlPointerV0               = charlie_bsc.TomlPointerV0
 	TomlPointerV1               = charlie_bsc.TomlPointerV1
+	TomlMultiV0                 = charlie_bsc.TomlMultiV0
 	TomlUriV0                   = charlie_bsc.TomlUriV0
 	TomlInventoryArchiveV0      = charlie_bsc.TomlInventoryArchiveV0
 	TomlInventoryArchiveV1      = charlie_bsc.TomlInventoryArchiveV1
@@ -81,6 +83,7 @@ var (
 	DecodeTomlS3V0                = charlie_bsc.DecodeTomlS3V0
 	DecodeTomlPointerV0           = charlie_bsc.DecodeTomlPointerV0
 	DecodeTomlPointerV1           = charlie_bsc.DecodeTomlPointerV1
+	DecodeTomlMultiV0             = charlie_bsc.DecodeTomlMultiV0
 	DecodeTomlUriV0               = charlie_bsc.DecodeTomlUriV0
 	DecodeTomlInventoryArchiveV0  = charlie_bsc.DecodeTomlInventoryArchiveV0
 	DecodeTomlInventoryArchiveV1  = charlie_bsc.DecodeTomlInventoryArchiveV1
@@ -105,6 +108,8 @@ var (
 	_ ConfigMutable               = &TomlPointerV0{}
 	_ ConfigPointer               = TomlPointerV1{}
 	_ ConfigMutable               = &TomlPointerV1{}
+	_ ConfigMulti                 = TomlMultiV0{}
+	_ ConfigMutable               = &TomlMultiV0{}
 	_ ConfigInventoryArchive      = TomlInventoryArchiveV0{}
 	_ ConfigUpgradeable           = TomlInventoryArchiveV0{}
 	_ ConfigMutable               = &TomlInventoryArchiveV0{}
@@ -169,6 +174,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigPointerV0
 	case *TomlPointerV1, TomlPointerV1:
 		typeId = ids.TypeTomlBlobStoreConfigPointerV1
+	case *TomlMultiV0, TomlMultiV0:
+		typeId = ids.TypeTomlBlobStoreConfigMultiV0
 	case *TomlInventoryArchiveV0, TomlInventoryArchiveV0:
 		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV0
 	case *TomlInventoryArchiveV1, TomlInventoryArchiveV1:

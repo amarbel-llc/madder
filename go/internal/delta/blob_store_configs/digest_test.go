@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 )
@@ -116,6 +117,90 @@ func TestDecodeAndVerifyRoundTrip(t *testing.T) {
 	}
 	if decoded.BlobDigest.IsNull() {
 		t.Fatal("BlobDigest should be populated after round-trip")
+	}
+}
+
+func mustBlobStoreId(t *testing.T, s string) blob_store_id.Id {
+	t.Helper()
+	var id blob_store_id.Id
+	if err := id.Set(s); err != nil {
+		t.Fatalf("Set(%q): %v", s, err)
+	}
+	return id
+}
+
+func TestEncodeWithDigest_MultiRoundTrip(t *testing.T) {
+	readFill := true
+	typedConfig := &TypedConfig{
+		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
+		Blob: &TomlMultiV0{
+			Mode:       "write_through",
+			WriteStore: mustBlobStoreId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"),
+			ReadStores: []blob_store_id.Id{mustBlobStoreId(t, "archive@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400")},
+			ReadFill:   &readFill,
+		},
+	}
+
+	var buf bytes.Buffer
+	if _, err := EncodeWithDigest(typedConfig, &buf); err != nil {
+		t.Fatalf("EncodeWithDigest: %v", err)
+	}
+
+	decoded := &TypedConfig{}
+	if _, err := DecodeAndVerify(decoded, bytes.NewReader(buf.Bytes())); err != nil {
+		t.Fatalf("DecodeAndVerify: %v", err)
+	}
+
+	multi, ok := decoded.Blob.(ConfigMulti)
+	if !ok {
+		t.Fatalf("decoded blob is %T, want ConfigMulti", decoded.Blob)
+	}
+	if multi.GetMode() != "write_through" {
+		t.Errorf("GetMode = %q", multi.GetMode())
+	}
+	if !multi.GetReadFill() {
+		t.Error("GetReadFill = false, want true")
+	}
+	if decoded.BlobDigest.IsNull() {
+		t.Error("BlobDigest null after round-trip")
+	}
+}
+
+// TestDecodeAndVerify_RejectsBareMultiRef: a multi config whose
+// reference lacks a digest must fail at decode. TomlMultiV0.Validate()
+// is wired by tommy into both the generated Encode AND Decode, so a bare
+// ref cannot even be produced through the Coder — the realistic threat
+// is a hand-edited config file on disk. This test crafts those on-disk
+// bytes by stripping the digest suffix off a validly-encoded reference,
+// then asserts DecodeAndVerify rejects them. Coder.DecodeFrom (which
+// runs the validating DecodeTomlMultiV0) fires before the digest
+// comparison, so the bare-ref check is what trips, not a digest
+// mismatch.
+func TestDecodeAndVerify_RejectsBareMultiRef(t *testing.T) {
+	typedConfig := &TypedConfig{
+		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
+		Blob: &TomlMultiV0{
+			Mode:         "mirror",
+			MirrorStores: []blob_store_id.Id{mustBlobStoreId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0")},
+		},
+	}
+
+	var buf bytes.Buffer
+	if _, err := EncodeWithDigest(typedConfig, &buf); err != nil {
+		t.Fatalf("EncodeWithDigest: %v", err)
+	}
+
+	// Strip the digest suffix to forge a hand-edited bare reference.
+	bare := bytes.Replace(buf.Bytes(),
+		[]byte("default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"),
+		[]byte("default"), 1)
+	if bytes.Equal(bare, buf.Bytes()) {
+		t.Fatal("digest-bearing reference not found in encoded output")
+	}
+
+	decoded := &TypedConfig{}
+	if _, err := DecodeAndVerify(decoded, bytes.NewReader(bare)); err == nil {
+		t.Fatal("expected decode to reject bare multi reference, got nil")
 	}
 }
 
