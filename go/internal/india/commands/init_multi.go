@@ -105,6 +105,7 @@ func (cmd *InitMulti) Run(req futility.Request) {
 		var id blob_store_id.Id
 		if err := id.Set(ref); err != nil {
 			errors.ContextCancelWithBadRequestError(req, err)
+			return blob_store_id.Id{} // unreachable; Cancel panics
 		}
 		if id.HasDigest() {
 			return id

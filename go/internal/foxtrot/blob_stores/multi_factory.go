@@ -158,11 +158,14 @@ func buildMultiStores(
 			return nil // all multis built
 		}
 		if !progressed {
-			// No multi advanced this pass and some remain unbuilt:
-			// the only Merkle-DAG-consistent cause is a dangling
-			// reference (a ref to a store that is itself an unbuilt
-			// multi blocked on the same condition, transitively
-			// bottoming out at a missing name).
+			// No multi advanced this pass and some remain unbuilt.
+			// Non-multi leaves are always built before this runs (the
+			// pass-1/2 construction in MakeBlobStores cancels — and
+			// thus panics — on any leaf-build failure), and
+			// digest-bearing references make cycles unrepresentable.
+			// So the only remaining cause is a dangling reference (a
+			// ref to a name not present in the map, transitively). The
+			// aggregated deferral errors name the offenders.
 			return errors.Join(deferred...)
 		}
 	}
