@@ -12,6 +12,7 @@ type (
 	ConfigInventoryArchiveDelta = internal.ConfigInventoryArchiveDelta
 	ConfigLocalHashBucketed     = internal.ConfigLocalHashBucketed
 	ConfigLocalMutable          = internal.ConfigLocalMutable
+	ConfigMulti                 = internal.ConfigMulti
 	ConfigMutable               = internal.ConfigMutable
 	ConfigNamed                 = internal.ConfigNamed
 	ConfigPointer               = internal.ConfigPointer
@@ -36,6 +37,7 @@ type (
 	TomlInventoryArchiveV2      = internal.TomlInventoryArchiveV2
 	TomlLocalHashBucketedV1     = internal.TomlLocalHashBucketedV1
 	TomlLocalHashBucketedV2     = internal.TomlLocalHashBucketedV2
+	TomlMultiV0                 = internal.TomlMultiV0
 	TomlPointerV0               = internal.TomlPointerV0
 	TomlPointerV1               = internal.TomlPointerV1
 	TomlS3V0                    = internal.TomlS3V0
@@ -83,6 +85,7 @@ var (
 	DecodeTomlInventoryArchiveV2  = internal.DecodeTomlInventoryArchiveV2
 	DecodeTomlLocalHashBucketedV1 = internal.DecodeTomlLocalHashBucketedV1
 	DecodeTomlLocalHashBucketedV2 = internal.DecodeTomlLocalHashBucketedV2
+	DecodeTomlMultiV0             = internal.DecodeTomlMultiV0
 	DecodeTomlPointerV0           = internal.DecodeTomlPointerV0
 	DecodeTomlPointerV1           = internal.DecodeTomlPointerV1
 	DecodeTomlS3V0                = internal.DecodeTomlS3V0

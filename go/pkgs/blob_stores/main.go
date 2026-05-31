@@ -26,7 +26,14 @@ type (
 type (
 	DeletionPrecondition = internal.DeletionPrecondition
 	DiscoveredConfig     = internal.DiscoveredConfig
-	Multi                = internal.Multi
+)
+
+// ErrMultiRefNotReady signals that a referenced store exists in the
+// map but has not been built yet. The store-map construction loop
+// treats it as "defer to the next iteration", not a hard failure.
+type (
+	ErrMultiRefNotReady = internal.ErrMultiRefNotReady
+	Multi               = internal.Multi
 )
 
 // MultiBuilder constructs a Multi blob store with one of two modes:

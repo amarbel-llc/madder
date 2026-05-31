@@ -26,6 +26,7 @@ const (
 	TypeTomlBlobStoreConfigInventoryArchiveV1       = internal.TypeTomlBlobStoreConfigInventoryArchiveV1
 	TypeTomlBlobStoreConfigInventoryArchiveV2       = internal.TypeTomlBlobStoreConfigInventoryArchiveV2
 	TypeTomlBlobStoreConfigInventoryArchiveVCurrent = internal.TypeTomlBlobStoreConfigInventoryArchiveVCurrent
+	TypeTomlBlobStoreConfigMultiV0                  = internal.TypeTomlBlobStoreConfigMultiV0
 	TypeTomlBlobStoreConfigPointerV0                = internal.TypeTomlBlobStoreConfigPointerV0
 	TypeTomlBlobStoreConfigPointerV1                = internal.TypeTomlBlobStoreConfigPointerV1
 	TypeTomlBlobStoreConfigS3V0                     = internal.TypeTomlBlobStoreConfigS3V0
