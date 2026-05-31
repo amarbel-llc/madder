@@ -176,6 +176,9 @@ func MakeBlobStores(
 		if _, needsCrossRef := blobStore.Config.Blob.(blob_store_configs.ConfigInventoryArchive); needsCrossRef {
 			continue
 		}
+		if _, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti); isMulti {
+			continue
+		}
 
 		var err error
 
@@ -197,6 +200,9 @@ func MakeBlobStores(
 		if blobStore.BlobStore != nil {
 			continue
 		}
+		if _, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti); isMulti {
+			continue
+		}
 
 		var err error
 
@@ -210,6 +216,11 @@ func MakeBlobStores(
 		}
 
 		blobStores[blobStoreIdString] = blobStore
+	}
+
+	if err := buildMultiStores(ctx, blobStores); err != nil {
+		ctx.Cancel(err)
+		return blobStores
 	}
 
 	return blobStores

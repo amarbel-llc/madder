@@ -114,6 +114,60 @@ func makeMultiStore(
 	return built, nil
 }
 
+// buildMultiStores materializes every ConfigMulti in blobStores in
+// dependency order. Each iteration builds any multi whose references
+// are all resolved; it loops until an iteration makes no progress.
+// Because digest-bearing references form a Merkle DAG, a no-progress
+// iteration with unbuilt multis remaining means a dangling reference
+// (cycles are unrepresentable). The aggregated deferral errors name
+// the offending references.
+func buildMultiStores(
+	ctx interfaces.ActiveContext,
+	blobStores BlobStoreMap,
+) error {
+	for {
+		progressed := false
+		var deferred []error
+
+		for key := range blobStores {
+			blobStore := blobStores[key]
+			if blobStore.BlobStore != nil {
+				continue
+			}
+			config, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti)
+			if !isMulti {
+				continue
+			}
+
+			built, err := makeMultiStore(ctx, config, blobStores)
+			if err != nil {
+				if errors.Is(err, ErrMultiRefNotReady{}) {
+					deferred = append(deferred, errors.Wrapf(err,
+						"multi %q", key))
+					continue
+				}
+				return errors.Wrapf(err, "multi %q", key)
+			}
+
+			blobStore.BlobStore = built
+			blobStores[key] = blobStore
+			progressed = true
+		}
+
+		if len(deferred) == 0 {
+			return nil // all multis built
+		}
+		if !progressed {
+			// No multi advanced this pass and some remain unbuilt:
+			// the only Merkle-DAG-consistent cause is a dangling
+			// reference (a ref to a store that is itself an unbuilt
+			// multi blocked on the same condition, transitively
+			// bottoming out at a missing name).
+			return errors.Join(deferred...)
+		}
+	}
+}
+
 // ErrMultiRefNotReady signals that a referenced store exists in the
 // map but has not been built yet. The store-map construction loop
 // treats it as "defer to the next iteration", not a hard failure.
