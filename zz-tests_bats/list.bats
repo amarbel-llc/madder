@@ -54,3 +54,38 @@ function list_ndjson_flags_legacy { # @test
   assert_success
   assert_output --partial '"digest_missing":true'
 }
+
+function list_tree_renders_multi_graph { # @test
+  init_store
+  run_madder init -encryption none .archive
+  assert_success
+  run_madder init-multi --mode write_through \
+    --write-store .default --read-store .archive --read-fill .cache
+  assert_success
+
+  # -tree only affects text output; force text mode so the bats-piped
+  # stdout (which would otherwise default to ndjson) exercises the tree
+  # renderer rather than the structured emitter.
+  run_madder list -tree -format=tap
+  assert_success
+  assert_output --partial 'multi'
+  assert_output --partial 'write_through'
+  # the tree shows the referenced leaves under the multi
+  assert_output --partial '.archive'
+  # the referenced leaf is indented beneath the multi with its role
+  assert_output --partial '(read)'
+}
+
+function list_ndjson_multi_fields { # @test
+  init_store
+  run_madder init -encryption none .archive
+  assert_success
+  run_madder init-multi --mode write_through \
+    --write-store .default --read-store .archive --read-fill .cache
+  assert_success
+
+  run_madder list -format=ndjson
+  assert_success
+  assert_output --partial '"mode":"write_through"'
+  assert_output --partial '"read_fill":true'
+}

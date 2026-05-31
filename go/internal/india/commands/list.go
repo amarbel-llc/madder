@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -23,6 +24,7 @@ type List struct {
 	command_components.EnvBlobStore
 
 	Format output_format.Format
+	Tree   bool
 }
 
 var (
@@ -58,15 +60,26 @@ func (cmd *List) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
+	flagSet.BoolVar(&cmd.Tree, "tree", false,
+		"render the multi-store reference graph (text mode only)")
 }
 
 type listRecord struct {
-	Id            string `json:"id"`
-	Description   string `json:"description"`
-	ConfigPath    string `json:"config_path"`
-	Base          string `json:"base"`
-	Digest        string `json:"digest,omitempty"`
-	DigestMissing bool   `json:"digest_missing,omitempty"`
+	Id            string          `json:"id"`
+	Description   string          `json:"description"`
+	ConfigPath    string          `json:"config_path"`
+	Base          string          `json:"base"`
+	Digest        string          `json:"digest,omitempty"`
+	DigestMissing bool            `json:"digest_missing,omitempty"`
+	Mode          string          `json:"mode,omitempty"`
+	ReadFill      *bool           `json:"read_fill,omitempty"`
+	Refs          []listRecordRef `json:"refs,omitempty"`
+}
+
+type listRecordRef struct {
+	Name   string `json:"name"`
+	Digest string `json:"digest"`
+	Role   string `json:"role"` // "write" | "read" | "mirror"
 }
 
 func (cmd List) Run(req futility.Request) {
@@ -84,13 +97,24 @@ func (cmd List) Run(req futility.Request) {
 	case output_format.FormatNDJSON:
 		err = emitListNDJSON(blobStores)
 	case output_format.FormatTAP:
-		emitListText(envBlobStore, blobStores)
+		cmd.emitListTextOrTree(envBlobStore, blobStores)
 	default:
-		emitListText(envBlobStore, blobStores)
+		cmd.emitListTextOrTree(envBlobStore, blobStores)
 	}
 	if err != nil {
 		req.Cancel(err)
 	}
+}
+
+func (cmd List) emitListTextOrTree(
+	envBlobStore command_components.BlobStoreEnv,
+	blobStores blob_stores.BlobStoreMap,
+) {
+	if cmd.Tree {
+		emitListTree(envBlobStore, blobStores)
+		return
+	}
+	emitListText(envBlobStore, blobStores)
 }
 
 func emitListText(
@@ -173,5 +197,97 @@ func makeListRecord(blobStore blob_stores.BlobStoreInitialized) listRecord {
 	} else {
 		rec.DigestMissing = true
 	}
+
+	if multi, ok := blobStore.Config.Blob.(blob_store_configs.ConfigMulti); ok {
+		rec.Mode = multi.GetMode()
+		switch multi.GetMode() {
+		case "mirror":
+			for _, id := range multi.GetMirrorStores() {
+				rec.Refs = append(rec.Refs, makeRef(id, "mirror"))
+			}
+		case "write_through":
+			rec.Refs = append(rec.Refs, makeRef(multi.GetWriteStore(), "write"))
+			for _, id := range multi.GetReadStores() {
+				rec.Refs = append(rec.Refs, makeRef(id, "read"))
+			}
+			rf := multi.GetReadFill()
+			rec.ReadFill = &rf
+		}
+	}
+
 	return rec
+}
+
+// makeRef splits an already-parsed, digest-bearing reference into its
+// bare name (the BlobStoreMap key) and digest. The ids are typed and
+// digest-bearing by construction (decode-time Validate), so no parsing
+// or error handling is needed.
+func makeRef(id blob_store_id.Id, role string) listRecordRef {
+	return listRecordRef{
+		Name:   id.String(),
+		Digest: id.GetDigest().String(),
+		Role:   role,
+	}
+}
+
+// emitListTree renders each store as a line, and for multi stores walks
+// its references and prints each referenced leaf indented beneath it
+// with a role annotation. Referenced stores are looked up in the same
+// BlobStoreMap by their bare id (id.String()).
+func emitListTree(
+	envBlobStore command_components.BlobStoreEnv,
+	blobStores blob_stores.BlobStoreMap,
+) {
+	for _, blobStore := range stableOrder(blobStores) {
+		idStr := blobStore.Path.GetId().String()
+		bd := blobStore.Config.BlobDigest
+		if !bd.IsNull() {
+			idStr += "@" + bd.String()
+		} else {
+			idStr += " (unmigrated)"
+		}
+
+		multi, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti)
+		if !isMulti {
+			envBlobStore.GetUI().Printf(
+				"%s: %s",
+				idStr,
+				blobStore.GetBlobStoreDescription(),
+			)
+			continue
+		}
+
+		envBlobStore.GetUI().Printf(
+			"%s: %s [multi/%s]",
+			idStr,
+			blobStore.GetBlobStoreDescription(),
+			multi.GetMode(),
+		)
+
+		var refs []listRecordRef
+		switch multi.GetMode() {
+		case "mirror":
+			for _, id := range multi.GetMirrorStores() {
+				refs = append(refs, makeRef(id, "mirror"))
+			}
+		case "write_through":
+			refs = append(refs, makeRef(multi.GetWriteStore(), "write"))
+			for _, id := range multi.GetReadStores() {
+				refs = append(refs, makeRef(id, "read"))
+			}
+		}
+
+		for _, ref := range refs {
+			description := ""
+			if child, ok := blobStores[ref.Name]; ok {
+				description = child.GetBlobStoreDescription()
+			}
+			envBlobStore.GetUI().Printf(
+				"  └── %s  %s  (%s)",
+				ref.Name,
+				description,
+				ref.Role,
+			)
+		}
+	}
 }
