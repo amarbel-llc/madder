@@ -106,6 +106,21 @@ type (
 		GetPath() directory_layout.BlobStorePath
 	}
 
+	// ConfigMulti is a blob_store-config that composes other stores
+	// via the Multi primitive. References are typed blob_store_id.Id
+	// values, parsed by the hyphence coder at decode time and
+	// validated as digest-bearing by Validate() (also at decode), so
+	// the accessors never return errors. The store-map factory does
+	// only lookup + digest assertion. See FDR-0009.
+	ConfigMulti interface {
+		Config
+		GetMode() string                     // "mirror" | "write_through"
+		GetWriteStore() blob_store_id.Id      // write_through; zero otherwise
+		GetReadStores() []blob_store_id.Id    // write_through; nil otherwise
+		GetMirrorStores() []blob_store_id.Id  // mirror; nil otherwise
+		GetReadFill() bool                   // defaults true; mirror ignores
+	}
+
 	ConfigSFTPRemotePath interface {
 		Config
 		GetRemotePath() string
