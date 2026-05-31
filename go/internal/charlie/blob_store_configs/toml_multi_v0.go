@@ -53,7 +53,8 @@ func (cfg TomlMultiV0) Validate() error {
 			return errors.BadRequestf(
 				"multi %s reference %q must be digest-bearing "+
 					"(name@blake2b256-…); bare references are forbidden "+
-					"inside a multi config", role, id.String())
+					"inside a multi config", role, id.String(),
+			)
 		}
 		return nil
 	}

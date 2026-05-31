@@ -83,9 +83,11 @@ func DecodeTomlMultiV0(input []byte) (*TomlMultiV0Document, error) {
 	}
 	return d, nil
 }
+
 func (d *TomlMultiV0Document) Data() *TomlMultiV0 {
 	return &d.data
 }
+
 func (d *TomlMultiV0Document) Encode() ([]byte, error) {
 	if err := d.data.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -145,21 +147,27 @@ func (d *TomlMultiV0Document) Encode() ([]byte, error) {
 	}
 	return d.cstDoc.Bytes(), nil
 }
+
 func (d *TomlMultiV0Document) Undecoded() []string {
 	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
 }
+
 func (d *TomlMultiV0Document) Comment(key string) string {
 	return d.cstDoc.GetComment(key)
 }
+
 func (d *TomlMultiV0Document) SetComment(key, comment string) {
 	d.cstDoc.SetComment(key, comment)
 }
+
 func (d *TomlMultiV0Document) InlineComment(key string) string {
 	return d.cstDoc.GetInlineComment(key)
 }
+
 func (d *TomlMultiV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
+
 func DecodeTomlMultiV0Into(data *TomlMultiV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
 	for _, _kv := range container.Children {
 		if _kv.Kind != cst.NodeKeyValue {
@@ -207,6 +215,7 @@ func DecodeTomlMultiV0Into(data *TomlMultiV0, doc *document.Document, container 
 	}
 	return nil
 }
+
 func EncodeTomlMultiV0From(data *TomlMultiV0, doc *document.Document, container *cst.Node) error {
 	if data.Mode != "" || cst.HasValue(container, "mode") {
 		if err := cst.SetAny(container, "mode", data.Mode); err != nil {

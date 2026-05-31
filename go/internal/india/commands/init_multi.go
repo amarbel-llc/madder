@@ -115,7 +115,8 @@ func (cmd *InitMulti) Run(req futility.Request) {
 		if digest.IsNull() {
 			req.Cancel(errors.BadRequestf(
 				"reference %q targets an unmigrated config; run "+
-					"`madder config-pin_digest %s` first", ref, ref))
+					"`madder config-pin_digest %s` first", ref, ref,
+			))
 			return blob_store_id.Id{}
 		}
 		return id.WithDigest(digest)
@@ -137,7 +138,8 @@ func (cmd *InitMulti) Run(req futility.Request) {
 
 	default:
 		req.Cancel(errors.BadRequestf(
-			"--mode must be mirror or write_through, got %q", cmd.mode))
+			"--mode must be mirror or write_through, got %q", cmd.mode,
+		))
 		return
 	}
 

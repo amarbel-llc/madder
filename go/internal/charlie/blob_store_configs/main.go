@@ -115,9 +115,9 @@ type (
 	ConfigMulti interface {
 		Config
 		GetMode() string                     // "mirror" | "write_through"
-		GetWriteStore() blob_store_id.Id      // write_through; zero otherwise
-		GetReadStores() []blob_store_id.Id    // write_through; nil otherwise
-		GetMirrorStores() []blob_store_id.Id  // mirror; nil otherwise
+		GetWriteStore() blob_store_id.Id     // write_through; zero otherwise
+		GetReadStores() []blob_store_id.Id   // write_through; nil otherwise
+		GetMirrorStores() []blob_store_id.Id // mirror; nil otherwise
 		GetReadFill() bool                   // defaults true; mirror ignores
 	}
 

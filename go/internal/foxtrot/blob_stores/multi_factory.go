@@ -27,7 +27,8 @@ func resolveMultiRef(
 	if !ok {
 		return BlobStoreInitialized{}, errors.BadRequestf(
 			"multi store references %q which is not present in any "+
-				"configured XDG scope", refId.Canonical())
+				"configured XDG scope", refId.Canonical(),
+		)
 	}
 	if resolved.BlobStore == nil {
 		return BlobStoreInitialized{}, ErrMultiRefNotReady{Ref: refId.Canonical()}
@@ -38,7 +39,8 @@ func resolveMultiRef(
 		return BlobStoreInitialized{}, errors.BadRequestf(
 			"multi reference %q targets an unmigrated config (no "+
 				"digest); run `madder config-pin_digest %s` first",
-			refId.Canonical(), refId.String())
+			refId.Canonical(), refId.String(),
+		)
 	}
 
 	idDigest := refId.GetDigest()
@@ -66,7 +68,8 @@ func makeMultiStore(
 		refs := config.GetMirrorStores()
 		if len(refs) == 0 {
 			return store, errors.BadRequestf(
-				"multi mirror mode requires at least one mirror-store")
+				"multi mirror mode requires at least one mirror-store",
+			)
 		}
 		mirrors := make([]BlobStoreInitialized, 0, len(refs))
 		for _, refId := range refs {
@@ -82,7 +85,8 @@ func makeMultiStore(
 		writeId := config.GetWriteStore()
 		if writeId.IsEmpty() {
 			return store, errors.BadRequestf(
-				"multi write_through mode requires a write-store")
+				"multi write_through mode requires a write-store",
+			)
 		}
 		writeStore, e := resolveMultiRef(writeId, blobStores)
 		if e != nil {
@@ -103,7 +107,8 @@ func makeMultiStore(
 	default:
 		return store, errors.BadRequestf(
 			"multi store has invalid mode %q (want mirror or "+
-				"write_through)", config.GetMode())
+				"write_through)", config.GetMode(),
+		)
 	}
 
 	built, err := builder.Build()
