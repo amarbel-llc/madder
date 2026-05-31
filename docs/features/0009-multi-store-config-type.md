@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: experimental
 date: 2026-05-26
 promotion-criteria: |
   Promote to `experimental` once an `init-multi` command exists, a

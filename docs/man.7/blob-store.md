@@ -173,6 +173,23 @@ Two on-disk wire formats exist:
     Retained for existing on-disk configs and callers that need the
     explicit shape.
 
+## Multi
+
+Composes other stores into one. A multi config (**!toml-blob_store_config-multi-v0**)
+either **mirror**s writes across a set of stores or **write_through**s
+to a single write store with read fallback (and optional read-fill
+cache tee). Created with **madder init-multi**:
+
+    madder init-multi --mode mirror \
+        --mirror-store .ssd --mirror-store .nvme .fanout
+
+References are recorded as **digest-bearing** blob-store-ids
+(*name*@*hash*-*digest*), which makes the reference graph a Merkle DAG
+(cycles are unrepresentable). A multi composes transparently through
+every command; **madder list -tree** renders its graph in text mode.
+See **blob-store-multi**(7) for the full primitive and config-type
+documentation.
+
 # CONFIG TAMPER DETECTION
 
 Every blob_store-config carries an `@` line in its hyphence metadata
@@ -313,7 +330,7 @@ init-from** to initialize a store from an existing configuration file.
 
 # SEE ALSO
 
-**madder**(1), **markl-id**(7)
+**madder**(1), **blob-store-multi**(7), **markl-id**(7)
 
 ADR 0002: Content-addressed overwrite-is-fine semantics
 (docs/decisions/0002-content-addressed-overwrite-is-fine.md)

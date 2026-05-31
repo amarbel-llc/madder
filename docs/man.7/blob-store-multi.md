@@ -18,15 +18,15 @@ already-initialised **BlobStore** values and presents them as a single
 **write-through** — selected at construction time.
 
 Multi is consumed as a Go library by callers (notably **dodder**, where
-it backs FDR-0015's multi-store read fallback). It is **not** a
-config-file blob-store type today: there is no **init-multi** command,
-no on-disk **!toml-blob_store_config-multi-v1** wire format, and no
-CLI surface that resolves a Multi from a blob-store-id. A separate
-config-type wrapper is being designed in **FDR-0009**
-(**docs/features/0009-multi-store-config-type.md**); when it lands the
-schema will live in that document or extend this page.
+it backs FDR-0015's multi-store read fallback). It is **also** a
+persistent config-file blob-store type: the **!toml-blob_store_config-multi-v0**
+wire format, authored by **madder init-multi**, resolves a Multi from a
+blob-store-id at load time so every command composes through it
+transparently. That config-type wrapper is specified in **FDR-0009**
+(**docs/features/0009-multi-store-config-type.md**).
 
-This page covers the primitive only.
+This page documents both the in-process primitive (below) and the
+config-type wrapper (see **CONFIG TYPE**).
 
 # MODES
 
@@ -262,6 +262,56 @@ write-through mode. **GetBlobStoreDescription** synthesises
 **multi/mirror(A,B,...)** in Mirror mode and
 **multi/write-through(W=&lt;desc&gt;, R=&lt;desc&gt;, ...)** in
 write-through mode.
+
+# CONFIG TYPE
+
+A multi blob store can be persisted as a **blob_store-config** with the
+type tag **!toml-blob_store_config-multi-v0**. Author one with **madder
+init-multi**, which assembles the config from typed flags — flags
+first, the new store's blob-store-id last:
+
+    madder init-multi --mode mirror \
+        --mirror-store .ssd --mirror-store .nvme .fanout
+
+    madder init-multi --mode write_through \
+        --write-store .default --read-store .archive --read-fill .cache
+
+The on-disk TOML body carries a **mode** (**mirror** or
+**write_through**), the referenced stores as **digest-bearing**
+blob-store-ids (*name*@*hash*-*digest*), and — for write_through — a
+**read-fill** boolean. The TOML keys are hyphenated: **mode**,
+**write-store**, **read-stores**, **mirror-stores**, **read-fill**. A
+mirror config:
+
+    !toml-blob_store_config-multi-v0
+    @ blake2b256-…
+
+    mode = "mirror"
+    mirror-stores = [".ssd@blake2b256-…", ".nvme@blake2b256-…"]
+
+A write_through config (**read-fill** defaults to **true** when the key
+is absent):
+
+    !toml-blob_store_config-multi-v0
+    @ blake2b256-…
+
+    mode = "write_through"
+    write-store = ".default@blake2b256-…"
+    read-stores = [".archive@blake2b256-…"]
+    read-fill = true
+
+References MUST be digest-bearing: the digest pins the referenced
+config's content (FDR-0008 Phase 2), which makes the reference graph a
+Merkle DAG — cycles are unrepresentable, so no runtime cycle-detection
+exists or is needed. References are parsed at decode time; a bare
+reference (no **@***digest*) is rejected when the config is read. At
+load time each reference's digest is asserted against the resolved
+store's config digest; a mismatch (e.g. after editing a referenced
+leaf) is a hard error, remedied by re-authoring the multi.
+
+When a multi is the default store, every command composes through it
+transparently; **madder list -tree** is the only surface that renders
+the graph (as text-mode output).
 
 # EXAMPLES
 
