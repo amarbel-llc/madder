@@ -102,13 +102,29 @@ Per FDR-0008 Phase 2 (`docs/plans/2026-05-27-config-digest-pins-phase2.md`,
   `name@blake2b256-…` wire form. This is what a multi config stores.
 - `id.Set("default@blake2b256-…")` parses the suffix;
   `id.GetDigest()` returns the `markl.Id`; `id.HasDigest()` reports
-  presence; `id.WithDigest(d)` sets it.
+  presence; `id.WithDigest(d)` sets it; `id.MarshalText()` /
+  `UnmarshalText()` delegate to `Canonical()` / `Set()` and are the
+  on-disk wire form (Phase 2 note #4).
 
-So a multi reference resolves by `refId.String()` (bare lookup) and
-**asserts** `refId.GetDigest()` against the looked-up store's
-`Config.BlobDigest`. This mirrors the resolver seam at
-`go/internal/foxtrot/blob_store_env/main.go` `GetBlobStore`, but
-happens inside the store-map factory instead.
+**Reference parsing happens at hyphence decode time, not in the
+factory** (design decision, 2026-05-31). The multi config's reference
+fields are typed `blob_store_id.Id` / `[]blob_store_id.Id`, so the
+hyphence/tommy coder parses each ref via `UnmarshalText` during
+decode and a malformed digest fails the decode. A decode-time
+`Validate()` step additionally rejects any reference that is **not**
+digest-bearing (bare refs are globally legal but forbidden inside a
+multi config). Consequently the `ConfigMulti` accessors return
+already-parsed `blob_store_id.Id` values and **never return errors**.
+
+At store-map build time the factory does only the two things that
+require the populated map: it looks each reference up by its bare key
+(`refId.String()`) and **asserts** `refId.GetDigest()` against the
+resolved store's `Config.BlobDigest`. This mirrors the resolver seam
+at `go/internal/foxtrot/blob_store_env/main.go` `GetBlobStore`.
+Digest-mismatch, dangling-reference, and not-yet-built are runtime
+construction conditions (they depend on the *other* configs), so
+those errors stay in the factory; format and bare-ref errors live at
+decode.
 
 ### D. `markl.AssertEqual` needs pointers
 
@@ -247,12 +263,13 @@ type. Refs: #217.
 
 ## Task 2: `TomlMultiV0` config struct + `ConfigMulti` interface
 
-This task authors the charlie-layer on-disk struct, its raw-string
-reference accessors, the `read-fill` default, and the `ConfigMulti`
-marker interface that the factory switches on. Reference parsing,
-digest assertion, and store lookup all live in the factory (Task 4),
-so the accessors here stay error-free and dumb — they expose raw
-fields only.
+This task authors the charlie-layer on-disk struct, its typed
+reference accessors, the `read-fill` default, the `Validate()`
+digest-bearing check (run at decode in Task 3), and the `ConfigMulti`
+marker interface that the factory switches on. References are typed
+`blob_store_id.Id` parsed by the coder at decode time, so the
+accessors return parsed values and never error (Orientation note C);
+digest assertion and store lookup live in the factory (Task 4).
 
 **Promotion criteria:** N/A — additive type.
 
@@ -272,15 +289,29 @@ Create `go/internal/charlie/blob_store_configs/toml_multi_v0_test.go`:
 
 package blob_store_configs
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+)
+
+func mustId(t *testing.T, s string) blob_store_id.Id {
+	t.Helper()
+	var id blob_store_id.Id
+	if err := id.Set(s); err != nil {
+		t.Fatalf("Set(%q): %v", s, err)
+	}
+	return id
+}
 
 func TestTomlMultiV0_Accessors(t *testing.T) {
 	readFill := true
 	cfg := TomlMultiV0{
-		Mode:         "write_through",
-		WriteStore:   "default@blake2b256-aaa",
-		ReadStores:   []string{"archive@blake2b256-bbb"},
-		ReadFill:     &readFill,
+		Mode:       "write_through",
+		WriteStore: mustId(t, "default@blake2b256-9ft3m74lwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsmwxsws"),
+		ReadStores: []blob_store_id.Id{mustId(t, "archive@blake2b256-2k4p9r3mwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsm")},
+		ReadFill:   &readFill,
 	}
 
 	if cfg.GetBlobStoreType() != "multi" {
@@ -289,11 +320,11 @@ func TestTomlMultiV0_Accessors(t *testing.T) {
 	if cfg.GetMode() != "write_through" {
 		t.Errorf("GetMode = %q", cfg.GetMode())
 	}
-	if cfg.GetWriteStoreRef() != "default@blake2b256-aaa" {
-		t.Errorf("GetWriteStoreRef = %q", cfg.GetWriteStoreRef())
+	if cfg.GetWriteStore().GetName() != "default" {
+		t.Errorf("GetWriteStore name = %q", cfg.GetWriteStore().GetName())
 	}
-	if got := cfg.GetReadStoreRefs(); len(got) != 1 || got[0] != "archive@blake2b256-bbb" {
-		t.Errorf("GetReadStoreRefs = %v", got)
+	if got := cfg.GetReadStores(); len(got) != 1 || !got[0].HasDigest() {
+		t.Errorf("GetReadStores = %v", got)
 	}
 	if !cfg.GetReadFill() {
 		t.Error("GetReadFill = false, want true")
@@ -305,6 +336,27 @@ func TestTomlMultiV0_ReadFillDefaultsTrue(t *testing.T) {
 	cfg := TomlMultiV0{Mode: "write_through"}
 	if !cfg.GetReadFill() {
 		t.Error("GetReadFill with nil field = false, want true (default)")
+	}
+}
+
+func TestTomlMultiV0_ValidateRejectsBareRef(t *testing.T) {
+	// A reference with no @digest is forbidden inside a multi config.
+	cfg := TomlMultiV0{
+		Mode:         "mirror",
+		MirrorStores: []blob_store_id.Id{mustId(t, "default")}, // bare
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate accepted a bare reference, want error")
+	}
+}
+
+func TestTomlMultiV0_ValidateAcceptsDigestBearing(t *testing.T) {
+	cfg := TomlMultiV0{
+		Mode:         "mirror",
+		MirrorStores: []blob_store_id.Id{mustId(t, "default@blake2b256-9ft3m74lwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsmwxsws")},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate rejected a digest-bearing ref: %v", err)
 	}
 }
 
@@ -328,17 +380,18 @@ block right after the `ConfigPointer` interface (line 107):
 
 ```go
 	// ConfigMulti is a blob_store-config that composes other stores
-	// via the Multi primitive. References are stored as raw
-	// digest-bearing blob-store-id strings (name@blake2b256-…) and
-	// parsed/validated by the store-map factory, not here. See
-	// FDR-0009.
+	// via the Multi primitive. References are typed blob_store_id.Id
+	// values, parsed by the hyphence coder at decode time and
+	// validated as digest-bearing by Validate() (also at decode), so
+	// the accessors never return errors. The store-map factory does
+	// only lookup + digest assertion. See FDR-0009.
 	ConfigMulti interface {
 		Config
-		GetMode() string            // "mirror" | "write_through"
-		GetWriteStoreRef() string   // write_through; "" otherwise
-		GetReadStoreRefs() []string  // write_through; nil otherwise
-		GetMirrorStoreRefs() []string // mirror; nil otherwise
-		GetReadFill() bool          // defaults true; mirror ignores
+		GetMode() string                    // "mirror" | "write_through"
+		GetWriteStore() blob_store_id.Id     // write_through; zero otherwise
+		GetReadStores() []blob_store_id.Id   // write_through; nil otherwise
+		GetMirrorStores() []blob_store_id.Id // mirror; nil otherwise
+		GetReadFill() bool                  // defaults true; mirror ignores
 	}
 ```
 
@@ -350,15 +403,17 @@ Create `go/internal/charlie/blob_store_configs/toml_multi_v0.go`:
 package blob_store_configs
 
 import (
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
 type TomlMultiV0 struct {
-	Mode         string   `toml:"mode"`
-	WriteStore   string   `toml:"write-store,omitempty"`
-	ReadStores   []string `toml:"read-stores,omitempty"`
-	MirrorStores []string `toml:"mirror-stores,omitempty"`
+	Mode         string             `toml:"mode"`
+	WriteStore   blob_store_id.Id   `toml:"write-store,omitempty"`
+	ReadStores   []blob_store_id.Id `toml:"read-stores,omitempty"`
+	MirrorStores []blob_store_id.Id `toml:"mirror-stores,omitempty"`
 	// ReadFill is a pointer so an absent key (nil) can default to
 	// true (FDR-0009). A present `read-fill = false` disables tee.
 	ReadFill *bool `toml:"read-fill,omitempty"`
@@ -372,21 +427,54 @@ func (cfg TomlMultiV0) GetMode() string {
 	return cfg.Mode
 }
 
-func (cfg TomlMultiV0) GetWriteStoreRef() string {
+func (cfg TomlMultiV0) GetWriteStore() blob_store_id.Id {
 	return cfg.WriteStore
 }
 
-func (cfg TomlMultiV0) GetReadStoreRefs() []string {
+func (cfg TomlMultiV0) GetReadStores() []blob_store_id.Id {
 	return cfg.ReadStores
 }
 
-func (cfg TomlMultiV0) GetMirrorStoreRefs() []string {
+func (cfg TomlMultiV0) GetMirrorStores() []blob_store_id.Id {
 	return cfg.MirrorStores
 }
 
 // GetReadFill defaults to true when the key is absent (FDR-0009).
 func (cfg TomlMultiV0) GetReadFill() bool {
 	return cfg.ReadFill == nil || *cfg.ReadFill
+}
+
+// Validate enforces the FDR-0009 invariant that every reference inside
+// a multi config is digest-bearing. It is called by the hyphence Coder
+// at decode time (Task 3), so a hand-edited config with a bare
+// reference fails to read. Malformed digests are caught earlier by
+// blob_store_id.Id.UnmarshalText during decode.
+func (cfg TomlMultiV0) Validate() error {
+	check := func(role string, id blob_store_id.Id) error {
+		if !id.HasDigest() {
+			return errors.BadRequestf(
+				"multi %s reference %q must be digest-bearing "+
+					"(name@blake2b256-…); bare references are forbidden "+
+					"inside a multi config", role, id.String())
+		}
+		return nil
+	}
+	if !cfg.WriteStore.IsEmpty() {
+		if err := check("write-store", cfg.WriteStore); err != nil {
+			return err
+		}
+	}
+	for _, id := range cfg.ReadStores {
+		if err := check("read-store", id); err != nil {
+			return err
+		}
+	}
+	for _, id := range cfg.MirrorStores {
+		if err := check("mirror-store", id); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetFlagDefinitions makes TomlMultiV0 a ConfigMutable so the generic
@@ -409,8 +497,24 @@ func (cfg *TomlMultiV0) SetFlagDefinitions(
 > from the struct. Run `go generate` for this package (Orientation
 > note E) and `git add` the generated file. If tommy chokes on the
 > `*bool` field, fall back to a plain `bool` with an explicit
-> `ReadFillSet bool` companion, or a `read-fill` string enum — but
-> try `*bool` first; pointer fields are common in tommy structs.
+> `ReadFillSet bool` companion — but try `*bool` first.
+
+> NOTE: the typed `blob_store_id.Id` reference fields rely on tommy/
+> toml honoring `encoding.TextMarshaler` / `TextUnmarshaler` (Phase 2
+> gave `Id` a `MarshalText` that renders the digest-bearing
+> `Canonical()` form and an `UnmarshalText` that parses it). **Verify
+> this before relying on it:** encode a `TomlMultiV0` with a typed ref
+> and confirm the on-disk form is `write-store = "name@blake2b256-…"`.
+> If tommy does NOT invoke TextMarshaler for struct/slice fields, fall
+> back to `[]string` reference fields and have `Validate()` (and a
+> decode-time parse cached into unexported typed fields) own the
+> conversion — keeping the accessors error-free either way. The
+> typed-field approach is preferred; this is the documented fallback.
+
+> NOTE: `blob_store_id.Id.IsEmpty()` is assumed by `Validate` for the
+> write-store presence check (the inventory-archive config uses the
+> same `GetLooseBlobStoreId().IsEmpty()` shape). Confirm `IsEmpty()`
+> exists; if not, use `GetName() == ""`.
 
 **Step 5: Run the generator, then the test**
 
@@ -430,9 +534,10 @@ git add go/internal/charlie/blob_store_configs/toml_multi_v0.go \
         go/internal/charlie/blob_store_configs/*multi*gen*.go
 git commit -m "blob_store_configs: add TomlMultiV0 + ConfigMulti interface
 
-FDR-0009 Step 3. On-disk multi config struct with raw-string
-digest-bearing references; ConfigMulti marker interface. Reference
-parsing/assertion deferred to the store-map factory. Refs: #217.
+FDR-0009 Step 3. On-disk multi config struct with typed
+blob_store_id.Id references parsed by the hyphence coder at decode
+time; Validate() enforces the digest-bearing rule at decode;
+ConfigMulti accessors are error-free. Refs: #217.
 
 :clown: with [Clown](https://github.com/amarbel-llc/clown)"
 ```
@@ -460,14 +565,23 @@ hyphence Coder can encode/decode the new tag and `EncodeWithDigest`/
 Append to `go/internal/delta/blob_store_configs/digest_test.go`:
 
 ```go
+func mustBlobStoreId(t *testing.T, s string) blob_store_id.Id {
+	t.Helper()
+	var id blob_store_id.Id
+	if err := id.Set(s); err != nil {
+		t.Fatalf("Set(%q): %v", s, err)
+	}
+	return id
+}
+
 func TestEncodeWithDigest_MultiRoundTrip(t *testing.T) {
 	readFill := true
 	typedConfig := &TypedConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
 		Blob: &TomlMultiV0{
 			Mode:       "write_through",
-			WriteStore: "default@blake2b256-9ft3m74lwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsmwxsws",
-			ReadStores: []string{"archive@blake2b256-2k4p9r3mwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsm"},
+			WriteStore: mustBlobStoreId(t, "default@blake2b256-9ft3m74lwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsmwxsws"),
+			ReadStores: []blob_store_id.Id{mustBlobStoreId(t, "archive@blake2b256-2k4p9r3mwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsm")},
 			ReadFill:   &readFill,
 		},
 	}
@@ -496,10 +610,34 @@ func TestEncodeWithDigest_MultiRoundTrip(t *testing.T) {
 		t.Error("BlobDigest null after round-trip")
 	}
 }
+
+// TestDecodeAndVerify_RejectsBareMultiRef: a multi config whose
+// reference lacks a digest must fail at decode — Validate() runs in
+// the Coder's Decode closure (Step 5). Encoding a bare typed Id
+// renders the bare wire form, which decode then rejects.
+func TestDecodeAndVerify_RejectsBareMultiRef(t *testing.T) {
+	typedConfig := &TypedConfig{
+		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
+		Blob: &TomlMultiV0{
+			Mode:         "mirror",
+			MirrorStores: []blob_store_id.Id{mustBlobStoreId(t, "default")}, // bare
+		},
+	}
+
+	var buf bytes.Buffer
+	if _, err := EncodeWithDigest(typedConfig, &buf); err != nil {
+		t.Fatalf("EncodeWithDigest: %v", err)
+	}
+
+	decoded := &TypedConfig{}
+	if _, err := DecodeAndVerify(decoded, bytes.NewReader(buf.Bytes())); err == nil {
+		t.Fatal("expected decode to reject bare multi reference, got nil")
+	}
+}
 ```
 
-Ensure `ids` is imported in the test file (it is, for the Phase-1
-tests; add if missing).
+Ensure `ids` and `blob_store_id` are imported in the test file
+(`ids` is, for the Phase-1 tests; add `blob_store_id` if missing).
 
 **Step 2: Run test to verify it fails**
 
@@ -567,7 +705,16 @@ matching Encode helper:
 				if err != nil {
 					return nil, err
 				}
-				return doc.Data(), nil
+				cfg := doc.Data()
+				// FDR-0009: enforce digest-bearing references at decode
+				// time, so the accessors and the factory can assume
+				// every reference is valid and digest-bearing.
+				if v, ok := cfg.(interface{ Validate() error }); ok {
+					if err := v.Validate(); err != nil {
+						return nil, err
+					}
+				}
+				return cfg, nil
 			},
 			Encode: /* mirror the pointer-v1 Encode closure exactly */,
 		},
@@ -578,6 +725,11 @@ matching Encode helper:
 > name. The `CoderTommy` generic params and the `doc.Data()` /
 > encode-side shape must match the package's existing convention or
 > the Coder won't compile.
+
+> NOTE: the inline `interface{ Validate() error }` assertion keeps
+> `Validate` off the exported `Config` interface — only multi configs
+> implement it, and only the decode closure calls it. This is the
+> decode-time seam that makes the bare-ref test in Step 1 pass.
 
 **Step 6: Run the round-trip test + package suite**
 
@@ -637,7 +789,7 @@ package blob_stores
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
@@ -657,22 +809,16 @@ func builtLeafForTest(t *testing.T, name string, digestSeed byte) BlobStoreIniti
 }
 
 func TestMakeMultiStore_WriteThrough(t *testing.T) {
-	ctx := /* the test ActiveContext helper used elsewhere in this package */ nil
-	_ = ctx
-
 	write := builtLeafForTest(t, "default", 0x01)
 	read := builtLeafForTest(t, "archive", 0x02)
 
 	stores := MakeBlobStoreMap(write, read)
 
-	writeRef := write.Path.GetId().WithDigest(write.Config.BlobDigest).Canonical()
-	readRef := read.Path.GetId().WithDigest(read.Config.BlobDigest).Canonical()
-
 	readFill := true
 	cfg := &blob_store_configs.TomlMultiV0{
 		Mode:       "write_through",
-		WriteStore: writeRef,
-		ReadStores: []string{readRef},
+		WriteStore: write.Path.GetId().WithDigest(write.Config.BlobDigest),
+		ReadStores: []blob_store_id.Id{read.Path.GetId().WithDigest(read.Config.BlobDigest)},
 		ReadFill:   &readFill,
 	}
 
@@ -692,32 +838,22 @@ func TestMakeMultiStore_DigestMismatchRefuses(t *testing.T) {
 	// Reference the right name but the WRONG digest.
 	var wrong markl.Id
 	_ = wrong.SetMarklId(markl.FormatIdHashBlake2b256, bytesSeeded(0xFF))
-	badRef := write.Path.GetId().WithDigest(wrong).Canonical()
 
 	cfg := &blob_store_configs.TomlMultiV0{
 		Mode:         "mirror",
-		MirrorStores: []string{badRef},
+		MirrorStores: []blob_store_id.Id{write.Path.GetId().WithDigest(wrong)},
 	}
 
 	if _, err := makeMultiStore(testCtx(t), cfg, stores); err == nil {
 		t.Fatal("expected digest-mismatch error, got nil")
 	}
 }
-
-func TestMakeMultiStore_BareRefRefuses(t *testing.T) {
-	write := builtLeafForTest(t, "default", 0x01)
-	stores := MakeBlobStoreMap(write)
-
-	cfg := &blob_store_configs.TomlMultiV0{
-		Mode:         "mirror",
-		MirrorStores: []string{"default"}, // no @digest — illegal in a multi
-	}
-
-	if _, err := makeMultiStore(testCtx(t), cfg, stores); err == nil {
-		t.Fatal("expected bare-reference error, got nil")
-	}
-}
 ```
+
+> NOTE: the bare-reference case is a **decode-time** test now
+> (`TestDecodeAndVerify_RejectsBareMultiRef` in Task 3), not a factory
+> test — the factory receives already-parsed, already-validated
+> `blob_store_id.Id` values, so it never sees a bare ref in practice.
 
 > NOTE: the test scaffolding (`testCtx`, `bytesSeeded`, the in-memory
 > store helper) must reuse what `multi_test.go` already established in
@@ -749,56 +885,43 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
-// resolveMultiRef parses a digest-bearing reference string, rejects
-// the bare form (every reference inside a multi config MUST be
-// digest-bearing — FDR-0009), looks the store up in the map by its
-// bare key, and asserts the reference's digest against the resolved
-// store's Phase-1 config digest.
+// resolveMultiRef looks a reference up in the map by its bare key and
+// asserts the reference's digest against the resolved store's Phase-1
+// config digest. References arrive already parsed and validated as
+// digest-bearing by decode-time Validate() (Task 2/3), so this does
+// not re-parse or re-check the format.
 //
 // Returns ErrMultiRefNotReady when the named store exists but has not
 // been built yet (BlobStore == nil) — the construction loop uses this
-// to defer. Returns a hard error for a bare ref, a dangling ref
-// (name not in the map), a legacy/undigested target, or a digest
-// mismatch.
+// to defer. Returns a hard error for a dangling ref (name not in the
+// map), a legacy/undigested target, or a digest mismatch.
 func resolveMultiRef(
-	ref string,
+	refId blob_store_id.Id,
 	blobStores BlobStoreMap,
 ) (BlobStoreInitialized, error) {
-	var refId blob_store_id.Id
-	if err := refId.Set(ref); err != nil {
-		return BlobStoreInitialized{}, errors.Wrapf(err,
-			"multi reference %q", ref)
-	}
-	if !refId.HasDigest() {
-		return BlobStoreInitialized{}, errors.BadRequestf(
-			"multi reference %q must be digest-bearing "+
-				"(name@blake2b256-…); bare references are forbidden "+
-				"inside a multi config", ref)
-	}
-
 	resolved, ok := blobStores[refId.String()]
 	if !ok {
 		return BlobStoreInitialized{}, errors.BadRequestf(
 			"multi store references %q which is not present in any "+
-				"configured XDG scope", ref)
+				"configured XDG scope", refId.Canonical())
 	}
 	if resolved.BlobStore == nil {
-		return BlobStoreInitialized{}, ErrMultiRefNotReady{Ref: ref}
+		return BlobStoreInitialized{}, ErrMultiRefNotReady{Ref: refId.Canonical()}
 	}
 
 	configDigest := resolved.Config.BlobDigest
 	if configDigest.IsNull() {
 		return BlobStoreInitialized{}, errors.BadRequestf(
-			"multi reference %q targets an unmigrated config "+
-				"(no digest); run `madder config-pin_digest %s` first",
-			ref, refId.String())
+			"multi reference %q targets an unmigrated config (no "+
+				"digest); run `madder config-pin_digest %s` first",
+			refId.Canonical(), refId.String())
 	}
 
 	idDigest := refId.GetDigest()
 	if err := markl.AssertEqual(&idDigest, &configDigest); err != nil {
 		return BlobStoreInitialized{}, errors.Wrapf(err,
 			"multi reference %q digest does not match resolved store",
-			ref)
+			refId.Canonical())
 	}
 
 	return resolved, nil
@@ -816,14 +939,14 @@ func makeMultiStore(
 
 	switch config.GetMode() {
 	case "mirror":
-		refs := config.GetMirrorStoreRefs()
+		refs := config.GetMirrorStores()
 		if len(refs) == 0 {
 			return store, errors.BadRequestf(
 				"multi mirror mode requires at least one mirror-store")
 		}
 		mirrors := make([]BlobStoreInitialized, 0, len(refs))
-		for _, ref := range refs {
-			resolved, e := resolveMultiRef(ref, blobStores)
+		for _, refId := range refs {
+			resolved, e := resolveMultiRef(refId, blobStores)
 			if e != nil {
 				return store, e
 			}
@@ -832,21 +955,20 @@ func makeMultiStore(
 		builder = builder.Mirror(mirrors...)
 
 	case "write_through":
-		writeRef := config.GetWriteStoreRef()
-		if writeRef == "" {
+		writeId := config.GetWriteStore()
+		if writeId.IsEmpty() {
 			return store, errors.BadRequestf(
 				"multi write_through mode requires a write-store")
 		}
-		writeStore, e := resolveMultiRef(writeRef, blobStores)
+		writeStore, e := resolveMultiRef(writeId, blobStores)
 		if e != nil {
 			return store, e
 		}
 		builder = builder.WriteTo(writeStore)
 
-		readRefs := config.GetReadStoreRefs()
-		reads := make([]BlobStoreInitialized, 0, len(readRefs))
-		for _, ref := range readRefs {
-			resolved, e := resolveMultiRef(ref, blobStores)
+		reads := make([]BlobStoreInitialized, 0, len(config.GetReadStores()))
+		for _, refId := range config.GetReadStores() {
+			resolved, e := resolveMultiRef(refId, blobStores)
 			if e != nil {
 				return store, e
 			}
@@ -910,8 +1032,8 @@ In `go/internal/foxtrot/blob_stores/main.go`, add before `default`
 just test-go -run TestMakeMultiStore ./internal/foxtrot/blob_stores/...
 ```
 
-Expected: PASS (all three: write-through builds, mismatch refuses,
-bare-ref refuses).
+Expected: PASS (write-through builds; digest mismatch refuses). The
+bare-reference case is a decode-time test in Task 3, not here.
 
 **Step 6: Commit**
 
@@ -921,10 +1043,10 @@ git add go/internal/foxtrot/blob_stores/multi_factory.go \
         go/internal/foxtrot/blob_stores/main.go
 git commit -m "blob_stores: resolve ConfigMulti into a built Multi
 
-FDR-0009 Step 3. makeMultiStore parses digest-bearing references,
-rejects bare refs, asserts each digest against the resolved store's
-Phase-1 config digest (markl.AssertEqual), and drives the Multi
-builder. ErrMultiRefNotReady lets the construction loop defer
+FDR-0009 Step 3. makeMultiStore looks up each (already-parsed,
+already-validated) reference, asserts its digest against the resolved
+store's Phase-1 config digest (markl.AssertEqual), and drives the
+Multi builder. ErrMultiRefNotReady lets the construction loop defer
 not-yet-built references. Refs: #217.
 
 :clown: with [Clown](https://github.com/amarbel-llc/clown)"
@@ -978,14 +1100,13 @@ func TestBuildMultiStores_Nested(t *testing.T) {
 
 	fast := multiLeafForTest(t, "fast", &blob_store_configs.TomlMultiV0{
 		Mode: "mirror",
-		MirrorStores: []string{
+		MirrorStores: []blob_store_id.Id{
 			digestRef(ssd), digestRef(nvme),
 		},
 	})
 	tiered := multiLeafForTest(t, "tiered", &blob_store_configs.TomlMultiV0{
 		Mode:       "write_through",
 		WriteStore: digestRef(fast), // reference the (as-yet unbuilt) multi
-		ReadStores: []string{},
 	})
 
 	stores := MakeBlobStoreMap(ssd, nvme, fast, tiered)
@@ -1003,7 +1124,7 @@ func TestBuildMultiStores_Nested(t *testing.T) {
 func TestBuildMultiStores_DanglingRef(t *testing.T) {
 	orphan := multiLeafForTest(t, "orphan", &blob_store_configs.TomlMultiV0{
 		Mode:         "mirror",
-		MirrorStores: []string{"ghost@blake2b256-aaa"},
+		MirrorStores: []blob_store_id.Id{mustId(t, "ghost@blake2b256-9ft3m74lwx9aq4nx7vrft96xeku0scrz8ymyljh9phpvfzv4kdgsmwxsws")},
 	})
 	stores := MakeBlobStoreMap(orphan)
 
@@ -1018,9 +1139,12 @@ func TestBuildMultiStores_DanglingRef(t *testing.T) {
 > `BlobStore == nil`, a `ConfigNamed.Path` whose id is `name`, and a
 > `Config` whose `.Blob` is the given `*TomlMultiV0` and whose
 > `.BlobDigest` is a non-null seeded digest (so a parent multi can
-> assert against it). `digestRef(bs)` returns
-> `bs.Path.GetId().WithDigest(bs.Config.BlobDigest).Canonical()`.
-> Reuse the Task-4 helpers.
+> assert against it). `digestRef(bs)` returns the typed
+> `bs.Path.GetId().WithDigest(bs.Config.BlobDigest)` (a
+> `blob_store_id.Id`, not a string). Reuse the Task-4 helpers; this
+> test file also needs the `blob_store_id` import and the `mustId`
+> helper (copy it from Task 2's test or factor it into a shared
+> test helper).
 
 **Step 2: Run test to verify it fails**
 
@@ -1367,15 +1491,17 @@ func (cmd *InitMulti) Run(req futility.Request) {
 
 	cfg := &blob_store_configs.TomlMultiV0{Mode: cmd.mode}
 
-	resolve := func(ref string) string {
+	resolve := func(ref string) blob_store_id.Id {
 		// Resolve a bare name to its leaf's current digest; pass a
-		// digest-bearing ref through unchanged.
+		// digest-bearing ref through unchanged. The typed Id renders
+		// to the digest-bearing wire form via MarshalText -> Canonical
+		// at encode time.
 		var id blob_store_id.Id
 		if err := id.Set(ref); err != nil {
 			errors.ContextCancelWithBadRequestError(req, err)
 		}
 		if id.HasDigest() {
-			return id.Canonical()
+			return id
 		}
 		leaf := envBlobStore.GetBlobStore(id)
 		digest := leaf.Config.BlobDigest
@@ -1383,9 +1509,9 @@ func (cmd *InitMulti) Run(req futility.Request) {
 			req.Cancel(errors.BadRequestf(
 				"reference %q targets an unmigrated config; run "+
 					"`madder config-pin_digest %s` first", ref, ref))
-			return ""
+			return blob_store_id.Id{}
 		}
-		return id.WithDigest(digest).Canonical()
+		return id.WithDigest(digest)
 	}
 
 	switch cmd.mode {
@@ -1577,13 +1703,13 @@ type listRecordRef struct {
 		rec.Mode = multi.GetMode()
 		switch multi.GetMode() {
 		case "mirror":
-			for _, ref := range multi.GetMirrorStoreRefs() {
-				rec.Refs = append(rec.Refs, makeRef(ref, "mirror"))
+			for _, id := range multi.GetMirrorStores() {
+				rec.Refs = append(rec.Refs, makeRef(id, "mirror"))
 			}
 		case "write_through":
-			rec.Refs = append(rec.Refs, makeRef(multi.GetWriteStoreRef(), "write"))
-			for _, ref := range multi.GetReadStoreRefs() {
-				rec.Refs = append(rec.Refs, makeRef(ref, "read"))
+			rec.Refs = append(rec.Refs, makeRef(multi.GetWriteStore(), "write"))
+			for _, id := range multi.GetReadStores() {
+				rec.Refs = append(rec.Refs, makeRef(id, "read"))
 			}
 			rf := multi.GetReadFill()
 			rec.ReadFill = &rf
@@ -1591,9 +1717,10 @@ type listRecordRef struct {
 	}
 ```
 
-where `makeRef(ref, role)` parses the ref into name + digest via
-`blob_store_id.Id.Set` (best-effort: on parse error, store the raw
-string as `Name` and leave `Digest` empty).
+where `makeRef(id blob_store_id.Id, role string) listRecordRef` splits
+the already-parsed id into `Name` (`id.String()`) and `Digest`
+(`id.GetDigest().String()`). No parsing or error handling — the ids
+are typed and digest-bearing by construction (decode-time Validate).
 
 - For `-tree`: when `cmd.Tree` is set, the text emitter recurses. Add
   a `emitListTree` function that, for each top-level multi, prints the
@@ -1732,8 +1859,8 @@ quorum, and read-fill quotas. None block `experimental`.
 |------|-------------|-----------|
 | 1 | `!toml-blob_store_config-multi-v0` type id | go: id round-trip |
 | 2 | `TomlMultiV0` struct + `ConfigMulti` interface | go: accessors + read-fill default |
-| 3 | Delta Coder entry + `TypeStructForConfig` | go: EncodeWithDigest/DecodeAndVerify round-trip |
-| 4 | `makeMultiStore` + factory case | go: build, digest-mismatch, bare-ref |
+| 3 | Delta Coder entry + `TypeStructForConfig` | go: round-trip + bare-ref rejected at decode |
+| 4 | `makeMultiStore` + factory case | go: build, digest-mismatch |
 | 5 | Fixpoint construction pass | go: nested, dangling-ref |
 | 6 | `madder init-multi` | bats: 4 canonical scenarios |
 | 7 | `list -tree` + structured fields | bats: tree + ndjson |
