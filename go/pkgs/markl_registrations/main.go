@@ -32,6 +32,7 @@ var AllAliases = internal.AllAliases
 var (
 	AllPurposes                           = internal.AllPurposes
 	PurposeBlobDigestV1Opts               = internal.PurposeBlobDigestV1Opts
+	PurposeBlobStoreConfigDigestV1Opts    = internal.PurposeBlobStoreConfigDigestV1Opts
 	PurposeMadderPrivateKeyV0Opts         = internal.PurposeMadderPrivateKeyV0Opts
 	PurposeMadderPrivateKeyV1Opts         = internal.PurposeMadderPrivateKeyV1Opts
 	PurposeMadderPubKeyV1Opts             = internal.PurposeMadderPubKeyV1Opts

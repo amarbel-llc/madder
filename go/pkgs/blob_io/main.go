@@ -10,9 +10,28 @@ type (
 )
 
 // TODO create a constructor function to enable debugging
+type ErrBlobMissing = internal.ErrBlobMissing
+
+// ErrBlobStoreUnavailable wraps a transport-level error (network
+// unreachable, SSH dial / handshake / auth failure, etc.) that means
+// the backend store could not be consulted at all — distinct from a
+// well-formed "blob not found" response. Multi-store fallback paths
+// (Multi.MakeBlobReader, per-command blobFromRemainingStores) treat
+// this as miss-equivalent and continue the walk.
+//
+// Backends that can distinguish unavailability from other errors at
+// the call site SHOULD wrap their unavailability returns in this type
+// so the classifier resolves the case via errors.As without having to
+// pattern-match opaque error strings. The classifier
+// IsBlobStoreUnavailable also recognises bare *net.OpError, DNS
+// errors, and net.Error.Timeout() returns so adapters that haven't
+// adopted the wrapper still benefit; future backends should prefer
+// the wrapper for precision.
+//
+// Closes #209.
 type (
-	ErrBlobMissing = internal.ErrBlobMissing
-	MoveOptions    = internal.MoveOptions
+	ErrBlobStoreUnavailable = internal.ErrBlobStoreUnavailable
+	MoveOptions             = internal.MoveOptions
 )
 
 // TemporaryFS is the temp-fs handle MoveOptions embeds. Aliased
@@ -33,20 +52,54 @@ var DefaultConfig = internal.DefaultConfig
 // path. See docs/decisions/0003-blob-store-hardlink-writes.md for the
 // EEXIST branch that will eventually call into this. Caller rationale
 // tracked in https://github.com/amarbel-llc/madder/issues/31.
+var ErrCollisionContentMismatch = internal.ErrCollisionContentMismatch
+
+// IsBlobStoreUnavailable reports whether err represents a
+// transport-level failure that means a blob-store backend could not
+// be consulted — as opposed to a well-formed "blob not found" or
+// I/O-corruption response. Multi-store fallback paths treat true as
+// a miss-equivalent and continue probing the remaining stores.
+//
+// Matching strategy, in priority order:
+//
+//  1. errors.As against ErrBlobStoreUnavailable. Backends that wrap
+//     their dial/handshake/auth boundary in the typed error get exact
+//     classification.
+//  2. errors.As against *net.OpError (TCP dial refused, no route to
+//     host, connection reset).
+//  3. errors.As against *net.DNSError (host unresolvable, NXDOMAIN).
+//  4. errors.As against net.Error with Timeout() == true (read/write
+//     deadline exceeded, dial timeout).
+//  5. Substring match against known SSH-handshake / auth-failure
+//     strings from golang.org/x/crypto/ssh. The ssh package does not
+//     export typed errors for these conditions today; the substring
+//     match is the documented fallback. New SFTP error returns
+//     should prefer wrapping in ErrBlobStoreUnavailable at the dial
+//     boundary so future cases land in case (1) instead.
+//
+// A nil error is not unavailable.
 var (
-	ErrCollisionContentMismatch                  = internal.ErrCollisionContentMismatch
+	IsBlobStoreUnavailable                       = internal.IsBlobStoreUnavailable
 	IsErrBlobAlreadyExists                       = internal.IsErrBlobAlreadyExists
 	IsErrBlobMissing                             = internal.IsErrBlobMissing
 	MakeConfig                                   = internal.MakeConfig
 	MakeDirIfNecessary                           = internal.MakeDirIfNecessary
 	MakeDirIfNecessaryForStringerWithHeadAndTail = internal.MakeDirIfNecessaryForStringerWithHeadAndTail
-	MakeHashBucketPath                           = internal.MakeHashBucketPath
-	MakeHashBucketPathFromMerkleId               = internal.MakeHashBucketPathFromMerkleId
-	MakeHashBucketPathJoinFunc                   = internal.MakeHashBucketPathJoinFunc
-	NewFileReaderOrErrNotExist                   = internal.NewFileReaderOrErrNotExist
-	NewMover                                     = internal.NewMover
-	NewNopReader                                 = internal.NewNopReader
-	NewReader                                    = internal.NewReader
-	NewWriter                                    = internal.NewWriter
-	PathFromHeadAndTail                          = internal.PathFromHeadAndTail
+)
+
+// MakeErrBlobStoreUnavailable wraps cause in an
+// ErrBlobStoreUnavailable. Returns nil when cause is nil so callers
+// can use it unconditionally on a wrap path that may not have an
+// error.
+var (
+	MakeErrBlobStoreUnavailable    = internal.MakeErrBlobStoreUnavailable
+	MakeHashBucketPath             = internal.MakeHashBucketPath
+	MakeHashBucketPathFromMerkleId = internal.MakeHashBucketPathFromMerkleId
+	MakeHashBucketPathJoinFunc     = internal.MakeHashBucketPathJoinFunc
+	NewFileReaderOrErrNotExist     = internal.NewFileReaderOrErrNotExist
+	NewMover                       = internal.NewMover
+	NewNopReader                   = internal.NewNopReader
+	NewReader                      = internal.NewReader
+	NewWriter                      = internal.NewWriter
+	PathFromHeadAndTail            = internal.PathFromHeadAndTail
 )

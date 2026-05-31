@@ -272,11 +272,14 @@ const (
 )
 
 // Blob Digests
+const PurposeBlobDigestV1 = internal.PurposeBlobDigestV1
+
+// Blob-Store-Config Digests
 const (
-	PurposeBlobDigestV1       = internal.PurposeBlobDigestV1
-	PurposeMadderPrivateKeyV0 = internal.PurposeMadderPrivateKeyV0
-	PurposeMadderPrivateKeyV1 = internal.PurposeMadderPrivateKeyV1
-	PurposeMadderPubKeyV1     = internal.PurposeMadderPubKeyV1
+	PurposeBlobStoreConfigDigestV1 = internal.PurposeBlobStoreConfigDigestV1
+	PurposeMadderPrivateKeyV0      = internal.PurposeMadderPrivateKeyV0
+	PurposeMadderPrivateKeyV1      = internal.PurposeMadderPrivateKeyV1
+	PurposeMadderPubKeyV1          = internal.PurposeMadderPubKeyV1
 )
 
 // Object Digests

@@ -4,6 +4,12 @@ package blob_store_id
 
 import internal "github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 
+// ErrIdDigestVsLegacyConfig is returned when a blob-store-id carries
+// a digest suffix but the resolved store's config is legacy (no `@`
+// against an un-digestable config defeats the point of the suffix,
+// so the error is hard and points the user at the migration command.
+type ErrIdDigestVsLegacyConfig = internal.ErrIdDigestVsLegacyConfig
+
 // Id is a blob-store id. cwdDepth is a runtime CLI-rendering concern,
 // only meaningful when location == Cwd: 0 = single-dot prefix (the
 // deepest `.<utility>/` ancestor on the walk-up), 1 = `..`, etc. Wire-

@@ -49,25 +49,71 @@ type (
 )
 
 var (
-	Coder                            = internal.Coder
-	ConfigKeyNames                   = internal.ConfigKeyNames
-	ConfigKeyValues                  = internal.ConfigKeyValues
-	DecodeTomlInventoryArchiveV0     = internal.DecodeTomlInventoryArchiveV0
-	DecodeTomlInventoryArchiveV1     = internal.DecodeTomlInventoryArchiveV1
-	DecodeTomlInventoryArchiveV2     = internal.DecodeTomlInventoryArchiveV2
-	DecodeTomlLocalHashBucketedV1    = internal.DecodeTomlLocalHashBucketedV1
-	DecodeTomlLocalHashBucketedV2    = internal.DecodeTomlLocalHashBucketedV2
-	DecodeTomlPointerV0              = internal.DecodeTomlPointerV0
-	DecodeTomlPointerV1              = internal.DecodeTomlPointerV1
-	DecodeTomlS3V0                   = internal.DecodeTomlS3V0
-	DecodeTomlSFTPV0                 = internal.DecodeTomlSFTPV0
-	DecodeTomlSFTPViaSSHConfigV0     = internal.DecodeTomlSFTPViaSSHConfigV0
-	DecodeTomlUriV0                  = internal.DecodeTomlUriV0
-	DecodeTomlV3                     = internal.DecodeTomlV3
-	DecodeTomlWebDAVV0               = internal.DecodeTomlWebDAVV0
-	Default                          = internal.Default
-	DefaultHashBuckets               = internal.DefaultHashBuckets
-	DefaultHashType                  = internal.DefaultHashType
+	Coder           = internal.Coder
+	ConfigKeyNames  = internal.ConfigKeyNames
+	ConfigKeyValues = internal.ConfigKeyValues
+)
+
+// DecodeAndVerify decodes a blob_store-config from r and, if its
+// metadata carries a BlobDigest, hashes the on-disk body bytes and
+// asserts the digests match via markl.AssertEqual. A config with no @
+// returns markl.ErrNotEqual carrying both digests.
+//
+// Implementation: buffer the whole input, run Coder.DecodeFrom on the
+// buffered bytes (populates BlobDigest from the metadata), then locate
+// the body offset by searching for the metadata-end boundary and hash
+// the raw on-disk body bytes. Buffering the whole config is acceptable
+// because blob_store-config files are bounded (KB-scale).
+//
+// Hashing the raw on-disk body bytes (rather than re-encoding the
+// decoded Config) keeps the contract symmetric with EncodeWithDigest
+// — the same bytes that were hashed at write time are hashed at read
+// time — and makes the verification independent of any
+// encoder-determinism caveats.
+var DecodeAndVerify = internal.DecodeAndVerify
+
+// DecodeAndVerifyFromFile is the file-aware wrapper around
+// DecodeAndVerify, mirroring hyphence.DecodeFromFile's shape: a "-"
+// path reads from stdin, any other path is opened read-only with the
+// exclusive helper and closed on return.
+var (
+	DecodeAndVerifyFromFile       = internal.DecodeAndVerifyFromFile
+	DecodeTomlInventoryArchiveV0  = internal.DecodeTomlInventoryArchiveV0
+	DecodeTomlInventoryArchiveV1  = internal.DecodeTomlInventoryArchiveV1
+	DecodeTomlInventoryArchiveV2  = internal.DecodeTomlInventoryArchiveV2
+	DecodeTomlLocalHashBucketedV1 = internal.DecodeTomlLocalHashBucketedV1
+	DecodeTomlLocalHashBucketedV2 = internal.DecodeTomlLocalHashBucketedV2
+	DecodeTomlPointerV0           = internal.DecodeTomlPointerV0
+	DecodeTomlPointerV1           = internal.DecodeTomlPointerV1
+	DecodeTomlS3V0                = internal.DecodeTomlS3V0
+	DecodeTomlSFTPV0              = internal.DecodeTomlSFTPV0
+	DecodeTomlSFTPViaSSHConfigV0  = internal.DecodeTomlSFTPViaSSHConfigV0
+	DecodeTomlUriV0               = internal.DecodeTomlUriV0
+	DecodeTomlV3                  = internal.DecodeTomlV3
+	DecodeTomlWebDAVV0            = internal.DecodeTomlWebDAVV0
+	Default                       = internal.Default
+	DefaultHashBuckets            = internal.DefaultHashBuckets
+	DefaultHashType               = internal.DefaultHashType
+)
+
+// DigestHash is the hash family used to compute the body digest.
+// Phase 1 hard-codes blake2b256.
+var DigestHash = internal.DigestHash
+
+// EncodeWithDigest renders typedConfig to w with a populated BlobDigest
+// covering the body bytes. It is the only sanctioned write path for
+// blob_store-config files after FDR-0008 Phase 1.
+//
+// Mechanism: encode the body to a scratch buffer via the inner Blob
+// coder, hash those bytes, stamp typedConfig.BlobDigest with the
+// resulting markl-id, then assemble the on-disk output as
+// `Boundary + metadata + Boundary + blank + bodyBuf` — the on-disk
+// body is the exact byte sequence that was hashed. This avoids any
+// dependency on the inner coder being deterministic across two calls
+// (e.g. randomized encryption-key generation in the
+// inventory_archive variants).
+var (
+	EncodeWithDigest                 = internal.EncodeWithDigest
 	SetMultiEncryptionFlagDefinition = internal.SetMultiEncryptionFlagDefinition
 )
 
@@ -82,8 +128,12 @@ var (
 // per ADR 0005).
 var TypeStructForConfig = internal.TypeStructForConfig
 
+const DefaultHashTypeId = internal.DefaultHashTypeId
+
+// DigestPurpose is the markl purpose stamped on the @ line of every
+// migrated blob_store-config. See FDR-0008.
 const (
-	DefaultHashTypeId  = internal.DefaultHashTypeId
+	DigestPurpose      = internal.DigestPurpose
 	HashTypeBlake2b256 = internal.HashTypeBlake2b256
 	HashTypeDefault    = internal.HashTypeDefault
 	HashTypeSha256     = internal.HashTypeSha256
