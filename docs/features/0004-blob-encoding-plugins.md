@@ -310,7 +310,7 @@ reference.
   mechanism for content-addressed builtin-plugin-ids. The v0
   package-name convention is a stop-gap; FDR 0005 picks the
   eventual replacement.
-- FDR 0006 (forthcoming) — adds the `zstd-with-dict` plugin and
+- FDR 0010 (forthcoming) — adds the `zstd-with-dict` plugin and
   the `cg capture --zstd-dict` / `madder train-zstd-dict` user-
   facing surfaces on top of this architecture, replacing the
   superseded FDR 0003 user-surface design.

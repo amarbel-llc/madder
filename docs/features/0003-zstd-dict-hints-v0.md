@@ -7,7 +7,7 @@ promotion-criteria: |
   replaced by FDR 0004's plugin architecture, which subsumes the
   dict-hint use case as a particular plugin. The user-facing
   `cg capture --zstd-dict` / `madder train-zstd-dict` surfaces
-  are preserved and re-homed in FDR 0006, which builds on FDR
+  are preserved and re-homed in FDR 0010, which builds on FDR
   0004.
 ---
 

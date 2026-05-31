@@ -5,7 +5,7 @@ package plugins
 import internal "github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 
 // Factory constructs a plugin instance. v0 plugins are non-parametric;
-// future parametric plugins (e.g. zstd-with-dict in FDR 0006) accept
+// future parametric plugins (e.g. zstd-with-dict in FDR 0010) accept
 // configuration via a separate side-data interface.
 type Factory = internal.Factory
 

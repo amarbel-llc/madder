@@ -252,7 +252,7 @@ madder behavior:
 - *Design exploration only* — 0002 remote inventory-archive packing,
   0005 plugin-id build orchestration.
 - *Superseded* — 0003 zstd dictionary hints (folded into 0004).
-- *cutting-garden (external repo)* — 0001 restore, 0006 diff, 0007
+- *cutting-garden (external repo)* — 0001 restore, 0002 diff, 0005
   URI-scheme plugins describe the cutting-garden CLI, which was
   extracted from this repo and now consumes madder as a library.
 

@@ -215,7 +215,7 @@ compile flags) is deferred until a path is selected.
   architecture this FDR refines. FDR 0004 ships the v0 package-
   name convention as a stop-gap; this FDR plans the content-
   addressed replacement.
-- `docs/features/0006-zstd-dict-hints.md` (forthcoming) — adds
+- `docs/features/0010-zstd-dict-hints.md` (forthcoming) — adds
   the `zstd-with-dict` plugin on top of FDR 0004's architecture.
   Independent of this FDR; ships under v0 conventions.
 - Go reproducible builds: <https://go.dev/blog/forward-compatible-go-toolchain>

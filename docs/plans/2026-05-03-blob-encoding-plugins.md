@@ -15,7 +15,7 @@
 **Out of scope** (deferred or covered elsewhere):
 - V4 store config schema with explicit `plugin-chain` field — separate FDR.
 - Build-orchestration for content-addressed builtin-plugin-ids — FDR 0005.
-- zstd-with-dict plugin and the `cg capture --zstd-dict` user surface — FDR 0006.
+- zstd-with-dict plugin and the `cg capture --zstd-dict` user surface — FDR 0010.
 - Pipeline plugins (composing multiple transforms) — additive future work.
 - Per-blob plugin marker / wire-format change — explicitly deferred in FDR 0004.
 
@@ -128,7 +128,7 @@ import (
 )
 
 // Factory constructs a plugin instance. v0 plugins are non-parametric;
-// future parametric plugins (e.g. zstd-with-dict in FDR 0006) accept
+// future parametric plugins (e.g. zstd-with-dict in FDR 0010) accept
 // configuration via a separate side-data interface.
 type Factory interface {
 	New() interfaces.IOWrapper
@@ -238,7 +238,7 @@ git commit -m "feat(plugins): registry skeleton + sentinel errors
 
 New package internal/bravo/plugins. Holds the global registry of
 madder-owned blob-encoding plugins. v0 plugins are non-parametric;
-future parametric plugins (zstd-with-dict, FDR 0006) layer on via a
+future parametric plugins (zstd-with-dict, FDR 0010) layer on via a
 separate side-data interface.
 
 :clown:"
@@ -1353,7 +1353,7 @@ rg --type go 'compression_type\.' go/  # zero matches
 rg --type go 'dewey/delta/compression_type' go/  # zero matches
 ```
 
-If all of these pass, FDR 0004 v0 is shipped. The only remaining work is FDR 0006 (zstd-with-dict), which builds on this foundation.
+If all of these pass, FDR 0004 v0 is shipped. The only remaining work is FDR 0010 (zstd-with-dict), which builds on this foundation.
 
 ---
 
@@ -1371,6 +1371,6 @@ A successful run produces:
 The user-facing surface (`madder write`, `madder cat`, `cg capture`, `madder init`, the four hyphence subcommands, every existing flag) is byte-identical in behavior. On-disk store configs are unchanged. inventory_archive's per-entry compression byte format is unchanged.
 
 The plugin abstraction is now the single point of dispatch for compression encoding, ready to grow:
-- FDR 0006 will add the `zstd-with-dict` plugin, the cg-capture flag, and the train-zstd-dict subcommand on top of this v0.
+- FDR 0010 will add the `zstd-with-dict` plugin, the cg-capture flag, and the train-zstd-dict subcommand on top of this v0.
 - A future V4 store config schema can surface plugin references directly in TOML.
 - A future build-orchestration FDR (0005) can wire content-addressed builtin-plugin-ids without touching this layer.
