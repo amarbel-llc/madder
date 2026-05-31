@@ -40,8 +40,10 @@
       url = "github:amarbel-llc/purse-first";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
-      inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
+      # purse-first replaced its treefmt-nix input with treelint; dedup
+      # treelint's transitive treefmt-nix onto ours (doppelgang lint).
+      inputs.treelint.inputs.treefmt-nix.follows = "treefmt-nix";
     };
 
     # Sourced via goFlakeInputs (see madder#208) so a tap bump only

@@ -374,9 +374,11 @@ lint-fmt:
 # regenerates from internal/. The nix build runs `dagnabit export` in
 # preBuild (go/default.nix), so `just build` always compiles against
 # freshly generated facades and CANNOT catch committed drift — this is
-# the only gate that does. Regenerate-and-git-diff is a workaround until
-# dagnabit grows a native, side-effect-free check mode, tracked upstream:
-# amarbel-llc/purse-first#123. `dagnabit export` runs treefmt on its own
+# the only gate that does. dagnabit grew a native `export --check`
+# (amarbel-llc/purse-first#123), but it false-positives on a correct tree
+# (amarbel-llc/purse-first#125: its temp output-dir produces temp-relative
+# imports + skips dagnabit's fold pass), so this regenerate-and-git-diff
+# stays the gate until #125 is fixed. `dagnabit export` formats its own
 # output, so no separate `nix fmt` is needed for a clean diff.
 [group("pre-build")]
 lint-facades:
