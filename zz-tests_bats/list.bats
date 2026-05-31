@@ -89,3 +89,25 @@ function list_ndjson_multi_fields { # @test
   assert_output --partial '"mode":"write_through"'
   assert_output --partial '"read_fill":true'
 }
+
+function list_tree_forces_text_when_piped { # @test
+  # #225: -tree must render the tree even when stdout is piped. bats
+  # captures stdout (non-TTY), so Format.Resolve would otherwise default
+  # to ndjson; before the fix, `list -tree` silently emitted ndjson and
+  # skipped the tree renderer. -tree now forces text output regardless
+  # of pipe/-format.
+  init_store
+  run_madder init -encryption none .archive
+  assert_success
+  run_madder init-multi --mode write_through \
+    --write-store .default --read-store .archive --read-fill .cache
+  assert_success
+
+  run_madder list -tree
+  assert_success
+  # tree-only text markers (absent from the ndjson encoder output):
+  assert_output --partial '[multi/write_through]'
+  assert_output --partial '(read)'
+  # and it must NOT be the ndjson encoder's output
+  refute_output --partial '"id":'
+}

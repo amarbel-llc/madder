@@ -61,7 +61,7 @@ func (cmd *List) SetFlagDefinitions(
 ) {
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 	flagSet.BoolVar(&cmd.Tree, "tree", false,
-		"render the multi-store reference graph (text mode only)")
+		"render the multi-store reference graph (forces text output)")
 }
 
 type listRecord struct {
@@ -86,6 +86,15 @@ func (cmd List) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
 
+	// -tree is a human-facing text rendering of the multi-store graph;
+	// it forces text output regardless of -format or whether stdout is
+	// a TTY. The structured graph data (mode/read_fill/refs) remains
+	// available via -format=ndjson/json without -tree. See #225.
+	if cmd.Tree {
+		emitListTree(envBlobStore, blobStores)
+		return
+	}
+
 	// list is not a streaming TAP producer: tap-mode and the
 	// auto-on-TTY default both render the same human text. ndjson
 	// emits one record per line; json wraps the same records in a
@@ -97,24 +106,13 @@ func (cmd List) Run(req futility.Request) {
 	case output_format.FormatNDJSON:
 		err = emitListNDJSON(blobStores)
 	case output_format.FormatTAP:
-		cmd.emitListTextOrTree(envBlobStore, blobStores)
+		emitListText(envBlobStore, blobStores)
 	default:
-		cmd.emitListTextOrTree(envBlobStore, blobStores)
+		emitListText(envBlobStore, blobStores)
 	}
 	if err != nil {
 		req.Cancel(err)
 	}
-}
-
-func (cmd List) emitListTextOrTree(
-	envBlobStore command_components.BlobStoreEnv,
-	blobStores blob_stores.BlobStoreMap,
-) {
-	if cmd.Tree {
-		emitListTree(envBlobStore, blobStores)
-		return
-	}
-	emitListText(envBlobStore, blobStores)
 }
 
 func emitListText(
