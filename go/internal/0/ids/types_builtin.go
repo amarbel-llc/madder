@@ -17,6 +17,7 @@ const (
 	TypeTomlBlobStoreConfigInventoryArchiveV2       = "!toml-blob_store_config-inventory_archive-v2"
 	TypeTomlBlobStoreConfigInventoryArchiveVCurrent = TypeTomlBlobStoreConfigInventoryArchiveV2
 	TypeTomlBlobStoreConfigVCurrent                 = TypeTomlBlobStoreConfigV3
+	TypeTomlBlobStoreConfigMultiV0                  = "!toml-blob_store_config-multi-v0"
 )
 
 type BuiltinType struct {
@@ -41,6 +42,7 @@ func init() {
 		TypeTomlBlobStoreConfigSftpViaSSHConfigV0,
 		TypeTomlBlobStoreConfigWebdavV0,
 		TypeTomlBlobStoreConfigS3V0,
+		TypeTomlBlobStoreConfigMultiV0,
 	} {
 		ts := MustTypeStruct(tipeString)
 		allMap[ts] = BuiltinType{TypeStruct: ts}
