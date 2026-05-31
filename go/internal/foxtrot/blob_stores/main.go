@@ -431,6 +431,13 @@ func MakeBlobStore(
 
 		return MakeBlobStore(envDir, configNamed, blobStores)
 
+	case blob_store_configs.ConfigMulti:
+		return makeMultiStore(
+			envDir.GetActiveContext(),
+			config,
+			blobStores,
+		)
+
 	default:
 		err = errors.BadRequestf(
 			"unsupported blob store type %q:%T",
