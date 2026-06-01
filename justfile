@@ -45,12 +45,19 @@ debug-check-facade-imports: generate-facades
 # only the hand-written structs as source of truth — decoupling
 # regeneration from whatever stale state the previous generated files
 # happened to be in.
+#
+# Chains `nix fmt` last (like generate-facades): tommy emits no blank
+# lines between top-level functions, but treefmt's gofmt rule restores
+# them, so the raw `goimports -w` output is not treefmt-clean. Running
+# the formatter here keeps generate-tommy a one-step process and
+# prevents merge-hook (lint-fmt) surprises.
 [group("build")]
 generate-tommy:
   find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \
     -maxdepth 1 -type f -name '*_tommy.go' -delete
   cd go && go generate ./internal/charlie/blob_store_configs/...
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
+  nix fmt
 
 #    ____ _
 #   / ___| | ___  __ _ _ __
