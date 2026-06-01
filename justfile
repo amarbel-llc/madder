@@ -377,28 +377,17 @@ lint-fmt:
   system=$(nix eval --raw --impure --expr 'builtins.currentSystem')
   nix build --print-build-logs --no-link ".#checks.${system}.treefmt"
 
-# Fail if the committed pkgs/ facades have drifted from what dagnabit
-# regenerates from internal/. The nix build runs `dagnabit export` in
-# preBuild (go/default.nix), so `just build` always compiles against
-# freshly generated facades and CANNOT catch committed drift — this is
-# the only gate that does. dagnabit grew a native `export --check`
-# (amarbel-llc/purse-first#123), but it false-positives on a correct tree
-# (amarbel-llc/purse-first#125: its temp output-dir produces temp-relative
-# imports + skips dagnabit's fold pass), so this regenerate-and-git-diff
-# stays the gate until #125 is fixed. `dagnabit export` formats its own
-# output, so no separate `nix fmt` is needed for a clean diff.
+# Fail if the committed pkgs/ facades have drifted from their internal/
+# sources. The nix build runs `dagnabit export` in preBuild
+# (go/default.nix), so `just build` compiles against freshly generated
+# facades and CANNOT catch committed drift — this is the only gate that
+# does. Uses dagnabit's native, side-effect-free check (added in
+# amarbel-llc/purse-first#123; the false-positive-on-a-correct-tree bug
+# was fixed in #125): it renders a comparison copy into a dot-prefixed
+# dir under the module root and exits nonzero if it differs from committed.
 [group("pre-build")]
 lint-facades:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd go && dagnabit export
-  if git diff --quiet -- pkgs; then
-    exit 0
-  fi
-  echo "error: pkgs/ facades have drifted from their internal/ sources." >&2
-  echo "       run \`just generate-facades\` and commit the result." >&2
-  git --no-pager diff --stat -- pkgs >&2
-  exit 1
+  cd go && dagnabit export --check
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_
