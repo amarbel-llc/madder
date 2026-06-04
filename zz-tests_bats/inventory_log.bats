@@ -73,7 +73,7 @@ function inventory_log_disabled_by_no_inventory_log_flag { # @test
   day_dir="$XDG_LOG_HOME/madder/inventory_log/$(date -u +%Y-%m-%d)"
   if [[ -d $day_dir ]]; then
     local count
-    count="$(ls -1 "$day_dir"/*.hyphence 2>/dev/null | wc -l)"
+    count="$(find "$day_dir" -maxdepth 1 -name '*.hyphence' 2>/dev/null | wc -l)"
     [[ $count -eq 0 ]] || fail "--no-inventory-log should prevent session file creation; found $count file(s) in $day_dir"
   fi
 }
@@ -91,7 +91,7 @@ function inventory_log_disabled_by_env_var { # @test
   day_dir="$XDG_LOG_HOME/madder/inventory_log/$(date -u +%Y-%m-%d)"
   if [[ -d $day_dir ]]; then
     local count
-    count="$(ls -1 "$day_dir"/*.hyphence 2>/dev/null | wc -l)"
+    count="$(find "$day_dir" -maxdepth 1 -name '*.hyphence' 2>/dev/null | wc -l)"
     [[ $count -eq 0 ]] || fail "MADDER_INVENTORY_LOG=0 should prevent session file creation; found $count file(s) in $day_dir"
   fi
 }

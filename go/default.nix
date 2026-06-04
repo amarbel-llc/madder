@@ -446,6 +446,11 @@ in
     ]
     ++ pkgs-master.lib.optionals (conformist != null) [
       conformist.packages.${system}.default
+      # nixfmt and shellcheck are the formatter/linter binaries conformist
+      # drives from conformist.toml; goimports/gofumpt/shfmt are already
+      # in the devshell above.
+      pkgs.nixfmt
+      pkgs-master.shellcheck
     ]
     ++ (with pkgs-master; [
       delve

@@ -1,6 +1,7 @@
 #! /bin/bash -e
 
 if [[ -z $BATS_TEST_TMPDIR ]]; then
+  # shellcheck disable=SC2016
   echo 'common.bash loaded before $BATS_TEST_TMPDIR set. aborting.' >&2
 
   cat >&2 <<-'EOM'
@@ -68,6 +69,7 @@ write_blob_id() {
     run_madder write -format tap "$store" "$path"
   fi
   assert_success
+  # shellcheck disable=SC2154
   echo "$output" | grep '^ok ' | awk '{print $4}' | head -n 1
 }
 
@@ -81,7 +83,7 @@ today_session_file() {
   date="$(date -u +%Y-%m-%d)"
   day_dir="$XDG_LOG_HOME/madder/inventory_log/$date"
   [[ -d $day_dir ]] || return 1
-  ls -1 "$day_dir"/*.hyphence 2>/dev/null | head -n 1
+  find "$day_dir" -maxdepth 1 -name '*.hyphence' 2>/dev/null | head -n 1
 }
 
 # session_body strips the 4-line hyphence header (---, ! type, ---,

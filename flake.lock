@@ -109,7 +109,10 @@
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
-        "treefmt-nix": "treefmt-nix_2",
+        "treefmt-nix": [
+          "bats",
+          "treefmt-nix"
+        ],
         "utils": [
           "utils"
         ]
@@ -182,7 +185,10 @@
           "nixpkgs-master"
         ],
         "systems": "systems",
-        "treefmt-nix": "treefmt-nix_3"
+        "treefmt-nix": [
+          "bats",
+          "treefmt-nix"
+        ]
       },
       "locked": {
         "lastModified": 1780574017,
@@ -311,7 +317,10 @@
           "purse-first"
         ],
         "rust-overlay": "rust-overlay",
-        "treefmt-nix": "treefmt-nix_5",
+        "treefmt-nix": [
+          "bats",
+          "treefmt-nix"
+        ],
         "utils": [
           "utils"
         ]
@@ -383,91 +392,6 @@
         "type": "github"
       }
     },
-    "treefmt-nix_2": {
-      "inputs": {
-        "nixpkgs": [
-          "doppelgang",
-          "igloo"
-        ]
-      },
-      "locked": {
-        "lastModified": 1780220602,
-        "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "db947814a175b7ca6ded66e21383d938df01c227",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "type": "github"
-      }
-    },
-    "treefmt-nix_3": {
-      "inputs": {
-        "nixpkgs": [
-          "igloo",
-          "nixpkgs-master"
-        ]
-      },
-      "locked": {
-        "lastModified": 1780220602,
-        "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "db947814a175b7ca6ded66e21383d938df01c227",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "type": "github"
-      }
-    },
-    "treefmt-nix_4": {
-      "inputs": {
-        "nixpkgs": [
-          "purse-first",
-          "treelint",
-          "igloo"
-        ]
-      },
-      "locked": {
-        "lastModified": 1775636079,
-        "narHash": "sha256-pc20NRoMdiar8oPQceQT47UUZMBTiMdUuWrYu2obUP0=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "790751ff7fd3801feeaf96d7dc416a8d581265ba",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "type": "github"
-      }
-    },
-    "treefmt-nix_5": {
-      "inputs": {
-        "nixpkgs": [
-          "tap",
-          "igloo"
-        ]
-      },
-      "locked": {
-        "lastModified": 1780220602,
-        "narHash": "sha256-eynAfOmbmxJnkp7YewvCEbShNnnYJ9gLLqkzsYtBPeM=",
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "rev": "db947814a175b7ca6ded66e21383d938df01c227",
-        "type": "github"
-      },
-      "original": {
-        "owner": "numtide",
-        "repo": "treefmt-nix",
-        "type": "github"
-      }
-    },
     "treelint": {
       "inputs": {
         "igloo": [
@@ -478,7 +402,10 @@
           "purse-first",
           "nixpkgs-master"
         ],
-        "treefmt-nix": "treefmt-nix_4",
+        "treefmt-nix": [
+          "bats",
+          "treefmt-nix"
+        ],
         "utils": [
           "purse-first",
           "utils"

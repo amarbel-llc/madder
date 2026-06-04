@@ -3,6 +3,7 @@
     igloo = {
       url = "github:amarbel-llc/igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
 
     nixpkgs-master.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
@@ -33,8 +34,10 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
-      # TODO: add inputs.conformist.follows = "conformist" once
-      # purse-first publishes its treelint → conformist migration.
+      # Dedup treelint's transitive treefmt-nix onto bats/treefmt-nix
+      # (doppelgang lint). Drop once purse-first publishes its
+      # treelint → conformist migration.
+      inputs.treelint.inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
 
     # conformist: the linter + formatter multiplexer (treefmt successor).
@@ -54,6 +57,7 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
+      inputs.treefmt-nix.follows = "bats/treefmt-nix";
       inputs.purse-first.follows = "purse-first";
       inputs.gomod2nix.follows = "purse-first/gomod2nix";
     };
@@ -64,6 +68,7 @@
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
+      inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
   };
 

@@ -56,7 +56,7 @@ generate-tommy:
     -maxdepth 1 -type f -name '*_tommy.go' -delete
   cd go && go generate ./internal/charlie/blob_store_configs/...
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
-  conformist
+  nix develop {{justfile_directory()}} --command conformist
 
 #    ____ _
 #   / ___| | ___  __ _ _ __
@@ -345,7 +345,7 @@ test-bats-tags *tags:
 # in ./conformist.toml. The read-only counterpart is `lint-fmt`.
 [group("codemod")]
 fmt:
-  conformist
+  nix develop {{justfile_directory()}} --command conformist
 
 #   _     _       _
 #  | |   (_)_ __ | |_
@@ -365,10 +365,11 @@ lint-flake:
 
 # Read-only format + lint gate via conformist (the treefmt successor).
 # Verifies formatter drift (Go/Nix/shell, per ./conformist.toml) plus
-# shellcheck. `just fmt` is the corresponding write mode.
+# shellcheck. Runs inside the nix devshell so all formatter binaries
+# (nixfmt, gofumpt, etc.) are on PATH. `just fmt` is the write mode.
 [group("pre-build")]
 lint-fmt:
-  conformist check
+  nix develop {{justfile_directory()}} --command conformist check
 
 # Fail if the committed pkgs/ facades have drifted from their internal/
 # sources. The nix build runs `dagnabit export` in preBuild

@@ -11,13 +11,13 @@ setup() {
 # walk-up visits both. CWD is the leaf below the inner ancestor.
 multi_ancestor_setup() {
   mkdir -p outer/inner/leaf
-  cd outer
+  cd outer || exit
   init_store .outer_only
   init_store .default
-  cd inner
+  cd inner || exit
   init_store .default
   init_store .inner_only
-  cd leaf
+  cd leaf || exit
 }
 
 function list_shows_both_ancestor_stores { # @test
