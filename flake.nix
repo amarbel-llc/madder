@@ -34,10 +34,9 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
-      # Dedup treelint's transitive treefmt-nix onto bats/treefmt-nix
-      # (doppelgang lint). Drop once purse-first publishes its
-      # treelint → conformist migration.
-      inputs.treelint.inputs.treefmt-nix.follows = "bats/treefmt-nix";
+      # purse-first uses conformist (treefmt successor); dedup its input
+      # onto ours so flake.lock carries one copy (doppelgang lint).
+      inputs.conformist.follows = "conformist";
     };
 
     # conformist: the linter + formatter multiplexer (treefmt successor).
