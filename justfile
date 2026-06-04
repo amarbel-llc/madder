@@ -18,7 +18,7 @@ build-go:
   cd go && go build ./...
 
 # Regenerate pkgs/ facades from internal/ packages via dagnabit.
-# dagnabit now emits treefmt-compatible output directly — it folds
+# dagnabit now emits conformist-compatible output directly — it folds
 # consecutive same-kind decls into grouped blocks and runs the project
 # formatter on its output (amarbel-llc/purse-first#108, since closed), so
 # a fresh export is already lint-fmt-clean. No post-export `nix fmt` is
@@ -45,18 +45,18 @@ debug-check-facade-imports: generate-facades
 # regeneration from whatever stale state the previous generated files
 # happened to be in.
 #
-# Chains `nix fmt` last (like generate-facades): tommy emits no blank
-# lines between top-level functions, but treefmt's gofmt rule restores
-# them, so the raw `goimports -w` output is not treefmt-clean. Running
-# the formatter here keeps generate-tommy a one-step process and
-# prevents merge-hook (lint-fmt) surprises.
+# Chains `conformist` last (like generate-facades): tommy emits no blank
+# lines between top-level functions, but gofumpt restores them, so the
+# raw `goimports -w` output is not conformist-clean. Running the formatter
+# here keeps generate-tommy a one-step process and prevents merge-hook
+# (lint-fmt) surprises.
 [group("build")]
 generate-tommy:
   find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \
     -maxdepth 1 -type f -name '*_tommy.go' -delete
   cd go && go generate ./internal/charlie/blob_store_configs/...
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
-  nix fmt
+  conformist
 
 #    ____ _
 #   / ___| | ___  __ _ _ __
@@ -340,12 +340,12 @@ test-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
-# Format all source files via treefmt-nix (goimports → gofumpt for Go,
-# nixfmt for Nix, shfmt for shell/bats). Config lives in ./treefmt.nix;
-# `nix fmt` runs the same wrapper.
+# Format all source files via conformist (the treefmt successor): Go
+# (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt). Config lives
+# in ./conformist.toml. The read-only counterpart is `lint-fmt`.
 [group("codemod")]
 fmt:
-  nix fmt
+  conformist
 
 #   _     _       _
 #  | |   (_)_ __ | |_
@@ -363,18 +363,12 @@ lint: lint-flake lint-fmt lint-facades
 lint-flake:
   doppelgang lint --flake .
 
-# Check that all source files match treefmt's expected formatting.
-# Sandboxed check derivation (no working-tree side effects); exits 1
-# on drift. `just fmt` is the corresponding write mode. Resolving the
-# system tuple via `nix eval` keeps the recipe portable across linux /
-# darwin without depending on just's `os()` (which returns `macos`,
-# not nix's `darwin`).
+# Read-only format + lint gate via conformist (the treefmt successor).
+# Verifies formatter drift (Go/Nix/shell, per ./conformist.toml) plus
+# shellcheck. `just fmt` is the corresponding write mode.
 [group("pre-build")]
 lint-fmt:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  system=$(nix eval --raw --impure --expr 'builtins.currentSystem')
-  nix build --print-build-logs --no-link ".#checks.${system}.treefmt"
+  conformist check
 
 # Fail if the committed pkgs/ facades have drifted from their internal/
 # sources. The nix build runs `dagnabit export` in preBuild

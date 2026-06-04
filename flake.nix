@@ -3,16 +3,9 @@
     igloo = {
       url = "github:amarbel-llc/igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
-      inputs.treefmt-nix.follows = "treefmt-nix";
     };
 
     nixpkgs-master.url = "github:NixOS/nixpkgs/d233902339c02a9c334e7e593de68855ad26c4cb";
-
-    # `nix fmt` driver. Config lives in ./treefmt.nix.
-    treefmt-nix = {
-      url = "github:numtide/treefmt-nix";
-      inputs.nixpkgs.follows = "igloo";
-    };
 
     utils = {
       url = "https://flakehub.com/f/numtide/flake-utils/0.1.102";
@@ -32,7 +25,6 @@
       url = "github:amarbel-llc/bats";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
-      inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.utils.follows = "utils";
     };
 
@@ -41,9 +33,17 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
-      # purse-first replaced its treefmt-nix input with treelint; dedup
-      # treelint's transitive treefmt-nix onto ours (doppelgang lint).
-      inputs.treelint.inputs.treefmt-nix.follows = "treefmt-nix";
+      # TODO: add inputs.conformist.follows = "conformist" once
+      # purse-first publishes its treelint → conformist migration.
+    };
+
+    # conformist: the linter + formatter multiplexer (treefmt successor).
+    # Config lives in ./conformist.toml.
+    conformist = {
+      url = "github:amarbel-llc/conformist";
+      inputs.igloo.follows = "igloo";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
     };
 
     # Sourced via goFlakeInputs (see madder#208) so a tap bump only
@@ -54,7 +54,6 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
-      inputs.treefmt-nix.follows = "treefmt-nix";
       inputs.purse-first.follows = "purse-first";
       inputs.gomod2nix.follows = "purse-first/gomod2nix";
     };
@@ -65,7 +64,6 @@
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
-      inputs.treefmt-nix.follows = "treefmt-nix";
     };
   };
 
@@ -80,7 +78,7 @@
       purse-first,
       tap,
       doppelgang,
-      treefmt-nix,
+      conformist,
       ...
     }:
     let
@@ -120,8 +118,22 @@
 
         inherit (gomod.goPkgs) go-pkgs go-pkgs-test;
 
-        # `nix fmt` entry point. Config lives in ./treefmt.nix.
-        treefmtEval = treefmt-nix.lib.evalModule pkgs ./treefmt.nix;
+        # `nix fmt` entry point: conformist (the treefmt successor) wrapped
+        # with the formatter binaries its ./conformist.toml drives on PATH.
+        # Formatting drift is gated by `just lint-fmt` (conformist check).
+        pkgs-master = import nixpkgs-master { inherit system; };
+        conformistFmt = pkgs.writeShellApplication {
+          name = "conformist-fmt";
+          runtimeInputs = [
+            conformist.packages.${system}.default
+            pkgs-master.gofumpt
+            pkgs-master.gotools
+            pkgs.nixfmt
+            pkgs.shfmt
+            pkgs.shellcheck
+          ];
+          text = ''exec conformist "$@"'';
+        };
 
         result = import ./go/default.nix {
           nixpkgs = igloo;
@@ -131,6 +143,7 @@
             bats
             purse-first
             doppelgang
+            conformist
             system
             ;
           # Pivot self-consumption onto the published artifact: every
@@ -158,12 +171,8 @@
           inherit go-pkgs go-pkgs-test;
         };
         devShells.default = result.devShells.default;
-        formatter = treefmtEval.config.build.wrapper;
-        # Sandboxed treefmt check for `just lint-fmt` and `nix flake
-        # check`. Runs formatters over the source tree in a nix build
-        # and exits non-zero on drift — no working-tree side effects,
-        # unlike `nix fmt -- --ci`.
-        checks.treefmt = treefmtEval.config.build.check self;
+        # `nix fmt` runs conformist (see conformistFmt above).
+        formatter = conformistFmt;
       }
     ));
 }

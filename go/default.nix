@@ -9,6 +9,9 @@
   # `import ./go/default.nix` callers without a flake context still
   # work — the devShell just won't carry doppelgang in that mode.
   doppelgang ? null,
+  # conformist (treefmt successor) — format + lint gate. Defaulted to null
+  # so non-flake callers still work; the devShell just won't carry it.
+  conformist ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -440,6 +443,9 @@ in
     ]
     ++ pkgs-master.lib.optionals (doppelgang != null) [
       doppelgang.packages.${system}.default
+    ]
+    ++ pkgs-master.lib.optionals (conformist != null) [
+      conformist.packages.${system}.default
     ]
     ++ (with pkgs-master; [
       delve
