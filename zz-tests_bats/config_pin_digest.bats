@@ -16,7 +16,7 @@ function config_pin_digest_mints_on_legacy { # @test
   chmod 0444 "$config"
 
   run grep -E '^@ blake2b256-' "$config"
-  assert_failure  # confirm legacy shape
+  assert_failure # confirm legacy shape
 
   run_madder config-pin_digest .default
   assert_success
@@ -50,8 +50,7 @@ function config_pin_digest_all { # @test
 
   for config in \
     .madder/local/share/blob_stores/default/blob_store-config \
-    .madder/local/share/blob_stores/archive/blob_store-config
-  do
+    .madder/local/share/blob_stores/archive/blob_store-config; do
     chmod 0644 "$config"
     sed -i.bak '/^@ /d' "$config" && rm "$config.bak"
     chmod 0444 "$config"
@@ -62,8 +61,7 @@ function config_pin_digest_all { # @test
 
   for config in \
     .madder/local/share/blob_stores/default/blob_store-config \
-    .madder/local/share/blob_stores/archive/blob_store-config
-  do
+    .madder/local/share/blob_stores/archive/blob_store-config; do
     run grep -E '^@ blake2b256-' "$config"
     assert_success
   done
