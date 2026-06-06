@@ -77,6 +77,20 @@ func (id Id) String() string {
 	return fmt.Sprintf("%c%s", prefix, id.id)
 }
 
+// DisambiguatedString returns the form a user can type to address the
+// store unambiguously even when a file of the same name exists in CWD
+// (#231). XDG-user ids render with the `~` parse-only alias — their
+// bare String() is exactly what file-first arg resolution would
+// re-route to the file. Every other location's prefixed String()
+// already bypasses the filesystem probe and is returned unchanged.
+func (id Id) DisambiguatedString() string {
+	if id.location == xdg_location_type.XDGUser {
+		return "~" + id.String()
+	}
+
+	return id.String()
+}
+
 // Canonical returns the wire-format form of an Id: same as String for
 // non-Cwd locations, and always single-dot for Cwd (depth dropped).
 // MarshalText delegates here so on-disk references survive CWD changes.

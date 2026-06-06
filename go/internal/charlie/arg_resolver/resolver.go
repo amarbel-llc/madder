@@ -146,11 +146,15 @@ func DetectShadow(arg string, candidates []blob_store_id.Id) (shadowed blob_stor
 
 // FormatShadowWarning builds the canonical message for a file arg that
 // shadows a configured blob-store-id. Centralized so every caller of
-// DetectShadow emits the same phrasing and disambiguation hint.
+// DetectShadow emits the same phrasing and disambiguation hint. The
+// hint renders the id's DisambiguatedString — for an unprefixed (XDG
+// user) store the bare name is exactly the argument that just resolved
+// to the file, so suggesting it back would be circular (#231); the `~`
+// parse-only alias bypasses the filesystem probe.
 func FormatShadowWarning(arg string, shadowed blob_store_id.Id) string {
 	return fmt.Sprintf(
 		"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
-		arg, shadowed, arg, shadowed.String(),
+		arg, shadowed, arg, shadowed.DisambiguatedString(),
 	)
 }
 

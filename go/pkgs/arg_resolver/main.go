@@ -25,7 +25,11 @@ var DetectShadow = internal.DetectShadow
 
 // FormatShadowWarning builds the canonical message for a file arg that
 // shadows a configured blob-store-id. Centralized so every caller of
-// DetectShadow emits the same phrasing and disambiguation hint.
+// DetectShadow emits the same phrasing and disambiguation hint. The
+// hint renders the id's DisambiguatedString — for an unprefixed (XDG
+// user) store the bare name is exactly the argument that just resolved
+// to the file, so suggesting it back would be circular (#231); the `~`
+// parse-only alias bypasses the filesystem probe.
 var FormatShadowWarning = internal.FormatShadowWarning
 
 // FormatStoreSwitchNotice builds the canonical message callers emit when

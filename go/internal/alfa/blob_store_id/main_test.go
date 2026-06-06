@@ -116,6 +116,43 @@ func TestId_Set_NameCharsetEnforced(t *testing.T) {
 	}
 }
 
+// TestId_DisambiguatedString pins #231's rendering contract: the form
+// a user can type to address the store unambiguously even when a file
+// of the same name exists in CWD. XDG-user ids render with the `~`
+// parse-only alias (their bare String() is exactly what file-first
+// resolution would re-route to the file); every other location's
+// prefixed String() already bypasses the filesystem probe.
+func TestId_DisambiguatedString(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"default", "~default"},
+		{"~legacy", "~legacy"},
+		{".archive", ".archive"},
+		{"..deep", "..deep"},
+		{"%scratch", "%scratch"},
+		{"_custom", "_custom"},
+		{"/system", "/system"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			var id Id
+			if err := id.Set(tc.input); err != nil {
+				t.Fatalf("Set(%q): %v", tc.input, err)
+			}
+
+			if got := id.DisambiguatedString(); got != tc.want {
+				t.Errorf(
+					"DisambiguatedString() = %q, want %q",
+					got, tc.want,
+				)
+			}
+		})
+	}
+}
+
 func TestId_Canonical_DropsDepth(t *testing.T) {
 	var id Id
 	if err := id.Set("...rsync_dot_net"); err != nil {

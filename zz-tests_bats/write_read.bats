@@ -141,8 +141,9 @@ function write_warns_when_file_shadows_store { # @test
 
   # Bare `write shadowed` resolves to the file but must warn about the
   # blob-store-id collision. Post-#227 the unprefixed init lands in XDG
-  # user scope (not the CWD walk-up), so the shadowed id renders
-  # unprefixed in the warning.
+  # user scope (not the CWD walk-up); post-#231 the hint offers the
+  # `~` parse-only alias, since the bare name would just re-resolve to
+  # the file.
   init_store
   run_madder init -encryption none shadowed
   assert_success
@@ -153,7 +154,7 @@ function write_warns_when_file_shadows_store { # @test
   assert_success
   assert_output --partial "shadows blob-store-id"
   assert_output --partial "'./shadowed'"
-  assert_output --partial 'or "shadowed" for the blob-store-id'
+  assert_output --partial 'or "~shadowed" for the blob-store-id'
 }
 
 function pack_blobs_warns_when_file_shadows_store { # @test

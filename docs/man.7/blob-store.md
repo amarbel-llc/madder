@@ -69,9 +69,11 @@ Two blob-store-ids that share a name but differ in prefix refer to
 Unprefixed names resolve to XDG user stores by default, but several
 commands (**write**, **pack-blobs**) consult the filesystem first: if a
 file of the same name exists in CWD, the argument is treated as a file
-path. To target a store unambiguously in a directory that may contain a
-like-named file, use an explicit prefix (**~mystore** or **\_mystore**) or
-the full disambiguating form.
+path. To target an XDG user store unambiguously in a directory that may
+contain a like-named file, use the **~** parse-only alias
+(**~mystore**); the shadow warning suggests this form. (A **\_** prefix
+selects the distinct Unknown scope — it does not address an XDG user
+store of the same name.)
 
 # STORE TYPES
 
