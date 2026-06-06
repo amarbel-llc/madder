@@ -20,7 +20,9 @@ func PrintBlobErrors(
 	envLocal env_local.Env,
 	blobErrors collections_slice.Slice[BlobError],
 ) {
-	ui.Err().Printf("blobs with errors: %d", blobErrors.Len())
+	// Route the header through the same env err sink as the per-blob
+	// lines below — not the process-global stderr printer (#229).
+	envLocal.GetErr().Printf("blobs with errors: %d", blobErrors.Len())
 
 	bufferedWriter, repool := pool.GetBufferedWriter(envLocal.GetErr())
 	defer repool()

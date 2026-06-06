@@ -9,7 +9,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 )
 
 func MakeBlobImporter(
@@ -144,11 +143,7 @@ func (blobImporter *BlobImporter) ImportBlobToStoreIfNecessary(
 			}
 		},
 		func(time time.Time) {
-			ui.Err().Printf(
-				"Copying %s... (%s written)",
-				blobId,
-				progressWriter.GetWrittenHumanString(),
-			)
+			blobImporter.printCopyProgress(blobId, &progressWriter)
 		},
 		3*time.Second,
 	); err != nil {
@@ -157,4 +152,21 @@ func (blobImporter *BlobImporter) ImportBlobToStoreIfNecessary(
 	}
 
 	return copyResult
+}
+
+// printCopyProgress emits the periodic copy-progress line through the
+// importer env's err sink (honoring env_ui's CustomErr /
+// UIFileIsStderr) rather than the process-global ui.Err() stderr
+// printer, so consumers can redirect transfer chatter per-env — the
+// same contract #228 established for blob-store construction chatter.
+// See #229.
+func (blobImporter *BlobImporter) printCopyProgress(
+	blobId domain_interfaces.MarklId,
+	progressWriter *env_ui.ProgressWriter,
+) {
+	blobImporter.EnvBlobStore.GetErr().Printf(
+		"Copying %s... (%s written)",
+		blobId,
+		progressWriter.GetWrittenHumanString(),
+	)
 }
