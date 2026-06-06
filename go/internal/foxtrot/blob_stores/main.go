@@ -248,6 +248,30 @@ func MakeRemoteBlobStore(
 	return blobStore
 }
 
+// uiErrEnv is the narrow slice of env_ui.Env that blob-store
+// construction sniffs for: a per-env err sink that honors env_ui's
+// CustomErr / UIFileIsStderr options. env_local.Env and
+// blob_store_env.BlobStoreEnv both satisfy it when they pass
+// themselves to MakeBlobStore; a bare env_dir.Env does not, and
+// chatter falls back to the process-global stderr printer. See #228.
+type uiErrEnv interface {
+	GetErr() fd.Std
+}
+
+// storeChatterPrinter resolves the base printer for blob-store and
+// ssh-helper chatter (lazy SFTP dial/host-key/remote-config lines)
+// from the env, preferring the env's own err sink over the ui.Err()
+// global so consumers can redirect or silence store chatter per-env
+// (#228). With no custom sink configured the env's sink IS stderr,
+// so default behavior is unchanged.
+func storeChatterPrinter(envDir env_dir.Env) ui.Printer {
+	if envUI, ok := envDir.(uiErrEnv); ok {
+		return envUI.GetErr()
+	}
+
+	return ui.Err()
+}
+
 // NOTE: blobStores parameter added to support inventory archive's
 // loose-blob-store-id resolution. This couples MakeBlobStore to the
 // store map, which may not scale well if more store types need
@@ -277,7 +301,7 @@ func MakeBlobStore(
 	}()
 
 	printer := ui.MakePrefixPrinter(
-		ui.Err(),
+		storeChatterPrinter(envDir),
 		fmt.Sprintf("# (blob_store: %s) ", configNamed.Path.GetId()),
 	)
 
