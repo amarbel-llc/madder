@@ -186,7 +186,7 @@ func writeCertPEM(pemBytes []byte) (name string, err error) {
 	}
 	defer errors.DeferredCloser(&err, f)
 	if _, err = f.Write(pemBytes); err != nil {
-		_ = os.Remove(f.Name())
+		err = errors.Join(err, os.Remove(f.Name()))
 		return "", err
 	}
 	return f.Name(), nil

@@ -119,7 +119,7 @@ func writeKnownHosts(publicKey ssh.PublicKey, port int) (name string, err error)
 		base64.StdEncoding.EncodeToString(publicKey.Marshal()),
 	)
 	if _, err = f.WriteString(line); err != nil {
-		_ = os.Remove(f.Name())
+		err = errors.Join(err, os.Remove(f.Name()))
 		return "", err
 	}
 	return f.Name(), nil
