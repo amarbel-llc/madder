@@ -53,6 +53,19 @@ func init() {
 			Description: "Initialize a CWD-relative store and copy all default-store blobs into it.",
 			Command:     "madder init .archive\nmadder sync .default .archive",
 		},
+		futility.Example{
+			Description: "Copy a single blob into a named store by piping cat " +
+				"into write. The blob-store-id argument switches write's " +
+				"destination (without one, blobs land in the default " +
+				"store); '-' reads stdin. write rehashes under the " +
+				"destination store's configured hash (blake2b256 by " +
+				"default), so the round-trip is content-preserving but " +
+				"not digest-preserving across hash types: bytes fetched " +
+				"by a sha256-… id land under a new blake2b256-… id, not " +
+				"the original address. To copy between stores of " +
+				"matching hash type, prefer 'madder sync'.",
+			Command: "madder cat \"$hash\" | madder write .archive -",
+		},
 	)
 
 	utility.Files = append(
