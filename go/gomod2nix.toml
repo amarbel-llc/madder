@@ -17,8 +17,8 @@ schema = 3
     goVersion = '1.14'
 
   [mod.'github.com/amarbel-llc/purse-first/libs/dewey']
-    version = 'v0.1.8'
-    hash = 'sha256-dNrByOns78mIRKUK9003JKK0p3L3UmYeZjRYt3J/huM='
+    version = 'v0.2.9'
+    hash = 'sha256-wHTb+8VhDR4nz8if2mfrHiICfzDf4C4sZZ6z7eumIak='
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/tap/go']
