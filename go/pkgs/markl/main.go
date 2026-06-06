@@ -99,16 +99,30 @@ var (
 
 // TODO verify if this is correct
 var (
-	AgeX25519GetPublicKey              = internal.AgeX25519GetPublicKey
-	AssertEqual                        = internal.AssertEqual
-	AssertIdIsNotNull                  = internal.AssertIdIsNotNull
-	AssertIdIsNotNullWithPurpose       = internal.AssertIdIsNotNullWithPurpose
-	AssertIdIsNull                     = internal.AssertIdIsNull
-	Clone                              = internal.Clone
-	CompareToReader                    = internal.CompareToReader
-	CompareToReaderAt                  = internal.CompareToReaderAt
-	ConnectEcdsaP256AgentSigner        = internal.ConnectEcdsaP256AgentSigner
-	ConnectSSHAgentSigner              = internal.ConnectSSHAgentSigner
+	AgeX25519GetPublicKey        = internal.AgeX25519GetPublicKey
+	AssertEqual                  = internal.AssertEqual
+	AssertIdIsNotNull            = internal.AssertIdIsNotNull
+	AssertIdIsNotNullWithPurpose = internal.AssertIdIsNotNullWithPurpose
+	AssertIdIsNull               = internal.AssertIdIsNull
+	Clone                        = internal.Clone
+	CompareToReader              = internal.CompareToReader
+	CompareToReaderAt            = internal.CompareToReaderAt
+	ConnectEcdsaP256AgentSigner  = internal.ConnectEcdsaP256AgentSigner
+	ConnectSSHAgentSigner        = internal.ConnectSSHAgentSigner
+)
+
+// DiscoverAgentECDHKeysVerbose discovers ECDSA P-256 keys from the agent
+// whose unix socket path is held in the named environment variable (e.g.
+// PIGGY_AUTH_SOCK to target piggy-agent instead of the agent fronted by
+// SSH_AUTH_SOCK).
+var DiscoverAgentECDHKeysVerbose = internal.DiscoverAgentECDHKeysVerbose
+
+// DiscoverAgentEd25519KeysVerbose discovers Ed25519 keys from the agent
+// whose unix socket path is held in the named environment variable (e.g.
+// PIGGY_AUTH_SOCK to target piggy-agent instead of the agent fronted by
+// SSH_AUTH_SOCK).
+var (
+	DiscoverAgentEd25519KeysVerbose    = internal.DiscoverAgentEd25519KeysVerbose
 	DiscoverPivyAgentECDHKeys          = internal.DiscoverPivyAgentECDHKeys
 	DiscoverPivyAgentECDHKeysVerbose   = internal.DiscoverPivyAgentECDHKeysVerbose
 	DiscoverSSHAgentECDHKeys           = internal.DiscoverSSHAgentECDHKeys

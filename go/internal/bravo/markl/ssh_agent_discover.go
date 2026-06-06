@@ -60,7 +60,17 @@ func DiscoverSSHAgentEd25519Keys() ([]Id, error) {
 }
 
 func DiscoverSSHAgentEd25519KeysVerbose() ([]DiscoveredKey, error) {
-	keys, err := listAgentKeys("SSH_AUTH_SOCK")
+	return DiscoverAgentEd25519KeysVerbose("SSH_AUTH_SOCK")
+}
+
+// DiscoverAgentEd25519KeysVerbose discovers Ed25519 keys from the agent
+// whose unix socket path is held in the named environment variable (e.g.
+// PIGGY_AUTH_SOCK to target piggy-agent instead of the agent fronted by
+// SSH_AUTH_SOCK).
+func DiscoverAgentEd25519KeysVerbose(
+	socketEnvVar string,
+) ([]DiscoveredKey, error) {
+	keys, err := listAgentKeys(socketEnvVar)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +122,17 @@ func DiscoverSSHAgentECDHKeys() ([]Id, error) {
 }
 
 func DiscoverSSHAgentECDHKeysVerbose() ([]DiscoveredKey, error) {
-	keys, err := listAgentKeys("SSH_AUTH_SOCK")
+	return DiscoverAgentECDHKeysVerbose("SSH_AUTH_SOCK")
+}
+
+// DiscoverAgentECDHKeysVerbose discovers ECDSA P-256 keys from the agent
+// whose unix socket path is held in the named environment variable (e.g.
+// PIGGY_AUTH_SOCK to target piggy-agent instead of the agent fronted by
+// SSH_AUTH_SOCK).
+func DiscoverAgentECDHKeysVerbose(
+	socketEnvVar string,
+) ([]DiscoveredKey, error) {
+	keys, err := listAgentKeys(socketEnvVar)
 	if err != nil {
 		return nil, err
 	}
