@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 )
 
 func (env env) Delete(paths ...string) (err error) {
@@ -18,7 +17,11 @@ func (env env) Delete(paths ...string) (err error) {
 		}
 
 		if env.IsDryRun() {
-			ui.Err().Print("would delete:", path)
+			// Route through the per-env sink when one was wired at
+			// construction (#232) so library consumers (dodder calls
+			// Delete from its checkout/deinit flows) can redirect the
+			// notice; nil falls back to the global stderr printer.
+			env.getUIErrPrinter().Print("would delete:", path)
 			return err
 		}
 

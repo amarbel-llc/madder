@@ -13,6 +13,7 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
 )
 
@@ -71,6 +72,13 @@ type env struct {
 
 	blobWriteObserver domain_interfaces.BlobWriteObserver
 
+	// uiErrPrinter is the optional per-env sink for env_dir's own
+	// chatter (the dry-run "would delete" notice, #232). Wired at
+	// env-construction time like blobWriteObserver — the setter lives
+	// on the concrete type because it needs a pointer receiver. Nil
+	// means fall back to the process-global stderr printer.
+	uiErrPrinter ui.Printer
+
 	xdg.XDG
 }
 
@@ -117,6 +125,25 @@ func (env env) GetBlobWriteObserver() domain_interfaces.BlobWriteObserver {
 
 func (env *env) SetBlobWriteObserver(observer domain_interfaces.BlobWriteObserver) {
 	env.blobWriteObserver = observer
+}
+
+// SetUIErrPrinter wires the err sink env_dir's own chatter routes
+// through (#232). Callers with the concrete value set it after
+// construction — (&dir).SetUIErrPrinter(envUI.GetErr()) — mirroring
+// SetBlobWriteObserver.
+func (env *env) SetUIErrPrinter(printer ui.Printer) {
+	env.uiErrPrinter = printer
+}
+
+// getUIErrPrinter resolves the chatter sink: the wired per-env
+// printer when one was set, the process-global stderr printer
+// otherwise (default behavior unchanged).
+func (env env) getUIErrPrinter() ui.Printer {
+	if env.uiErrPrinter != nil {
+		return env.uiErrPrinter
+	}
+
+	return ui.Err()
 }
 
 func (env env) GetActiveContext() interfaces.ActiveContext {

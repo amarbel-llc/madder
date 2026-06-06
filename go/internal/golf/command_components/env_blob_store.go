@@ -78,6 +78,13 @@ func (cmd EnvBlobStore) makeEnvLocal(
 		xdgScope = req.Utility.GetName()
 	}
 
+	envUI := env_ui.Make(
+		req,
+		config,
+		debugOptions,
+		envOptions,
+	)
+
 	dir := env_dir.MakeDefault(
 		req,
 		env_dir.Config{
@@ -88,13 +95,10 @@ func (cmd EnvBlobStore) makeEnvLocal(
 	)
 
 	(&dir).SetBlobWriteObserver(makeBlobWriteObserver(req))
-
-	envUI := env_ui.Make(
-		req,
-		config,
-		debugOptions,
-		envOptions,
-	)
+	// Route env_dir's own chatter (dry-run delete notices) through the
+	// env err sink so it honors CustomErr / UIFileIsStderr like the
+	// blob-store and transfer chatter (#232).
+	(&dir).SetUIErrPrinter(envUI.GetErr())
 
 	return env_local.Make(envUI, dir)
 }
