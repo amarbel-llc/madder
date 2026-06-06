@@ -28,7 +28,10 @@ Unprefixed IDs default to XDG user location.
 
 `Set()` checks if the first character is a known prefix (`.`, `/`, `_`, `~`, `%`).
 If so, it splits prefix + remainder. Otherwise the entire value is the name with
-XDG user location. `String()` omits the prefix for XDG user IDs. `~` is accepted
+XDG user location. The name portion must match `[a-zA-Z0-9_-]+` (blob-store(7));
+`Set()` rejects anything else (#227 — path-shaped values used to parse and then
+mangle init's store paths). Direct construction via `Make`/`MakeWithLocation`
+is not validated. `String()` omits the prefix for XDG user IDs. `~` is accepted
 on parse for backward compatibility but is never emitted.
 
 Two IDs with the same name but different locations (e.g. `default` vs `.default`)

@@ -137,7 +137,7 @@ func (id *Id) Set(value string) (err error) {
 		id.cwdDepth = uint(dots - 1)
 		id.id = value[dots:]
 
-		return err
+		return validateName(id.id)
 	}
 
 	id.cwdDepth = 0
@@ -160,7 +160,36 @@ func (id *Id) Set(value string) (err error) {
 		id.id = value
 	}
 
-	return err
+	return validateName(id.id)
+}
+
+// validateName enforces the documented name charset on parsed ids —
+// blob-store(7): "The ID portion after the prefix may contain only
+// [a-zA-Z0-9_-]." Without it, a path-shaped value like
+// "/home/user/store" parsed as an XDGSystem id whose name carried
+// slashes, and init string-joined that name into a nested directory
+// tree under the store root (#227). Direct construction via Make /
+// MakeWithLocation stays unvalidated: those take trusted, internal
+// names (e.g. discovery reading existing directory base names).
+func validateName(name string) error {
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '_',
+			r == '-':
+		default:
+			return errors.Errorf(
+				"blob_store_id name may contain only [a-zA-Z0-9_-]; "+
+					"got %q in %q",
+				string(r),
+				name,
+			)
+		}
+	}
+
+	return nil
 }
 
 func (id Id) Less(otherId Id) bool {

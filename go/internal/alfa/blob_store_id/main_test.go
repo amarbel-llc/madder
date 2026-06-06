@@ -66,6 +66,56 @@ func TestId_Set_AllDotsRejected(t *testing.T) {
 	}
 }
 
+// TestId_Set_NameCharsetEnforced pins the second half of #227:
+// blob-store(7) declares the name portion may contain only
+// [a-zA-Z0-9_-], but Set never enforced it. A path-shaped value like
+// "/home/user/store" parsed as an XDGSystem id whose NAME contained
+// slashes, which init then string-joined into a nested directory tree
+// under the store root instead of rejecting the argument.
+func TestId_Set_NameCharsetEnforced(t *testing.T) {
+	invalid := []string{
+		"/home/user/store", // the #227 mangle: separators in the name
+		"foo/bar",
+		".foo/bar",
+		"%foo/bar",
+		"foo.bar", // dot is only meaningful as a location prefix
+		"foo bar",
+		"föö",
+	}
+
+	for _, input := range invalid {
+		t.Run(input, func(t *testing.T) {
+			var id Id
+			if err := id.Set(input); err == nil {
+				t.Errorf(
+					"Set(%q) = nil, want name-charset error (got id %q)",
+					input, id.String(),
+				)
+			}
+		})
+	}
+
+	valid := []string{
+		"default",
+		"sftp-default",
+		"under_score",
+		"..deep",
+		"%scratch",
+		"_custom",
+		"~legacy",
+		"/system",
+	}
+
+	for _, input := range valid {
+		t.Run(input, func(t *testing.T) {
+			var id Id
+			if err := id.Set(input); err != nil {
+				t.Errorf("Set(%q): unexpected error: %v", input, err)
+			}
+		})
+	}
+}
+
 func TestId_Canonical_DropsDepth(t *testing.T) {
 	var id Id
 	if err := id.Set("...rsync_dot_net"); err != nil {

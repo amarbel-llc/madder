@@ -140,7 +140,9 @@ function list_json_and_ndjson_output_deterministic_across_runs { # @test
 function write_warns_when_file_shadows_store { # @test
 
   # Bare `write shadowed` resolves to the file but must warn about the
-  # blob-store-id collision.
+  # blob-store-id collision. Post-#227 the unprefixed init lands in XDG
+  # user scope (not the CWD walk-up), so the shadowed id renders
+  # unprefixed in the warning.
   init_store
   run_madder init -encryption none shadowed
   assert_success
@@ -151,7 +153,7 @@ function write_warns_when_file_shadows_store { # @test
   assert_success
   assert_output --partial "shadows blob-store-id"
   assert_output --partial "'./shadowed'"
-  assert_output --partial '".shadowed"'
+  assert_output --partial 'or "shadowed" for the blob-store-id'
 }
 
 function pack_blobs_warns_when_file_shadows_store { # @test
