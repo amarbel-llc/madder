@@ -52,6 +52,25 @@ func (cmd Init) InitBlobStore(
 		return path
 	}
 
+	// The registered id's location comes from the layout
+	// (getBlobStorePath), so a scope the layout cannot represent would
+	// create the store under a DIFFERENT id than the user named —
+	// reject instead (#230). Under the user-data layout this covers
+	// '%' (XDG cache — owned by madder-cache(1)), '/' (XDG system —
+	// not implemented), and '_' (Unknown — root comes from
+	// configuration, not a name).
+	if id.GetLocationType() != layout.GetLocationType() {
+		envBlobStore.Cancel(errors.BadRequestf(
+			"blob-store-id %q selects the %v scope, which this "+
+				"utility's store layout (%v) cannot represent; "+
+				"see blob-store(7) for scope prefixes (#230)",
+			id,
+			id.GetLocationType(),
+			layout.GetLocationType(),
+		))
+		return path
+	}
+
 	path = directory_layout.GetBlobStorePath(
 		layout,
 		id.GetName(),

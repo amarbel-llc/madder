@@ -15,7 +15,6 @@ type (
 		GetLocationType() Type
 	}
 
-	//go:generate stringer -type=Typee
 	Typee int
 )
 
@@ -35,6 +34,30 @@ var (
 func (Typee) xdgLocationType() {}
 
 func (t Typee) GetLocationType() Type { return t }
+
+// String renders the user-facing scope name (the vocabulary
+// blob-store(7) uses), primarily for error messages like #230's
+// unsupported-scope rejection. Hand-written rather than
+// stringer-generated so the names read as documentation terms, not Go
+// identifiers.
+func (t Typee) String() string {
+	switch t {
+	case Cwd:
+		return "CWD"
+
+	case XDGUser:
+		return "XDG user"
+
+	case XDGSystem:
+		return "XDG system"
+
+	case XDGCache:
+		return "XDG cache"
+
+	default:
+		return "unknown"
+	}
+}
 
 func (t *Typee) SetPrefix(firstChar rune) (err error) {
 	switch firstChar {

@@ -38,18 +38,23 @@ location:
 
 **/**
 :   XDG system store. Located under system-wide XDG data directories.
-    Example: **/shared**
+    Example: **/shared**. Not yet implemented — **madder init** rejects
+    this scope rather than silently creating the store elsewhere.
 
 **%**
 :   XDG cache store. Located under
     **$XDG_CACHE_HOME/madder-cache/blob_stores/** (typically
     **~/.cache/madder-cache/blob_stores/**). Purgeable — managed by the
-    **madder-cache**(1) utility. Example: **%scratch**
+    **madder-cache**(1) utility. Example: **%scratch**. Create with
+    **madder-cache init**; **madder init** rejects this scope because
+    its store layout cannot represent it.
 
 **\_**
 :   Unknown location. Reserved for stores whose filesystem root is
-    determined by configuration rather than the XDG scheme. Example:
-    **\_custom**
+    determined by configuration rather than the XDG scheme (e.g. stores
+    opened from an explicit config path). Example: **\_custom**. Cannot
+    be created by **madder init** — the root comes from configuration,
+    not from a name.
 
 **~**
 :   XDG user store — accepted on parse for backward compatibility but
