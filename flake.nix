@@ -46,6 +46,7 @@
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
+      inputs.purse-first.follows = "purse-first";
     };
 
     # Sourced via goFlakeInputs (see madder#208) so a tap bump only
