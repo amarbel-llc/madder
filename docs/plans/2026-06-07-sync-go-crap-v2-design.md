@@ -36,15 +36,39 @@ pseudo-version to keep madder unblocked; file a crap issue to retag
 
 ## 2. Format surface
 
+> **Revision (2026-06-08): sync presents the viewport natively on a TTY.**
+> The original draft kept TAP as sync's interactive default. Corrected:
+> `madder sync` on a TTY now renders the go-crap **viewport** itself
+> (in-process, live), and TAP is dropped from sync entirely.
+
 - `output_format` gains `FormatCRAP = Format("crap")` (flag value,
-  completion text, FlagDescription).
-- `Resolve` untouched; new `ResolvePipedDefault(stdout *os.File, piped
-  Format) Format` collapses auto → tap on TTY, → `piped` otherwise.
-  `Resolve` becomes a thin call with `FormatNDJSON` — one code path.
-- sync calls `ResolvePipedDefault(os.Stdout, FormatCRAP)`: piped sync
-  emits ndjson-crap **by default**; `-format ndjson` / `-format json` is
-  the explicit opt-out back to the legacy `{id,state,size,error}` records
-  (byte-identical); `-format tap` unchanged.
+  completion text, FlagDescription) and an exported `IsTTY(*os.File) bool`
+  helper. `FormatTAP` stays in the package — other commands still use it;
+  only **sync** drops it.
+- `Resolve`/`ResolvePipedDefault` remain for the other streaming commands
+  (their interactive default is still TAP; their piped adoption of crap is
+  tracked in madder#234). sync does NOT use `ResolvePipedDefault` because
+  its TTY branch is the viewport, not a wire format.
+- **sync's resolution** (in `runStore`):
+  - `auto` + TTY → native viewport: `viewport.Present(os.Stdout, …)` fed by
+    `syncCrapSink` over an `io.Pipe` (the in-process form of
+    `madder sync | crap-present`). The viewport renders to stdout (the tty);
+    no wire bytes hit stdout in this mode.
+  - `auto` + piped → ndjson-crap wire (`syncCrapSink` → stdout).
+  - `-format crap` → raw ndjson-crap wire to stdout, even on a TTY (escape
+    hatch to see/redirect the records).
+  - `-format ndjson` / `-format json` → legacy `{id,state,size,error}`
+    records (byte-identical to before).
+  - `-format tap` → **rejected by sync** with a guiding error (the shared
+    flag still parses `tap` for other commands; sync refuses it at runtime).
+- `syncTapSink` is deleted.
+- Viewport-mode plumbing: producer (the blob loop + summary + finalize)
+  runs on the main goroutine so all `req` interaction stays single-threaded;
+  `viewport.Present` runs in a goroutine reading the pipe; `pw.Close()`
+  after `finalize()` gives the reader EOF so `Present` returns. Notices
+  (e.g. "limit hit") are discarded in viewport mode — the Summary record is
+  rendered natively. Records are producer-generated and always valid, so the
+  viewport's decoder cannot error mid-stream (the only deadlock edge).
 - Command help + man text document the new default and the opt-out.
 - `output_format` is a `dagnabit export` facade source
   (`pkgs/output_format`, consumed by cutting-garden). The additions are
