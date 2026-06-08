@@ -178,11 +178,24 @@ func discoverBucketDepth(
 func configFromDiscoveredConfig(
 	discovered DiscoveredConfig,
 ) *blob_store_configs.DefaultType {
+	// Normalize a nil encryption list to a non-nil empty slice so the
+	// written remote config (and the info-repo config-immutable view)
+	// renders `encryption = []` rather than omitting the key. tommy's
+	// decode rewrite distinguishes a nil slice (omitted on encode) from a
+	// present-but-empty one (rendered as `[]`); pre-rewrite tommy rendered
+	// both as `[]`. EncryptionKeys treats nil and empty identically, so
+	// this preserves the on-disk/display wire shape without changing
+	// encryption behavior.
+	encryption := discovered.Encryption
+	if encryption == nil {
+		encryption = []markl.Id{}
+	}
+
 	return &blob_store_configs.DefaultType{
 		HashTypeId:      blob_store_configs.HashType(discovered.HashTypeId),
 		HashBuckets:     discovered.Buckets,
 		CompressionType: "zstd",
-		Encryption:      discovered.Encryption,
+		Encryption:      encryption,
 		SingleHash:      !discovered.MultiHash,
 	}
 }
