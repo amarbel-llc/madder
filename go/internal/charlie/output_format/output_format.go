@@ -9,7 +9,9 @@
 // per-record stream. crap emits ndjson-crap result-family records
 // (go-crap v2). auto is the default; Resolve collapses it to tap on a
 // TTY and to ndjson when stdout is piped, while ResolvePipedDefault lets
-// a command choose its own piped default (sync passes crap).
+// a command choose its own piped default (sync passes crap). A command
+// may bypass Resolve to present differently on a TTY (sync renders the
+// go-crap viewport).
 //
 // Each consuming command defines its own sink interface (TAP vs NDJSON)
 // because per-command event shapes differ. This package only supplies the
@@ -91,9 +93,13 @@ func (f Format) Resolve(stdout *os.File) Format {
 // default has migrated to ndjson-crap pass FormatCRAP; Resolve keeps the
 // legacy ndjson piped default for everyone else.
 func (f Format) ResolvePipedDefault(stdout *os.File, piped Format) Format {
+	return f.resolveFor(IsTTY(stdout), piped)
+}
+
+// IsTTY reports whether stdout is an interactive terminal.
+func IsTTY(stdout *os.File) bool {
 	fd := stdout.Fd()
-	isTTY := isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
-	return f.resolveFor(isTTY, piped)
+	return isatty.IsTerminal(fd) || isatty.IsCygwinTerminal(fd)
 }
 
 func (f Format) resolveFor(isTTY bool, piped Format) Format {

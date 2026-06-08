@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/crap/go-crap/ndjsoncrap"
+	"github.com/amarbel-llc/crap/go-crap/viewport"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -21,7 +21,6 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 
 func init() {
@@ -66,12 +65,13 @@ func (cmd Sync) GetDescription() futility.Description {
 			"destinations. When source and destination use different hash " +
 			"types, blobs are rehashed (source digests are not preserved in " +
 			"single-hash destinations). Use -limit to cap the number of " +
-			"blobs transferred. Output defaults to TAP on an interactive " +
-			"terminal and to ndjson-crap when stdout is piped " +
-			"(crap-present-compatible; see crap's spec). Pass -format " +
-			"ndjson (or json) for the legacy per-record JSON described " +
-			"below, or -format to force any encoding. Each JSON record " +
-			"has fields \"id\", " +
+			"blobs transferred. On an interactive terminal sync renders a " +
+			"live viewport (the in-process form of piping ndjson-crap to " +
+			"crap-present); when stdout is piped it emits ndjson-crap. " +
+			"Pass -format ndjson (or json) for the legacy per-record JSON " +
+			"described below, or -format crap for raw ndjson-crap even on " +
+			"a terminal. (-format tap is not supported by sync.) Each JSON " +
+			"record has fields \"id\", " +
 			"\"state\" (transferred, exists, failed, list_error), \"size\" " +
 			"for transferred blobs, and \"error\" for failures. Summary and " +
 			"limit notices route to stderr in JSON mode.",
@@ -136,51 +136,14 @@ type syncSink interface {
 	listError(err error)
 	// notice reports informational events (limit-hit); stderr in JSON mode.
 	notice(msg string)
-	// summary reports final counts. TAP renders a comment; JSON prints a
-	// human line to stderr; crap emits the Summary record.
+	// summary reports final counts. JSON prints a human line to stderr;
+	// crap emits the Summary record.
 	summary(succeeded, failed, ignored, total int)
 	// bailOut reports a fatal error that stops the stream.
 	bailOut(msg string)
-	// finalize flushes buffered output. TAP emits the trailing plan;
-	// crap relies on summary() having been called first.
+	// finalize flushes buffered output. crap relies on summary() having
+	// been called first.
 	finalize()
-}
-
-type syncTapSink struct {
-	tw *tap.Writer
-}
-
-func (s *syncTapSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
-	s.tw.Ok(formatSyncTestPoint(id, bytesWritten))
-}
-
-func (s *syncTapSink) exists(id domain_interfaces.MarklId) {
-	s.tw.Ok(formatSyncTestPoint(id, 0))
-}
-
-func (s *syncTapSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
-	s.tw.NotOk(formatSyncTestPoint(id, bytesWritten), tap_diagnostics.FromError(err))
-}
-
-func (s *syncTapSink) listError(err error) {
-	s.tw.NotOk("(unknown blob)", tap_diagnostics.FromError(err))
-}
-
-func (s *syncTapSink) notice(msg string) {
-	s.tw.Comment("%s", msg)
-}
-
-func (s *syncTapSink) summary(succeeded, failed, ignored, total int) {
-	s.tw.Comment("Successes: %d, Failures: %d, Ignored: %d, Total: %d",
-		succeeded, failed, ignored, total)
-}
-
-func (s *syncTapSink) bailOut(msg string) {
-	s.tw.BailOut("%s", msg)
-}
-
-func (s *syncTapSink) finalize() {
-	s.tw.Plan()
 }
 
 type syncRecord struct {
@@ -340,29 +303,14 @@ func (cmd Sync) runStore(
 	source blob_stores.BlobStoreInitialized,
 	destination blob_stores.BlobStoreMap,
 ) {
-	var sink syncSink
-	switch cmd.Format.ResolvePipedDefault(os.Stdout, output_format.FormatCRAP) {
-	case output_format.FormatCRAP:
-		sink = newSyncCrapSink(os.Stdout, os.Stderr)
-	case output_format.FormatJSON, output_format.FormatNDJSON:
-		buf := bufio.NewWriter(os.Stdout)
-		sink = &syncJsonSink{
-			buf:    buf,
-			enc:    json.NewEncoder(buf),
-			errOut: os.Stderr,
-		}
-	default:
-		sink = &syncTapSink{tw: tap.NewWriter(os.Stdout)}
-	}
-
+	// The no-destinations bailOut and the cross-hash confirm both run
+	// before any streaming begins and short-circuit with a cancelled
+	// request, so they do not depend on the viewport-vs-wire choice. The
+	// bailOut record is routed through whatever output the format implies
+	// (a fresh sink for the wire/JSON paths, the viewport's pipe on a TTY)
+	// so the observable record stream is unchanged from before.
 	if len(destination) == 0 {
-		sink.bailOut("only one blob store, nothing to sync")
-
-		errors.ContextCancelWithBadRequestf(
-			req,
-			"only one blob store, nothing to sync",
-		)
-
+		cmd.emitBailOut(req, "only one blob store, nothing to sync")
 		return
 	}
 
@@ -403,6 +351,155 @@ func (cmd Sync) runStore(
 		useDestinationHashType = true
 	}
 
+	// auto + TTY renders the live go-crap viewport natively (the
+	// in-process form of `madder sync | crap-present`); no wire bytes hit
+	// stdout in this mode.
+	if cmd.Format == output_format.FormatAuto && output_format.IsTTY(os.Stdout) {
+		cmd.streamToViewport(req, envBlobStore, source, destination, useDestinationHashType)
+		return
+	}
+
+	resolved := cmd.Format
+	if resolved == output_format.FormatAuto {
+		resolved = output_format.FormatCRAP // piped default
+	}
+
+	var sink syncSink
+	switch resolved {
+	case output_format.FormatCRAP:
+		sink = newSyncCrapSink(os.Stdout, os.Stderr)
+	case output_format.FormatJSON, output_format.FormatNDJSON:
+		buf := bufio.NewWriter(os.Stdout)
+		sink = &syncJsonSink{
+			buf:    buf,
+			enc:    json.NewEncoder(buf),
+			errOut: os.Stderr,
+		}
+	default: // tap or anything else sync no longer supports
+		errors.ContextCancelWithBadRequestf(
+			req,
+			"sync does not support -format %s; omit -format for the live viewport on a terminal, or use -format crap, ndjson, or json",
+			resolved,
+		)
+		return
+	}
+
+	cmd.streamToSink(req, envBlobStore, source, destination, useDestinationHashType, sink)
+}
+
+// emitBailOut writes the no-destinations bailOut record through whatever
+// output the resolved format implies, then cancels the request. On a TTY
+// (auto) the record is rendered by the viewport; for the wire/JSON paths a
+// throwaway sink emits it to stdout; -format tap is rejected with a guiding
+// error before any record is written.
+func (cmd Sync) emitBailOut(req futility.Request, msg string) {
+	if cmd.Format == output_format.FormatAuto && output_format.IsTTY(os.Stdout) {
+		pr, pw := io.Pipe()
+		presentDone := make(chan error, 1)
+		go func() {
+			presentDone <- viewport.Present(pr, viewport.Options{
+				Title: "sync",
+				Out:   os.Stdout,
+				IsTTY: true,
+			})
+		}()
+
+		sink := newSyncCrapSink(pw, io.Discard)
+		sink.bailOut(msg)
+		sink.finalize()
+		_ = pw.Close()
+		<-presentDone
+
+		errors.ContextCancelWithBadRequestf(req, "%s", msg)
+		return
+	}
+
+	resolved := cmd.Format
+	if resolved == output_format.FormatAuto {
+		resolved = output_format.FormatCRAP
+	}
+
+	switch resolved {
+	case output_format.FormatCRAP:
+		sink := newSyncCrapSink(os.Stdout, os.Stderr)
+		sink.bailOut(msg)
+		sink.finalize()
+	case output_format.FormatJSON, output_format.FormatNDJSON:
+		buf := bufio.NewWriter(os.Stdout)
+		sink := &syncJsonSink{buf: buf, enc: json.NewEncoder(buf), errOut: os.Stderr}
+		sink.bailOut(msg)
+		sink.finalize()
+	default: // tap or anything else sync no longer supports
+		errors.ContextCancelWithBadRequestf(
+			req,
+			"sync does not support -format %s; omit -format for the live viewport on a terminal, or use -format crap, ndjson, or json",
+			resolved,
+		)
+		return
+	}
+
+	errors.ContextCancelWithBadRequestf(req, "%s", msg)
+}
+
+// streamToViewport runs the blob loop on the main goroutine (so all req
+// interaction stays single-threaded) while viewport.Present consumes the
+// ndjson-crap records over an io.Pipe in a goroutine and renders the live
+// TUI to stdout. streamToSink's deferred block writes the Summary and
+// flushes into the pipe before returning, after which closing the writer
+// gives Present EOF so it returns. Records are producer-generated and
+// always valid, so Present's decoder cannot error mid-stream — the pipe
+// only ever yields a clean EOF, which is why this cannot deadlock.
+func (cmd Sync) streamToViewport(
+	req futility.Request,
+	envBlobStore command_components.BlobStoreEnv,
+	source blob_stores.BlobStoreInitialized,
+	destination blob_stores.BlobStoreMap,
+	useDestinationHashType bool,
+) {
+	pr, pw := io.Pipe()
+
+	presentDone := make(chan error, 1)
+	go func() {
+		presentDone <- viewport.Present(pr, viewport.Options{
+			Title: "sync",
+			Out:   os.Stdout,
+			IsTTY: true,
+		})
+	}()
+
+	// Notices are discarded in viewport mode; the Summary record is
+	// rendered natively. The producer runs on this (main) goroutine.
+	sink := newSyncCrapSink(pw, io.Discard)
+	cmd.streamToSink(req, envBlobStore, source, destination, useDestinationHashType, sink)
+
+	// streamToSink's deferred summary+finalize has flushed the Summary
+	// into the pipe by now; closing the writer signals EOF so Present
+	// returns.
+	_ = pw.Close()
+
+	// NOTE(crap#20): viewport.Present can hang if bubbletea's p.Run()
+	// errors before draining the pipe — the producer above blocks on a
+	// full pipe while Present never reaches its read loop, so this
+	// <-presentDone never fires. The fix belongs upstream in
+	// viewport.Present, not here. See
+	// https://github.com/amarbel-llc/crap/issues/20.
+	if err := <-presentDone; err != nil {
+		errors.ContextCancelWithError(req, err)
+	}
+}
+
+// streamToSink drives the importer and the blob loop, emitting per-blob
+// events into sink. The deferred block emits the final summary and
+// finalizes (flushes) the sink — this is where the viewport's pipe gets
+// its terminating Summary record.
+func (cmd Sync) streamToSink(
+	req futility.Request,
+	envBlobStore command_components.BlobStoreEnv,
+	source blob_stores.BlobStoreInitialized,
+	destination blob_stores.BlobStoreMap,
+	useDestinationHashType bool,
+	sink syncSink,
+) {
 	blobImporter := blob_transfers.MakeBlobImporter(
 		envBlobStore,
 		source,

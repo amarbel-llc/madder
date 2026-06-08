@@ -1,6 +1,9 @@
 package output_format
 
-import "testing"
+import (
+	"os"
+	"testing"
+)
 
 func TestResolveFor(t *testing.T) {
 	cases := []struct {
@@ -24,6 +27,22 @@ func TestResolveFor(t *testing.T) {
 				t.Errorf("expected %q, got %q", c.expected, actual)
 			}
 		})
+	}
+}
+
+func TestIsTTYPipeIsNotATerminal(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+	defer w.Close()
+
+	if IsTTY(w) {
+		t.Error("IsTTY(pipe write end) = true, want false")
+	}
+	if IsTTY(r) {
+		t.Error("IsTTY(pipe read end) = true, want false")
 	}
 }
 

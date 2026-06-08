@@ -86,3 +86,21 @@ function sync_ndjson_opt_out { # @test
   assert_output --partial '"state":"transferred"'
   refute_output --partial '"type":"crap"'
 }
+
+function sync_rejects_tap { # @test
+
+  # sync no longer supports TAP; -format tap is rejected at runtime.
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "x" >"$blob"
+  run_madder write -format tap "$blob"
+  assert_success
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync -format tap .default .sha256
+  assert_failure
+  assert_output --partial "does not support -format tap"
+}

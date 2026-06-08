@@ -16,6 +16,9 @@ import internal "github.com/amarbel-llc/madder/go/internal/charlie/output_format
 // crap:           ndjson-crap records, one JSON record per line (go-crap v2).
 type Format = internal.Format
 
+// IsTTY reports whether stdout is an interactive terminal.
+var IsTTY = internal.IsTTY
+
 // Default is the value to initialize a flag field with.
 const Default = internal.Default
 
