@@ -17,9 +17,9 @@ var (
 )
 
 type TomlSFTPViaSSHConfigV0Document struct {
-	data     TomlSFTPViaSSHConfigV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlSFTPViaSSHConfigV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlSFTPViaSSHConfigV0(input []byte) (*TomlSFTPViaSSHConfigV0Document, error) {
@@ -27,29 +27,28 @@ func DecodeTomlSFTPViaSSHConfigV0(input []byte) (*TomlSFTPViaSSHConfigV0Document
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlSFTPViaSSHConfigV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlSFTPViaSSHConfigV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vUri, _ok := model.Get("uri"); _ok && _vUri.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUri.Leaf); _xok {
+			if err := d.data.Uri.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("uri: %w", err)
+			}
+			_vUri.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "uri":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.Uri.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("uri: %w", err)
-				}
-				d.consumed["uri"] = true
-			}
-		case "known-hosts-file":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.KnownHostsFile = v
-				d.consumed["known-hosts-file"] = true
-			}
+	}
+	if _vKnownHostsFile, _ok := model.Get("known-hosts-file"); _ok && _vKnownHostsFile.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vKnownHostsFile.Leaf); _xok {
+			d.data.KnownHostsFile = _x
+			_vKnownHostsFile.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -80,7 +79,10 @@ func (d *TomlSFTPViaSSHConfigV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlSFTPViaSSHConfigV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlSFTPViaSSHConfigV0Document) Comment(key string) string {
@@ -99,24 +101,19 @@ func (d *TomlSFTPViaSSHConfigV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlSFTPViaSSHConfigV0Into(data *TomlSFTPViaSSHConfigV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlSFTPViaSSHConfigV0Into(data *TomlSFTPViaSSHConfigV0, sub *cst.Value) error {
+	if _vUri, _ok := sub.Get("uri"); _ok && _vUri.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUri.Leaf); _xok {
+			if err := data.Uri.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("uri: %w", err)
+			}
+			_vUri.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "uri":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.Uri.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("uri: %w", err)
-				}
-				consumed[keyPrefix+"uri"] = true
-			}
-		case "known-hosts-file":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.KnownHostsFile = v
-				consumed[keyPrefix+"known-hosts-file"] = true
-			}
+	}
+	if _vKnownHostsFile, _ok := sub.Get("known-hosts-file"); _ok && _vKnownHostsFile.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vKnownHostsFile.Leaf); _xok {
+			data.KnownHostsFile = _x
+			_vKnownHostsFile.MarkConsumed()
 		}
 	}
 	return nil

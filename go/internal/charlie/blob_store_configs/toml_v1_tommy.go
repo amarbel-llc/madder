@@ -18,9 +18,9 @@ var (
 )
 
 type TomlLocalHashBucketedV1Document struct {
-	data     TomlLocalHashBucketedV1
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlLocalHashBucketedV1
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlLocalHashBucketedV1(input []byte) (*TomlLocalHashBucketedV1Document, error) {
@@ -28,46 +28,51 @@ func DecodeTomlLocalHashBucketedV1(input []byte) (*TomlLocalHashBucketedV1Docume
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlLocalHashBucketedV1Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlLocalHashBucketedV1Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vHashBuckets, _ok := model.Get("hash-buckets"); _ok && _vHashBuckets.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractIntSlice(_vHashBuckets.Leaf); _xok {
+			d.data.HashBuckets = values.IntSlice(_x)
+			if d.data.HashBuckets == nil {
+				d.data.HashBuckets = values.IntSlice{}
+			}
+			_vHashBuckets.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash-buckets":
-			if v, ok := cst.ExtractIntSlice(_kv); ok {
-				d.data.HashBuckets = values.IntSlice(v)
-				d.consumed["hash-buckets"] = true
+	}
+	if _vBasePath, _ok := model.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			d.data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vHashTypeId, _ok := model.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := d.data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("hash_type-id: %w", err)
 			}
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.BasePath = v
-				d.consumed["base-path"] = true
+			_vHashTypeId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := model.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := d.data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("encryption: %w", err)
 			}
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("hash_type-id: %w", err)
-				}
-				d.consumed["hash_type-id"] = true
-			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("encryption: %w", err)
-				}
-				d.consumed["encryption"] = true
-			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.CompressionType = v
-				d.consumed["compression-type"] = true
-			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vCompressionType, _ok := model.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			d.data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -79,8 +84,10 @@ func (d *TomlLocalHashBucketedV1Document) Data() *TomlLocalHashBucketedV1 {
 
 func (d *TomlLocalHashBucketedV1Document) Encode() ([]byte, error) {
 	{
-		if err := cst.SetAny(d.cstDoc.Root(), "hash-buckets", []int(d.data.HashBuckets)); err != nil {
-			return nil, fmt.Errorf("%w", err)
+		if d.data.HashBuckets != nil {
+			if err := cst.SetAny(d.cstDoc.Root(), "hash-buckets", []int(d.data.HashBuckets)); err != nil {
+				return nil, fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if d.data.BasePath != "" {
@@ -117,7 +124,10 @@ func (d *TomlLocalHashBucketedV1Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlLocalHashBucketedV1Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlLocalHashBucketedV1Document) Comment(key string) string {
@@ -136,41 +146,42 @@ func (d *TomlLocalHashBucketedV1Document) SetInlineComment(key, comment string) 
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlLocalHashBucketedV1Into(data *TomlLocalHashBucketedV1, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlLocalHashBucketedV1Into(data *TomlLocalHashBucketedV1, sub *cst.Value) error {
+	if _vHashBuckets, _ok := sub.Get("hash-buckets"); _ok && _vHashBuckets.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractIntSlice(_vHashBuckets.Leaf); _xok {
+			data.HashBuckets = values.IntSlice(_x)
+			if data.HashBuckets == nil {
+				data.HashBuckets = values.IntSlice{}
+			}
+			_vHashBuckets.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash-buckets":
-			if v, ok := cst.ExtractIntSlice(_kv); ok {
-				data.HashBuckets = values.IntSlice(v)
-				consumed[keyPrefix+"hash-buckets"] = true
+	}
+	if _vBasePath, _ok := sub.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vHashTypeId, _ok := sub.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("hash_type-id: %w", err)
 			}
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.BasePath = v
-				consumed[keyPrefix+"base-path"] = true
+			_vHashTypeId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := sub.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("encryption: %w", err)
 			}
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("hash_type-id: %w", err)
-				}
-				consumed[keyPrefix+"hash_type-id"] = true
-			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("encryption: %w", err)
-				}
-				consumed[keyPrefix+"encryption"] = true
-			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.CompressionType = v
-				consumed[keyPrefix+"compression-type"] = true
-			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vCompressionType, _ok := sub.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
 		}
 	}
 	return nil
@@ -178,8 +189,10 @@ func DecodeTomlLocalHashBucketedV1Into(data *TomlLocalHashBucketedV1, doc *docum
 
 func EncodeTomlLocalHashBucketedV1From(data *TomlLocalHashBucketedV1, doc *document.Document, container *cst.Node) error {
 	{
-		if err := cst.SetAny(container, "hash-buckets", []int(data.HashBuckets)); err != nil {
-			return fmt.Errorf("%w", err)
+		if data.HashBuckets != nil {
+			if err := cst.SetAny(container, "hash-buckets", []int(data.HashBuckets)); err != nil {
+				return fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if data.BasePath != "" {

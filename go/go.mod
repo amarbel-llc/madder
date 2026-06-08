@@ -6,7 +6,7 @@ require (
 	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/purse-first/libs/dewey v0.3.0
 	github.com/amarbel-llc/tap/go v0.1.8
-	github.com/amarbel-llc/tommy v0.0.0-20260405143331-87255e87bf37
+	github.com/amarbel-llc/tommy v0.3.4-0.20260608131104-42624689df9b
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16

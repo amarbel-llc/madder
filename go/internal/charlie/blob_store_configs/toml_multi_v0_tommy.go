@@ -18,9 +18,9 @@ var (
 )
 
 type TomlMultiV0Document struct {
-	data     TomlMultiV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlMultiV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlMultiV0(input []byte) (*TomlMultiV0Document, error) {
@@ -28,54 +28,56 @@ func DecodeTomlMultiV0(input []byte) (*TomlMultiV0Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlMultiV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlMultiV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vMode, _ok := model.Get("mode"); _ok && _vMode.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vMode.Leaf); _xok {
+			d.data.Mode = _x
+			_vMode.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "mode":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Mode = v
-				d.consumed["mode"] = true
+	}
+	if _vWriteStore, _ok := model.Get("write-store"); _ok && _vWriteStore.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vWriteStore.Leaf); _xok {
+			if err := d.data.WriteStore.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("write-store: %w", err)
 			}
-		case "write-store":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.WriteStore.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("write-store: %w", err)
+			_vWriteStore.MarkConsumed()
+		}
+	}
+	if _vReadStores, _ok := model.Get("read-stores"); _ok && _vReadStores.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vReadStores.Leaf); _xok {
+			d.data.ReadStores = make([]blob_store_id.Id, len(_x))
+			for _si, _s := range _x {
+				if err := d.data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
+					return nil, fmt.Errorf("read-stores[%d]: %w", _si, err)
 				}
-				d.consumed["write-store"] = true
 			}
-		case "read-stores":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				d.data.ReadStores = make([]blob_store_id.Id, len(v))
-				for _si, _s := range v {
-					if err := d.data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
-						return nil, fmt.Errorf("read-stores[%d]: %w", _si, err)
-					}
+			_vReadStores.MarkConsumed()
+		}
+	}
+	if _vMirrorStores, _ok := model.Get("mirror-stores"); _ok && _vMirrorStores.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vMirrorStores.Leaf); _xok {
+			d.data.MirrorStores = make([]blob_store_id.Id, len(_x))
+			for _si, _s := range _x {
+				if err := d.data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
+					return nil, fmt.Errorf("mirror-stores[%d]: %w", _si, err)
 				}
-				d.consumed["read-stores"] = true
 			}
-		case "mirror-stores":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				d.data.MirrorStores = make([]blob_store_id.Id, len(v))
-				for _si, _s := range v {
-					if err := d.data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
-						return nil, fmt.Errorf("mirror-stores[%d]: %w", _si, err)
-					}
-				}
-				d.consumed["mirror-stores"] = true
-			}
-		case "read-fill":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.ReadFill = &v
-				d.consumed["read-fill"] = true
-			}
+			_vMirrorStores.MarkConsumed()
+		}
+	}
+	if _vReadFill, _ok := model.Get("read-fill"); _ok && _vReadFill.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vReadFill.Leaf); _xok {
+			d.data.ReadFill = &_x
+			_vReadFill.MarkConsumed()
 		}
 	}
 	if err := d.data.Validate(); err != nil {
@@ -149,7 +151,10 @@ func (d *TomlMultiV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlMultiV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlMultiV0Document) Comment(key string) string {
@@ -168,55 +173,59 @@ func (d *TomlMultiV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlMultiV0Into(data *TomlMultiV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlMultiV0Into(data *TomlMultiV0, sub *cst.Value) error {
+	if _vMode, _ok := sub.Get("mode"); _ok && _vMode.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vMode.Leaf); _xok {
+			data.Mode = _x
+			_vMode.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "mode":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Mode = v
-				consumed[keyPrefix+"mode"] = true
+	}
+	if _vWriteStore, _ok := sub.Get("write-store"); _ok && _vWriteStore.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vWriteStore.Leaf); _xok {
+			if err := data.WriteStore.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("write-store: %w", err)
 			}
-		case "write-store":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.WriteStore.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("write-store: %w", err)
-				}
-				consumed[keyPrefix+"write-store"] = true
-			}
-		case "read-stores":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				data.ReadStores = make([]blob_store_id.Id, len(v))
-				for _si, _s := range v {
-					if err := data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
-						return fmt.Errorf("read-stores[%d]: %w", _si, err)
-					}
-				}
-				consumed[keyPrefix+"read-stores"] = true
-			}
-		case "mirror-stores":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				data.MirrorStores = make([]blob_store_id.Id, len(v))
-				for _si, _s := range v {
-					if err := data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
-						return fmt.Errorf("mirror-stores[%d]: %w", _si, err)
-					}
-				}
-				consumed[keyPrefix+"mirror-stores"] = true
-			}
-		case "read-fill":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.ReadFill = &v
-				consumed[keyPrefix+"read-fill"] = true
-			}
+			_vWriteStore.MarkConsumed()
 		}
+	}
+	if _vReadStores, _ok := sub.Get("read-stores"); _ok && _vReadStores.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vReadStores.Leaf); _xok {
+			data.ReadStores = make([]blob_store_id.Id, len(_x))
+			for _si, _s := range _x {
+				if err := data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
+					return fmt.Errorf("read-stores[%d]: %w", _si, err)
+				}
+			}
+			_vReadStores.MarkConsumed()
+		}
+	}
+	if _vMirrorStores, _ok := sub.Get("mirror-stores"); _ok && _vMirrorStores.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vMirrorStores.Leaf); _xok {
+			data.MirrorStores = make([]blob_store_id.Id, len(_x))
+			for _si, _s := range _x {
+				if err := data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
+					return fmt.Errorf("mirror-stores[%d]: %w", _si, err)
+				}
+			}
+			_vMirrorStores.MarkConsumed()
+		}
+	}
+	if _vReadFill, _ok := sub.Get("read-fill"); _ok && _vReadFill.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vReadFill.Leaf); _xok {
+			data.ReadFill = &_x
+			_vReadFill.MarkConsumed()
+		}
+	}
+	if err := data.Validate(); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
 	}
 	return nil
 }
 
 func EncodeTomlMultiV0From(data *TomlMultiV0, doc *document.Document, container *cst.Node) error {
+	if err := data.Validate(); err != nil {
+		return fmt.Errorf("validation failed: %w", err)
+	}
 	if data.Mode != "" || cst.HasValue(container, "mode") {
 		if err := cst.SetAny(container, "mode", data.Mode); err != nil {
 			return fmt.Errorf("%w", err)

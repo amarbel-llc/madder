@@ -17,9 +17,9 @@ var (
 )
 
 type TomlPointerV1Document struct {
-	data     TomlPointerV1
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlPointerV1
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlPointerV1(input []byte) (*TomlPointerV1Document, error) {
@@ -27,22 +27,20 @@ func DecodeTomlPointerV1(input []byte) (*TomlPointerV1Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlPointerV1Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
-		}
-		switch cst.KeyValueName(_kv) {
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.BasePath = v
-				d.consumed["base-path"] = true
-			}
+	d := &TomlPointerV1Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vBasePath, _ok := model.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			d.data.BasePath = _x
+			_vBasePath.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -62,7 +60,10 @@ func (d *TomlPointerV1Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlPointerV1Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlPointerV1Document) Comment(key string) string {
@@ -81,17 +82,11 @@ func (d *TomlPointerV1Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlPointerV1Into(data *TomlPointerV1, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
-		}
-		switch cst.KeyValueName(_kv) {
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.BasePath = v
-				consumed[keyPrefix+"base-path"] = true
-			}
+func DecodeTomlPointerV1Into(data *TomlPointerV1, sub *cst.Value) error {
+	if _vBasePath, _ok := sub.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			data.BasePath = _x
+			_vBasePath.MarkConsumed()
 		}
 	}
 	return nil

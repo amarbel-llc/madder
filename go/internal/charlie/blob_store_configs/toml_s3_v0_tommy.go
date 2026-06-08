@@ -17,9 +17,9 @@ var (
 )
 
 type TomlS3V0Document struct {
-	data     TomlS3V0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlS3V0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlS3V0(input []byte) (*TomlS3V0Document, error) {
@@ -27,62 +27,68 @@ func DecodeTomlS3V0(input []byte) (*TomlS3V0Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlS3V0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlS3V0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vEndpoint, _ok := model.Get("endpoint"); _ok && _vEndpoint.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEndpoint.Leaf); _xok {
+			d.data.Endpoint = _x
+			_vEndpoint.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "endpoint":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Endpoint = v
-				d.consumed["endpoint"] = true
-			}
-		case "region":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Region = v
-				d.consumed["region"] = true
-			}
-		case "bucket":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Bucket = v
-				d.consumed["bucket"] = true
-			}
-		case "prefix":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Prefix = v
-				d.consumed["prefix"] = true
-			}
-		case "access-key-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.AccessKeyId = v
-				d.consumed["access-key-id"] = true
-			}
-		case "secret-access-key":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.SecretAccessKey = v
-				d.consumed["secret-access-key"] = true
-			}
-		case "session-token":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.SessionToken = v
-				d.consumed["session-token"] = true
-			}
-		case "use-path-style":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.UsePathStyle = v
-				d.consumed["use-path-style"] = true
-			}
-		case "insecure-skip-tls-verify":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.InsecureSkipVerify = v
-				d.consumed["insecure-skip-tls-verify"] = true
-			}
+	}
+	if _vRegion, _ok := model.Get("region"); _ok && _vRegion.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vRegion.Leaf); _xok {
+			d.data.Region = _x
+			_vRegion.MarkConsumed()
+		}
+	}
+	if _vBucket, _ok := model.Get("bucket"); _ok && _vBucket.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBucket.Leaf); _xok {
+			d.data.Bucket = _x
+			_vBucket.MarkConsumed()
+		}
+	}
+	if _vPrefix, _ok := model.Get("prefix"); _ok && _vPrefix.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPrefix.Leaf); _xok {
+			d.data.Prefix = _x
+			_vPrefix.MarkConsumed()
+		}
+	}
+	if _vAccessKeyId, _ok := model.Get("access-key-id"); _ok && _vAccessKeyId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vAccessKeyId.Leaf); _xok {
+			d.data.AccessKeyId = _x
+			_vAccessKeyId.MarkConsumed()
+		}
+	}
+	if _vSecretAccessKey, _ok := model.Get("secret-access-key"); _ok && _vSecretAccessKey.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vSecretAccessKey.Leaf); _xok {
+			d.data.SecretAccessKey = _x
+			_vSecretAccessKey.MarkConsumed()
+		}
+	}
+	if _vSessionToken, _ok := model.Get("session-token"); _ok && _vSessionToken.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vSessionToken.Leaf); _xok {
+			d.data.SessionToken = _x
+			_vSessionToken.MarkConsumed()
+		}
+	}
+	if _vUsePathStyle, _ok := model.Get("use-path-style"); _ok && _vUsePathStyle.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vUsePathStyle.Leaf); _xok {
+			d.data.UsePathStyle = _x
+			_vUsePathStyle.MarkConsumed()
+		}
+	}
+	if _vInsecureSkipTlsVerify, _ok := model.Get("insecure-skip-tls-verify"); _ok && _vInsecureSkipTlsVerify.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vInsecureSkipTlsVerify.Leaf); _xok {
+			d.data.InsecureSkipVerify = _x
+			_vInsecureSkipTlsVerify.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -158,7 +164,10 @@ func (d *TomlS3V0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlS3V0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlS3V0Document) Comment(key string) string {
@@ -177,57 +186,59 @@ func (d *TomlS3V0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlS3V0Into(data *TomlS3V0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlS3V0Into(data *TomlS3V0, sub *cst.Value) error {
+	if _vEndpoint, _ok := sub.Get("endpoint"); _ok && _vEndpoint.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEndpoint.Leaf); _xok {
+			data.Endpoint = _x
+			_vEndpoint.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "endpoint":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Endpoint = v
-				consumed[keyPrefix+"endpoint"] = true
-			}
-		case "region":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Region = v
-				consumed[keyPrefix+"region"] = true
-			}
-		case "bucket":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Bucket = v
-				consumed[keyPrefix+"bucket"] = true
-			}
-		case "prefix":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Prefix = v
-				consumed[keyPrefix+"prefix"] = true
-			}
-		case "access-key-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.AccessKeyId = v
-				consumed[keyPrefix+"access-key-id"] = true
-			}
-		case "secret-access-key":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.SecretAccessKey = v
-				consumed[keyPrefix+"secret-access-key"] = true
-			}
-		case "session-token":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.SessionToken = v
-				consumed[keyPrefix+"session-token"] = true
-			}
-		case "use-path-style":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.UsePathStyle = v
-				consumed[keyPrefix+"use-path-style"] = true
-			}
-		case "insecure-skip-tls-verify":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.InsecureSkipVerify = v
-				consumed[keyPrefix+"insecure-skip-tls-verify"] = true
-			}
+	}
+	if _vRegion, _ok := sub.Get("region"); _ok && _vRegion.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vRegion.Leaf); _xok {
+			data.Region = _x
+			_vRegion.MarkConsumed()
+		}
+	}
+	if _vBucket, _ok := sub.Get("bucket"); _ok && _vBucket.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBucket.Leaf); _xok {
+			data.Bucket = _x
+			_vBucket.MarkConsumed()
+		}
+	}
+	if _vPrefix, _ok := sub.Get("prefix"); _ok && _vPrefix.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPrefix.Leaf); _xok {
+			data.Prefix = _x
+			_vPrefix.MarkConsumed()
+		}
+	}
+	if _vAccessKeyId, _ok := sub.Get("access-key-id"); _ok && _vAccessKeyId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vAccessKeyId.Leaf); _xok {
+			data.AccessKeyId = _x
+			_vAccessKeyId.MarkConsumed()
+		}
+	}
+	if _vSecretAccessKey, _ok := sub.Get("secret-access-key"); _ok && _vSecretAccessKey.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vSecretAccessKey.Leaf); _xok {
+			data.SecretAccessKey = _x
+			_vSecretAccessKey.MarkConsumed()
+		}
+	}
+	if _vSessionToken, _ok := sub.Get("session-token"); _ok && _vSessionToken.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vSessionToken.Leaf); _xok {
+			data.SessionToken = _x
+			_vSessionToken.MarkConsumed()
+		}
+	}
+	if _vUsePathStyle, _ok := sub.Get("use-path-style"); _ok && _vUsePathStyle.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vUsePathStyle.Leaf); _xok {
+			data.UsePathStyle = _x
+			_vUsePathStyle.MarkConsumed()
+		}
+	}
+	if _vInsecureSkipTlsVerify, _ok := sub.Get("insecure-skip-tls-verify"); _ok && _vInsecureSkipTlsVerify.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vInsecureSkipTlsVerify.Leaf); _xok {
+			data.InsecureSkipVerify = _x
+			_vInsecureSkipTlsVerify.MarkConsumed()
 		}
 	}
 	return nil

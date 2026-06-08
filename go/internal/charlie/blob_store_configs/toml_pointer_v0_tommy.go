@@ -17,9 +17,9 @@ var (
 )
 
 type TomlPointerV0Document struct {
-	data     TomlPointerV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlPointerV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlPointerV0(input []byte) (*TomlPointerV0Document, error) {
@@ -27,34 +27,34 @@ func DecodeTomlPointerV0(input []byte) (*TomlPointerV0Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlPointerV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlPointerV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vId, _ok := model.Get("id"); _ok && _vId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vId.Leaf); _xok {
+			if err := d.data.Id.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("id: %w", err)
+			}
+			_vId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.Id.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("id: %w", err)
-				}
-				d.consumed["id"] = true
-			}
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.BasePath = v
-				d.consumed["base-path"] = true
-			}
-		case "config-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.ConfigPath = v
-				d.consumed["config-path"] = true
-			}
+	}
+	if _vBasePath, _ok := model.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			d.data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vConfigPath, _ok := model.Get("config-path"); _ok && _vConfigPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vConfigPath.Leaf); _xok {
+			d.data.ConfigPath = _x
+			_vConfigPath.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -88,7 +88,10 @@ func (d *TomlPointerV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlPointerV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlPointerV0Document) Comment(key string) string {
@@ -107,29 +110,25 @@ func (d *TomlPointerV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlPointerV0Into(data *TomlPointerV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlPointerV0Into(data *TomlPointerV0, sub *cst.Value) error {
+	if _vId, _ok := sub.Get("id"); _ok && _vId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vId.Leaf); _xok {
+			if err := data.Id.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("id: %w", err)
+			}
+			_vId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.Id.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("id: %w", err)
-				}
-				consumed[keyPrefix+"id"] = true
-			}
-		case "base-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.BasePath = v
-				consumed[keyPrefix+"base-path"] = true
-			}
-		case "config-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.ConfigPath = v
-				consumed[keyPrefix+"config-path"] = true
-			}
+	}
+	if _vBasePath, _ok := sub.Get("base-path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vConfigPath, _ok := sub.Get("config-path"); _ok && _vConfigPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vConfigPath.Leaf); _xok {
+			data.ConfigPath = _x
+			_vConfigPath.MarkConsumed()
 		}
 	}
 	return nil

@@ -17,9 +17,9 @@ var (
 )
 
 type SignatureConfigDocument struct {
-	data     SignatureConfig
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   SignatureConfig
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeSignatureConfig(input []byte) (*SignatureConfigDocument, error) {
@@ -27,42 +27,44 @@ func DecodeSignatureConfig(input []byte) (*SignatureConfigDocument, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &SignatureConfigDocument{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &SignatureConfigDocument{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vType, _ok := model.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+			d.data.Type = _x
+			_vType.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Type = v
-				d.consumed["type"] = true
-			}
-		case "signature-len":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.SignatureLen = v
-				d.consumed["signature-len"] = true
-			}
-		case "avg-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.AvgChunkSize = v
-				d.consumed["avg-chunk-size"] = true
-			}
-		case "min-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.MinChunkSize = v
-				d.consumed["min-chunk-size"] = true
-			}
-		case "max-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.MaxChunkSize = v
-				d.consumed["max-chunk-size"] = true
-			}
+	}
+	if _vSignatureLen, _ok := model.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+			d.data.SignatureLen = _x
+			_vSignatureLen.MarkConsumed()
+		}
+	}
+	if _vAvgChunkSize, _ok := model.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+			d.data.AvgChunkSize = _x
+			_vAvgChunkSize.MarkConsumed()
+		}
+	}
+	if _vMinChunkSize, _ok := model.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+			d.data.MinChunkSize = _x
+			_vMinChunkSize.MarkConsumed()
+		}
+	}
+	if _vMaxChunkSize, _ok := model.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+			d.data.MaxChunkSize = _x
+			_vMaxChunkSize.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -102,7 +104,10 @@ func (d *SignatureConfigDocument) Encode() ([]byte, error) {
 }
 
 func (d *SignatureConfigDocument) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *SignatureConfigDocument) Comment(key string) string {
@@ -121,37 +126,35 @@ func (d *SignatureConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeSignatureConfigInto(data *SignatureConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeSignatureConfigInto(data *SignatureConfig, sub *cst.Value) error {
+	if _vType, _ok := sub.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+			data.Type = _x
+			_vType.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Type = v
-				consumed[keyPrefix+"type"] = true
-			}
-		case "signature-len":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.SignatureLen = v
-				consumed[keyPrefix+"signature-len"] = true
-			}
-		case "avg-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.AvgChunkSize = v
-				consumed[keyPrefix+"avg-chunk-size"] = true
-			}
-		case "min-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.MinChunkSize = v
-				consumed[keyPrefix+"min-chunk-size"] = true
-			}
-		case "max-chunk-size":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.MaxChunkSize = v
-				consumed[keyPrefix+"max-chunk-size"] = true
-			}
+	}
+	if _vSignatureLen, _ok := sub.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+			data.SignatureLen = _x
+			_vSignatureLen.MarkConsumed()
+		}
+	}
+	if _vAvgChunkSize, _ok := sub.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+			data.AvgChunkSize = _x
+			_vAvgChunkSize.MarkConsumed()
+		}
+	}
+	if _vMinChunkSize, _ok := sub.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+			data.MinChunkSize = _x
+			_vMinChunkSize.MarkConsumed()
+		}
+	}
+	if _vMaxChunkSize, _ok := sub.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+			data.MaxChunkSize = _x
+			_vMaxChunkSize.MarkConsumed()
 		}
 	}
 	return nil
@@ -187,9 +190,9 @@ func EncodeSignatureConfigFrom(data *SignatureConfig, doc *document.Document, co
 }
 
 type SelectorConfigDocument struct {
-	data     SelectorConfig
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   SelectorConfig
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeSelectorConfig(input []byte) (*SelectorConfigDocument, error) {
@@ -197,42 +200,44 @@ func DecodeSelectorConfig(input []byte) (*SelectorConfigDocument, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &SelectorConfigDocument{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &SelectorConfigDocument{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vType, _ok := model.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+			d.data.Type = _x
+			_vType.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Type = v
-				d.consumed["type"] = true
-			}
-		case "bands":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.Bands = v
-				d.consumed["bands"] = true
-			}
-		case "rows-per-band":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.RowsPerBand = v
-				d.consumed["rows-per-band"] = true
-			}
-		case "min-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				d.data.MinBlobSize = v
-				d.consumed["min-blob-size"] = true
-			}
-		case "max-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				d.data.MaxBlobSize = v
-				d.consumed["max-blob-size"] = true
-			}
+	}
+	if _vBands, _ok := model.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+			d.data.Bands = _x
+			_vBands.MarkConsumed()
+		}
+	}
+	if _vRowsPerBand, _ok := model.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+			d.data.RowsPerBand = _x
+			_vRowsPerBand.MarkConsumed()
+		}
+	}
+	if _vMinBlobSize, _ok := model.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+			d.data.MinBlobSize = _x
+			_vMinBlobSize.MarkConsumed()
+		}
+	}
+	if _vMaxBlobSize, _ok := model.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+			d.data.MaxBlobSize = _x
+			_vMaxBlobSize.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -272,7 +277,10 @@ func (d *SelectorConfigDocument) Encode() ([]byte, error) {
 }
 
 func (d *SelectorConfigDocument) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *SelectorConfigDocument) Comment(key string) string {
@@ -291,37 +299,35 @@ func (d *SelectorConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeSelectorConfigInto(data *SelectorConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeSelectorConfigInto(data *SelectorConfig, sub *cst.Value) error {
+	if _vType, _ok := sub.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+			data.Type = _x
+			_vType.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Type = v
-				consumed[keyPrefix+"type"] = true
-			}
-		case "bands":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.Bands = v
-				consumed[keyPrefix+"bands"] = true
-			}
-		case "rows-per-band":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.RowsPerBand = v
-				consumed[keyPrefix+"rows-per-band"] = true
-			}
-		case "min-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				data.MinBlobSize = v
-				consumed[keyPrefix+"min-blob-size"] = true
-			}
-		case "max-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				data.MaxBlobSize = v
-				consumed[keyPrefix+"max-blob-size"] = true
-			}
+	}
+	if _vBands, _ok := sub.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+			data.Bands = _x
+			_vBands.MarkConsumed()
+		}
+	}
+	if _vRowsPerBand, _ok := sub.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+			data.RowsPerBand = _x
+			_vRowsPerBand.MarkConsumed()
+		}
+	}
+	if _vMinBlobSize, _ok := sub.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+			data.MinBlobSize = _x
+			_vMinBlobSize.MarkConsumed()
+		}
+	}
+	if _vMaxBlobSize, _ok := sub.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+			data.MaxBlobSize = _x
+			_vMaxBlobSize.MarkConsumed()
 		}
 	}
 	return nil
@@ -357,9 +363,9 @@ func EncodeSelectorConfigFrom(data *SelectorConfig, doc *document.Document, cont
 }
 
 type DeltaConfigDocument struct {
-	data     DeltaConfig
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   DeltaConfig
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeDeltaConfig(input []byte) (*DeltaConfigDocument, error) {
@@ -367,118 +373,160 @@ func DecodeDeltaConfig(input []byte) (*DeltaConfigDocument, error) {
 	if err != nil {
 		return nil, err
 	}
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
+	}
 
 	d := &DeltaConfigDocument{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+		cstDoc: doc,
+		model:  model,
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	if _vEnabled, _ok := model.Get("enabled"); _ok && _vEnabled.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vEnabled.Leaf); _xok {
+			d.data.Enabled = _x
+			_vEnabled.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "enabled":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.Enabled = v
-				d.consumed["enabled"] = true
+	}
+	if _vAlgorithm, _ok := model.Get("algorithm"); _ok && _vAlgorithm.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vAlgorithm.Leaf); _xok {
+			d.data.Algorithm = _x
+			_vAlgorithm.MarkConsumed()
+		}
+	}
+	if _vMinBlobSize, _ok := model.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+			d.data.MinBlobSize = _x
+			_vMinBlobSize.MarkConsumed()
+		}
+	}
+	if _vMaxBlobSize, _ok := model.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+			d.data.MaxBlobSize = _x
+			_vMaxBlobSize.MarkConsumed()
+		}
+	}
+	if _vSizeRatio, _ok := model.Get("size-ratio"); _ok && _vSizeRatio.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractFloat64(_vSizeRatio.Leaf); _xok {
+			d.data.SizeRatio = _x
+			_vSizeRatio.MarkConsumed()
+		}
+	}
+	if _vSignature, _ok := model.Get("signature"); _ok && _vSignature.Kind == cst.VTable {
+		_vSignature.MarkSeen()
+		if _vSignatureType, _ok := _vSignature.Get("type"); _ok && _vSignatureType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vSignatureType.Leaf); _xok {
+				d.data.Signature.Type = _x
+				_vSignatureType.MarkConsumed()
 			}
-		case "algorithm":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Algorithm = v
-				d.consumed["algorithm"] = true
+		}
+		if _vSignatureSignatureLen, _ok := _vSignature.Get("signature-len"); _ok && _vSignatureSignatureLen.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureSignatureLen.Leaf); _xok {
+				d.data.Signature.SignatureLen = _x
+				_vSignatureSignatureLen.MarkConsumed()
 			}
-		case "min-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				d.data.MinBlobSize = v
-				d.consumed["min-blob-size"] = true
+		}
+		if _vSignatureAvgChunkSize, _ok := _vSignature.Get("avg-chunk-size"); _ok && _vSignatureAvgChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureAvgChunkSize.Leaf); _xok {
+				d.data.Signature.AvgChunkSize = _x
+				_vSignatureAvgChunkSize.MarkConsumed()
 			}
-		case "max-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				d.data.MaxBlobSize = v
-				d.consumed["max-blob-size"] = true
+		}
+		if _vSignatureMinChunkSize, _ok := _vSignature.Get("min-chunk-size"); _ok && _vSignatureMinChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureMinChunkSize.Leaf); _xok {
+				d.data.Signature.MinChunkSize = _x
+				_vSignatureMinChunkSize.MarkConsumed()
 			}
-		case "size-ratio":
-			if v, ok := cst.ExtractFloat64(_kv); ok {
-				d.data.SizeRatio = v
-				d.consumed["size-ratio"] = true
+		}
+		if _vSignatureMaxChunkSize, _ok := _vSignature.Get("max-chunk-size"); _ok && _vSignatureMaxChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureMaxChunkSize.Leaf); _xok {
+				d.data.Signature.MaxChunkSize = _x
+				_vSignatureMaxChunkSize.MarkConsumed()
+			}
+		}
+	} else {
+		if _vType, _ok := model.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+				d.data.Signature.Type = _x
+				_vType.MarkConsumed()
+			}
+		}
+		if _vSignatureLen, _ok := model.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+				d.data.Signature.SignatureLen = _x
+				_vSignatureLen.MarkConsumed()
+			}
+		}
+		if _vAvgChunkSize, _ok := model.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+				d.data.Signature.AvgChunkSize = _x
+				_vAvgChunkSize.MarkConsumed()
+			}
+		}
+		if _vMinChunkSize, _ok := model.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+				d.data.Signature.MinChunkSize = _x
+				_vMinChunkSize.MarkConsumed()
+			}
+		}
+		if _vMaxChunkSize, _ok := model.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+				d.data.Signature.MaxChunkSize = _x
+				_vMaxChunkSize.MarkConsumed()
 			}
 		}
 	}
-	for _, _ch := range d.cstDoc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == "signature" {
-			d.consumed["signature"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "type":
-					if v, ok := cst.ExtractString(_kv); ok {
-						d.data.Signature.Type = v
-						d.consumed["signature.type"] = true
-					}
-				case "signature-len":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Signature.SignatureLen = v
-						d.consumed["signature.signature-len"] = true
-					}
-				case "avg-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Signature.AvgChunkSize = v
-						d.consumed["signature.avg-chunk-size"] = true
-					}
-				case "min-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Signature.MinChunkSize = v
-						d.consumed["signature.min-chunk-size"] = true
-					}
-				case "max-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Signature.MaxChunkSize = v
-						d.consumed["signature.max-chunk-size"] = true
-					}
-				}
+	if _vSelector, _ok := model.Get("selector"); _ok && _vSelector.Kind == cst.VTable {
+		_vSelector.MarkSeen()
+		if _vSelectorType, _ok := _vSelector.Get("type"); _ok && _vSelectorType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vSelectorType.Leaf); _xok {
+				d.data.Selector.Type = _x
+				_vSelectorType.MarkConsumed()
 			}
-			break
 		}
-	}
-	for _, _ch := range d.cstDoc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == "selector" {
-			d.consumed["selector"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "type":
-					if v, ok := cst.ExtractString(_kv); ok {
-						d.data.Selector.Type = v
-						d.consumed["selector.type"] = true
-					}
-				case "bands":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Selector.Bands = v
-						d.consumed["selector.bands"] = true
-					}
-				case "rows-per-band":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						d.data.Selector.RowsPerBand = v
-						d.consumed["selector.rows-per-band"] = true
-					}
-				case "min-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						d.data.Selector.MinBlobSize = v
-						d.consumed["selector.min-blob-size"] = true
-					}
-				case "max-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						d.data.Selector.MaxBlobSize = v
-						d.consumed["selector.max-blob-size"] = true
-					}
-				}
+		if _vSelectorBands, _ok := _vSelector.Get("bands"); _ok && _vSelectorBands.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSelectorBands.Leaf); _xok {
+				d.data.Selector.Bands = _x
+				_vSelectorBands.MarkConsumed()
 			}
-			break
+		}
+		if _vSelectorRowsPerBand, _ok := _vSelector.Get("rows-per-band"); _ok && _vSelectorRowsPerBand.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSelectorRowsPerBand.Leaf); _xok {
+				d.data.Selector.RowsPerBand = _x
+				_vSelectorRowsPerBand.MarkConsumed()
+			}
+		}
+		if _vSelectorMinBlobSize, _ok := _vSelector.Get("min-blob-size"); _ok && _vSelectorMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vSelectorMinBlobSize.Leaf); _xok {
+				d.data.Selector.MinBlobSize = _x
+				_vSelectorMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vSelectorMaxBlobSize, _ok := _vSelector.Get("max-blob-size"); _ok && _vSelectorMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vSelectorMaxBlobSize.Leaf); _xok {
+				d.data.Selector.MaxBlobSize = _x
+				_vSelectorMaxBlobSize.MarkConsumed()
+			}
+		}
+	} else {
+		if _vType, _ok := model.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+				d.data.Selector.Type = _x
+				_vType.MarkConsumed()
+			}
+		}
+		if _vBands, _ok := model.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+				d.data.Selector.Bands = _x
+				_vBands.MarkConsumed()
+			}
+		}
+		if _vRowsPerBand, _ok := model.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+				d.data.Selector.RowsPerBand = _x
+				_vRowsPerBand.MarkConsumed()
+			}
 		}
 	}
 	return d, nil
@@ -574,7 +622,10 @@ func (d *DeltaConfigDocument) Encode() ([]byte, error) {
 }
 
 func (d *DeltaConfigDocument) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *DeltaConfigDocument) Comment(key string) string {
@@ -593,113 +644,151 @@ func (d *DeltaConfigDocument) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeDeltaConfigInto(data *DeltaConfig, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeDeltaConfigInto(data *DeltaConfig, sub *cst.Value) error {
+	if _vEnabled, _ok := sub.Get("enabled"); _ok && _vEnabled.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vEnabled.Leaf); _xok {
+			data.Enabled = _x
+			_vEnabled.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "enabled":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.Enabled = v
-				consumed[keyPrefix+"enabled"] = true
+	}
+	if _vAlgorithm, _ok := sub.Get("algorithm"); _ok && _vAlgorithm.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vAlgorithm.Leaf); _xok {
+			data.Algorithm = _x
+			_vAlgorithm.MarkConsumed()
+		}
+	}
+	if _vMinBlobSize, _ok := sub.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+			data.MinBlobSize = _x
+			_vMinBlobSize.MarkConsumed()
+		}
+	}
+	if _vMaxBlobSize, _ok := sub.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+			data.MaxBlobSize = _x
+			_vMaxBlobSize.MarkConsumed()
+		}
+	}
+	if _vSizeRatio, _ok := sub.Get("size-ratio"); _ok && _vSizeRatio.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractFloat64(_vSizeRatio.Leaf); _xok {
+			data.SizeRatio = _x
+			_vSizeRatio.MarkConsumed()
+		}
+	}
+	if _vSignature, _ok := sub.Get("signature"); _ok && _vSignature.Kind == cst.VTable {
+		_vSignature.MarkSeen()
+		if _vSignatureType, _ok := _vSignature.Get("type"); _ok && _vSignatureType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vSignatureType.Leaf); _xok {
+				data.Signature.Type = _x
+				_vSignatureType.MarkConsumed()
 			}
-		case "algorithm":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Algorithm = v
-				consumed[keyPrefix+"algorithm"] = true
+		}
+		if _vSignatureSignatureLen, _ok := _vSignature.Get("signature-len"); _ok && _vSignatureSignatureLen.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureSignatureLen.Leaf); _xok {
+				data.Signature.SignatureLen = _x
+				_vSignatureSignatureLen.MarkConsumed()
 			}
-		case "min-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				data.MinBlobSize = v
-				consumed[keyPrefix+"min-blob-size"] = true
+		}
+		if _vSignatureAvgChunkSize, _ok := _vSignature.Get("avg-chunk-size"); _ok && _vSignatureAvgChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureAvgChunkSize.Leaf); _xok {
+				data.Signature.AvgChunkSize = _x
+				_vSignatureAvgChunkSize.MarkConsumed()
 			}
-		case "max-blob-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				data.MaxBlobSize = v
-				consumed[keyPrefix+"max-blob-size"] = true
+		}
+		if _vSignatureMinChunkSize, _ok := _vSignature.Get("min-chunk-size"); _ok && _vSignatureMinChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureMinChunkSize.Leaf); _xok {
+				data.Signature.MinChunkSize = _x
+				_vSignatureMinChunkSize.MarkConsumed()
 			}
-		case "size-ratio":
-			if v, ok := cst.ExtractFloat64(_kv); ok {
-				data.SizeRatio = v
-				consumed[keyPrefix+"size-ratio"] = true
+		}
+		if _vSignatureMaxChunkSize, _ok := _vSignature.Get("max-chunk-size"); _ok && _vSignatureMaxChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureMaxChunkSize.Leaf); _xok {
+				data.Signature.MaxChunkSize = _x
+				_vSignatureMaxChunkSize.MarkConsumed()
+			}
+		}
+	} else {
+		if _vType, _ok := sub.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+				data.Signature.Type = _x
+				_vType.MarkConsumed()
+			}
+		}
+		if _vSignatureLen, _ok := sub.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+				data.Signature.SignatureLen = _x
+				_vSignatureLen.MarkConsumed()
+			}
+		}
+		if _vAvgChunkSize, _ok := sub.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+				data.Signature.AvgChunkSize = _x
+				_vAvgChunkSize.MarkConsumed()
+			}
+		}
+		if _vMinChunkSize, _ok := sub.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+				data.Signature.MinChunkSize = _x
+				_vMinChunkSize.MarkConsumed()
+			}
+		}
+		if _vMaxChunkSize, _ok := sub.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+				data.Signature.MaxChunkSize = _x
+				_vMaxChunkSize.MarkConsumed()
 			}
 		}
 	}
-	for _, _ch := range doc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == keyPrefix+"signature" {
-			consumed[keyPrefix+"signature"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "type":
-					if v, ok := cst.ExtractString(_kv); ok {
-						data.Signature.Type = v
-						consumed[keyPrefix+"signature.type"] = true
-					}
-				case "signature-len":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Signature.SignatureLen = v
-						consumed[keyPrefix+"signature.signature-len"] = true
-					}
-				case "avg-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Signature.AvgChunkSize = v
-						consumed[keyPrefix+"signature.avg-chunk-size"] = true
-					}
-				case "min-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Signature.MinChunkSize = v
-						consumed[keyPrefix+"signature.min-chunk-size"] = true
-					}
-				case "max-chunk-size":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Signature.MaxChunkSize = v
-						consumed[keyPrefix+"signature.max-chunk-size"] = true
-					}
-				}
+	if _vSelector, _ok := sub.Get("selector"); _ok && _vSelector.Kind == cst.VTable {
+		_vSelector.MarkSeen()
+		if _vSelectorType, _ok := _vSelector.Get("type"); _ok && _vSelectorType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vSelectorType.Leaf); _xok {
+				data.Selector.Type = _x
+				_vSelectorType.MarkConsumed()
 			}
-			break
 		}
-	}
-	for _, _ch := range doc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == keyPrefix+"selector" {
-			consumed[keyPrefix+"selector"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "type":
-					if v, ok := cst.ExtractString(_kv); ok {
-						data.Selector.Type = v
-						consumed[keyPrefix+"selector.type"] = true
-					}
-				case "bands":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Selector.Bands = v
-						consumed[keyPrefix+"selector.bands"] = true
-					}
-				case "rows-per-band":
-					if v, ok := cst.ExtractInt(_kv); ok {
-						data.Selector.RowsPerBand = v
-						consumed[keyPrefix+"selector.rows-per-band"] = true
-					}
-				case "min-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						data.Selector.MinBlobSize = v
-						consumed[keyPrefix+"selector.min-blob-size"] = true
-					}
-				case "max-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						data.Selector.MaxBlobSize = v
-						consumed[keyPrefix+"selector.max-blob-size"] = true
-					}
-				}
+		if _vSelectorBands, _ok := _vSelector.Get("bands"); _ok && _vSelectorBands.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSelectorBands.Leaf); _xok {
+				data.Selector.Bands = _x
+				_vSelectorBands.MarkConsumed()
 			}
-			break
+		}
+		if _vSelectorRowsPerBand, _ok := _vSelector.Get("rows-per-band"); _ok && _vSelectorRowsPerBand.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vSelectorRowsPerBand.Leaf); _xok {
+				data.Selector.RowsPerBand = _x
+				_vSelectorRowsPerBand.MarkConsumed()
+			}
+		}
+		if _vSelectorMinBlobSize, _ok := _vSelector.Get("min-blob-size"); _ok && _vSelectorMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vSelectorMinBlobSize.Leaf); _xok {
+				data.Selector.MinBlobSize = _x
+				_vSelectorMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vSelectorMaxBlobSize, _ok := _vSelector.Get("max-blob-size"); _ok && _vSelectorMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vSelectorMaxBlobSize.Leaf); _xok {
+				data.Selector.MaxBlobSize = _x
+				_vSelectorMaxBlobSize.MarkConsumed()
+			}
+		}
+	} else {
+		if _vType, _ok := sub.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+				data.Selector.Type = _x
+				_vType.MarkConsumed()
+			}
+		}
+		if _vBands, _ok := sub.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+				data.Selector.Bands = _x
+				_vBands.MarkConsumed()
+			}
+		}
+		if _vRowsPerBand, _ok := sub.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+				data.Selector.RowsPerBand = _x
+				_vRowsPerBand.MarkConsumed()
+			}
 		}
 	}
 	return nil
@@ -791,9 +880,9 @@ func EncodeDeltaConfigFrom(data *DeltaConfig, doc *document.Document, container 
 }
 
 type TomlInventoryArchiveV1Document struct {
-	data     TomlInventoryArchiveV1
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlInventoryArchiveV1
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlInventoryArchiveV1(input []byte) (*TomlInventoryArchiveV1Document, error) {
@@ -801,162 +890,230 @@ func DecodeTomlInventoryArchiveV1(input []byte) (*TomlInventoryArchiveV1Document
 	if err != nil {
 		return nil, err
 	}
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
+	}
 
 	d := &TomlInventoryArchiveV1Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+		cstDoc: doc,
+		model:  model,
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	if _vHashTypeId, _ok := model.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := d.data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("hash_type-id: %w", err)
+			}
+			_vHashTypeId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("hash_type-id: %w", err)
+	}
+	if _vCompressionType, _ok := model.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			d.data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vLooseBlobStoreId, _ok := model.Get("loose-blob-store-id"); _ok && _vLooseBlobStoreId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vLooseBlobStoreId.Leaf); _xok {
+			if err := d.data.LooseBlobStoreId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("loose-blob-store-id: %w", err)
+			}
+			_vLooseBlobStoreId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := model.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := d.data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("encryption: %w", err)
+			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vDelta, _ok := model.Get("delta"); _ok && _vDelta.Kind == cst.VTable {
+		_vDelta.MarkSeen()
+		if _vDeltaEnabled, _ok := _vDelta.Get("enabled"); _ok && _vDeltaEnabled.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractBool(_vDeltaEnabled.Leaf); _xok {
+				d.data.Delta.Enabled = _x
+				_vDeltaEnabled.MarkConsumed()
+			}
+		}
+		if _vDeltaAlgorithm, _ok := _vDelta.Get("algorithm"); _ok && _vDeltaAlgorithm.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vDeltaAlgorithm.Leaf); _xok {
+				d.data.Delta.Algorithm = _x
+				_vDeltaAlgorithm.MarkConsumed()
+			}
+		}
+		if _vDeltaMinBlobSize, _ok := _vDelta.Get("min-blob-size"); _ok && _vDeltaMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vDeltaMinBlobSize.Leaf); _xok {
+				d.data.Delta.MinBlobSize = _x
+				_vDeltaMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vDeltaMaxBlobSize, _ok := _vDelta.Get("max-blob-size"); _ok && _vDeltaMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vDeltaMaxBlobSize.Leaf); _xok {
+				d.data.Delta.MaxBlobSize = _x
+				_vDeltaMaxBlobSize.MarkConsumed()
+			}
+		}
+		if _vDeltaSizeRatio, _ok := _vDelta.Get("size-ratio"); _ok && _vDeltaSizeRatio.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractFloat64(_vDeltaSizeRatio.Leaf); _xok {
+				d.data.Delta.SizeRatio = _x
+				_vDeltaSizeRatio.MarkConsumed()
+			}
+		}
+		if _vDeltaSignature, _ok := _vDelta.Get("signature"); _ok && _vDeltaSignature.Kind == cst.VTable {
+			_vDeltaSignature.MarkSeen()
+			if _vDeltaSignatureType, _ok := _vDeltaSignature.Get("type"); _ok && _vDeltaSignatureType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vDeltaSignatureType.Leaf); _xok {
+					d.data.Delta.Signature.Type = _x
+					_vDeltaSignatureType.MarkConsumed()
 				}
-				d.consumed["hash_type-id"] = true
 			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.CompressionType = v
-				d.consumed["compression-type"] = true
-			}
-		case "loose-blob-store-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.LooseBlobStoreId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("loose-blob-store-id: %w", err)
+			if _vDeltaSignatureSignatureLen, _ok := _vDeltaSignature.Get("signature-len"); _ok && _vDeltaSignatureSignatureLen.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureSignatureLen.Leaf); _xok {
+					d.data.Delta.Signature.SignatureLen = _x
+					_vDeltaSignatureSignatureLen.MarkConsumed()
 				}
-				d.consumed["loose-blob-store-id"] = true
 			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("encryption: %w", err)
+			if _vDeltaSignatureAvgChunkSize, _ok := _vDeltaSignature.Get("avg-chunk-size"); _ok && _vDeltaSignatureAvgChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureAvgChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.AvgChunkSize = _x
+					_vDeltaSignatureAvgChunkSize.MarkConsumed()
 				}
-				d.consumed["encryption"] = true
 			}
-		case "max-pack-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				d.data.MaxPackSize = v
-				d.consumed["max-pack-size"] = true
+			if _vDeltaSignatureMinChunkSize, _ok := _vDeltaSignature.Get("min-chunk-size"); _ok && _vDeltaSignatureMinChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureMinChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.MinChunkSize = _x
+					_vDeltaSignatureMinChunkSize.MarkConsumed()
+				}
+			}
+			if _vDeltaSignatureMaxChunkSize, _ok := _vDeltaSignature.Get("max-chunk-size"); _ok && _vDeltaSignatureMaxChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureMaxChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.MaxChunkSize = _x
+					_vDeltaSignatureMaxChunkSize.MarkConsumed()
+				}
+			}
+		} else {
+			if _vType, _ok := _vDelta.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+					d.data.Delta.Signature.Type = _x
+					_vType.MarkConsumed()
+				}
+			}
+			if _vSignatureLen, _ok := _vDelta.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+					d.data.Delta.Signature.SignatureLen = _x
+					_vSignatureLen.MarkConsumed()
+				}
+			}
+			if _vAvgChunkSize, _ok := _vDelta.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.AvgChunkSize = _x
+					_vAvgChunkSize.MarkConsumed()
+				}
+			}
+			if _vMinChunkSize, _ok := _vDelta.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.MinChunkSize = _x
+					_vMinChunkSize.MarkConsumed()
+				}
+			}
+			if _vMaxChunkSize, _ok := _vDelta.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+					d.data.Delta.Signature.MaxChunkSize = _x
+					_vMaxChunkSize.MarkConsumed()
+				}
+			}
+		}
+		if _vDeltaSelector, _ok := _vDelta.Get("selector"); _ok && _vDeltaSelector.Kind == cst.VTable {
+			_vDeltaSelector.MarkSeen()
+			if _vDeltaSelectorType, _ok := _vDeltaSelector.Get("type"); _ok && _vDeltaSelectorType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vDeltaSelectorType.Leaf); _xok {
+					d.data.Delta.Selector.Type = _x
+					_vDeltaSelectorType.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorBands, _ok := _vDeltaSelector.Get("bands"); _ok && _vDeltaSelectorBands.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSelectorBands.Leaf); _xok {
+					d.data.Delta.Selector.Bands = _x
+					_vDeltaSelectorBands.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorRowsPerBand, _ok := _vDeltaSelector.Get("rows-per-band"); _ok && _vDeltaSelectorRowsPerBand.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSelectorRowsPerBand.Leaf); _xok {
+					d.data.Delta.Selector.RowsPerBand = _x
+					_vDeltaSelectorRowsPerBand.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorMinBlobSize, _ok := _vDeltaSelector.Get("min-blob-size"); _ok && _vDeltaSelectorMinBlobSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractUint64(_vDeltaSelectorMinBlobSize.Leaf); _xok {
+					d.data.Delta.Selector.MinBlobSize = _x
+					_vDeltaSelectorMinBlobSize.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorMaxBlobSize, _ok := _vDeltaSelector.Get("max-blob-size"); _ok && _vDeltaSelectorMaxBlobSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractUint64(_vDeltaSelectorMaxBlobSize.Leaf); _xok {
+					d.data.Delta.Selector.MaxBlobSize = _x
+					_vDeltaSelectorMaxBlobSize.MarkConsumed()
+				}
+			}
+		} else {
+			if _vType, _ok := _vDelta.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+					d.data.Delta.Selector.Type = _x
+					_vType.MarkConsumed()
+				}
+			}
+			if _vBands, _ok := _vDelta.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+					d.data.Delta.Selector.Bands = _x
+					_vBands.MarkConsumed()
+				}
+			}
+			if _vRowsPerBand, _ok := _vDelta.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+					d.data.Delta.Selector.RowsPerBand = _x
+					_vRowsPerBand.MarkConsumed()
+				}
+			}
+		}
+	} else {
+		if _vEnabled, _ok := model.Get("enabled"); _ok && _vEnabled.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractBool(_vEnabled.Leaf); _xok {
+				d.data.Delta.Enabled = _x
+				_vEnabled.MarkConsumed()
+			}
+		}
+		if _vAlgorithm, _ok := model.Get("algorithm"); _ok && _vAlgorithm.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vAlgorithm.Leaf); _xok {
+				d.data.Delta.Algorithm = _x
+				_vAlgorithm.MarkConsumed()
+			}
+		}
+		if _vMinBlobSize, _ok := model.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+				d.data.Delta.MinBlobSize = _x
+				_vMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vMaxBlobSize, _ok := model.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+				d.data.Delta.MaxBlobSize = _x
+				_vMaxBlobSize.MarkConsumed()
+			}
+		}
+		if _vSizeRatio, _ok := model.Get("size-ratio"); _ok && _vSizeRatio.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractFloat64(_vSizeRatio.Leaf); _xok {
+				d.data.Delta.SizeRatio = _x
+				_vSizeRatio.MarkConsumed()
 			}
 		}
 	}
-	for _, _ch := range d.cstDoc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == "delta" {
-			d.consumed["delta"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "enabled":
-					if v, ok := cst.ExtractBool(_kv); ok {
-						d.data.Delta.Enabled = v
-						d.consumed["delta.enabled"] = true
-					}
-				case "algorithm":
-					if v, ok := cst.ExtractString(_kv); ok {
-						d.data.Delta.Algorithm = v
-						d.consumed["delta.algorithm"] = true
-					}
-				case "min-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						d.data.Delta.MinBlobSize = v
-						d.consumed["delta.min-blob-size"] = true
-					}
-				case "max-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						d.data.Delta.MaxBlobSize = v
-						d.consumed["delta.max-blob-size"] = true
-					}
-				case "size-ratio":
-					if v, ok := cst.ExtractFloat64(_kv); ok {
-						d.data.Delta.SizeRatio = v
-						d.consumed["delta.size-ratio"] = true
-					}
-				}
-			}
-			for _, _ch := range d.cstDoc.Root().Children {
-				if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == "delta.signature" {
-					d.consumed["delta.signature"] = true
-					for _, _kv := range _ch.Children {
-						if _kv.Kind != cst.NodeKeyValue {
-							continue
-						}
-						switch cst.KeyValueName(_kv) {
-						case "type":
-							if v, ok := cst.ExtractString(_kv); ok {
-								d.data.Delta.Signature.Type = v
-								d.consumed["delta.signature.type"] = true
-							}
-						case "signature-len":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Signature.SignatureLen = v
-								d.consumed["delta.signature.signature-len"] = true
-							}
-						case "avg-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Signature.AvgChunkSize = v
-								d.consumed["delta.signature.avg-chunk-size"] = true
-							}
-						case "min-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Signature.MinChunkSize = v
-								d.consumed["delta.signature.min-chunk-size"] = true
-							}
-						case "max-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Signature.MaxChunkSize = v
-								d.consumed["delta.signature.max-chunk-size"] = true
-							}
-						}
-					}
-					break
-				}
-			}
-			for _, _ch := range d.cstDoc.Root().Children {
-				if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == "delta.selector" {
-					d.consumed["delta.selector"] = true
-					for _, _kv := range _ch.Children {
-						if _kv.Kind != cst.NodeKeyValue {
-							continue
-						}
-						switch cst.KeyValueName(_kv) {
-						case "type":
-							if v, ok := cst.ExtractString(_kv); ok {
-								d.data.Delta.Selector.Type = v
-								d.consumed["delta.selector.type"] = true
-							}
-						case "bands":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Selector.Bands = v
-								d.consumed["delta.selector.bands"] = true
-							}
-						case "rows-per-band":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								d.data.Delta.Selector.RowsPerBand = v
-								d.consumed["delta.selector.rows-per-band"] = true
-							}
-						case "min-blob-size":
-							if v, ok := cst.ExtractUint64(_kv); ok {
-								d.data.Delta.Selector.MinBlobSize = v
-								d.consumed["delta.selector.min-blob-size"] = true
-							}
-						case "max-blob-size":
-							if v, ok := cst.ExtractUint64(_kv); ok {
-								d.data.Delta.Selector.MaxBlobSize = v
-								d.consumed["delta.selector.max-blob-size"] = true
-							}
-						}
-					}
-					break
-				}
-			}
-			break
+	if _vMaxPackSize, _ok := model.Get("max-pack-size"); _ok && _vMaxPackSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxPackSize.Leaf); _xok {
+			d.data.MaxPackSize = _x
+			_vMaxPackSize.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -1092,7 +1249,10 @@ func (d *TomlInventoryArchiveV1Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlInventoryArchiveV1Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlInventoryArchiveV1Document) Comment(key string) string {
@@ -1111,157 +1271,221 @@ func (d *TomlInventoryArchiveV1Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlInventoryArchiveV1Into(data *TomlInventoryArchiveV1, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlInventoryArchiveV1Into(data *TomlInventoryArchiveV1, sub *cst.Value) error {
+	if _vHashTypeId, _ok := sub.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("hash_type-id: %w", err)
+			}
+			_vHashTypeId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("hash_type-id: %w", err)
+	}
+	if _vCompressionType, _ok := sub.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vLooseBlobStoreId, _ok := sub.Get("loose-blob-store-id"); _ok && _vLooseBlobStoreId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vLooseBlobStoreId.Leaf); _xok {
+			if err := data.LooseBlobStoreId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("loose-blob-store-id: %w", err)
+			}
+			_vLooseBlobStoreId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := sub.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("encryption: %w", err)
+			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vDelta, _ok := sub.Get("delta"); _ok && _vDelta.Kind == cst.VTable {
+		_vDelta.MarkSeen()
+		if _vDeltaEnabled, _ok := _vDelta.Get("enabled"); _ok && _vDeltaEnabled.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractBool(_vDeltaEnabled.Leaf); _xok {
+				data.Delta.Enabled = _x
+				_vDeltaEnabled.MarkConsumed()
+			}
+		}
+		if _vDeltaAlgorithm, _ok := _vDelta.Get("algorithm"); _ok && _vDeltaAlgorithm.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vDeltaAlgorithm.Leaf); _xok {
+				data.Delta.Algorithm = _x
+				_vDeltaAlgorithm.MarkConsumed()
+			}
+		}
+		if _vDeltaMinBlobSize, _ok := _vDelta.Get("min-blob-size"); _ok && _vDeltaMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vDeltaMinBlobSize.Leaf); _xok {
+				data.Delta.MinBlobSize = _x
+				_vDeltaMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vDeltaMaxBlobSize, _ok := _vDelta.Get("max-blob-size"); _ok && _vDeltaMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vDeltaMaxBlobSize.Leaf); _xok {
+				data.Delta.MaxBlobSize = _x
+				_vDeltaMaxBlobSize.MarkConsumed()
+			}
+		}
+		if _vDeltaSizeRatio, _ok := _vDelta.Get("size-ratio"); _ok && _vDeltaSizeRatio.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractFloat64(_vDeltaSizeRatio.Leaf); _xok {
+				data.Delta.SizeRatio = _x
+				_vDeltaSizeRatio.MarkConsumed()
+			}
+		}
+		if _vDeltaSignature, _ok := _vDelta.Get("signature"); _ok && _vDeltaSignature.Kind == cst.VTable {
+			_vDeltaSignature.MarkSeen()
+			if _vDeltaSignatureType, _ok := _vDeltaSignature.Get("type"); _ok && _vDeltaSignatureType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vDeltaSignatureType.Leaf); _xok {
+					data.Delta.Signature.Type = _x
+					_vDeltaSignatureType.MarkConsumed()
 				}
-				consumed[keyPrefix+"hash_type-id"] = true
 			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.CompressionType = v
-				consumed[keyPrefix+"compression-type"] = true
-			}
-		case "loose-blob-store-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.LooseBlobStoreId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("loose-blob-store-id: %w", err)
+			if _vDeltaSignatureSignatureLen, _ok := _vDeltaSignature.Get("signature-len"); _ok && _vDeltaSignatureSignatureLen.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureSignatureLen.Leaf); _xok {
+					data.Delta.Signature.SignatureLen = _x
+					_vDeltaSignatureSignatureLen.MarkConsumed()
 				}
-				consumed[keyPrefix+"loose-blob-store-id"] = true
 			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("encryption: %w", err)
+			if _vDeltaSignatureAvgChunkSize, _ok := _vDeltaSignature.Get("avg-chunk-size"); _ok && _vDeltaSignatureAvgChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureAvgChunkSize.Leaf); _xok {
+					data.Delta.Signature.AvgChunkSize = _x
+					_vDeltaSignatureAvgChunkSize.MarkConsumed()
 				}
-				consumed[keyPrefix+"encryption"] = true
 			}
-		case "max-pack-size":
-			if v, ok := cst.ExtractUint64(_kv); ok {
-				data.MaxPackSize = v
-				consumed[keyPrefix+"max-pack-size"] = true
+			if _vDeltaSignatureMinChunkSize, _ok := _vDeltaSignature.Get("min-chunk-size"); _ok && _vDeltaSignatureMinChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureMinChunkSize.Leaf); _xok {
+					data.Delta.Signature.MinChunkSize = _x
+					_vDeltaSignatureMinChunkSize.MarkConsumed()
+				}
+			}
+			if _vDeltaSignatureMaxChunkSize, _ok := _vDeltaSignature.Get("max-chunk-size"); _ok && _vDeltaSignatureMaxChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSignatureMaxChunkSize.Leaf); _xok {
+					data.Delta.Signature.MaxChunkSize = _x
+					_vDeltaSignatureMaxChunkSize.MarkConsumed()
+				}
+			}
+		} else {
+			if _vType, _ok := _vDelta.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+					data.Delta.Signature.Type = _x
+					_vType.MarkConsumed()
+				}
+			}
+			if _vSignatureLen, _ok := _vDelta.Get("signature-len"); _ok && _vSignatureLen.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vSignatureLen.Leaf); _xok {
+					data.Delta.Signature.SignatureLen = _x
+					_vSignatureLen.MarkConsumed()
+				}
+			}
+			if _vAvgChunkSize, _ok := _vDelta.Get("avg-chunk-size"); _ok && _vAvgChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vAvgChunkSize.Leaf); _xok {
+					data.Delta.Signature.AvgChunkSize = _x
+					_vAvgChunkSize.MarkConsumed()
+				}
+			}
+			if _vMinChunkSize, _ok := _vDelta.Get("min-chunk-size"); _ok && _vMinChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vMinChunkSize.Leaf); _xok {
+					data.Delta.Signature.MinChunkSize = _x
+					_vMinChunkSize.MarkConsumed()
+				}
+			}
+			if _vMaxChunkSize, _ok := _vDelta.Get("max-chunk-size"); _ok && _vMaxChunkSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vMaxChunkSize.Leaf); _xok {
+					data.Delta.Signature.MaxChunkSize = _x
+					_vMaxChunkSize.MarkConsumed()
+				}
+			}
+		}
+		if _vDeltaSelector, _ok := _vDelta.Get("selector"); _ok && _vDeltaSelector.Kind == cst.VTable {
+			_vDeltaSelector.MarkSeen()
+			if _vDeltaSelectorType, _ok := _vDeltaSelector.Get("type"); _ok && _vDeltaSelectorType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vDeltaSelectorType.Leaf); _xok {
+					data.Delta.Selector.Type = _x
+					_vDeltaSelectorType.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorBands, _ok := _vDeltaSelector.Get("bands"); _ok && _vDeltaSelectorBands.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSelectorBands.Leaf); _xok {
+					data.Delta.Selector.Bands = _x
+					_vDeltaSelectorBands.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorRowsPerBand, _ok := _vDeltaSelector.Get("rows-per-band"); _ok && _vDeltaSelectorRowsPerBand.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vDeltaSelectorRowsPerBand.Leaf); _xok {
+					data.Delta.Selector.RowsPerBand = _x
+					_vDeltaSelectorRowsPerBand.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorMinBlobSize, _ok := _vDeltaSelector.Get("min-blob-size"); _ok && _vDeltaSelectorMinBlobSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractUint64(_vDeltaSelectorMinBlobSize.Leaf); _xok {
+					data.Delta.Selector.MinBlobSize = _x
+					_vDeltaSelectorMinBlobSize.MarkConsumed()
+				}
+			}
+			if _vDeltaSelectorMaxBlobSize, _ok := _vDeltaSelector.Get("max-blob-size"); _ok && _vDeltaSelectorMaxBlobSize.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractUint64(_vDeltaSelectorMaxBlobSize.Leaf); _xok {
+					data.Delta.Selector.MaxBlobSize = _x
+					_vDeltaSelectorMaxBlobSize.MarkConsumed()
+				}
+			}
+		} else {
+			if _vType, _ok := _vDelta.Get("type"); _ok && _vType.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractString(_vType.Leaf); _xok {
+					data.Delta.Selector.Type = _x
+					_vType.MarkConsumed()
+				}
+			}
+			if _vBands, _ok := _vDelta.Get("bands"); _ok && _vBands.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vBands.Leaf); _xok {
+					data.Delta.Selector.Bands = _x
+					_vBands.MarkConsumed()
+				}
+			}
+			if _vRowsPerBand, _ok := _vDelta.Get("rows-per-band"); _ok && _vRowsPerBand.Kind == cst.VLeaf {
+				if _x, _xok := cst.ExtractInt(_vRowsPerBand.Leaf); _xok {
+					data.Delta.Selector.RowsPerBand = _x
+					_vRowsPerBand.MarkConsumed()
+				}
+			}
+		}
+	} else {
+		if _vEnabled, _ok := sub.Get("enabled"); _ok && _vEnabled.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractBool(_vEnabled.Leaf); _xok {
+				data.Delta.Enabled = _x
+				_vEnabled.MarkConsumed()
+			}
+		}
+		if _vAlgorithm, _ok := sub.Get("algorithm"); _ok && _vAlgorithm.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractString(_vAlgorithm.Leaf); _xok {
+				data.Delta.Algorithm = _x
+				_vAlgorithm.MarkConsumed()
+			}
+		}
+		if _vMinBlobSize, _ok := sub.Get("min-blob-size"); _ok && _vMinBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vMinBlobSize.Leaf); _xok {
+				data.Delta.MinBlobSize = _x
+				_vMinBlobSize.MarkConsumed()
+			}
+		}
+		if _vMaxBlobSize, _ok := sub.Get("max-blob-size"); _ok && _vMaxBlobSize.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractUint64(_vMaxBlobSize.Leaf); _xok {
+				data.Delta.MaxBlobSize = _x
+				_vMaxBlobSize.MarkConsumed()
+			}
+		}
+		if _vSizeRatio, _ok := sub.Get("size-ratio"); _ok && _vSizeRatio.Kind == cst.VLeaf {
+			if _x, _xok := cst.ExtractFloat64(_vSizeRatio.Leaf); _xok {
+				data.Delta.SizeRatio = _x
+				_vSizeRatio.MarkConsumed()
 			}
 		}
 	}
-	for _, _ch := range doc.Root().Children {
-		if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == keyPrefix+"delta" {
-			consumed[keyPrefix+"delta"] = true
-			for _, _kv := range _ch.Children {
-				if _kv.Kind != cst.NodeKeyValue {
-					continue
-				}
-				switch cst.KeyValueName(_kv) {
-				case "enabled":
-					if v, ok := cst.ExtractBool(_kv); ok {
-						data.Delta.Enabled = v
-						consumed[keyPrefix+"delta.enabled"] = true
-					}
-				case "algorithm":
-					if v, ok := cst.ExtractString(_kv); ok {
-						data.Delta.Algorithm = v
-						consumed[keyPrefix+"delta.algorithm"] = true
-					}
-				case "min-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						data.Delta.MinBlobSize = v
-						consumed[keyPrefix+"delta.min-blob-size"] = true
-					}
-				case "max-blob-size":
-					if v, ok := cst.ExtractUint64(_kv); ok {
-						data.Delta.MaxBlobSize = v
-						consumed[keyPrefix+"delta.max-blob-size"] = true
-					}
-				case "size-ratio":
-					if v, ok := cst.ExtractFloat64(_kv); ok {
-						data.Delta.SizeRatio = v
-						consumed[keyPrefix+"delta.size-ratio"] = true
-					}
-				}
-			}
-			for _, _ch := range doc.Root().Children {
-				if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == keyPrefix+"delta.signature" {
-					consumed[keyPrefix+"delta.signature"] = true
-					for _, _kv := range _ch.Children {
-						if _kv.Kind != cst.NodeKeyValue {
-							continue
-						}
-						switch cst.KeyValueName(_kv) {
-						case "type":
-							if v, ok := cst.ExtractString(_kv); ok {
-								data.Delta.Signature.Type = v
-								consumed[keyPrefix+"delta.signature.type"] = true
-							}
-						case "signature-len":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Signature.SignatureLen = v
-								consumed[keyPrefix+"delta.signature.signature-len"] = true
-							}
-						case "avg-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Signature.AvgChunkSize = v
-								consumed[keyPrefix+"delta.signature.avg-chunk-size"] = true
-							}
-						case "min-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Signature.MinChunkSize = v
-								consumed[keyPrefix+"delta.signature.min-chunk-size"] = true
-							}
-						case "max-chunk-size":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Signature.MaxChunkSize = v
-								consumed[keyPrefix+"delta.signature.max-chunk-size"] = true
-							}
-						}
-					}
-					break
-				}
-			}
-			for _, _ch := range doc.Root().Children {
-				if _ch.Kind == cst.NodeTable && cst.TableHeaderKey(_ch) == keyPrefix+"delta.selector" {
-					consumed[keyPrefix+"delta.selector"] = true
-					for _, _kv := range _ch.Children {
-						if _kv.Kind != cst.NodeKeyValue {
-							continue
-						}
-						switch cst.KeyValueName(_kv) {
-						case "type":
-							if v, ok := cst.ExtractString(_kv); ok {
-								data.Delta.Selector.Type = v
-								consumed[keyPrefix+"delta.selector.type"] = true
-							}
-						case "bands":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Selector.Bands = v
-								consumed[keyPrefix+"delta.selector.bands"] = true
-							}
-						case "rows-per-band":
-							if v, ok := cst.ExtractInt(_kv); ok {
-								data.Delta.Selector.RowsPerBand = v
-								consumed[keyPrefix+"delta.selector.rows-per-band"] = true
-							}
-						case "min-blob-size":
-							if v, ok := cst.ExtractUint64(_kv); ok {
-								data.Delta.Selector.MinBlobSize = v
-								consumed[keyPrefix+"delta.selector.min-blob-size"] = true
-							}
-						case "max-blob-size":
-							if v, ok := cst.ExtractUint64(_kv); ok {
-								data.Delta.Selector.MaxBlobSize = v
-								consumed[keyPrefix+"delta.selector.max-blob-size"] = true
-							}
-						}
-					}
-					break
-				}
-			}
-			break
+	if _vMaxPackSize, _ok := sub.Get("max-pack-size"); _ok && _vMaxPackSize.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractUint64(_vMaxPackSize.Leaf); _xok {
+			data.MaxPackSize = _x
+			_vMaxPackSize.MarkConsumed()
 		}
 	}
 	return nil

@@ -17,9 +17,9 @@ var (
 )
 
 type TomlInventoryArchiveV0Document struct {
-	data     TomlInventoryArchiveV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlInventoryArchiveV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlInventoryArchiveV0(input []byte) (*TomlInventoryArchiveV0Document, error) {
@@ -27,43 +27,44 @@ func DecodeTomlInventoryArchiveV0(input []byte) (*TomlInventoryArchiveV0Document
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlInventoryArchiveV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlInventoryArchiveV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vHashTypeId, _ok := model.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := d.data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("hash_type-id: %w", err)
+			}
+			_vHashTypeId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("hash_type-id: %w", err)
-				}
-				d.consumed["hash_type-id"] = true
+	}
+	if _vCompressionType, _ok := model.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			d.data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vLooseBlobStoreId, _ok := model.Get("loose-blob-store-id"); _ok && _vLooseBlobStoreId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vLooseBlobStoreId.Leaf); _xok {
+			if err := d.data.LooseBlobStoreId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("loose-blob-store-id: %w", err)
 			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.CompressionType = v
-				d.consumed["compression-type"] = true
+			_vLooseBlobStoreId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := model.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := d.data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("encryption: %w", err)
 			}
-		case "loose-blob-store-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.LooseBlobStoreId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("loose-blob-store-id: %w", err)
-				}
-				d.consumed["loose-blob-store-id"] = true
-			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("encryption: %w", err)
-				}
-				d.consumed["encryption"] = true
-			}
+			_vEncryption.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -110,7 +111,10 @@ func (d *TomlInventoryArchiveV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlInventoryArchiveV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlInventoryArchiveV0Document) Comment(key string) string {
@@ -129,38 +133,35 @@ func (d *TomlInventoryArchiveV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlInventoryArchiveV0Into(data *TomlInventoryArchiveV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlInventoryArchiveV0Into(data *TomlInventoryArchiveV0, sub *cst.Value) error {
+	if _vHashTypeId, _ok := sub.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("hash_type-id: %w", err)
+			}
+			_vHashTypeId.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("hash_type-id: %w", err)
-				}
-				consumed[keyPrefix+"hash_type-id"] = true
+	}
+	if _vCompressionType, _ok := sub.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vLooseBlobStoreId, _ok := sub.Get("loose-blob-store-id"); _ok && _vLooseBlobStoreId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vLooseBlobStoreId.Leaf); _xok {
+			if err := data.LooseBlobStoreId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("loose-blob-store-id: %w", err)
 			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.CompressionType = v
-				consumed[keyPrefix+"compression-type"] = true
+			_vLooseBlobStoreId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := sub.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vEncryption.Leaf); _xok {
+			if err := data.Encryption.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("encryption: %w", err)
 			}
-		case "loose-blob-store-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.LooseBlobStoreId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("loose-blob-store-id: %w", err)
-				}
-				consumed[keyPrefix+"loose-blob-store-id"] = true
-			}
-		case "encryption":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.Encryption.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("encryption: %w", err)
-				}
-				consumed[keyPrefix+"encryption"] = true
-			}
+			_vEncryption.MarkConsumed()
 		}
 	}
 	return nil

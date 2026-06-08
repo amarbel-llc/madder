@@ -50,6 +50,12 @@ debug-check-facade-imports: generate-facades
 # raw `goimports -w` output is not conformist-clean. Running the formatter
 # here keeps generate-tommy a one-step process and prevents merge-hook
 # (lint-fmt) surprises.
+#
+# Uses the `tommy` CLI from the devshell (the tommy flake input). The CLI
+# can't be `go build`'d from madder's own module: tommy's codegen packages
+# pull deps (e.g. dave/jennifer) that madder doesn't import, so `go mod
+# tidy` prunes them from go.sum and an in-module build fails. Keep the
+# devshell tommy in sync with go.mod's tommy via `nix flake update tommy`.
 [group("build")]
 generate-tommy:
   find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \

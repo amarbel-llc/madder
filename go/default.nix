@@ -437,9 +437,16 @@ in
       tommy.packages.${system}.default
       bats.packages.${system}.default
       purse-first.packages.${system}.dagnabit
-      madder-test-sftp-server
-      madder-test-craft-legacy-blob
-      madder-test-webdav-server
+      # NOTE: the madder-test-* fixture binaries (sftp/webdav servers,
+      # craft-legacy-blob) are intentionally NOT listed here. Each is a
+      # buildGoApplication that compiles madder, so putting them in the
+      # devshell makes `nix develop` / `direnv reload` require the whole
+      # tree to compile first — a bootstrap deadlock whenever generated
+      # code is stale (e.g. regenerating *_tommy.go across a tommy bump,
+      # where you need the devshell to run the regen that fixes the very
+      # compile error blocking the devshell). The net_cap bats lane still
+      # gets them self-sufficiently via netCapExtraBinaries; for ad-hoc
+      # local use, `nix build .#madder-test-sftp-server` (etc.).
     ]
     ++ pkgs-master.lib.optionals (doppelgang != null) [
       doppelgang.packages.${system}.default

@@ -19,9 +19,9 @@ var (
 )
 
 type TomlV3Document struct {
-	data     TomlV3
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlV3
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
@@ -29,59 +29,66 @@ func DecodeTomlV3(input []byte) (*TomlV3Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlV3Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlV3Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vHashBuckets, _ok := model.Get("hash_buckets"); _ok && _vHashBuckets.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractIntSlice(_vHashBuckets.Leaf); _xok {
+			d.data.HashBuckets = values.IntSlice(_x)
+			if d.data.HashBuckets == nil {
+				d.data.HashBuckets = values.IntSlice{}
+			}
+			_vHashBuckets.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_buckets":
-			if v, ok := cst.ExtractIntSlice(_kv); ok {
-				d.data.HashBuckets = values.IntSlice(v)
-				d.consumed["hash_buckets"] = true
+	}
+	if _vBasePath, _ok := model.Get("base_path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			d.data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vHashTypeId, _ok := model.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := d.data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return nil, fmt.Errorf("hash_type-id: %w", err)
 			}
-		case "base_path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.BasePath = v
-				d.consumed["base_path"] = true
-			}
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := d.data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return nil, fmt.Errorf("hash_type-id: %w", err)
+			_vHashTypeId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := model.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vEncryption.Leaf); _xok {
+			d.data.Encryption = make([]markl.Id, len(_x))
+			for _si, _s := range _x {
+				if err := d.data.Encryption[_si].UnmarshalText([]byte(_s)); err != nil {
+					return nil, fmt.Errorf("encryption[%d]: %w", _si, err)
 				}
-				d.consumed["hash_type-id"] = true
 			}
-		case "encryption":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				d.data.Encryption = make([]markl.Id, len(v))
-				for _si, _s := range v {
-					if err := d.data.Encryption[_si].UnmarshalText([]byte(_s)); err != nil {
-						return nil, fmt.Errorf("encryption[%d]: %w", _si, err)
-					}
-				}
-				d.consumed["encryption"] = true
-			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.CompressionType = v
-				d.consumed["compression-type"] = true
-			}
-		case "verify-on-collision":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.VerifyOnCollision = v
-				d.consumed["verify-on-collision"] = true
-			}
-		case "single_hash":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.SingleHash = v
-				d.consumed["single_hash"] = true
-			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vCompressionType, _ok := model.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			d.data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vVerifyOnCollision, _ok := model.Get("verify-on-collision"); _ok && _vVerifyOnCollision.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vVerifyOnCollision.Leaf); _xok {
+			d.data.VerifyOnCollision = _x
+			_vVerifyOnCollision.MarkConsumed()
+		}
+	}
+	if _vSingleHash, _ok := model.Get("single_hash"); _ok && _vSingleHash.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vSingleHash.Leaf); _xok {
+			d.data.SingleHash = _x
+			_vSingleHash.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -93,8 +100,10 @@ func (d *TomlV3Document) Data() *TomlV3 {
 
 func (d *TomlV3Document) Encode() ([]byte, error) {
 	{
-		if err := cst.SetAny(d.cstDoc.Root(), "hash_buckets", []int(d.data.HashBuckets)); err != nil {
-			return nil, fmt.Errorf("%w", err)
+		if d.data.HashBuckets != nil {
+			if err := cst.SetAny(d.cstDoc.Root(), "hash_buckets", []int(d.data.HashBuckets)); err != nil {
+				return nil, fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if d.data.BasePath != "" {
@@ -114,16 +123,18 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 		}
 	}
 	{
-		vals := make([]string, len(d.data.Encryption))
-		for i, item := range d.data.Encryption {
-			v, err := item.MarshalText()
-			if err != nil {
-				return nil, fmt.Errorf("encryption[%d]: %w", i, err)
+		if d.data.Encryption != nil {
+			vals := make([]string, len(d.data.Encryption))
+			for i, item := range d.data.Encryption {
+				v, err := item.MarshalText()
+				if err != nil {
+					return nil, fmt.Errorf("encryption[%d]: %w", i, err)
+				}
+				vals[i] = string(v)
 			}
-			vals[i] = string(v)
-		}
-		if err := cst.SetAny(d.cstDoc.Root(), "encryption", vals); err != nil {
-			return nil, fmt.Errorf("%w", err)
+			if err := cst.SetAny(d.cstDoc.Root(), "encryption", vals); err != nil {
+				return nil, fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if d.data.CompressionType != "" || cst.HasValue(d.cstDoc.Root(), "compression-type") {
@@ -147,7 +158,10 @@ func (d *TomlV3Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlV3Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlV3Document) Comment(key string) string {
@@ -166,54 +180,57 @@ func (d *TomlV3Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlV3Into(data *TomlV3, sub *cst.Value) error {
+	if _vHashBuckets, _ok := sub.Get("hash_buckets"); _ok && _vHashBuckets.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractIntSlice(_vHashBuckets.Leaf); _xok {
+			data.HashBuckets = values.IntSlice(_x)
+			if data.HashBuckets == nil {
+				data.HashBuckets = values.IntSlice{}
+			}
+			_vHashBuckets.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "hash_buckets":
-			if v, ok := cst.ExtractIntSlice(_kv); ok {
-				data.HashBuckets = values.IntSlice(v)
-				consumed[keyPrefix+"hash_buckets"] = true
+	}
+	if _vBasePath, _ok := sub.Get("base_path"); _ok && _vBasePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBasePath.Leaf); _xok {
+			data.BasePath = _x
+			_vBasePath.MarkConsumed()
+		}
+	}
+	if _vHashTypeId, _ok := sub.Get("hash_type-id"); _ok && _vHashTypeId.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHashTypeId.Leaf); _xok {
+			if err := data.HashTypeId.UnmarshalText([]byte(_x)); err != nil {
+				return fmt.Errorf("hash_type-id: %w", err)
 			}
-		case "base_path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.BasePath = v
-				consumed[keyPrefix+"base_path"] = true
-			}
-		case "hash_type-id":
-			if v, ok := cst.ExtractString(_kv); ok {
-				if err := data.HashTypeId.UnmarshalText([]byte(v)); err != nil {
-					return fmt.Errorf("hash_type-id: %w", err)
+			_vHashTypeId.MarkConsumed()
+		}
+	}
+	if _vEncryption, _ok := sub.Get("encryption"); _ok && _vEncryption.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractStringSlice(_vEncryption.Leaf); _xok {
+			data.Encryption = make([]markl.Id, len(_x))
+			for _si, _s := range _x {
+				if err := data.Encryption[_si].UnmarshalText([]byte(_s)); err != nil {
+					return fmt.Errorf("encryption[%d]: %w", _si, err)
 				}
-				consumed[keyPrefix+"hash_type-id"] = true
 			}
-		case "encryption":
-			if v, ok := cst.ExtractStringSlice(_kv); ok {
-				data.Encryption = make([]markl.Id, len(v))
-				for _si, _s := range v {
-					if err := data.Encryption[_si].UnmarshalText([]byte(_s)); err != nil {
-						return fmt.Errorf("encryption[%d]: %w", _si, err)
-					}
-				}
-				consumed[keyPrefix+"encryption"] = true
-			}
-		case "compression-type":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.CompressionType = v
-				consumed[keyPrefix+"compression-type"] = true
-			}
-		case "verify-on-collision":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.VerifyOnCollision = v
-				consumed[keyPrefix+"verify-on-collision"] = true
-			}
-		case "single_hash":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.SingleHash = v
-				consumed[keyPrefix+"single_hash"] = true
-			}
+			_vEncryption.MarkConsumed()
+		}
+	}
+	if _vCompressionType, _ok := sub.Get("compression-type"); _ok && _vCompressionType.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vCompressionType.Leaf); _xok {
+			data.CompressionType = _x
+			_vCompressionType.MarkConsumed()
+		}
+	}
+	if _vVerifyOnCollision, _ok := sub.Get("verify-on-collision"); _ok && _vVerifyOnCollision.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vVerifyOnCollision.Leaf); _xok {
+			data.VerifyOnCollision = _x
+			_vVerifyOnCollision.MarkConsumed()
+		}
+	}
+	if _vSingleHash, _ok := sub.Get("single_hash"); _ok && _vSingleHash.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vSingleHash.Leaf); _xok {
+			data.SingleHash = _x
+			_vSingleHash.MarkConsumed()
 		}
 	}
 	return nil
@@ -221,8 +238,10 @@ func DecodeTomlV3Into(data *TomlV3, doc *document.Document, container *cst.Node,
 
 func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node) error {
 	{
-		if err := cst.SetAny(container, "hash_buckets", []int(data.HashBuckets)); err != nil {
-			return fmt.Errorf("%w", err)
+		if data.HashBuckets != nil {
+			if err := cst.SetAny(container, "hash_buckets", []int(data.HashBuckets)); err != nil {
+				return fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if data.BasePath != "" {
@@ -242,16 +261,18 @@ func EncodeTomlV3From(data *TomlV3, doc *document.Document, container *cst.Node)
 		}
 	}
 	{
-		vals := make([]string, len(data.Encryption))
-		for i, item := range data.Encryption {
-			v, err := item.MarshalText()
-			if err != nil {
-				return fmt.Errorf("encryption[%d]: %w", i, err)
+		if data.Encryption != nil {
+			vals := make([]string, len(data.Encryption))
+			for i, item := range data.Encryption {
+				v, err := item.MarshalText()
+				if err != nil {
+					return fmt.Errorf("encryption[%d]: %w", i, err)
+				}
+				vals[i] = string(v)
 			}
-			vals[i] = string(v)
-		}
-		if err := cst.SetAny(container, "encryption", vals); err != nil {
-			return fmt.Errorf("%w", err)
+			if err := cst.SetAny(container, "encryption", vals); err != nil {
+				return fmt.Errorf("%w", err)
+			}
 		}
 	}
 	if data.CompressionType != "" || cst.HasValue(container, "compression-type") {

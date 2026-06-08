@@ -17,9 +17,9 @@ var (
 )
 
 type TomlWebDAVV0Document struct {
-	data     TomlWebDAVV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlWebDAVV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlWebDAVV0(input []byte) (*TomlWebDAVV0Document, error) {
@@ -27,62 +27,68 @@ func DecodeTomlWebDAVV0(input []byte) (*TomlWebDAVV0Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlWebDAVV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlWebDAVV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vUrl, _ok := model.Get("url"); _ok && _vUrl.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUrl.Leaf); _xok {
+			d.data.URL = _x
+			_vUrl.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "url":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.URL = v
-				d.consumed["url"] = true
-			}
-		case "user":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.User = v
-				d.consumed["user"] = true
-			}
-		case "password":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Password = v
-				d.consumed["password"] = true
-			}
-		case "bearer-token":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.BearerToken = v
-				d.consumed["bearer-token"] = true
-			}
-		case "tls-client-cert-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.TLSClientCertPath = v
-				d.consumed["tls-client-cert-path"] = true
-			}
-		case "tls-client-key-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.TLSClientKeyPath = v
-				d.consumed["tls-client-key-path"] = true
-			}
-		case "tls-ca-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.TLSCAPath = v
-				d.consumed["tls-ca-path"] = true
-			}
-		case "tls-server-name":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.TLSServerName = v
-				d.consumed["tls-server-name"] = true
-			}
-		case "tls-insecure-skip-verify":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				d.data.TLSInsecureSkipVerify = v
-				d.consumed["tls-insecure-skip-verify"] = true
-			}
+	}
+	if _vUser, _ok := model.Get("user"); _ok && _vUser.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUser.Leaf); _xok {
+			d.data.User = _x
+			_vUser.MarkConsumed()
+		}
+	}
+	if _vPassword, _ok := model.Get("password"); _ok && _vPassword.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPassword.Leaf); _xok {
+			d.data.Password = _x
+			_vPassword.MarkConsumed()
+		}
+	}
+	if _vBearerToken, _ok := model.Get("bearer-token"); _ok && _vBearerToken.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBearerToken.Leaf); _xok {
+			d.data.BearerToken = _x
+			_vBearerToken.MarkConsumed()
+		}
+	}
+	if _vTlsClientCertPath, _ok := model.Get("tls-client-cert-path"); _ok && _vTlsClientCertPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsClientCertPath.Leaf); _xok {
+			d.data.TLSClientCertPath = _x
+			_vTlsClientCertPath.MarkConsumed()
+		}
+	}
+	if _vTlsClientKeyPath, _ok := model.Get("tls-client-key-path"); _ok && _vTlsClientKeyPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsClientKeyPath.Leaf); _xok {
+			d.data.TLSClientKeyPath = _x
+			_vTlsClientKeyPath.MarkConsumed()
+		}
+	}
+	if _vTlsCaPath, _ok := model.Get("tls-ca-path"); _ok && _vTlsCaPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsCaPath.Leaf); _xok {
+			d.data.TLSCAPath = _x
+			_vTlsCaPath.MarkConsumed()
+		}
+	}
+	if _vTlsServerName, _ok := model.Get("tls-server-name"); _ok && _vTlsServerName.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsServerName.Leaf); _xok {
+			d.data.TLSServerName = _x
+			_vTlsServerName.MarkConsumed()
+		}
+	}
+	if _vTlsInsecureSkipVerify, _ok := model.Get("tls-insecure-skip-verify"); _ok && _vTlsInsecureSkipVerify.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vTlsInsecureSkipVerify.Leaf); _xok {
+			d.data.TLSInsecureSkipVerify = _x
+			_vTlsInsecureSkipVerify.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -158,7 +164,10 @@ func (d *TomlWebDAVV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlWebDAVV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlWebDAVV0Document) Comment(key string) string {
@@ -177,57 +186,59 @@ func (d *TomlWebDAVV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlWebDAVV0Into(data *TomlWebDAVV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlWebDAVV0Into(data *TomlWebDAVV0, sub *cst.Value) error {
+	if _vUrl, _ok := sub.Get("url"); _ok && _vUrl.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUrl.Leaf); _xok {
+			data.URL = _x
+			_vUrl.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "url":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.URL = v
-				consumed[keyPrefix+"url"] = true
-			}
-		case "user":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.User = v
-				consumed[keyPrefix+"user"] = true
-			}
-		case "password":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Password = v
-				consumed[keyPrefix+"password"] = true
-			}
-		case "bearer-token":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.BearerToken = v
-				consumed[keyPrefix+"bearer-token"] = true
-			}
-		case "tls-client-cert-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.TLSClientCertPath = v
-				consumed[keyPrefix+"tls-client-cert-path"] = true
-			}
-		case "tls-client-key-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.TLSClientKeyPath = v
-				consumed[keyPrefix+"tls-client-key-path"] = true
-			}
-		case "tls-ca-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.TLSCAPath = v
-				consumed[keyPrefix+"tls-ca-path"] = true
-			}
-		case "tls-server-name":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.TLSServerName = v
-				consumed[keyPrefix+"tls-server-name"] = true
-			}
-		case "tls-insecure-skip-verify":
-			if v, ok := cst.ExtractBool(_kv); ok {
-				data.TLSInsecureSkipVerify = v
-				consumed[keyPrefix+"tls-insecure-skip-verify"] = true
-			}
+	}
+	if _vUser, _ok := sub.Get("user"); _ok && _vUser.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUser.Leaf); _xok {
+			data.User = _x
+			_vUser.MarkConsumed()
+		}
+	}
+	if _vPassword, _ok := sub.Get("password"); _ok && _vPassword.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPassword.Leaf); _xok {
+			data.Password = _x
+			_vPassword.MarkConsumed()
+		}
+	}
+	if _vBearerToken, _ok := sub.Get("bearer-token"); _ok && _vBearerToken.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vBearerToken.Leaf); _xok {
+			data.BearerToken = _x
+			_vBearerToken.MarkConsumed()
+		}
+	}
+	if _vTlsClientCertPath, _ok := sub.Get("tls-client-cert-path"); _ok && _vTlsClientCertPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsClientCertPath.Leaf); _xok {
+			data.TLSClientCertPath = _x
+			_vTlsClientCertPath.MarkConsumed()
+		}
+	}
+	if _vTlsClientKeyPath, _ok := sub.Get("tls-client-key-path"); _ok && _vTlsClientKeyPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsClientKeyPath.Leaf); _xok {
+			data.TLSClientKeyPath = _x
+			_vTlsClientKeyPath.MarkConsumed()
+		}
+	}
+	if _vTlsCaPath, _ok := sub.Get("tls-ca-path"); _ok && _vTlsCaPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsCaPath.Leaf); _xok {
+			data.TLSCAPath = _x
+			_vTlsCaPath.MarkConsumed()
+		}
+	}
+	if _vTlsServerName, _ok := sub.Get("tls-server-name"); _ok && _vTlsServerName.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vTlsServerName.Leaf); _xok {
+			data.TLSServerName = _x
+			_vTlsServerName.MarkConsumed()
+		}
+	}
+	if _vTlsInsecureSkipVerify, _ok := sub.Get("tls-insecure-skip-verify"); _ok && _vTlsInsecureSkipVerify.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractBool(_vTlsInsecureSkipVerify.Leaf); _xok {
+			data.TLSInsecureSkipVerify = _x
+			_vTlsInsecureSkipVerify.MarkConsumed()
 		}
 	}
 	return nil

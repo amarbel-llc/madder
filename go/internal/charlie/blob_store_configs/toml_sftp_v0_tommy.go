@@ -17,9 +17,9 @@ var (
 )
 
 type TomlSFTPV0Document struct {
-	data     TomlSFTPV0
-	cstDoc   *document.Document
-	consumed map[string]bool
+	data   TomlSFTPV0
+	cstDoc *document.Document
+	model  *cst.Value
 }
 
 func DecodeTomlSFTPV0(input []byte) (*TomlSFTPV0Document, error) {
@@ -27,52 +27,56 @@ func DecodeTomlSFTPV0(input []byte) (*TomlSFTPV0Document, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	d := &TomlSFTPV0Document{
-		consumed: make(map[string]bool),
-		cstDoc:   doc,
+	model, err := cst.Decompose(doc.Root())
+	if err != nil {
+		return nil, err
 	}
 
-	for _, _kv := range d.cstDoc.Root().Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+	d := &TomlSFTPV0Document{
+		cstDoc: doc,
+		model:  model,
+	}
+
+	if _vHost, _ok := model.Get("host"); _ok && _vHost.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHost.Leaf); _xok {
+			d.data.Host = _x
+			_vHost.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "host":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Host = v
-				d.consumed["host"] = true
-			}
-		case "port":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				d.data.Port = v
-				d.consumed["port"] = true
-			}
-		case "user":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.User = v
-				d.consumed["user"] = true
-			}
-		case "password":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.Password = v
-				d.consumed["password"] = true
-			}
-		case "private-key-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.PrivateKeyPath = v
-				d.consumed["private-key-path"] = true
-			}
-		case "remote-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.RemotePath = v
-				d.consumed["remote-path"] = true
-			}
-		case "known-hosts-file":
-			if v, ok := cst.ExtractString(_kv); ok {
-				d.data.KnownHostsFile = v
-				d.consumed["known-hosts-file"] = true
-			}
+	}
+	if _vPort, _ok := model.Get("port"); _ok && _vPort.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vPort.Leaf); _xok {
+			d.data.Port = _x
+			_vPort.MarkConsumed()
+		}
+	}
+	if _vUser, _ok := model.Get("user"); _ok && _vUser.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUser.Leaf); _xok {
+			d.data.User = _x
+			_vUser.MarkConsumed()
+		}
+	}
+	if _vPassword, _ok := model.Get("password"); _ok && _vPassword.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPassword.Leaf); _xok {
+			d.data.Password = _x
+			_vPassword.MarkConsumed()
+		}
+	}
+	if _vPrivateKeyPath, _ok := model.Get("private-key-path"); _ok && _vPrivateKeyPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPrivateKeyPath.Leaf); _xok {
+			d.data.PrivateKeyPath = _x
+			_vPrivateKeyPath.MarkConsumed()
+		}
+	}
+	if _vRemotePath, _ok := model.Get("remote-path"); _ok && _vRemotePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vRemotePath.Leaf); _xok {
+			d.data.RemotePath = _x
+			_vRemotePath.MarkConsumed()
+		}
+	}
+	if _vKnownHostsFile, _ok := model.Get("known-hosts-file"); _ok && _vKnownHostsFile.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vKnownHostsFile.Leaf); _xok {
+			d.data.KnownHostsFile = _x
+			_vKnownHostsFile.MarkConsumed()
 		}
 	}
 	return d, nil
@@ -130,7 +134,10 @@ func (d *TomlSFTPV0Document) Encode() ([]byte, error) {
 }
 
 func (d *TomlSFTPV0Document) Undecoded() []string {
-	return document.UndecodedKeys(d.cstDoc.Root(), d.consumed)
+	if d.model == nil {
+		return nil
+	}
+	return d.model.Undecoded()
 }
 
 func (d *TomlSFTPV0Document) Comment(key string) string {
@@ -149,47 +156,47 @@ func (d *TomlSFTPV0Document) SetInlineComment(key, comment string) {
 	d.cstDoc.SetInlineComment(key, comment)
 }
 
-func DecodeTomlSFTPV0Into(data *TomlSFTPV0, doc *document.Document, container *cst.Node, consumed map[string]bool, keyPrefix string) error {
-	for _, _kv := range container.Children {
-		if _kv.Kind != cst.NodeKeyValue {
-			continue
+func DecodeTomlSFTPV0Into(data *TomlSFTPV0, sub *cst.Value) error {
+	if _vHost, _ok := sub.Get("host"); _ok && _vHost.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vHost.Leaf); _xok {
+			data.Host = _x
+			_vHost.MarkConsumed()
 		}
-		switch cst.KeyValueName(_kv) {
-		case "host":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Host = v
-				consumed[keyPrefix+"host"] = true
-			}
-		case "port":
-			if v, ok := cst.ExtractInt(_kv); ok {
-				data.Port = v
-				consumed[keyPrefix+"port"] = true
-			}
-		case "user":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.User = v
-				consumed[keyPrefix+"user"] = true
-			}
-		case "password":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.Password = v
-				consumed[keyPrefix+"password"] = true
-			}
-		case "private-key-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.PrivateKeyPath = v
-				consumed[keyPrefix+"private-key-path"] = true
-			}
-		case "remote-path":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.RemotePath = v
-				consumed[keyPrefix+"remote-path"] = true
-			}
-		case "known-hosts-file":
-			if v, ok := cst.ExtractString(_kv); ok {
-				data.KnownHostsFile = v
-				consumed[keyPrefix+"known-hosts-file"] = true
-			}
+	}
+	if _vPort, _ok := sub.Get("port"); _ok && _vPort.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractInt(_vPort.Leaf); _xok {
+			data.Port = _x
+			_vPort.MarkConsumed()
+		}
+	}
+	if _vUser, _ok := sub.Get("user"); _ok && _vUser.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vUser.Leaf); _xok {
+			data.User = _x
+			_vUser.MarkConsumed()
+		}
+	}
+	if _vPassword, _ok := sub.Get("password"); _ok && _vPassword.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPassword.Leaf); _xok {
+			data.Password = _x
+			_vPassword.MarkConsumed()
+		}
+	}
+	if _vPrivateKeyPath, _ok := sub.Get("private-key-path"); _ok && _vPrivateKeyPath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vPrivateKeyPath.Leaf); _xok {
+			data.PrivateKeyPath = _x
+			_vPrivateKeyPath.MarkConsumed()
+		}
+	}
+	if _vRemotePath, _ok := sub.Get("remote-path"); _ok && _vRemotePath.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vRemotePath.Leaf); _xok {
+			data.RemotePath = _x
+			_vRemotePath.MarkConsumed()
+		}
+	}
+	if _vKnownHostsFile, _ok := sub.Get("known-hosts-file"); _ok && _vKnownHostsFile.Kind == cst.VLeaf {
+		if _x, _xok := cst.ExtractString(_vKnownHostsFile.Leaf); _xok {
+			data.KnownHostsFile = _x
+			_vKnownHostsFile.MarkConsumed()
 		}
 	}
 	return nil
