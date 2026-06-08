@@ -372,18 +372,20 @@ function sftp_sync_idempotent { # @test
   assert_success
 }
 
-function sftp_sync_json_auto_detects { # @test
+function sftp_sync_crap_auto_detects { # @test
   init_store
   init_sftp_test_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
-  echo "sftp-sync-json-test" >"$blob"
+  echo "sftp-sync-crap-test" >"$blob"
   run_madder write -format tap "$blob"
   assert_success
 
+  # Default auto-format under `run` (no TTY) emits ndjson-crap operations.
   run_madder sync .default .sftp-test
   assert_success
-  assert_output --partial '"state":"transferred"'
+  assert_output --partial '"type":"crap"'
+  assert_output --partial '"type":"operation_end"'
   refute_output --partial 'TAP version 14'
 }
 

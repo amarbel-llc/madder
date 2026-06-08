@@ -3,6 +3,8 @@ package output_format
 import (
 	"os"
 	"testing"
+
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
 )
 
 func TestResolveFor(t *testing.T) {
@@ -35,8 +37,9 @@ func TestIsTTYPipeIsNotATerminal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("os.Pipe: %v", err)
 	}
-	defer r.Close()
-	defer w.Close()
+	// Test-pipe teardown; both close errors are non-actionable here.
+	defer files.CloseReadOnly(r)
+	defer files.CloseReadOnly(w)
 
 	if IsTTY(w) {
 		t.Error("IsTTY(pipe write end) = true, want false")
