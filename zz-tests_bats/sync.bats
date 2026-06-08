@@ -63,8 +63,12 @@ function sync_crap_auto_detects { # @test
 
   run_madder sync .default .sha256
   assert_success
+  # Meta header (Source: "madder") still emits a "crap" record; the body is
+  # now operation-family records (scan phase + Operation), not a result
+  # summary.
   assert_output --partial '"type":"crap"'
-  assert_output --partial '"type":"summary"'
+  assert_output --partial '"type":"operation_start"'
+  assert_output --partial '"type":"operation_end"'
   refute_output --partial 'TAP version 14'
 }
 

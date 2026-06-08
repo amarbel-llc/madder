@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/amarbel-llc/crap/go-crap/v2/crap"
 	"github.com/amarbel-llc/crap/go-crap/v2/ndjsoncrap"
 	"github.com/amarbel-llc/crap/go-crap/v2/viewport"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -72,7 +73,7 @@ func (cmd Sync) GetDescription() futility.Description {
 			"described below, or -format crap for raw ndjson-crap even on " +
 			"a terminal. (-format tap is not supported by sync.) Each JSON " +
 			"record has fields \"id\", " +
-			"\"state\" (transferred, exists, failed, list_error), \"size\" " +
+			"\"state\" (transferred, failed, list_error), \"size\" " +
 			"for transferred blobs, and \"error\" for failures. Summary and " +
 			"limit notices route to stderr in JSON mode.",
 	}
@@ -121,15 +122,16 @@ func (cmd Sync) Run(req futility.Request) {
 	cmd.runStore(req, envBlobStore, source, destinations)
 }
 
-// syncSink is Sync-local because the per-blob event shape (transfer with
-// byte count + exists + failed) differs from blob_write_sink's record.
+// syncSink is the legacy -format ndjson/json wire sink (the crap/viewport
+// path uses crap.Reporter directly, not this interface). Already-present
+// blobs are reported via transferred with bytesWritten 0 — the legacy
+// records do not distinguish a skip from a copy (the crap path does, via
+// op.Skip). That fold is intentional and byte-identical to pre-rewrite
+// output; see streamToSink.
 type syncSink interface {
 	// transferred reports a blob copied from source to destinations with
 	// bytesWritten known.
 	transferred(id domain_interfaces.MarklId, bytesWritten int64)
-	// exists reports a blob skipped because it was already in all
-	// destinations (bytesWritten is 0).
-	exists(id domain_interfaces.MarklId)
 	// failed reports a transfer failure for a known id.
 	failed(id domain_interfaces.MarklId, bytesWritten int64, err error)
 	// listError reports a failure reading the source's blob list (no id).
@@ -176,10 +178,6 @@ func (s *syncJsonSink) transferred(id domain_interfaces.MarklId, bytesWritten in
 	s.emit(syncRecord{Id: id.String(), Size: &size, State: syncStateTransferred})
 }
 
-func (s *syncJsonSink) exists(id domain_interfaces.MarklId) {
-	s.emit(syncRecord{Id: id.String(), State: syncStateExists})
-}
-
 func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
 	rec := syncRecord{Id: id.String(), State: syncStateFailed, Error: err.Error()}
 	if bytesWritten > 0 {
@@ -207,93 +205,6 @@ func (s *syncJsonSink) bailOut(msg string) {
 }
 
 func (s *syncJsonSink) finalize() {
-	_ = s.buf.Flush()
-}
-
-// syncCrapSink emits ndjson-crap result-family records (go-crap v2).
-// Routing parity note: runStore never calls exists() — already-present
-// blobs surface as transferred with size 0 (see the IsErrBlobAlreadyExists
-// branch). The exists() impl below is for interface completeness; the
-// skip-directive mapping activates if/when runStore routes it.
-//
-// No Plan record is emitted: sync only learns its count after running,
-// so per tap-ndjson(7) the count is reported in the Summary's PlanCount
-// instead (the trailing-plan-producer case).
-type syncCrapSink struct {
-	buf    *bufio.Writer
-	w      *ndjsoncrap.Writer
-	errOut io.Writer
-	n      int
-}
-
-func newSyncCrapSink(out io.Writer, errOut io.Writer) *syncCrapSink {
-	buf := bufio.NewWriter(out)
-	sink := &syncCrapSink{buf: buf, w: ndjsoncrap.NewWriter(buf), errOut: errOut}
-	_ = sink.w.Write(ndjsoncrap.Meta{Title: "sync", Source: "madder"})
-	return sink
-}
-
-func (s *syncCrapSink) test(t ndjsoncrap.Test) {
-	s.n++
-	t.N = s.n
-	_ = s.w.Write(t)
-}
-
-func (s *syncCrapSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
-	s.test(ndjsoncrap.Test{
-		Description: formatSyncTestPoint(id, bytesWritten),
-		OK:          true,
-		Diagnostic:  map[string]any{"state": syncStateTransferred, "size": bytesWritten},
-	})
-}
-
-func (s *syncCrapSink) exists(id domain_interfaces.MarklId) {
-	s.test(ndjsoncrap.Test{
-		Description: formatSyncTestPoint(id, 0),
-		OK:          true,
-		Directive:   &ndjsoncrap.Directive{Kind: "skip", Reason: syncStateExists},
-		Diagnostic:  map[string]any{"state": syncStateExists},
-	})
-}
-
-func (s *syncCrapSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
-	diag := map[string]any{"state": syncStateFailed, "error": err.Error()}
-	if bytesWritten > 0 {
-		diag["size"] = bytesWritten
-	}
-	s.test(ndjsoncrap.Test{
-		Description: formatSyncTestPoint(id, bytesWritten),
-		Diagnostic:  diag,
-	})
-}
-
-func (s *syncCrapSink) listError(err error) {
-	s.test(ndjsoncrap.Test{
-		Description: "(unknown blob)",
-		Diagnostic:  map[string]any{"state": syncStateListError, "error": err.Error()},
-	})
-}
-
-func (s *syncCrapSink) notice(msg string) {
-	fmt.Fprintln(s.errOut, msg)
-}
-
-func (s *syncCrapSink) bailOut(msg string) {
-	_ = s.w.Write(ndjsoncrap.Bailout{Message: msg})
-}
-
-func (s *syncCrapSink) summary(succeeded, failed, ignored, total int) {
-	_ = s.w.Write(ndjsoncrap.Summary{
-		Passed:    succeeded,
-		Failed:    failed,
-		Skipped:   ignored,
-		Total:     total,
-		PlanCount: total,
-		Valid:     true,
-	})
-}
-
-func (s *syncCrapSink) finalize() {
 	_ = s.buf.Flush()
 }
 
@@ -353,7 +264,8 @@ func (cmd Sync) runStore(
 
 	// auto + TTY renders the live go-crap viewport natively (the
 	// in-process form of `madder sync | crap-present`); no wire bytes hit
-	// stdout in this mode.
+	// stdout in this mode. The producer is runStoreCrap driving a
+	// crap.Reporter into the pipe.
 	if cmd.Format == output_format.FormatAuto && output_format.IsTTY(os.Stdout) {
 		cmd.streamToViewport(req, envBlobStore, source, destination, useDestinationHashType)
 		return
@@ -364,17 +276,26 @@ func (cmd Sync) runStore(
 		resolved = output_format.FormatCRAP // piped default
 	}
 
-	var sink syncSink
 	switch resolved {
 	case output_format.FormatCRAP:
-		sink = newSyncCrapSink(os.Stdout, os.Stderr)
+		// Raw ndjson-crap operation-family wire (even on a TTY when
+		// -format crap is explicit).
+		cmd.runStoreCrap(
+			req,
+			envBlobStore,
+			source,
+			destination,
+			os.Stdout,
+			useDestinationHashType,
+		)
 	case output_format.FormatJSON, output_format.FormatNDJSON:
 		buf := bufio.NewWriter(os.Stdout)
-		sink = &syncJsonSink{
+		sink := &syncJsonSink{
 			buf:    buf,
 			enc:    json.NewEncoder(buf),
 			errOut: os.Stderr,
 		}
+		cmd.streamToSink(req, envBlobStore, source, destination, useDestinationHashType, sink)
 	default: // tap or anything else sync no longer supports
 		errors.ContextCancelWithBadRequestf(
 			req,
@@ -383,15 +304,123 @@ func (cmd Sync) runStore(
 		)
 		return
 	}
+}
 
-	cmd.streamToSink(req, envBlobStore, source, destination, useDestinationHashType, sink)
+// runStoreCrap drives a crap.Reporter (go-crap v2.1.0 operation API, crap
+// RFC 0001) over out: a coarse scan phase (surfacing the source's lazy
+// remote connect + index walk), then a single Operation with one
+// Item/Skip/Fail per blob and a tallied operation_end at Finish. The
+// viewport consumer renders this as a capped rolling blob list + an
+// item-count progress bar + a running byte counter (the driver accumulates
+// each Item's bytes into OperationProgress automatically, so no explicit
+// Progress calls are needed) + dimmed skip lines.
+//
+// Materialization strategy: two-pass. Blob-store AllBlobs iterators reuse a
+// single pooled MarklId buffer across yields (see localAllBlobs /
+// remoteSftp.allBlobsForBase), so retaining yielded ids in a slice would
+// alias them all to the last value. Rather than clone every id (markl.Clone
+// returns a repool func, awkward to thread across a retained slice), pass 1
+// walks AllBlobs counting only — yielding the Operation's Total — and pass 2
+// re-walks AllBlobs transferring each blob. The cost is a second source walk
+// (a second remote SFTP walk for SFTP sources); the benefit is no id-lifetime
+// footgun. A scan-phase list error short-circuits before the Operation opens,
+// so no operation is left dangling.
+func (cmd Sync) runStoreCrap(
+	req futility.Request,
+	envBlobStore command_components.BlobStoreEnv,
+	source blob_stores.BlobStoreInitialized,
+	destination blob_stores.BlobStoreMap,
+	out io.Writer,
+	useDestinationHashType bool,
+) {
+	reporter := crap.NewReporter(out, crap.ReporterOptions{Source: "madder"})
+
+	// Stage 1: coarse connect/scan phase. The AllBlobs walk triggers the
+	// SFTP connect (lazy initializeOnce), so this phase makes remote
+	// bootstrap + the index walk visible coarsely. Pass 1 counts only.
+	scan := reporter.Phase(fmt.Sprintf("scanning %s", source.GetId()))
+
+	var total int
+	var scanErr error
+
+	for _, errIter := range source.AllBlobs() {
+		if errIter != nil {
+			scanErr = errIter
+			break
+		}
+
+		total++
+	}
+
+	if scanErr != nil {
+		scan.Fail(scanErr)
+		errors.ContextCancelWithError(req, scanErr)
+		return
+	}
+
+	scan.Done()
+
+	// Stage 2: the transfer operation. Total = item count from the scan;
+	// BytesTotal stays 0 (unknown — a running byte counter, not a
+	// determinate byte bar, per the agreed design). Pass 2 re-walks and
+	// transfers.
+	op := reporter.Operation("sync", crap.OpOptions{Total: total})
+
+	blobImporter := blob_transfers.MakeBlobImporter(
+		envBlobStore,
+		source,
+		destination,
+	)
+
+	blobImporter.UseDestinationHashType = useDestinationHashType
+
+	var lastBytesWritten int64
+
+	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
+		bytesWritten, _ := result.GetBytesWrittenAndState()
+		lastBytesWritten = bytesWritten
+		return nil
+	}
+
+	for blobId, errIter := range source.AllBlobs() {
+		lastBytesWritten = 0
+
+		if errIter != nil {
+			// A list error mid-transfer (rare — the scan pass already
+			// succeeded) surfaces as a failed item with no id.
+			op.Fail("(unknown blob)", errIter)
+			continue
+		}
+
+		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
+			if blob_io.IsErrBlobAlreadyExists(err) {
+				op.Skip(formatSyncTestPoint(blobId, 0), syncStateExists)
+			} else {
+				op.Fail(formatSyncTestPoint(blobId, lastBytesWritten), err)
+			}
+		} else {
+			op.Item(formatSyncTestPoint(blobId, lastBytesWritten), lastBytesWritten)
+		}
+
+		if cmd.Limit > 0 &&
+			(blobImporter.Counts.Succeeded+blobImporter.Counts.Failed) > cmd.Limit {
+			break
+		}
+	}
+
+	op.Finish()
+
+	if err := reporter.Err(); err != nil {
+		errors.ContextCancelWithError(req, err)
+	}
 }
 
 // emitBailOut writes the no-destinations bailOut record through whatever
 // output the resolved format implies, then cancels the request. On a TTY
-// (auto) the record is rendered by the viewport; for the wire/JSON paths a
-// throwaway sink emits it to stdout; -format tap is rejected with a guiding
-// error before any record is written.
+// (auto) the record is rendered by the viewport; for the crap wire path a
+// Meta + Bailout pair is written to stdout; for the JSON paths the
+// syncJsonSink emits its bail_out record; -format tap is rejected with a
+// guiding error before any record is written.
 func (cmd Sync) emitBailOut(req futility.Request, msg string) {
 	if cmd.Format == output_format.FormatAuto && output_format.IsTTY(os.Stdout) {
 		pr, pw := io.Pipe()
@@ -404,11 +433,12 @@ func (cmd Sync) emitBailOut(req futility.Request, msg string) {
 			})
 		}()
 
-		sink := newSyncCrapSink(pw, io.Discard)
-		sink.bailOut(msg)
-		sink.finalize()
+		writeSyncBailout(pw, msg)
 		_ = pw.Close()
-		<-presentDone
+		if presErr := <-presentDone; presErr != nil {
+			errors.ContextCancelWithError(req, presErr)
+			return
+		}
 
 		errors.ContextCancelWithBadRequestf(req, "%s", msg)
 		return
@@ -421,9 +451,7 @@ func (cmd Sync) emitBailOut(req futility.Request, msg string) {
 
 	switch resolved {
 	case output_format.FormatCRAP:
-		sink := newSyncCrapSink(os.Stdout, os.Stderr)
-		sink.bailOut(msg)
-		sink.finalize()
+		writeSyncBailout(os.Stdout, msg)
 	case output_format.FormatJSON, output_format.FormatNDJSON:
 		buf := bufio.NewWriter(os.Stdout)
 		sink := &syncJsonSink{buf: buf, enc: json.NewEncoder(buf), errOut: os.Stderr}
@@ -441,14 +469,25 @@ func (cmd Sync) emitBailOut(req futility.Request, msg string) {
 	errors.ContextCancelWithBadRequestf(req, "%s", msg)
 }
 
-// streamToViewport runs the blob loop on the main goroutine (so all req
-// interaction stays single-threaded) while viewport.Present consumes the
-// ndjson-crap records over an io.Pipe in a goroutine and renders the live
-// TUI to stdout. streamToSink's deferred block writes the Summary and
-// flushes into the pipe before returning, after which closing the writer
-// gives Present EOF so it returns. Records are producer-generated and
-// always valid, so Present's decoder cannot error mid-stream — the pipe
-// only ever yields a clean EOF, which is why this cannot deadlock.
+// writeSyncBailout emits a Meta header + Bailout record onto out as
+// ndjson-crap. Used by the no-destinations short-circuit for the crap wire
+// and viewport paths, where there is no Operation to dangle — a bailout is
+// the conformant way to terminate the stream before any work begins.
+func writeSyncBailout(out io.Writer, msg string) {
+	buf := bufio.NewWriter(out)
+	w := ndjsoncrap.NewWriter(buf)
+	_ = w.Write(ndjsoncrap.Meta{Title: "sync", Source: "madder"})
+	_ = w.Write(ndjsoncrap.Bailout{Message: msg})
+	_ = buf.Flush()
+}
+
+// streamToViewport runs the producer (runStoreCrap) on the main goroutine
+// (so all req interaction stays single-threaded) while viewport.Present
+// consumes the ndjson-crap records over an io.Pipe in a goroutine and
+// renders the live TUI to stdout. runStoreCrap emits the operation_end into
+// the pipe before returning, after which closing the writer gives Present
+// EOF so it returns. The go-crap v2.1.0 viewport-driver deadlock fix
+// (crap#20) is in this dependency, so the pipe yields a clean EOF.
 func (cmd Sync) streamToViewport(
 	req futility.Request,
 	envBlobStore command_components.BlobStoreEnv,
@@ -467,14 +506,12 @@ func (cmd Sync) streamToViewport(
 		})
 	}()
 
-	// Notices are discarded in viewport mode; the Summary record is
-	// rendered natively. The producer runs on this (main) goroutine.
-	sink := newSyncCrapSink(pw, io.Discard)
-	cmd.streamToSink(req, envBlobStore, source, destination, useDestinationHashType, sink)
+	// The producer runs on this (main) goroutine, writing operation-family
+	// records into the pipe; the viewport renders them live.
+	cmd.runStoreCrap(req, envBlobStore, source, destination, pw, useDestinationHashType)
 
-	// streamToSink's deferred summary+finalize has flushed the Summary
-	// into the pipe by now; closing the writer signals EOF so Present
-	// returns.
+	// runStoreCrap has flushed the operation_end into the pipe by now;
+	// closing the writer signals EOF so Present returns.
 	_ = pw.Close()
 
 	if err := <-presentDone; err != nil {
@@ -535,6 +572,10 @@ func (cmd Sync) streamToSink(
 
 		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
 			if blob_io.IsErrBlobAlreadyExists(err) {
+				// Legacy ndjson/json: an already-present blob folds into
+				// transferred (bytesWritten 0), not a distinct skip — kept
+				// byte-identical to pre-rewrite output. The crap path
+				// distinguishes it via op.Skip.
 				sink.transferred(blobId, lastBytesWritten)
 			} else {
 				sink.failed(blobId, lastBytesWritten, err)
