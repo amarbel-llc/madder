@@ -62,6 +62,17 @@
       inputs.gomod2nix.follows = "purse-first/gomod2nix";
     };
 
+    # Sourced via goFlakeInputs (see madder#208) so a crap bump only
+    # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
+    crap = {
+      url = "github:amarbel-llc/crap";
+      inputs.igloo.follows = "igloo";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+      inputs.bats.follows = "bats";
+      inputs.conformist.follows = "conformist";
+    };
+
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "github:amarbel-llc/doppelgang";
@@ -82,6 +93,7 @@
       bats,
       purse-first,
       tap,
+      crap,
       doppelgang,
       conformist,
       ...
@@ -113,6 +125,7 @@
             system
             tap
             tommy
+            crap
             ;
           # Scope the producer at go/ so downstream consumers reference
           # go-pkgs directly with no subPath. Madder's repo root has

@@ -22,6 +22,7 @@
   src,
   tap,
   tommy,
+  crap,
   system,
 }:
 {
@@ -41,6 +42,10 @@
     };
     "github.com/amarbel-llc/tommy" = {
       src = tommy.packages.${system}.go-pkgs;
+    };
+    # crap's go-pkgs is built from its go-crap/ subtree, so no subPath.
+    "github.com/amarbel-llc/crap/go-crap" = {
+      src = crap.packages.${system}.go-pkgs;
     };
   };
 }

@@ -104,6 +104,38 @@
         "type": "github"
       }
     },
+    "crap": {
+      "inputs": {
+        "bats": [
+          "bats"
+        ],
+        "conformist": [
+          "conformist"
+        ],
+        "igloo": [
+          "igloo"
+        ],
+        "nixpkgs-master": [
+          "nixpkgs-master"
+        ],
+        "utils": [
+          "utils"
+        ]
+      },
+      "locked": {
+        "lastModified": 1780877425,
+        "narHash": "sha256-qibDngzOMzhTN21FaAMSGsAQatU5cLmlAZLI3oAxZWk=",
+        "owner": "amarbel-llc",
+        "repo": "crap",
+        "rev": "5f5a10b0db4d78e6445842da0da47babf2b695b1",
+        "type": "github"
+      },
+      "original": {
+        "owner": "amarbel-llc",
+        "repo": "crap",
+        "type": "github"
+      }
+    },
     "doppelgang": {
       "inputs": {
         "igloo": [
@@ -257,6 +289,7 @@
       "inputs": {
         "bats": "bats",
         "conformist": "conformist",
+        "crap": "crap",
         "doppelgang": "doppelgang",
         "igloo": "igloo",
         "nixpkgs-master": "nixpkgs-master",
