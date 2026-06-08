@@ -45,8 +45,10 @@
     };
     # crap's go-pkgs is full-repo-filtered (its repo is polyglot:
     # go-crap/ alongside rust-crap/), so the go-crap module lives at
-    # the go-crap/ subtree and consumers slice with subPath.
-    "github.com/amarbel-llc/crap/go-crap" = {
+    # the go-crap/ subtree and consumers slice with subPath. The module
+    # declared path gained a /v2 suffix at the v2.0.0 release; the source
+    # subtree is still go-crap/.
+    "github.com/amarbel-llc/crap/go-crap/v2" = {
       src = crap.packages.${system}.go-pkgs;
       subPath = "go-crap";
     };

@@ -7,8 +7,8 @@ import (
 	"io"
 	"os"
 
-	"github.com/amarbel-llc/crap/go-crap/ndjsoncrap"
-	"github.com/amarbel-llc/crap/go-crap/viewport"
+	"github.com/amarbel-llc/crap/go-crap/v2/ndjsoncrap"
+	"github.com/amarbel-llc/crap/go-crap/v2/viewport"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
@@ -477,12 +477,6 @@ func (cmd Sync) streamToViewport(
 	// returns.
 	_ = pw.Close()
 
-	// NOTE(crap#20): viewport.Present can hang if bubbletea's p.Run()
-	// errors before draining the pipe — the producer above blocks on a
-	// full pipe while Present never reaches its read loop, so this
-	// <-presentDone never fires. The fix belongs upstream in
-	// viewport.Present, not here. See
-	// https://github.com/amarbel-llc/crap/issues/20.
 	if err := <-presentDone; err != nil {
 		errors.ContextCancelWithError(req, err)
 	}
