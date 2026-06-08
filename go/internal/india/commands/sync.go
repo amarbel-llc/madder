@@ -130,9 +130,11 @@ type syncSink interface {
 	failed(id domain_interfaces.MarklId, bytesWritten int64, err error)
 	// listError reports a failure reading the source's blob list (no id).
 	listError(err error)
-	// notice reports informational events (limit-hit, summary); stderr in
-	// JSON mode.
+	// notice reports informational events (limit-hit); stderr in JSON mode.
 	notice(msg string)
+	// summary reports final counts. TAP renders a comment; JSON prints a
+	// human line to stderr; crap emits the Summary record.
+	summary(succeeded, failed, ignored, total int)
 	// bailOut reports a fatal error that stops the stream.
 	bailOut(msg string)
 	// finalize flushes. TAP emits the plan; JSON is a no-op.
@@ -161,6 +163,11 @@ func (s *syncTapSink) listError(err error) {
 
 func (s *syncTapSink) notice(msg string) {
 	s.tw.Comment("%s", msg)
+}
+
+func (s *syncTapSink) summary(succeeded, failed, ignored, total int) {
+	s.tw.Comment("Successes: %d, Failures: %d, Ignored: %d, Total: %d",
+		succeeded, failed, ignored, total)
 }
 
 func (s *syncTapSink) bailOut(msg string) {
@@ -220,6 +227,11 @@ func (s *syncJsonSink) listError(err error) {
 
 func (s *syncJsonSink) notice(msg string) {
 	fmt.Fprintln(s.errOut, msg)
+}
+
+func (s *syncJsonSink) summary(succeeded, failed, ignored, total int) {
+	fmt.Fprintf(s.errOut, "Successes: %d, Failures: %d, Ignored: %d, Total: %d\n",
+		succeeded, failed, ignored, total)
 }
 
 func (s *syncJsonSink) bailOut(msg string) {
@@ -315,13 +327,12 @@ func (cmd Sync) runStore(
 
 	defer req.Must(
 		func(_ interfaces.ActiveContext) error {
-			sink.notice(fmt.Sprintf(
-				"Successes: %d, Failures: %d, Ignored: %d, Total: %d",
+			sink.summary(
 				blobImporter.Counts.Succeeded,
 				blobImporter.Counts.Failed,
 				blobImporter.Counts.Ignored,
 				blobImporter.Counts.Total,
-			))
+			)
 
 			sink.finalize()
 
