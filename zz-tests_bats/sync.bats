@@ -48,13 +48,13 @@ function sync_idempotent { # @test
   assert_success
 }
 
-function sync_json_auto_detects { # @test
+function sync_crap_auto_detects { # @test
 
-  # Default auto-format under `run` (no TTY) must emit NDJSON, not TAP.
+  # Default auto-format under `run` (no TTY) must emit ndjson-crap.
   init_store
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
-  echo "sync-json-test" >"$blob"
+  echo "sync-crap-test" >"$blob"
   run_madder write -format tap "$blob"
   assert_success
 
@@ -63,6 +63,26 @@ function sync_json_auto_detects { # @test
 
   run_madder sync .default .sha256
   assert_success
-  assert_output --partial '"state":"transferred"'
+  assert_output --partial '"type":"crap"'
+  assert_output --partial '"type":"summary"'
   refute_output --partial 'TAP version 14'
+}
+
+function sync_ndjson_opt_out { # @test
+
+  # -format ndjson keeps the legacy {id,state,size,error} records.
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sync-ndjson-test" >"$blob"
+  run_madder write -format tap "$blob"
+  assert_success
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial '"type":"crap"'
 }
