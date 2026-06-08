@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/amarbel-llc/crap/go-crap/ndjsoncrap"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
@@ -66,8 +67,11 @@ func (cmd Sync) GetDescription() futility.Description {
 			"types, blobs are rehashed (source digests are not preserved in " +
 			"single-hash destinations). Use -limit to cap the number of " +
 			"blobs transferred. Output defaults to TAP on an interactive " +
-			"terminal and to NDJSON when stdout is piped; pass -format to " +
-			"force a specific encoding. Each JSON record has fields \"id\", " +
+			"terminal and to ndjson-crap when stdout is piped " +
+			"(crap-present-compatible; see crap's spec). Pass -format " +
+			"ndjson (or json) for the legacy per-record JSON described " +
+			"below, or -format to force any encoding. Each JSON record " +
+			"has fields \"id\", " +
 			"\"state\" (transferred, exists, failed, list_error), \"size\" " +
 			"for transferred blobs, and \"error\" for failures. Summary and " +
 			"limit notices route to stderr in JSON mode.",
@@ -137,7 +141,8 @@ type syncSink interface {
 	summary(succeeded, failed, ignored, total int)
 	// bailOut reports a fatal error that stops the stream.
 	bailOut(msg string)
-	// finalize flushes. TAP emits the plan; JSON is a no-op.
+	// finalize flushes buffered output. TAP emits the trailing plan;
+	// crap relies on summary() having been called first.
 	finalize()
 }
 
@@ -242,6 +247,93 @@ func (s *syncJsonSink) finalize() {
 	_ = s.buf.Flush()
 }
 
+// syncCrapSink emits ndjson-crap result-family records (go-crap v2).
+// Routing parity note: runStore never calls exists() — already-present
+// blobs surface as transferred with size 0 (see the IsErrBlobAlreadyExists
+// branch). The exists() impl below is for interface completeness; the
+// skip-directive mapping activates if/when runStore routes it.
+//
+// No Plan record is emitted: sync only learns its count after running,
+// so per tap-ndjson(7) the count is reported in the Summary's PlanCount
+// instead (the trailing-plan-producer case).
+type syncCrapSink struct {
+	buf    *bufio.Writer
+	w      *ndjsoncrap.Writer
+	errOut io.Writer
+	n      int
+}
+
+func newSyncCrapSink(out io.Writer, errOut io.Writer) *syncCrapSink {
+	buf := bufio.NewWriter(out)
+	sink := &syncCrapSink{buf: buf, w: ndjsoncrap.NewWriter(buf), errOut: errOut}
+	_ = sink.w.Write(ndjsoncrap.Meta{Title: "sync", Source: "madder"})
+	return sink
+}
+
+func (s *syncCrapSink) test(t ndjsoncrap.Test) {
+	s.n++
+	t.N = s.n
+	_ = s.w.Write(t)
+}
+
+func (s *syncCrapSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
+	s.test(ndjsoncrap.Test{
+		Description: formatSyncTestPoint(id, bytesWritten),
+		OK:          true,
+		Diagnostic:  map[string]any{"state": syncStateTransferred, "size": bytesWritten},
+	})
+}
+
+func (s *syncCrapSink) exists(id domain_interfaces.MarklId) {
+	s.test(ndjsoncrap.Test{
+		Description: formatSyncTestPoint(id, 0),
+		OK:          true,
+		Directive:   &ndjsoncrap.Directive{Kind: "skip", Reason: syncStateExists},
+		Diagnostic:  map[string]any{"state": syncStateExists},
+	})
+}
+
+func (s *syncCrapSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
+	diag := map[string]any{"state": syncStateFailed, "error": err.Error()}
+	if bytesWritten > 0 {
+		diag["size"] = bytesWritten
+	}
+	s.test(ndjsoncrap.Test{
+		Description: formatSyncTestPoint(id, bytesWritten),
+		Diagnostic:  diag,
+	})
+}
+
+func (s *syncCrapSink) listError(err error) {
+	s.test(ndjsoncrap.Test{
+		Description: "(unknown blob)",
+		Diagnostic:  map[string]any{"state": syncStateListError, "error": err.Error()},
+	})
+}
+
+func (s *syncCrapSink) notice(msg string) {
+	fmt.Fprintln(s.errOut, msg)
+}
+
+func (s *syncCrapSink) bailOut(msg string) {
+	_ = s.w.Write(ndjsoncrap.Bailout{Message: msg})
+}
+
+func (s *syncCrapSink) summary(succeeded, failed, ignored, total int) {
+	_ = s.w.Write(ndjsoncrap.Summary{
+		Passed:    succeeded,
+		Failed:    failed,
+		Skipped:   ignored,
+		Total:     total,
+		PlanCount: total,
+		Valid:     true,
+	})
+}
+
+func (s *syncCrapSink) finalize() {
+	_ = s.buf.Flush()
+}
+
 func (cmd Sync) runStore(
 	req futility.Request,
 	envBlobStore command_components.BlobStoreEnv,
@@ -249,7 +341,9 @@ func (cmd Sync) runStore(
 	destination blob_stores.BlobStoreMap,
 ) {
 	var sink syncSink
-	switch cmd.Format.Resolve(os.Stdout) {
+	switch cmd.Format.ResolvePipedDefault(os.Stdout, output_format.FormatCRAP) {
+	case output_format.FormatCRAP:
+		sink = newSyncCrapSink(os.Stdout, os.Stderr)
 	case output_format.FormatJSON, output_format.FormatNDJSON:
 		buf := bufio.NewWriter(os.Stdout)
 		sink = &syncJsonSink{

@@ -28,7 +28,7 @@ import (
 
 // Format selects the encoding of a command's per-record result stream.
 //
-// auto (default): ndjson when stdout is not a TTY, TAP otherwise.
+// auto (default): TAP on a TTY; otherwise the command's piped default (ndjson for most commands, ndjson-crap for sync).
 // tap:            TAP format regardless of stdout.
 // json:           single JSON document (command-specific shape).
 //
@@ -69,7 +69,7 @@ func (f *Format) Set(value string) error {
 
 func (Format) GetCLICompletion() map[string]string {
 	return map[string]string{
-		FormatAuto.String():   "TAP on a TTY, NDJSON when stdout is piped (default)",
+		FormatAuto.String():   "TAP on a TTY, per-command default when piped: ndjson, or crap for sync (default)",
 		FormatTAP.String():    "TAP format (human-readable)",
 		FormatJSON.String():   "single JSON document (alias for ndjson on streaming commands)",
 		FormatNDJSON.String(): "NDJSON: one JSON object per record",

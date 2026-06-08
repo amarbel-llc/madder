@@ -43,9 +43,12 @@
     "github.com/amarbel-llc/tommy" = {
       src = tommy.packages.${system}.go-pkgs;
     };
-    # crap's go-pkgs is built from its go-crap/ subtree, so no subPath.
+    # crap's go-pkgs is full-repo-filtered (its repo is polyglot:
+    # go-crap/ alongside rust-crap/), so the go-crap module lives at
+    # the go-crap/ subtree and consumers slice with subPath.
     "github.com/amarbel-llc/crap/go-crap" = {
       src = crap.packages.${system}.go-pkgs;
+      subPath = "go-crap";
     };
   };
 }

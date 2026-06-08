@@ -16,6 +16,11 @@ schema = 3
     hash = 'sha256-GlSZOyix7Ct7tOKmSKpGckDjMhTtiYPBTpoWdwGLx5M='
     goVersion = '1.14'
 
+  [mod.'github.com/amarbel-llc/crap/go-crap']
+    version = 'v0.0.0-20260608001025-5f5a10b0db4d'
+    hash = 'sha256-R0J0pbiwre9cFDJgMdC1Z4XZ5uGQP3e0AuofU2LXpX4='
+    goVersion = '1.26'
+
   [mod.'github.com/amarbel-llc/purse-first/libs/dewey']
     version = 'v0.3.0'
     hash = 'sha256-2ZLpvKJ8yescpMRKFz5UmF3hAvWguJGF5Q/ksYVWIgc='

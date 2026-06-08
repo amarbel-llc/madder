@@ -6,7 +6,7 @@ import internal "github.com/amarbel-llc/madder/go/internal/charlie/output_format
 
 // Format selects the encoding of a command's per-record result stream.
 //
-// auto (default): ndjson when stdout is not a TTY, TAP otherwise.
+// auto (default): TAP on a TTY; otherwise the command's piped default (ndjson for most commands, ndjson-crap for sync).
 // tap:            TAP format regardless of stdout.
 // json:           single JSON document (command-specific shape).
 //
