@@ -13,6 +13,7 @@ import internal "github.com/amarbel-llc/madder/go/internal/charlie/output_format
 //	For streaming commands this is an alias for ndjson.
 //
 // ndjson:         one JSON object per line.
+// crap:           ndjson-crap records, one JSON record per line (go-crap v2).
 type Format = internal.Format
 
 // Default is the value to initialize a flag field with.
@@ -23,6 +24,7 @@ const Default = internal.Default
 const (
 	FlagDescription = internal.FlagDescription
 	FormatAuto      = internal.FormatAuto
+	FormatCRAP      = internal.FormatCRAP
 	FormatJSON      = internal.FormatJSON
 	FormatNDJSON    = internal.FormatNDJSON
 	FormatTAP       = internal.FormatTAP
