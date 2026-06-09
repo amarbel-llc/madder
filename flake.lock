@@ -226,11 +226,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1780934007,
-        "narHash": "sha256-9lg6DhDelIS7stiyAiWytPBAP5sNUaOKHiulW29hWQ8=",
+        "lastModified": 1781009819,
+        "narHash": "sha256-wbpPg/q/x/lUSICL+jcJp1Ei5fKLuVBESDG97kCS/Sc=",
         "owner": "amarbel-llc",
         "repo": "igloo",
-        "rev": "c12b4224bb296b010f9ad3ec849bfde3affee564",
+        "rev": "0f82f95c8c466ec5ffce6b56a939b09fae7d0951",
         "type": "github"
       },
       "original": {

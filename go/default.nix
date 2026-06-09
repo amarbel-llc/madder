@@ -160,7 +160,7 @@ let
   # — it lives as separate `bats-*` lanes (`batsLaneOutputs`) so
   # downstream consumers don't pay the integration-test cost on a
   # from-source rebuild. See amarbel-llc/eng#62.
-  madder = pkgs.buildGoApplication ({
+  madderArgs = {
     pname = "madder";
     inherit version commit goFlakeInputs;
     src = goPkgsTest;
@@ -211,7 +211,43 @@ let
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';
-  });
+  };
+
+  madder = pkgs.buildGoApplication madderArgs;
+
+  # madder-gowork is a GATED tracer for igloo#39's experimental
+  # `goFlakeInputsMode = "workspace"`: instead of the default
+  # require+replace+sentinel merged go.mod, workspace mode synthesizes a
+  # go.work with the consumer as the sole `use .` member and every
+  # bridged producer + external dep as `replace <mod> => <store path>`,
+  # then runs `go work vendor` in-build so go itself generates
+  # vendor/ + modules.txt (go owns the MVS / version-skew reconciliation).
+  # No sentinel: madder's organic requires (go-crap/v2 v2.1.0, tap,
+  # tommy) stand and producers just become replaced deps, so the /v2
+  # producer (github.com/amarbel-llc/crap/go-crap/v2) needs no
+  # major-suffix special-casing. This output validates the one path
+  # igloo's own tests don't cover: external transitive deps of a /v2
+  # bridged producer (the bubbletea/charm tree under go-crap/v2),
+  # including pre-modules (go.mod-less) deps, vendored through the real
+  # buildGoApplication in workspace mode.
+  #
+  # Deliberately NOT in the default `madder` lane and NOT in the `just`
+  # pre-merge hook (default builds only .#madder; test builds
+  # madder-race/bats-*). Build it explicitly via `just build-gowork`
+  # (group: explore) or `nix build .#madder-gowork`.
+  #
+  # CAVEAT: the Go build cache is disabled for workspace-bridge builds
+  # (the cache derivation can't yet carry out-of-tree /nix/store `use`
+  # targets — an igloo#39 perf follow-up, not a correctness gap), so
+  # this is always a cold build. Inherits madder's full checkPhase
+  # (`go test -tags test ./...`) for max fidelity.
+  madder-gowork = pkgs.buildGoApplication (
+    madderArgs
+    // {
+      pname = "madder-gowork";
+      goFlakeInputsMode = "workspace";
+    }
+  );
 
   # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)
   # / clown-json(5)) that exposes madder blobs as MCP resources at
@@ -418,6 +454,7 @@ in
   packages = {
     inherit
       madder
+      madder-gowork
       madder-race
       madder-cover
       madder-cli-cover
