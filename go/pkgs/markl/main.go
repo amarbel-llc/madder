@@ -280,9 +280,19 @@ const (
 	FormatIdHashSha256      = internal.FormatIdHashSha256
 	FormatIdNonceSec        = internal.FormatIdNonceSec
 	FormatIdPivyEcdhP256Pub = internal.FormatIdPivyEcdhP256Pub
-	IdFormatBlech32         = internal.IdFormatBlech32
-	IdFormatDefault         = internal.IdFormatDefault
-	IdFormatHex             = internal.IdFormatHex
+)
+
+// SEC1-compressed P-256 public key (33 bytes), surfaced via the SSH
+// agent from a PIV authentication/signature slot (9A/9C/9E). Byte
+// shape is identical to ecdsa_p256_pub; the distinct format id lets a
+// purpose distinguish piggy PIV SSH-auth keys from recipient pubkeys
+// of the same shape. Owned jointly with amarbel-llc/piggy (mirrored
+// in its piggy-markl crate). See RFC 0002 §5.
+const (
+	FormatIdSshEcdsaNistp256Pub = internal.FormatIdSshEcdsaNistp256Pub
+	IdFormatBlech32             = internal.IdFormatBlech32
+	IdFormatDefault             = internal.IdFormatDefault
+	IdFormatHex                 = internal.IdFormatHex
 )
 
 // Blob Digests
@@ -313,6 +323,18 @@ const (
 	PurposeObjectSigV0 = internal.PurposeObjectSigV0
 	PurposeObjectSigV1 = internal.PurposeObjectSigV1
 	PurposeObjectSigV2 = internal.PurposeObjectSigV2
+)
+
+// Piggy keys (jointly owned with amarbel-llc/piggy; see RFC 0002 §6.1
+// and the piggy-markl crate). The piggy-piv_* purposes carry a PIV
+// slot's SSH-suitable public key; piggy-recipient-v1 carries an
+// encryption recipient pubkey (PIV slot 9D or an age recipient).
+// keep sorted
+const (
+	PurposePiggyPivAuthV1     = internal.PurposePiggyPivAuthV1
+	PurposePiggyPivCardAuthV1 = internal.PurposePiggyPivCardAuthV1
+	PurposePiggyPivSigV1      = internal.PurposePiggyPivSigV1
+	PurposePiggyRecipientV1   = internal.PurposePiggyRecipientV1
 )
 
 // PrivateKeys

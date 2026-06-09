@@ -30,19 +30,34 @@ var AllAliases = internal.AllAliases
 // TODO(#108) codegen this slice from the per-purpose vars so adding
 // a new Purpose*Opts entry doesn't require a manual append.
 var (
-	AllPurposes                           = internal.AllPurposes
-	PurposeBlobDigestV1Opts               = internal.PurposeBlobDigestV1Opts
-	PurposeBlobStoreConfigDigestV1Opts    = internal.PurposeBlobStoreConfigDigestV1Opts
-	PurposeMadderPrivateKeyV0Opts         = internal.PurposeMadderPrivateKeyV0Opts
-	PurposeMadderPrivateKeyV1Opts         = internal.PurposeMadderPrivateKeyV1Opts
-	PurposeMadderPubKeyV1Opts             = internal.PurposeMadderPubKeyV1Opts
-	PurposeObjectDigestV1Opts             = internal.PurposeObjectDigestV1Opts
-	PurposeObjectDigestV2Opts             = internal.PurposeObjectDigestV2Opts
-	PurposeObjectMotherSigV1Opts          = internal.PurposeObjectMotherSigV1Opts
-	PurposeObjectMotherSigV2Opts          = internal.PurposeObjectMotherSigV2Opts
-	PurposeObjectSigV0Opts                = internal.PurposeObjectSigV0Opts
-	PurposeObjectSigV1Opts                = internal.PurposeObjectSigV1Opts
-	PurposeObjectSigV2Opts                = internal.PurposeObjectSigV2Opts
+	AllPurposes                        = internal.AllPurposes
+	PurposeBlobDigestV1Opts            = internal.PurposeBlobDigestV1Opts
+	PurposeBlobStoreConfigDigestV1Opts = internal.PurposeBlobStoreConfigDigestV1Opts
+	PurposeMadderPrivateKeyV0Opts      = internal.PurposeMadderPrivateKeyV0Opts
+	PurposeMadderPrivateKeyV1Opts      = internal.PurposeMadderPrivateKeyV1Opts
+	PurposeMadderPubKeyV1Opts          = internal.PurposeMadderPubKeyV1Opts
+	PurposeObjectDigestV1Opts          = internal.PurposeObjectDigestV1Opts
+	PurposeObjectDigestV2Opts          = internal.PurposeObjectDigestV2Opts
+	PurposeObjectMotherSigV1Opts       = internal.PurposeObjectMotherSigV1Opts
+	PurposeObjectMotherSigV2Opts       = internal.PurposeObjectMotherSigV2Opts
+	PurposeObjectSigV0Opts             = internal.PurposeObjectSigV0Opts
+	PurposeObjectSigV1Opts             = internal.PurposeObjectSigV1Opts
+	PurposeObjectSigV2Opts             = internal.PurposeObjectSigV2Opts
+)
+
+// Piggy PIV-slot public keys (auth 9A, sig 9C, card-auth 9E). Each
+// carries the slot's SSH-suitable compressed P-256 point; jointly
+// owned with amarbel-llc/piggy and mirrored in its piggy-markl crate.
+var (
+	PurposePiggyPivAuthV1Opts     = internal.PurposePiggyPivAuthV1Opts
+	PurposePiggyPivCardAuthV1Opts = internal.PurposePiggyPivCardAuthV1Opts
+	PurposePiggyPivSigV1Opts      = internal.PurposePiggyPivSigV1Opts
+)
+
+// Piggy encryption recipient (PIV slot 9D ECDH key, or an age
+// recipient). This is the key madder encrypts blobs to.
+var (
+	PurposePiggyRecipientV1Opts           = internal.PurposePiggyRecipientV1Opts
 	PurposeRepoPrivateKeyV1Opts           = internal.PurposeRepoPrivateKeyV1Opts
 	PurposeRepoPubKeyV1Opts               = internal.PurposeRepoPubKeyV1Opts
 	PurposeRequestAuthChallengeV1Opts     = internal.PurposeRequestAuthChallengeV1Opts
