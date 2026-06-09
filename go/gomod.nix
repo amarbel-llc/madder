@@ -25,11 +25,7 @@
   crap,
   system,
 }:
-{
-  # mkGoPkgs defaults fit madder's tree (no embedded assets outside
-  # testdata/), so no `extras` / `testExtras` needed.
-  goPkgs = pkgs.mkGoPkgs { inherit src; };
-
+let
   # Bridging tap/tommy through their own `go-pkgs` outputs means
   # non-Go edits in those repos no longer trigger madder rebuilds
   # (#213). tap's go-pkgs is full-repo-filtered (its repo is
@@ -53,4 +49,16 @@
       subPath = "go-crap";
     };
   };
+in
+{
+  # mkGoPkgs defaults fit madder's tree (no embedded assets outside
+  # testdata/), so no `extras` / `testExtras` needed. goFlakeInputs is
+  # passed so go-pkgs / go-pkgs-test carry `passthru.goFlakeInputs`,
+  # letting downstream consumers that bridge madder inherit madder's own
+  # bridges (go-crap/v2, tap, tommy) at depth-1 rather than re-declaring
+  # them (RFC 0001 § Multi-producer closures; amarbel-llc/igloo#39
+  # workspace-mode chaining). mkGoPkgs uses it only to attach the
+  # passthru — the filtered source tree is unchanged.
+  goPkgs = pkgs.mkGoPkgs { inherit src goFlakeInputs; };
+  inherit goFlakeInputs;
 }
