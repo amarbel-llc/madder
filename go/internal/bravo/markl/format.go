@@ -24,6 +24,14 @@ const (
 	FormatIdEcdsaP256Pub = "ecdsa_p256_pub"
 	FormatIdEcdsaP256Sig = "ecdsa_p256_sig"
 
+	// SEC1-compressed P-256 public key (33 bytes), surfaced via the SSH
+	// agent from a PIV authentication/signature slot (9A/9C/9E). Byte
+	// shape is identical to ecdsa_p256_pub; the distinct format id lets a
+	// purpose distinguish piggy PIV SSH-auth keys from recipient pubkeys
+	// of the same shape. Owned jointly with amarbel-llc/piggy (mirrored
+	// in its piggy-markl crate). See RFC 0002 §5.
+	FormatIdSshEcdsaNistp256Pub = "ssh_ecdsa_nistp256_pub"
+
 	FormatIdPivyEcdhP256Pub = "pivy_ecdh_p256_pub"
 
 	FormatIdHashSha256     = "sha256"
@@ -104,6 +112,14 @@ func init() {
 	)
 
 	makeStubEcdsaP256SSHFormat()
+
+	RegisterFormat(
+		FormatPub{
+			Id:     FormatIdSshEcdsaNistp256Pub,
+			Size:   33,
+			Verify: EcdsaP256Verify,
+		},
+	)
 
 	// PivyEcdhP256
 	RegisterFormat(

@@ -198,6 +198,38 @@ var (
 			markl.FormatIdPivyEcdhP256Pub,
 		},
 	}
+
+	// Piggy PIV-slot public keys (auth 9A, sig 9C, card-auth 9E). Each
+	// carries the slot's SSH-suitable compressed P-256 point; jointly
+	// owned with amarbel-llc/piggy and mirrored in its piggy-markl crate.
+	PurposePiggyPivAuthV1Opts = markl.RegisterPurposeOpts{
+		Id:        markl.PurposePiggyPivAuthV1,
+		Type:      markl.PurposeTypePubKey,
+		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
+	}
+
+	PurposePiggyPivSigV1Opts = markl.RegisterPurposeOpts{
+		Id:        markl.PurposePiggyPivSigV1,
+		Type:      markl.PurposeTypePubKey,
+		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
+	}
+
+	PurposePiggyPivCardAuthV1Opts = markl.RegisterPurposeOpts{
+		Id:        markl.PurposePiggyPivCardAuthV1,
+		Type:      markl.PurposeTypePubKey,
+		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
+	}
+
+	// Piggy encryption recipient (PIV slot 9D ECDH key, or an age
+	// recipient). This is the key madder encrypts blobs to.
+	PurposePiggyRecipientV1Opts = markl.RegisterPurposeOpts{
+		Id:   markl.PurposePiggyRecipientV1,
+		Type: markl.PurposeTypePubKey,
+		FormatIds: []string{
+			markl.FormatIdPivyEcdhP256Pub,
+			markl.FormatIdAgeX25519Pub,
+		},
+	}
 )
 
 // AllPurposes is the canonical, ordered list of purposes madder
@@ -226,6 +258,10 @@ var AllPurposes = []markl.RegisterPurposeOpts{
 	PurposeMadderPubKeyV1Opts,
 	PurposeMadderPrivateKeyV0Opts,
 	PurposeMadderPrivateKeyV1Opts,
+	PurposePiggyPivAuthV1Opts,
+	PurposePiggyPivSigV1Opts,
+	PurposePiggyPivCardAuthV1Opts,
+	PurposePiggyRecipientV1Opts,
 }
 
 // Canonical purpose-id → format-id aliases. See AllPurposes for the

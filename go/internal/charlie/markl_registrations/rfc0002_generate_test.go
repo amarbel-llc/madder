@@ -36,6 +36,10 @@ var rfc0002StablePurposes = []string{
 	markl.PurposeObjectSigV2,
 	markl.PurposeRepoPubKeyV1,
 	markl.PurposeRepoPrivateKeyV1,
+	markl.PurposePiggyPivAuthV1,
+	markl.PurposePiggyPivSigV1,
+	markl.PurposePiggyPivCardAuthV1,
+	markl.PurposePiggyRecipientV1,
 }
 
 // rfc0002StableFormats lists every format ID currently registered.
@@ -52,6 +56,7 @@ var rfc0002StableFormats = []rfc0002FormatRow{
 	{markl.FormatIdEcdsaP256Pub, 33},
 	{markl.FormatIdEcdsaP256Sig, 64},
 	{markl.FormatIdEcdsaP256SSH, 33},
+	{markl.FormatIdSshEcdsaNistp256Pub, 33},
 	{markl.FormatIdAgeX25519Pub, 32},
 	{markl.FormatIdAgeX25519Sec, 32},
 	{markl.FormatIdPivyEcdhP256Pub, 33},

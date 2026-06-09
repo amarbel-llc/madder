@@ -43,6 +43,16 @@ const (
 	PurposeRepoPrivateKeyV1   = "dodder-repo-private_key-v1"
 	PurposeMadderPrivateKeyV0 = "madder-private_key-v0"
 	PurposeMadderPrivateKeyV1 = "madder-private_key-v1"
+
+	// Piggy keys (jointly owned with amarbel-llc/piggy; see RFC 0002 §6.1
+	// and the piggy-markl crate). The piggy-piv_* purposes carry a PIV
+	// slot's SSH-suitable public key; piggy-recipient-v1 carries an
+	// encryption recipient pubkey (PIV slot 9D or an age recipient).
+	// keep sorted
+	PurposePiggyPivAuthV1     = "piggy-piv_auth-v1"      // PIV slot 9A
+	PurposePiggyPivCardAuthV1 = "piggy-piv_card_auth-v1" // PIV slot 9E
+	PurposePiggyPivSigV1      = "piggy-piv_sig-v1"       // PIV slot 9C
+	PurposePiggyRecipientV1   = "piggy-recipient-v1"     // PIV slot 9D / age
 )
 
 // Production registrations live in internal/charlie/markl_registrations

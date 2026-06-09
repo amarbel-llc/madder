@@ -5,6 +5,7 @@ authors: Sasha F (with Clown), drafted from amarbel-llc/madder#150
 revisions:
   - 2026-05-09: initial draft (amarbel-llc/madder#150)
   - 2026-05-10: revert combined-HRP checksum rule to split-HRP form (amarbel-llc/madder#159)
+  - 2026-06-09: add ssh_ecdsa_nistp256_pub format (§5) and piggy-piv_*/piggy-recipient-v1 purposes (§6.1), promoted to the normative cross-language subset
 ---
 
 # RFC 0002 — Markl ID Format
@@ -232,6 +233,7 @@ size for the named format. *(test:
 | `age_x25519_pub`     | 32           | age X25519 public key                        |
 | `age_x25519_sec`     | 32           | age X25519 secret key                        |
 | `pivy_ecdh_p256_pub` | 33           | PIV ECDH P-256 compressed public key (SEC 1) |
+| `ssh_ecdsa_nistp256_pub` | 33       | SSH-suitable ECDSA P-256 public key, SEC1-compressed |
 | `nonce`              | 32           | Random nonce                                 |
 
 The `*_ssh` formats carry a bare public-key payload (32 or 33 bytes);
@@ -239,6 +241,15 @@ the SSH-agent integration that produces signatures with these keys is
 implementation-internal and not part of the wire format. Earlier
 informal documentation described these formats as "variable size" —
 that was incorrect.
+
+`ssh_ecdsa_nistp256_pub` is byte-identical in shape to `ecdsa_p256_pub`
+(both are 33-byte SEC1-compressed P-256 points). The distinct format ID
+exists so a purpose (§6.1) can distinguish a PIV slot's SSH-suitable
+authentication/signature key (`piggy-piv_*-v1`) from a repository or
+recipient public key of the same shape, preventing the format-confusion
+attack described in §8 item 3. This format is owned jointly with
+[`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy), which
+mirrors it in its `piggy-markl` Rust crate.
 
 ### 5.1. Registering New Formats
 
@@ -268,6 +279,17 @@ others.
 | `dodder-object-sig-v2`           | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature         |
 | `dodder-repo-public_key-v1`      | `ed25519_pub`, `ecdsa_p256_pub`                 | Repository public key    |
 | `dodder-repo-private_key-v1`     | `ed25519_sec`, `ed25519_ssh`, `ecdsa_p256_ssh`  | Repository private key   |
+| `piggy-piv_auth-v1`              | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9A public key (Authentication) |
+| `piggy-piv_sig-v1`               | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9C public key (Digital Signature) |
+| `piggy-piv_card_auth-v1`         | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9E public key (Card Authentication) |
+| `piggy-recipient-v1`             | `pivy_ecdh_p256_pub`, `age_x25519_pub`          | Encryption recipient (PIV slot 9D ECDH key, or age recipient) |
+
+The `piggy-*` purposes are owned jointly with
+[`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy) and mirrored
+in its `piggy-markl` Rust crate
+(`crates/piggy-markl/src/{format,purpose}.rs`). They are surfaced by
+`piggy list` and consumed by madder wherever a piggy-issued key appears
+in a markl-id slot.
 
 *(test: `TestRFC0002VectorsRoundTrip/purpose/...` plus
 `TestAllPurposes_Registered`,

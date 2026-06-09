@@ -646,6 +646,37 @@ debug-init-repro storeid="default":
   echo "(tmp workdir: $workdir)"
   echo "(tmp home:    $home)"
 
+# Run `madder init -encryption <value> <store>` in an isolated tmp
+# HOME/workdir to check whether an -encryption markl-id (or key path)
+# parses and validates. Serves the encryption-key-vocabulary dev-loop:
+# when madder gains a new format/purpose (e.g. piggy-* keys, madder#?),
+# paste the markl-id `piggy list` emits as <value> and confirm it no
+# longer fails with `unknown format id` / `IncompatiblePurposeAndFormat`.
+# Note: parse/validate happens before any key material is touched, so a
+# YubiKey need not be present; a recipient key still encrypts end-to-end
+# only if its purpose permits it (auth/sig keys parse but are not
+# encryption recipients). Same ceiling/tmp-home safety as
+# debug-init-repro. Usage: just debug-init-encryption '<markl-id>' [storeid]
+[group("debug")]
+debug-init-encryption value storeid="enc":
+  #!/usr/bin/env bash
+  set -u
+  root={{justfile_directory()}}
+  home=$(mktemp -d)
+  workdir=$(mktemp -d)
+  cd "$workdir"
+  unset XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME XDG_STATE_HOME
+  export HOME="$home"
+  export MADDER_CEILING_DIRECTORIES="$workdir"
+  echo "=== init -encryption {{value}} {{storeid}} ==="
+  set +e
+  (cd "$root/go" && go run ./cmd/madder init -encryption "{{value}}" "{{storeid}}")
+  rc=$?
+  set -e
+  echo "  exit=$rc"
+  echo "(tmp workdir: $workdir)"
+  echo "(tmp home:    $home)"
+
 # Reproduce issue #145: `madder list` from a leaf below an inner
 # `.madder/` should surface both ancestor `.madder/` stores with
 # disambiguating dot prefixes. Builds a fresh fixture under tmp so it
