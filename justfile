@@ -17,17 +17,6 @@ build:
 build-go:
   cd go && go build ./...
 
-# Build the gated madder-gowork tracer for igloo#39's experimental
-# `goFlakeInputsMode = "workspace"` (sentinel-free go.work overlay for
-# goFlakeInputs). Validates that the /v2 go-crap producer's bubbletea
-# transitive tree vendors through the real buildGoApplication in
-# workspace mode. NOT part of the default lane or the `just` pre-merge
-# hook. Always a COLD build (workspace-bridge builds disable the Go
-# cache — igloo#39 perf follow-up). See go/default.nix `madder-gowork`.
-[group("explore")]
-build-gowork:
-  nix build .#madder-gowork --no-link --print-build-logs
-
 # Regenerate pkgs/ facades from internal/ packages via dagnabit.
 # dagnabit now emits conformist-compatible output directly — it folds
 # consecutive same-kind decls into grouped blocks and runs the project
