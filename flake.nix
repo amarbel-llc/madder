@@ -34,9 +34,6 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
-      # purse-first uses conformist (treefmt successor); dedup its input
-      # onto ours so flake.lock carries one copy (doppelgang lint).
-      inputs.conformist.follows = "conformist";
     };
 
     # conformist: the linter + formatter multiplexer (treefmt successor).
