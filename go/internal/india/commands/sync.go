@@ -306,7 +306,7 @@ func (cmd Sync) runStore(
 	}
 }
 
-// runStoreCrap drives a crap.Reporter (go-crap v2.1.0 operation API, crap
+// runStoreCrap drives a crap.Reporter (go-crap v2 operation API, crap
 // RFC 0001) over out: a coarse scan phase (surfacing the source's lazy
 // remote connect + index walk), then a single Operation with one
 // Item/Skip/Fail per blob and a tallied operation_end at Finish. The
