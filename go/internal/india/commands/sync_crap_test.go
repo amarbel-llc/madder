@@ -11,6 +11,7 @@ import (
 	"github.com/amarbel-llc/crap/go-crap/v2/ndjsoncrap"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 )
 
 // testMarklId returns a deterministic sha256 markl id seeded from a
@@ -122,6 +123,99 @@ func TestSyncRunStoreCrapStream(t *testing.T) {
 	}
 	if end.OK {
 		t.Errorf("record 7: operation_end ok should be false when failed>0, got %#v", records[7])
+	}
+}
+
+// TestSyncScanDiagnostic pins the diagnostic syncScanDiagnostic builds for
+// a failed scan phase (#237): the source store id plus the
+// connection-identifying config keys, and — load-bearing — none of the
+// secret or local-path keys (password, private-key-path).
+func TestSyncScanDiagnostic(t *testing.T) {
+	config := &blob_store_configs.TomlSFTPV0{
+		Host:           "sftp.example.test",
+		Port:           2222,
+		User:           "syncer",
+		Password:       "hunter2",
+		PrivateKeyPath: "/home/someone/.ssh/id_ed25519",
+		RemotePath:     "/srv/blobs",
+	}
+
+	diag := syncScanDiagnostic("/repo-default", config)
+
+	want := map[string]any{
+		"source":          "/repo-default",
+		"blob-store-type": "sftp",
+		"host":            "sftp.example.test",
+		"port":            "2222",
+		"user":            "syncer",
+		"remote-path":     "/srv/blobs",
+	}
+
+	for key, wantValue := range want {
+		if diag[key] != wantValue {
+			t.Errorf("diag[%q]: got %#v, want %#v", key, diag[key], wantValue)
+		}
+	}
+
+	// Exhaustive: the allowlist is the sole gate before wire emission, so
+	// any key outside `want` (password, private-key-path, a future
+	// allowlist addition…) is a leak, not an enhancement.
+	for key, got := range diag {
+		if _, ok := want[key]; !ok {
+			t.Errorf("diag[%q] must not surface, got %#v", key, got)
+		}
+	}
+
+	if diag := syncScanDiagnostic("src", nil); diag["source"] != "src" {
+		t.Errorf("nil config: expected source-only diag, got %#v", diag)
+	}
+}
+
+// TestSyncScanFailDiagOnWire replays the scan-failure record sequence
+// runStoreCrap produces and asserts the diagnostic rides the scan
+// node_end (go-crap crap#22), making the phase a self-sufficient verdict
+// unit — no paired result-family Test record.
+func TestSyncScanFailDiagOnWire(t *testing.T) {
+	var buf bytes.Buffer
+
+	reporter := crap.NewReporter(&buf, crap.ReporterOptions{Source: "madder"})
+	scan := reporter.Phase("scanning src")
+	scan.FailDiag(
+		errors.New("connect refused"),
+		syncScanDiagnostic("src", &blob_store_configs.TomlSFTPV0{
+			Host:       "sftp.example.test",
+			RemotePath: "/srv/blobs",
+		}),
+	)
+	if err := reporter.Err(); err != nil {
+		t.Fatalf("reporter.Err: %v", err)
+	}
+
+	var nodeEnd *ndjsoncrap.NodeEnd
+	r := ndjsoncrap.NewReader(&buf)
+	for {
+		rec, err := r.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatalf("Next: %v", err)
+		}
+		if ne, ok := rec.(ndjsoncrap.NodeEnd); ok {
+			nodeEnd = &ne
+		}
+	}
+
+	if nodeEnd == nil {
+		t.Fatal("no node_end record on the wire")
+	}
+	if nodeEnd.ExitCode == nil || *nodeEnd.ExitCode != 1 {
+		t.Errorf("node_end: expected exit 1, got %#v", nodeEnd)
+	}
+	if nodeEnd.Diagnostic["source"] != "src" ||
+		nodeEnd.Diagnostic["host"] != "sftp.example.test" {
+		t.Errorf("node_end diagnostic missing scan context, got %#v",
+			nodeEnd.Diagnostic)
 	}
 }
 

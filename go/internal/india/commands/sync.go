@@ -12,6 +12,7 @@ import (
 	"github.com/amarbel-llc/crap/go-crap/v2/viewport"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
+	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -353,7 +354,10 @@ func (cmd Sync) runStoreCrap(
 	}
 
 	if scanErr != nil {
-		scan.Fail(scanErr)
+		scan.FailDiag(scanErr, syncScanDiagnostic(
+			source.GetId().String(),
+			source.Config.Blob,
+		))
 		errors.ContextCancelWithError(req, scanErr)
 		return
 	}
@@ -413,6 +417,48 @@ func (cmd Sync) runStoreCrap(
 	if err := reporter.Err(); err != nil {
 		errors.ContextCancelWithError(req, err)
 	}
+}
+
+// syncScanDiagnosticKeys is the connection-identifying subset of
+// blob_store_configs.ConfigKeyValues keys that rides a failed scan phase's
+// node_end diagnostic: where the scan was pointed, not how the store is
+// tuned. Local filesystem paths (private-key-path, tls-*-path) and tuning
+// knobs (delta.*, hash_buckets, compression) stay off the wire — the
+// stream may be captured into world-readable artifacts.
+var syncScanDiagnosticKeys = []string{
+	"blob-store-type",
+	"host", "port", "user", "remote-path", // sftp
+	"url",                                    // webdav
+	"endpoint", "region", "bucket", "prefix", // s3
+}
+
+// syncScanDiagnostic builds the diagnostic for a failed scan phase
+// (#237; go-crap crap#22): source store id plus the
+// connection-identifying config keys, making the scan node_end a
+// self-sufficient verdict unit on the wire and in the viewport. The keys
+// come from the redaction-pinned ConfigKeyValues surface and are further
+// narrowed by syncScanDiagnosticKeys.
+func syncScanDiagnostic(
+	sourceId string,
+	config blob_store_configs.Config,
+) map[string]any {
+	diag := map[string]any{"source": sourceId}
+
+	// A scan failure must never escalate into a panic while being
+	// reported; a store with no decoded config still gets the id.
+	if config == nil {
+		return diag
+	}
+
+	keyValues := blob_store_configs.ConfigKeyValues(config)
+
+	for _, key := range syncScanDiagnosticKeys {
+		if value, ok := keyValues[key]; ok {
+			diag[key] = value
+		}
+	}
+
+	return diag
 }
 
 // emitBailOut writes the no-destinations bailOut record through whatever
