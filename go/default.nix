@@ -48,6 +48,48 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
+  # tommy codegen as a conformist linter driver. Walks the tree for
+  # `//go:generate tommy generate` directives and runs `tommy generate` per file
+  # (REPAIR mode; the conformist.toml CHECK command is a no-op `true`). Resolves
+  # tommy + go from the AMBIENT PATH and skips (exit 0) when either is missing,
+  # so it is a safe no-op where the toolchain is absent and regenerates the
+  # blob_store_configs *_tommy.go in the devshell (where tommy + go are present),
+  # landing in the `conformist --commit` chore. Exposed below so the conformistFmt
+  # wrapper in flake.nix can put it on the `nix fmt` PATH too.
+  tommyCodegen = pkgs.writeShellApplication {
+    name = "conformist-tommy-codegen";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.findutils
+      pkgs.gnugrep
+    ];
+    text = ''
+      mode="repair"
+      if [ "''${1:-}" = "--check" ]; then
+        mode="check"
+      fi
+      if ! command -v tommy >/dev/null 2>&1; then
+        echo "tommy-codegen: tommy not on PATH; skipping" >&2
+        exit 0
+      fi
+      if ! command -v go >/dev/null 2>&1; then
+        echo "tommy-codegen: go not on PATH; skipping" >&2
+        exit 0
+      fi
+      status=0
+      while IFS= read -r f; do
+        dir=$(dirname "$f")
+        base=$(basename "$f")
+        if [ "$mode" = "check" ]; then
+          ( cd "$dir" || exit 1; GOFILE="$base" tommy generate --check; ) || status=1
+        else
+          ( cd "$dir" || exit 1; GOFILE="$base" tommy generate; ) || status=1
+        fi
+      done < <(grep -rIl --include='*.go' 'go:generate tommy generate' . 2>/dev/null | grep -v '/result' || true)
+      exit "$status"
+    '';
+  };
+
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
   # BATS_LIB_PATH, MADDER_BIN / HYPHENCE_BIN exported via the
@@ -415,6 +457,10 @@ let
   };
 in
 {
+  # Exposed so flake.nix's conformistFmt wrapper can put the codegen linter
+  # driver on the `nix fmt` PATH (it is also in the devShell below).
+  inherit tommyCodegen;
+
   packages = {
     inherit
       madder
@@ -458,6 +504,9 @@ in
       # in the devshell above.
       pkgs.nixfmt
       pkgs-master.shellcheck
+      # conformist's tommy-codegen linter driver ([linter.tommy-codegen] regen
+      # in `conformist` repair). tommy itself is already in the devshell above.
+      tommyCodegen
     ]
     ++ (with pkgs-master; [
       delve

@@ -146,6 +146,11 @@
             pkgs.nixfmt
             pkgs.shfmt
             pkgs.shellcheck
+            # tommy (TOML formatter, [formatter.tommy]) + the codegen driver
+            # ([linter.tommy-codegen]) so `nix fmt` resolves both. result is
+            # defined below in this recursive let.
+            tommy.packages.${system}.default
+            result.tommyCodegen
           ];
           text = ''exec conformist "$@"'';
         };
