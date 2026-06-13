@@ -48,47 +48,13 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # tommy codegen as a conformist linter driver. Walks the tree for
-  # `//go:generate tommy generate` directives and runs `tommy generate` per file
-  # (REPAIR mode; the conformist.toml CHECK command is a no-op `true`). Resolves
-  # tommy + go from the AMBIENT PATH and skips (exit 0) when either is missing,
-  # so it is a safe no-op where the toolchain is absent and regenerates the
-  # blob_store_configs *_tommy.go in the devshell (where tommy + go are present),
+  # tommy's conformist codegen linter driver ([linter.tommy-codegen]), owned by
+  # the tommy flake so the pinned tommy input resolves which tommy backs it (no
+  # per-repo driver duplication). It bakes that tommy in and skips when go is
+  # absent. Regenerates the blob_store_configs *_tommy.go in the devshell,
   # landing in the `conformist --commit` chore. Exposed below so the conformistFmt
   # wrapper in flake.nix can put it on the `nix fmt` PATH too.
-  tommyCodegen = pkgs.writeShellApplication {
-    name = "conformist-tommy-codegen";
-    runtimeInputs = [
-      pkgs.coreutils
-      pkgs.findutils
-      pkgs.gnugrep
-    ];
-    text = ''
-      mode="repair"
-      if [ "''${1:-}" = "--check" ]; then
-        mode="check"
-      fi
-      if ! command -v tommy >/dev/null 2>&1; then
-        echo "tommy-codegen: tommy not on PATH; skipping" >&2
-        exit 0
-      fi
-      if ! command -v go >/dev/null 2>&1; then
-        echo "tommy-codegen: go not on PATH; skipping" >&2
-        exit 0
-      fi
-      status=0
-      while IFS= read -r f; do
-        dir=$(dirname "$f")
-        base=$(basename "$f")
-        if [ "$mode" = "check" ]; then
-          ( cd "$dir" || exit 1; GOFILE="$base" tommy generate --check; ) || status=1
-        else
-          ( cd "$dir" || exit 1; GOFILE="$base" tommy generate; ) || status=1
-        fi
-      done < <(grep -rIl --include='*.go' 'go:generate tommy generate' . 2>/dev/null | grep -v '/result' || true)
-      exit "$status"
-    '';
-  };
+  tommyCodegen = tommy.packages.${system}.conformist-tommy-codegen;
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
