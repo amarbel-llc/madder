@@ -48,6 +48,14 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
+  # tommy's conformist codegen linter driver ([linter.tommy-codegen]), owned by
+  # the tommy flake so the pinned tommy input resolves which tommy backs it (no
+  # per-repo driver duplication). It bakes that tommy in and skips when go is
+  # absent. Regenerates the blob_store_configs *_tommy.go in the devshell,
+  # landing in the `conformist --commit` chore. Exposed below so the conformistFmt
+  # wrapper in flake.nix can put it on the `nix fmt` PATH too.
+  tommyCodegen = tommy.packages.${system}.conformist-tommy-codegen;
+
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
   # BATS_LIB_PATH, MADDER_BIN / HYPHENCE_BIN exported via the
@@ -415,6 +423,10 @@ let
   };
 in
 {
+  # Exposed so flake.nix's conformistFmt wrapper can put the codegen linter
+  # driver on the `nix fmt` PATH (it is also in the devShell below).
+  inherit tommyCodegen;
+
   packages = {
     inherit
       madder
@@ -458,6 +470,9 @@ in
       # in the devshell above.
       pkgs.nixfmt
       pkgs-master.shellcheck
+      # conformist's tommy-codegen linter driver ([linter.tommy-codegen] regen
+      # in `conformist` repair). tommy itself is already in the devshell above.
+      tommyCodegen
     ]
     ++ (with pkgs-master; [
       delve
