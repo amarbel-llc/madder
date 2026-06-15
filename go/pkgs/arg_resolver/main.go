@@ -17,7 +17,7 @@ type Resolved = internal.Resolved
 // DetectShadow reports whether arg, when it resolves to a file in CWD,
 // shares a bare name with one of the candidate blob-store-ids. Prefixed
 // names never shadow (the prefix bypasses the filesystem probe in
-// blob_store_id.Id.Set). Returns the shadowed id and true on a hit.
+// scoped_id.Id.Set). Returns the shadowed id and true on a hit.
 //
 // Callers should invoke this only when both ModeFile and ModeStoreSwitch
 // are accepted — it has no meaning otherwise.

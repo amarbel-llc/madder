@@ -1,24 +1,24 @@
 package directory_layout
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 )
 
 type BlobStorePath interface {
 	GetBase() string
 	GetConfig() string
-	GetId() blob_store_id.Id
+	GetId() scoped_id.Id
 }
 
 type blobStorePath struct {
 	base   string
 	config string
-	id     blob_store_id.Id
+	id     scoped_id.Id
 }
 
 var _ BlobStorePath = blobStorePath{}
 
-func MakeBlobStorePath(id blob_store_id.Id, base, config string) blobStorePath {
+func MakeBlobStorePath(id scoped_id.Id, base, config string) blobStorePath {
 	return blobStorePath{
 		id:     id,
 		base:   base,
@@ -34,7 +34,7 @@ func (path blobStorePath) GetConfig() string {
 	return path.config
 }
 
-func (path blobStorePath) GetId() blob_store_id.Id {
+func (path blobStorePath) GetId() scoped_id.Id {
 	return path.id
 }
 
@@ -52,7 +52,7 @@ func getBlobStorePath(
 	idString string,
 ) BlobStorePath {
 	return MakeBlobStorePath(
-		blob_store_id.MakeWithLocation(
+		scoped_id.MakeWithLocation(
 			idString,
 			directoryLayout.GetLocationType(),
 		),
@@ -77,9 +77,9 @@ func GetBlobStorePathForCustomPath(
 	configPath string,
 ) BlobStorePath {
 	return MakeBlobStorePath(
-		blob_store_id.MakeWithLocation(
+		scoped_id.MakeWithLocation(
 			idString,
-			blob_store_id.LocationTypeUnknown,
+			scoped_id.LocationTypeUnknown,
 		),
 		basePath,
 		configPath,

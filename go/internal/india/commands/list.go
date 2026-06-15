@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -220,7 +220,7 @@ func makeListRecord(blobStore blob_stores.BlobStoreInitialized) listRecord {
 // bare name (the BlobStoreMap key) and digest. The ids are typed and
 // digest-bearing by construction (decode-time Validate), so no parsing
 // or error handling is needed.
-func makeRef(id blob_store_id.Id, role string) listRecordRef {
+func makeRef(id scoped_id.Id, role string) listRecordRef {
 	return listRecordRef{
 		Name:   id.String(),
 		Digest: id.GetDigest().String(),

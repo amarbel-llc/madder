@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -58,9 +58,9 @@ func (env envDirBare) GetBlobWriteObserver() domain_interfaces.BlobWriteObserver
 func makeSftpConfigNamed(t *testing.T) blob_store_configs.ConfigNamed {
 	t.Helper()
 
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set("sftp-chatter"); err != nil {
-		t.Fatalf("blob_store_id.Set: %v", err)
+		t.Fatalf("scoped_id.Set: %v", err)
 	}
 
 	return blob_store_configs.ConfigNamed{

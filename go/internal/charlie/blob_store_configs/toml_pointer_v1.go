@@ -3,7 +3,7 @@ package blob_store_configs
 import (
 	"path/filepath"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
@@ -30,7 +30,7 @@ func (blobStoreConfig *TomlPointerV1) SetFlagDefinitions(
 
 func (blobStoreConfig TomlPointerV1) GetPath() directory_layout.BlobStorePath {
 	return directory_layout.MakeBlobStorePath(
-		blob_store_id.Id{},
+		scoped_id.Id{},
 		blobStoreConfig.BasePath,
 		filepath.Join(
 			blobStoreConfig.BasePath,

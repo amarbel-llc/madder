@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/tommy/pkg/cst"
 	"github.com/amarbel-llc/tommy/pkg/document"
 )
@@ -54,7 +54,7 @@ func DecodeTomlMultiV0(input []byte) (*TomlMultiV0Document, error) {
 	}
 	if _vReadStores, _ok := model.Get("read-stores"); _ok && _vReadStores.Kind == cst.VLeaf {
 		if _x, _xok := cst.ExtractStringSlice(_vReadStores.Leaf); _xok {
-			d.data.ReadStores = make([]blob_store_id.Id, len(_x))
+			d.data.ReadStores = make([]scoped_id.Id, len(_x))
 			for _si, _s := range _x {
 				if err := d.data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
 					return nil, fmt.Errorf("read-stores[%d]: %w", _si, err)
@@ -65,7 +65,7 @@ func DecodeTomlMultiV0(input []byte) (*TomlMultiV0Document, error) {
 	}
 	if _vMirrorStores, _ok := model.Get("mirror-stores"); _ok && _vMirrorStores.Kind == cst.VLeaf {
 		if _x, _xok := cst.ExtractStringSlice(_vMirrorStores.Leaf); _xok {
-			d.data.MirrorStores = make([]blob_store_id.Id, len(_x))
+			d.data.MirrorStores = make([]scoped_id.Id, len(_x))
 			for _si, _s := range _x {
 				if err := d.data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
 					return nil, fmt.Errorf("mirror-stores[%d]: %w", _si, err)
@@ -190,7 +190,7 @@ func DecodeTomlMultiV0Into(data *TomlMultiV0, sub *cst.Value) error {
 	}
 	if _vReadStores, _ok := sub.Get("read-stores"); _ok && _vReadStores.Kind == cst.VLeaf {
 		if _x, _xok := cst.ExtractStringSlice(_vReadStores.Leaf); _xok {
-			data.ReadStores = make([]blob_store_id.Id, len(_x))
+			data.ReadStores = make([]scoped_id.Id, len(_x))
 			for _si, _s := range _x {
 				if err := data.ReadStores[_si].UnmarshalText([]byte(_s)); err != nil {
 					return fmt.Errorf("read-stores[%d]: %w", _si, err)
@@ -201,7 +201,7 @@ func DecodeTomlMultiV0Into(data *TomlMultiV0, sub *cst.Value) error {
 	}
 	if _vMirrorStores, _ok := sub.Get("mirror-stores"); _ok && _vMirrorStores.Kind == cst.VLeaf {
 		if _x, _xok := cst.ExtractStringSlice(_vMirrorStores.Leaf); _xok {
-			data.MirrorStores = make([]blob_store_id.Id, len(_x))
+			data.MirrorStores = make([]scoped_id.Id, len(_x))
 			for _si, _s := range _x {
 				if err := data.MirrorStores[_si].UnmarshalText([]byte(_s)); err != nil {
 					return fmt.Errorf("mirror-stores[%d]: %w", _si, err)

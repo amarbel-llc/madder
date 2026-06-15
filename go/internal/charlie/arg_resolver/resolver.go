@@ -34,7 +34,7 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -67,7 +67,7 @@ type Resolved struct {
 
 	BlobReader  domain_interfaces.BlobReader // KindFile
 	BlobId      markl.Id                     // KindBlobId
-	BlobStoreId blob_store_id.Id             // KindStoreSwitch
+	BlobStoreId scoped_id.Id                 // KindStoreSwitch
 	Err         error                        // KindError
 }
 
@@ -103,7 +103,7 @@ func Resolve(arg string, mode Mode) Resolved {
 	}
 
 	if mode&ModeStoreSwitch != 0 {
-		var id blob_store_id.Id
+		var id scoped_id.Id
 		if err := id.Set(arg); err == nil {
 			resolved.Kind = KindStoreSwitch
 			resolved.BlobStoreId = id
@@ -119,12 +119,12 @@ func Resolve(arg string, mode Mode) Resolved {
 // DetectShadow reports whether arg, when it resolves to a file in CWD,
 // shares a bare name with one of the candidate blob-store-ids. Prefixed
 // names never shadow (the prefix bypasses the filesystem probe in
-// blob_store_id.Id.Set). Returns the shadowed id and true on a hit.
+// scoped_id.Id.Set). Returns the shadowed id and true on a hit.
 //
 // Callers should invoke this only when both ModeFile and ModeStoreSwitch
 // are accepted — it has no meaning otherwise.
-func DetectShadow(arg string, candidates []blob_store_id.Id) (shadowed blob_store_id.Id, ok bool) {
-	var asStoreId blob_store_id.Id
+func DetectShadow(arg string, candidates []scoped_id.Id) (shadowed scoped_id.Id, ok bool) {
+	var asStoreId scoped_id.Id
 	if err := asStoreId.Set(arg); err != nil {
 		return shadowed, false
 	}
@@ -151,7 +151,7 @@ func DetectShadow(arg string, candidates []blob_store_id.Id) (shadowed blob_stor
 // user) store the bare name is exactly the argument that just resolved
 // to the file, so suggesting it back would be circular (#231); the `~`
 // parse-only alias bypasses the filesystem probe.
-func FormatShadowWarning(arg string, shadowed blob_store_id.Id) string {
+func FormatShadowWarning(arg string, shadowed scoped_id.Id) string {
 	return fmt.Sprintf(
 		"warning: %q shadows blob-store-id %q; use './%s' for the file or %q for the blob-store-id",
 		arg, shadowed, arg, shadowed.DisambiguatedString(),
@@ -160,7 +160,7 @@ func FormatShadowWarning(arg string, shadowed blob_store_id.Id) string {
 
 // FormatStoreSwitchNotice builds the canonical message callers emit when
 // a KindStoreSwitch arg rebinds the active store.
-func FormatStoreSwitchNotice(id blob_store_id.Id) string {
+func FormatStoreSwitchNotice(id scoped_id.Id) string {
 	return fmt.Sprintf("switched to blob-store-id: %s", id)
 }
 

@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -87,7 +87,7 @@ func (cmd *InitMulti) SetFlagDefinitions(
 }
 
 func (cmd *InitMulti) Run(req futility.Request) {
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)
 	}
@@ -97,15 +97,15 @@ func (cmd *InitMulti) Run(req futility.Request) {
 
 	cfg := &blob_store_configs.TomlMultiV0{Mode: cmd.mode}
 
-	resolve := func(ref string) blob_store_id.Id {
+	resolve := func(ref string) scoped_id.Id {
 		// Resolve a bare name to its leaf's current digest; pass a
 		// digest-bearing ref through unchanged. The typed Id renders
 		// to the digest-bearing wire form via MarshalText -> Canonical
 		// at encode time.
-		var id blob_store_id.Id
+		var id scoped_id.Id
 		if err := id.Set(ref); err != nil {
 			errors.ContextCancelWithBadRequestError(req, err)
-			return blob_store_id.Id{} // unreachable; Cancel panics
+			return scoped_id.Id{} // unreachable; Cancel panics
 		}
 		if id.HasDigest() {
 			return id
@@ -117,7 +117,7 @@ func (cmd *InitMulti) Run(req futility.Request) {
 				"reference %q targets an unmigrated config; run "+
 					"`madder config-pin_digest %s` first", ref, ref,
 			))
-			return blob_store_id.Id{}
+			return scoped_id.Id{}
 		}
 		return id.WithDigest(digest)
 	}

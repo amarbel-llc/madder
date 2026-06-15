@@ -51,7 +51,6 @@ type (
 	EnvVarNames          = internal.EnvVarNames
 	ErrTempAlreadyExists = internal.ErrTempAlreadyExists
 	RelativePath         = internal.RelativePath
-	RepoId               = internal.RepoId
 	TemporaryFS          = internal.TemporaryFS
 )
 

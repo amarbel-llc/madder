@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -75,7 +75,7 @@ func (cmd Has) GetDescription() futility.Description {
 func (cmd Has) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 	explicitStore := false
 	var missCount int
 
@@ -133,20 +133,20 @@ func (cmd Has) Run(req futility.Request) {
 func (cmd Has) findStores(
 	envBlobStore command_components.BlobStoreEnv,
 	blobId domain_interfaces.MarklId,
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 	explicitStore bool,
-) []blob_store_id.Id {
+) []scoped_id.Id {
 	if explicitStore {
 		store := envBlobStore.GetBlobStore(blobStoreId)
 		if store.HasBlob(blobId) {
-			return []blob_store_id.Id{store.Path.GetId()}
+			return []scoped_id.Id{store.Path.GetId()}
 		}
 		return nil
 	}
 
 	defaultStore, remaining := envBlobStore.GetDefaultBlobStoreAndRemaining()
 
-	var hits []blob_store_id.Id
+	var hits []scoped_id.Id
 
 	if defaultStore.HasBlob(blobId) {
 		hits = append(hits, defaultStore.Path.GetId())

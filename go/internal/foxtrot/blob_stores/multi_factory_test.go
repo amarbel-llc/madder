@@ -5,7 +5,7 @@ package blob_stores
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
@@ -64,7 +64,7 @@ func builtLeafForTest(
 	var bs BlobStoreInitialized
 	bs.BlobStore = &multiModeStub{}
 	bs.ConfigNamed.Path = directory_layout.MakeBlobStorePath(
-		blob_store_id.Make(name),
+		scoped_id.Make(name),
 		"", // base — unused by the factory for already-built leaves
 		"", // config path — same
 	)
@@ -84,7 +84,7 @@ func TestMakeMultiStore_WriteThrough(t *testing.T) {
 	cfg := &blob_store_configs.TomlMultiV0{
 		Mode:       "write_through",
 		WriteStore: write.Path.GetId().WithDigest(write.Config.BlobDigest),
-		ReadStores: []blob_store_id.Id{
+		ReadStores: []scoped_id.Id{
 			read.Path.GetId().WithDigest(read.Config.BlobDigest),
 		},
 		ReadFill: &readFill,
@@ -108,7 +108,7 @@ func TestMakeMultiStore_DigestMismatchRefuses(t *testing.T) {
 
 	cfg := &blob_store_configs.TomlMultiV0{
 		Mode: "mirror",
-		MirrorStores: []blob_store_id.Id{
+		MirrorStores: []scoped_id.Id{
 			write.Path.GetId().WithDigest(wrong),
 		},
 	}

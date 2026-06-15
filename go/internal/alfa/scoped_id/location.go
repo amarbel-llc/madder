@@ -1,4 +1,4 @@
-package blob_store_id
+package scoped_id
 
 import "github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
 

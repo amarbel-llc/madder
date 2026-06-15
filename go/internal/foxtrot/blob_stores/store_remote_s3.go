@@ -24,8 +24,8 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
@@ -42,7 +42,7 @@ type remoteS3 struct {
 	uiPrinter ui.Printer
 	once      sync.Once
 
-	id blob_store_id.Id
+	id scoped_id.Id
 
 	buckets []int
 
@@ -77,7 +77,7 @@ var _ domain_interfaces.BlobStore = &remoteS3{}
 func makeS3Store(
 	ctx interfaces.ActiveContext,
 	uiPrinter ui.Printer,
-	id blob_store_id.Id,
+	id scoped_id.Id,
 	config blob_store_configs.ConfigS3,
 	observer domain_interfaces.BlobWriteObserver,
 ) (blobStore *remoteS3, err error) {

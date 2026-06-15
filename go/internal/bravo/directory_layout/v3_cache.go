@@ -1,7 +1,7 @@
 package directory_layout
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
@@ -24,12 +24,12 @@ func (layout v3Cache) MakePathBlobStore(
 	)
 }
 
-func (layout v3Cache) GetLocationType() blob_store_id.LocationType {
+func (layout v3Cache) GetLocationType() scoped_id.LocationType {
 	if layout.xdg.IsOverridden() {
-		return blob_store_id.LocationTypeCwd
+		return scoped_id.LocationTypeCwd
 	}
 
-	return blob_store_id.LocationTypeXDGCache
+	return scoped_id.LocationTypeXDGCache
 }
 
 func (layout v3Cache) cloneUninitialized() uninitializedXDG {

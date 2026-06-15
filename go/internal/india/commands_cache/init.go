@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
@@ -65,7 +65,7 @@ func (cmd *Init) SetFlagDefinitions(
 }
 
 func (cmd *Init) Run(req futility.Request) {
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)

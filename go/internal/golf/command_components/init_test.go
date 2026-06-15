@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -106,7 +106,7 @@ func TestInitBlobStore_UnprefixedIdIgnoresAncestorOverride(t *testing.T) {
 		t.Fatal("test setup: env XDG is not ancestor-overridden")
 	}
 
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set("xdg-roundtrip"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestInitBlobStore_CwdIdStillLandsInCurrentDir(t *testing.T) {
 	envLocal := makeEnvLocalAt(t, filepath.Dir(root), leaf, xdgDataHome)
 	envBlobStore := blob_store_env.MakeBlobStoreEnvWithoutStores(envLocal)
 
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set(".cwd-store"); err != nil {
 		t.Fatalf("Set: %v", err)
 	}
@@ -245,7 +245,7 @@ func TestInitBlobStore_RejectsScopesTheLayoutCannotRepresent(t *testing.T) {
 				envLocal,
 			)
 
-			var id blob_store_id.Id
+			var id scoped_id.Id
 			if err := id.Set(input); err != nil {
 				t.Fatalf("Set(%q): %v", input, err)
 			}

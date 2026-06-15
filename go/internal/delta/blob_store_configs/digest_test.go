@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 )
@@ -120,9 +120,9 @@ func TestDecodeAndVerifyRoundTrip(t *testing.T) {
 	}
 }
 
-func mustBlobStoreId(t *testing.T, s string) blob_store_id.Id {
+func mustBlobStoreId(t *testing.T, s string) scoped_id.Id {
 	t.Helper()
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set(s); err != nil {
 		t.Fatalf("Set(%q): %v", s, err)
 	}
@@ -136,7 +136,7 @@ func TestEncodeWithDigest_MultiRoundTrip(t *testing.T) {
 		Blob: &TomlMultiV0{
 			Mode:       "write_through",
 			WriteStore: mustBlobStoreId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"),
-			ReadStores: []blob_store_id.Id{mustBlobStoreId(t, "archive@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400")},
+			ReadStores: []scoped_id.Id{mustBlobStoreId(t, "archive@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400")},
 			ReadFill:   &readFill,
 		},
 	}
@@ -181,7 +181,7 @@ func TestDecodeAndVerify_RejectsBareMultiRef(t *testing.T) {
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
 		Blob: &TomlMultiV0{
 			Mode:         "mirror",
-			MirrorStores: []blob_store_id.Id{mustBlobStoreId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0")},
+			MirrorStores: []scoped_id.Id{mustBlobStoreId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0")},
 		},
 	}
 

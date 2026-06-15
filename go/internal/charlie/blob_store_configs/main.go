@@ -3,7 +3,7 @@ package blob_store_configs
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -67,7 +67,7 @@ type (
 		configLocal
 		ConfigHashType
 		domain_interfaces.BlobIOWrapper
-		GetLooseBlobStoreId() blob_store_id.Id
+		GetLooseBlobStoreId() scoped_id.Id
 		GetCompressionRef() string
 		GetMaxPackSize() uint64
 	}
@@ -107,18 +107,18 @@ type (
 	}
 
 	// ConfigMulti is a blob_store-config that composes other stores
-	// via the Multi primitive. References are typed blob_store_id.Id
+	// via the Multi primitive. References are typed scoped_id.Id
 	// values, parsed by the hyphence coder at decode time and
 	// validated as digest-bearing by Validate() (also at decode), so
 	// the accessors never return errors. The store-map factory does
 	// only lookup + digest assertion. See FDR-0009.
 	ConfigMulti interface {
 		Config
-		GetMode() string                     // "mirror" | "write_through"
-		GetWriteStore() blob_store_id.Id     // write_through; zero otherwise
-		GetReadStores() []blob_store_id.Id   // write_through; nil otherwise
-		GetMirrorStores() []blob_store_id.Id // mirror; nil otherwise
-		GetReadFill() bool                   // defaults true; mirror ignores
+		GetMode() string                 // "mirror" | "write_through"
+		GetWriteStore() scoped_id.Id     // write_through; zero otherwise
+		GetReadStores() []scoped_id.Id   // write_through; nil otherwise
+		GetMirrorStores() []scoped_id.Id // mirror; nil otherwise
+		GetReadFill() bool               // defaults true; mirror ignores
 	}
 
 	ConfigSFTPRemotePath interface {

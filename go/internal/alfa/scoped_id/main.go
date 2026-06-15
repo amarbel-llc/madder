@@ -1,4 +1,4 @@
-package blob_store_id
+package scoped_id
 
 //go:generate dagnabit export
 
@@ -14,16 +14,27 @@ import (
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
-// Id is a blob-store id. cwdDepth is a runtime CLI-rendering concern,
+// Id is a scoped id: a location-prefixed, optionally-named handle to an
+// addressable root — a madder blob store or a dodder repo. cwdDepth is a
+// runtime CLI-rendering concern,
 // only meaningful when location == Cwd: 0 = single-dot prefix (the
 // deepest `.<utility>/` ancestor on the walk-up), 1 = `..`, etc. Wire-
 // format serialization via MarshalText always emits the canonical
 // single-dot form so on-disk refs stay stable across CWDs (#145).
+//
+// remoteFirst is the FDR-0019 system-scope spelling marker, only
+// meaningful when location == XDGSystem: the `/name` spelling parses as
+// remote-first (consult the consuming repo's remotes, fall back to the
+// system-scoped `name`), while `//name` forces the system scope and
+// never matches a remote. madder has no remote transport, so it ignores
+// the marker and resolves both spellings to the system scope; dodder
+// reads it to drive remote-first resolution. (See blob-store(7).)
 type Id struct {
-	location xdg_location_type.Typee
-	id       string
-	cwdDepth uint
-	digest   markl.Id // FDR-0008 Phase 2; zero value = no digest
+	location    xdg_location_type.Typee
+	id          string
+	cwdDepth    uint
+	remoteFirst bool
+	digest      markl.Id // FDR-0008 Phase 2; zero value = no digest
 }
 
 var (
@@ -59,6 +70,14 @@ func (id Id) GetLocationType() LocationType {
 	return id.location
 }
 
+// IsRemoteFirst reports the FDR-0019 system-scope spelling: true for the
+// single-slash `/name` (remote-first), false for `//name` (forced
+// system) and every non-system location. madder ignores this; dodder
+// reads it to drive remote-first resolution.
+func (id Id) IsRemoteFirst() bool {
+	return id.remoteFirst
+}
+
 func (id Id) String() string {
 	if id.id == "" {
 		return ""
@@ -66,6 +85,16 @@ func (id Id) String() string {
 
 	if id.location == xdg_location_type.Cwd {
 		return strings.Repeat(".", int(id.cwdDepth)+1) + id.id
+	}
+
+	// FDR-0019: system scope is spelled `//name` (forced system); the
+	// single-slash `/name` is the remote-first spelling. Both parse to
+	// XDGSystem, distinguished only by remoteFirst.
+	if id.location == xdg_location_type.XDGSystem {
+		if id.remoteFirst {
+			return "/" + id.id
+		}
+		return "//" + id.id
 	}
 
 	prefix := id.location.GetPrefix()
@@ -108,7 +137,7 @@ func (id Id) Canonical() string {
 
 func (id *Id) Set(value string) (err error) {
 	if len(value) == 0 {
-		err = errors.Errorf("empty blob_store_id")
+		err = errors.Errorf("empty scoped_id")
 		return err
 	}
 
@@ -119,19 +148,21 @@ func (id *Id) Set(value string) (err error) {
 	if hasDigest {
 		if len(left) == 0 {
 			err = errors.Errorf(
-				"blob_store_id is empty before `@`: %q", value,
+				"scoped_id is empty before `@`: %q", value,
 			)
 			return err
 		}
 		if err = id.digest.Set(digestText); err != nil {
 			err = errors.Wrapf(err,
-				"blob_store_id digest: %q", digestText)
+				"scoped_id digest: %q", digestText)
 			return err
 		}
 		value = left
 	} else {
 		id.digest = markl.Id{}
 	}
+
+	id.remoteFirst = false
 
 	if value[0] == '.' {
 		dots := 0
@@ -141,7 +172,7 @@ func (id *Id) Set(value string) (err error) {
 
 		if dots == len(value) {
 			err = errors.Errorf(
-				"blob_store_id is all dots, no name: %q",
+				"scoped_id is all dots, no name: %q",
 				value,
 			)
 			return err
@@ -156,6 +187,36 @@ func (id *Id) Set(value string) (err error) {
 
 	id.cwdDepth = 0
 
+	// FDR-0019: slash-prefixed ids are system scope. `//name` forces the
+	// system scope; `/name` is remote-first (a consuming repo resolves
+	// remotes first, falling back to the system-scoped `name`). Bare `/`
+	// stays the legacy nameless system selector. `//name` was previously
+	// rejected by validateName (the embedded slash failed the charset),
+	// so adopting it is purely additive.
+	if value[0] == '/' {
+		id.location = xdg_location_type.XDGSystem
+
+		if len(value) > 1 && value[1] == '/' {
+			id.id = value[2:]
+
+			if id.id == "" {
+				err = errors.Errorf(
+					"scoped_id is all slashes, no name: %q",
+					value,
+				)
+				return err
+			}
+		} else {
+			id.id = value[1:]
+
+			if id.id != "" {
+				id.remoteFirst = true
+			}
+		}
+
+		return validateName(id.id)
+	}
+
 	firstChar := rune(value[0])
 
 	if id.location.IsPrefix(firstChar) {
@@ -163,7 +224,7 @@ func (id *Id) Set(value string) (err error) {
 
 		if err = id.location.SetPrefix(firstChar); err != nil {
 			err = errors.Errorf(
-				"unsupported first char for blob_store_id: %q",
+				"unsupported first char for scoped_id: %q",
 				string(firstChar),
 			)
 
@@ -195,7 +256,7 @@ func validateName(name string) error {
 			r == '-':
 		default:
 			return errors.Errorf(
-				"blob_store_id name may contain only [a-zA-Z0-9_-]; "+
+				"scoped_id name may contain only [a-zA-Z0-9_-]; "+
 					"got %q in %q",
 				string(r),
 				name,
@@ -217,6 +278,12 @@ func (id Id) Less(otherId Id) bool {
 
 	if id.cwdDepth != otherId.cwdDepth {
 		return id.cwdDepth < otherId.cwdDepth
+	}
+
+	// FDR-0019: plain system (`//name`, remoteFirst=false) sorts before
+	// remote-first (`/name`, remoteFirst=true).
+	if id.remoteFirst != otherId.remoteFirst {
+		return !id.remoteFirst
 	}
 
 	// FDR-0008 Phase 2: digest as the final tie-breaker. Compares

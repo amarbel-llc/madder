@@ -3,7 +3,7 @@ package commands
 import (
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/files"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -86,7 +86,7 @@ func (cmd ConfigPinDigest) Run(req futility.Request) {
 	} else {
 		targets = make(blob_stores.BlobStoreMap, req.RemainingArgCount())
 		for range req.RemainingArgCount() {
-			id := futility.PopRequestArg[blob_store_id.Id](req, "blob-store-id")
+			id := futility.PopRequestArg[scoped_id.Id](req, "blob-store-id")
 			key := id.String()
 			bs, ok := allStores[key]
 			if !ok {

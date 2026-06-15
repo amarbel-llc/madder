@@ -3,7 +3,7 @@ package commands
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -22,7 +22,7 @@ import (
 // caller can stop short of writing the local pointer config.
 func (cmd *Init) ensureWebdavRemoteConfigExists(
 	req futility.Request,
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 	webdavConfig blob_store_configs.ConfigWebDAV,
 ) bool {
 	printer := ui.MakePrefixPrinter(

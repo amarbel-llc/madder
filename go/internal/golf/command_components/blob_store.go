@@ -1,7 +1,7 @@
 package command_components
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -126,7 +126,7 @@ func (cmd *BlobStore) MakeBlobStoreFromIdString(
 	envBlobStore BlobStoreEnv,
 	blobStoreIdString string,
 ) (blobStore blob_stores.BlobStoreInitialized) {
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 
 	if err := blobStoreId.Set(blobStoreIdString); err != nil {
 		envBlobStore.Cancel(err)
@@ -138,8 +138,8 @@ func (cmd *BlobStore) MakeBlobStoreFromIdString(
 
 // BlobStoreIds returns every configured blob-store-id as a slice, suitable
 // for passing to arg_resolver.DetectShadow.
-func BlobStoreIds(m blob_stores.BlobStoreMap) []blob_store_id.Id {
-	ids := make([]blob_store_id.Id, 0, len(m))
+func BlobStoreIds(m blob_stores.BlobStoreMap) []scoped_id.Id {
+	ids := make([]scoped_id.Id, 0, len(m))
 	for _, s := range m {
 		ids = append(ids, s.Path.GetId())
 	}
@@ -160,7 +160,7 @@ func (cmd BlobStore) MakeBlobStoresFromIdsOrAll(
 	}
 
 	for range req.RemainingArgCount() {
-		blobStoreId := futility.PopRequestArg[blob_store_id.Id](
+		blobStoreId := futility.PopRequestArg[scoped_id.Id](
 			req,
 			"blob-store-id",
 		)
@@ -186,7 +186,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 		return envBlobStore.GetDefaultBlobStoreAndRemaining()
 	}
 
-	sourceBlobStoreId := futility.PopRequestArg[blob_store_id.Id](
+	sourceBlobStoreId := futility.PopRequestArg[scoped_id.Id](
 		req,
 		"source blob-store-id",
 	)
@@ -194,7 +194,7 @@ func (cmd BlobStore) MakeSourceAndDestinationBlobStoresFromIdsOrAll(
 	source = envBlobStore.GetBlobStore(*sourceBlobStoreId)
 
 	for range req.RemainingArgCount() {
-		blobStoreId := futility.PopRequestArg[blob_store_id.Id](
+		blobStoreId := futility.PopRequestArg[scoped_id.Id](
 			req,
 			"destination blob-store-id",
 		)

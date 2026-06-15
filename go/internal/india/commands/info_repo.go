@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -192,7 +192,7 @@ func lookupBlobStoreById(
 	env command_components.BlobStoreEnv,
 	arg string,
 ) (blob_stores.BlobStoreInitialized, bool) {
-	var id blob_store_id.Id
+	var id scoped_id.Id
 
 	if err := id.Set(arg); err != nil {
 		return blob_stores.BlobStoreInitialized{}, false

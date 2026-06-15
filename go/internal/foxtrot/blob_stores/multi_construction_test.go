@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -29,7 +29,7 @@ func multiLeafForTest(
 	var bs BlobStoreInitialized
 	// BlobStore intentionally nil — buildMultiStores is what builds it.
 	bs.ConfigNamed.Path = directory_layout.MakeBlobStorePath(
-		blob_store_id.Make(name),
+		scoped_id.Make(name),
 		"", // base — unused by the multi factory
 		"", // config path — same
 	)
@@ -41,9 +41,9 @@ func multiLeafForTest(
 	return bs
 }
 
-// digestRef returns the typed digest-bearing blob_store_id.Id a parent multi
+// digestRef returns the typed digest-bearing scoped_id.Id a parent multi
 // stores as a reference: the leaf's bare id pinned to its Config.BlobDigest.
-func digestRef(bs BlobStoreInitialized) blob_store_id.Id {
+func digestRef(bs BlobStoreInitialized) scoped_id.Id {
 	return bs.Path.GetId().WithDigest(bs.Config.BlobDigest)
 }
 
@@ -53,7 +53,7 @@ func TestBuildMultiStores_Nested(t *testing.T) {
 
 	fast := multiLeafForTest(t, "fast", &blob_store_configs.TomlMultiV0{
 		Mode: "mirror",
-		MirrorStores: []blob_store_id.Id{
+		MirrorStores: []scoped_id.Id{
 			digestRef(ssd), digestRef(nvme),
 		},
 	})
@@ -76,10 +76,10 @@ func TestBuildMultiStores_Nested(t *testing.T) {
 
 func TestBuildMultiStores_DanglingRef(t *testing.T) {
 	// "ghost" is digest-bearing and well-formed but not present in the map.
-	ghost := blob_store_id.Make("ghost").WithDigest(digestSeeded(t, 0x09))
+	ghost := scoped_id.Make("ghost").WithDigest(digestSeeded(t, 0x09))
 	orphan := multiLeafForTest(t, "orphan", &blob_store_configs.TomlMultiV0{
 		Mode:         "mirror",
-		MirrorStores: []blob_store_id.Id{ghost},
+		MirrorStores: []scoped_id.Id{ghost},
 	})
 	stores := MakeBlobStoreMap(orphan)
 

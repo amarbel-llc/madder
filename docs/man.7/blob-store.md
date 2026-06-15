@@ -36,10 +36,19 @@ location:
     directory rather than the ancestor directory where **.madder/** was
     found. Example: **.archive**
 
-**/**
+**//**
 :   XDG system store. Located under system-wide XDG data directories.
-    Example: **/shared**. Not yet implemented — **madder init** rejects
+    Example: **//shared**. Not yet implemented — **madder init** rejects
     this scope rather than silently creating the store elsewhere.
+
+**/**
+:   Remote-first selection (FDR-0019). A single leading slash addresses a
+    *remote* named **name** defined by the consuming repository, falling
+    back to the system-scoped store named **name** when no such remote
+    exists. Example: **/origin**. madder has no remote transport, so it
+    resolves **/name** to the system scope (which **madder init** likewise
+    rejects); the remote-first behavior is consumed by dodder. A bare
+    **/** with no name is the legacy nameless system selector.
 
 **%**
 :   XDG cache store. Located under

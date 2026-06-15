@@ -2,7 +2,7 @@ package blob_store_configs
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -81,8 +81,8 @@ func (config TomlInventoryArchiveV2) GetBlobEncryption() domain_interfaces.Markl
 	return config.Encryption
 }
 
-func (config TomlInventoryArchiveV2) GetLooseBlobStoreId() blob_store_id.Id {
-	var zero blob_store_id.Id
+func (config TomlInventoryArchiveV2) GetLooseBlobStoreId() scoped_id.Id {
+	var zero scoped_id.Id
 	return zero
 }
 

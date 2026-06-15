@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 )
 
 // TestFormatShadowWarning_HintIsActionable pins #231: the
@@ -36,7 +36,7 @@ func TestFormatShadowWarning_HintIsActionable(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			var id blob_store_id.Id
+			var id scoped_id.Id
 			if err := id.Set(tc.id); err != nil {
 				t.Fatalf("Set(%q): %v", tc.id, err)
 			}

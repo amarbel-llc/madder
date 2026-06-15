@@ -14,8 +14,8 @@ import (
 	"sync"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
@@ -32,7 +32,7 @@ type remoteWebdav struct {
 	uiPrinter ui.Printer
 	once      sync.Once
 
-	id blob_store_id.Id
+	id scoped_id.Id
 
 	buckets []int
 
@@ -87,7 +87,7 @@ var _ domain_interfaces.BlobStore = &remoteWebdav{}
 func makeWebdavStore(
 	ctx interfaces.ActiveContext,
 	uiPrinter ui.Printer,
-	id blob_store_id.Id,
+	id scoped_id.Id,
 	config blob_store_configs.ConfigWebDAV,
 	httpClientInitializer func() (*http.Client, error),
 	observer domain_interfaces.BlobWriteObserver,

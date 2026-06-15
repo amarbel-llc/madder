@@ -28,7 +28,7 @@ type MoveOptions struct {
 	Observer domain_interfaces.BlobWriteObserver
 	// StoreId is stamped into the observer event so audit logs can be
 	// attributed to the store that produced them. Opaque string form
-	// of blob_store_id.Id, populated at the call site.
+	// of scoped_id.Id, populated at the call site.
 	StoreId string
 }
 

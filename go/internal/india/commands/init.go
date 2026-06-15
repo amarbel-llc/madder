@@ -7,7 +7,7 @@ import (
 	"path"
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -288,7 +288,7 @@ func (cmd *Init) SetFlagDefinitions(
 }
 
 func (cmd *Init) Run(req futility.Request) {
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob-store-id")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)
@@ -349,7 +349,7 @@ func (cmd *Init) Run(req futility.Request) {
 
 func (cmd *Init) runDiscover(
 	req futility.Request,
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 	tw *tap.Writer,
 ) {
 	sftpConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
@@ -522,7 +522,7 @@ func makeSSHClientForSFTPConfig(
 // caller can stop short of writing the local pointer config.
 func (cmd *Init) ensureRemoteConfigExists(
 	req futility.Request,
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 	sftpConfig blob_store_configs.ConfigSFTPRemotePath,
 ) bool {
 	printer := ui.MakePrefixPrinter(
@@ -598,7 +598,7 @@ func (cmd *Init) ensureRemoteConfigExists(
 // one when absent. Returns false when the request was cancelled.
 func (cmd *Init) ensureS3RemoteConfigExists(
 	req futility.Request,
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 	s3Config blob_store_configs.ConfigS3,
 ) bool {
 	// Validate credential state before any HTTP work so init-s3's

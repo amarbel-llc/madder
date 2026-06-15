@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -103,10 +103,10 @@ func (cmd Has) Run(req futility.Request) {
 func (cmd Has) findStores(
 	envBlobStore command_components.BlobStoreEnv,
 	blobId *markl.Id,
-) []blob_store_id.Id {
+) []scoped_id.Id {
 	defaultStore, remaining := envBlobStore.GetDefaultBlobStoreAndRemaining()
 
-	var hits []blob_store_id.Id
+	var hits []scoped_id.Id
 
 	if defaultStore.HasBlob(blobId) {
 		hits = append(hits, defaultStore.Path.GetId())

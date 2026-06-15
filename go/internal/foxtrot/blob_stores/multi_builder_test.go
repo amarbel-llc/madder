@@ -5,7 +5,7 @@ package blob_stores
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 )
@@ -158,7 +158,7 @@ func TestBuilder_WriteTo_AfterMirrorWithStores(t *testing.T) {
 // are treated as the same store regardless of the embedded
 // BlobStore interface value, so Build() must reject.
 func TestBuilder_Build_WriteStoreInReadList_WithPaths(t *testing.T) {
-	id := blob_store_id.Make("dup-id")
+	id := scoped_id.Make("dup-id")
 	path := directory_layout.MakeBlobStorePath(id, "/base", "/config")
 
 	// Two BlobStore interface values that differ — same Path id, distinct

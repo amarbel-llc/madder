@@ -2,7 +2,7 @@ package blob_stores
 
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -20,7 +20,7 @@ import (
 // to defer. Returns a hard error for a dangling ref (name not in the
 // map), a legacy/undigested target, or a digest mismatch.
 func resolveMultiRef(
-	refId blob_store_id.Id,
+	refId scoped_id.Id,
 	blobStores BlobStoreMap,
 ) (BlobStoreInitialized, error) {
 	resolved, ok := blobStores[refId.String()]

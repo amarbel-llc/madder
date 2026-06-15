@@ -1,16 +1,16 @@
 package blob_store_configs
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
 type TomlPointerV0 struct {
-	Id         blob_store_id.Id `toml:"id"`
-	BasePath   string           `toml:"base-path"`
-	ConfigPath string           `toml:"config-path"`
+	Id         scoped_id.Id `toml:"id"`
+	BasePath   string       `toml:"base-path"`
+	ConfigPath string       `toml:"config-path"`
 }
 
 func (TomlPointerV0) GetBlobStoreType() string {

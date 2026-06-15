@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_write_sink"
 	"github.com/amarbel-llc/madder/go/internal/charlie/output_format"
@@ -140,7 +140,7 @@ func (cmd PackBlobs) Run(req futility.Request) {
 		packTapWriter = tw
 	}
 
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 	storeIdString := ".default"
 	blobFilter := make(map[string]domain_interfaces.MarklId)
 

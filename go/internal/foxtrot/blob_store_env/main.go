@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -88,7 +88,7 @@ func MakeBlobStoreEnvWithoutStores(
 
 func MakeBlobStoreEnvWithOrder(
 	envLocal env_local.Env,
-	blobStoreIds []blob_store_id.Id,
+	blobStoreIds []scoped_id.Id,
 ) BlobStoreEnv {
 	env, ok := makeBlobStoreEnvBase(envLocal)
 	if !ok {
@@ -118,7 +118,7 @@ func (env *BlobStoreEnv) setupStores() {
 	env.defaultBlobStoreIdString = keys[0]
 }
 
-func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []blob_store_id.Id) {
+func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []scoped_id.Id) {
 	if len(blobStoreIds) == 0 {
 		return
 	}
@@ -181,7 +181,7 @@ func (env BlobStoreEnv) GetBlobStoresSorted() []blob_stores.BlobStoreInitialized
 }
 
 func (env BlobStoreEnv) GetBlobStore(
-	blobStoreId blob_store_id.Id,
+	blobStoreId scoped_id.Id,
 ) blob_stores.BlobStoreInitialized {
 	// FDR-0008 Phase 2 note: the map is keyed by the bare String()
 	// form. Discovery never produces digest-bearing IDs, and String()
@@ -213,7 +213,7 @@ func (env BlobStoreEnv) GetBlobStore(
 		if configDigest.IsNull() {
 			errors.ContextCancelWithBadRequestError(
 				env,
-				blob_store_id.ErrIdDigestVsLegacyConfig{Id: key},
+				scoped_id.ErrIdDigestVsLegacyConfig{Id: key},
 			)
 			return blob_stores.BlobStoreInitialized{}
 		}

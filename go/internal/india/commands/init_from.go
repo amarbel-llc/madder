@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -70,7 +70,7 @@ func (cmd InitFrom) Complete(
 }
 
 func (cmd *InitFrom) Run(req futility.Request) {
-	var blobStoreId blob_store_id.Id
+	var blobStoreId scoped_id.Id
 
 	if err := blobStoreId.Set(req.PopArg("blob store name")); err != nil {
 		errors.ContextCancelWithBadRequestError(req, err)

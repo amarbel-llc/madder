@@ -10,16 +10,16 @@ import (
 	"github.com/aws/smithy-go"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 )
 
-func mustParseBlobStoreId(t *testing.T, s string) blob_store_id.Id {
+func mustParseBlobStoreId(t *testing.T, s string) scoped_id.Id {
 	t.Helper()
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set(s); err != nil {
-		t.Fatalf("blob_store_id.Set(%q): %v", s, err)
+		t.Fatalf("scoped_id.Set(%q): %v", s, err)
 	}
 	return id
 }

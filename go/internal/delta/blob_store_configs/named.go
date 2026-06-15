@@ -1,7 +1,7 @@
 package blob_store_configs
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 )
 
@@ -10,6 +10,6 @@ type ConfigNamed struct {
 	Config TypedConfig
 }
 
-func (configNamed ConfigNamed) GetId() blob_store_id.Id {
+func (configNamed ConfigNamed) GetId() scoped_id.Id {
 	return configNamed.Path.GetId()
 }

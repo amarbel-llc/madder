@@ -1,4 +1,4 @@
-package blob_store_id
+package scoped_id
 
 import (
 	"fmt"

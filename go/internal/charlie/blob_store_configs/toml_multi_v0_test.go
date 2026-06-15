@@ -5,13 +5,13 @@ package blob_store_configs
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 )
 
-func mustId(t *testing.T, s string) blob_store_id.Id {
+func mustId(t *testing.T, s string) scoped_id.Id {
 	t.Helper()
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set(s); err != nil {
 		t.Fatalf("Set(%q): %v", s, err)
 	}
@@ -23,7 +23,7 @@ func TestTomlMultiV0_Accessors(t *testing.T) {
 	cfg := TomlMultiV0{
 		Mode:       "write_through",
 		WriteStore: mustId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"),
-		ReadStores: []blob_store_id.Id{mustId(t, "archive@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400")},
+		ReadStores: []scoped_id.Id{mustId(t, "archive@blake2b256-qqqsyqcyq5rqwzqfpg9scrgwpugpzysnzs23v9ccrydpk8qarc0s6vk400")},
 		ReadFill:   &readFill,
 	}
 
@@ -56,7 +56,7 @@ func TestTomlMultiV0_ValidateRejectsBareRef(t *testing.T) {
 	// A reference with no @digest is forbidden inside a multi config.
 	cfg := TomlMultiV0{
 		Mode:         "mirror",
-		MirrorStores: []blob_store_id.Id{mustId(t, "default")}, // bare
+		MirrorStores: []scoped_id.Id{mustId(t, "default")}, // bare
 	}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate accepted a bare reference, want error")
@@ -66,7 +66,7 @@ func TestTomlMultiV0_ValidateRejectsBareRef(t *testing.T) {
 func TestTomlMultiV0_ValidateAcceptsDigestBearing(t *testing.T) {
 	cfg := TomlMultiV0{
 		Mode:         "mirror",
-		MirrorStores: []blob_store_id.Id{mustId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0")},
+		MirrorStores: []scoped_id.Id{mustId(t, "default@blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0")},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Validate rejected a digest-bearing ref: %v", err)

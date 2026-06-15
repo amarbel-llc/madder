@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 
@@ -18,9 +18,9 @@ import (
 // helper directly because the full Close() path requires a live
 // WebDAV server; that's covered by webdav.bats.
 func TestWebdavMoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set("webdav-default"); err != nil {
-		t.Fatalf("blob_store_id.Set: %v", err)
+		t.Fatalf("scoped_id.Set: %v", err)
 	}
 
 	observer := &recordingObserver{}

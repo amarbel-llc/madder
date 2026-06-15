@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
@@ -46,7 +46,7 @@ func (store inventoryArchiveV0) archivesPath() string {
 func makeInventoryArchiveV0(
 	envDir env_dir.Env,
 	basePath string,
-	id blob_store_id.Id,
+	id scoped_id.Id,
 	config blob_store_configs.ConfigInventoryArchive,
 	looseBlobStore domain_interfaces.BlobStore,
 ) (store inventoryArchiveV0, err error) {

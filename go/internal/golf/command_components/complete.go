@@ -1,7 +1,7 @@
 package command_components
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -14,7 +14,7 @@ type Complete struct {
 }
 
 func (cmd Complete) GetFlagValueBlobIds(
-	blobStoreId *blob_store_id.Id,
+	blobStoreId *scoped_id.Id,
 ) interfaces.FlagValue {
 	return futility.FlagValueCompleter{
 		FlagValue: blobStoreId,

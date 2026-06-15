@@ -4,7 +4,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/files"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
@@ -17,7 +17,7 @@ type Init struct{}
 func (cmd Init) InitBlobStore(
 	ctx interfaces.ActiveContext,
 	envBlobStore BlobStoreEnv,
-	id blob_store_id.Id,
+	id scoped_id.Id,
 	config *blob_store_configs.TypedConfig,
 ) (path directory_layout.BlobStorePath) {
 	// The id's location prefix selects the XDG scope (blob-store(7)),
@@ -29,7 +29,7 @@ func (cmd Init) InitBlobStore(
 	// (and therefore `write`) would never resolve it.
 	var xdgForId directory_layout.XDG
 
-	if id.GetLocationType() == blob_store_id.LocationTypeCwd {
+	if id.GetLocationType() == scoped_id.LocationTypeCwd {
 		// Explicit `.`-prefix: root the store in the *current*
 		// directory, not the deepest ancestor override.
 		xdgForId = envBlobStore.GetXDGForBlobStores().CloneWithOverridePath(

@@ -12,7 +12,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -39,9 +39,9 @@ func (o *recordingObserver) OnBlobPublished(ev domain_interfaces.BlobWriteEvent)
 // The Close() call site is visually verified and covered by a future
 // bats SFTP integration test (tracked separately).
 func TestSftpMoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
-	var id blob_store_id.Id
+	var id scoped_id.Id
 	if err := id.Set("sftp-default"); err != nil {
-		t.Fatalf("blob_store_id.Set: %v", err)
+		t.Fatalf("scoped_id.Set: %v", err)
 	}
 
 	observer := &recordingObserver{}

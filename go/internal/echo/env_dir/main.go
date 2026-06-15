@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -26,7 +26,7 @@ type Env interface {
 
 	GetXDG() xdg.XDG
 	GetXDGForBlobStores() xdg.XDG
-	GetXDGForBlobStoreId(blob_store_id.Id) xdg.XDG
+	GetXDGForBlobStoreId(scoped_id.Id) xdg.XDG
 
 	GetExecPath() string
 	GetTempLocal() TemporaryFS
@@ -185,17 +185,17 @@ func (env env) GetXDGForBlobStores() xdg.XDG {
 	return env.XDG.CloneWithUtilityName(env.XDG.UtilityName)
 }
 
-func (env env) GetXDGForBlobStoreId(id blob_store_id.Id) xdg.XDG {
+func (env env) GetXDGForBlobStoreId(id scoped_id.Id) xdg.XDG {
 	xdg := env.GetXDGForBlobStores()
 
 	switch id.GetLocationType() {
-	case blob_store_id.LocationTypeXDGUser:
+	case scoped_id.LocationTypeXDGUser:
 		return xdg.CloneWithoutOverride()
 
-	case blob_store_id.LocationTypeXDGCache:
+	case scoped_id.LocationTypeXDGCache:
 		return xdg.CloneWithoutOverride()
 
-	case blob_store_id.LocationTypeCwd:
+	case scoped_id.LocationTypeCwd:
 		return xdg
 
 	default:

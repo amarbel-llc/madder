@@ -1,6 +1,6 @@
 //go:build test
 
-package blob_store_id
+package scoped_id
 
 import (
 	"bytes"
@@ -23,6 +23,7 @@ func TestId_Set_String_RoundTrip(t *testing.T) {
 		{"..default", xdg_location_type.Cwd, "default", 1},
 		{"...rsync_dot_net", xdg_location_type.Cwd, "rsync_dot_net", 2},
 		{"/system", xdg_location_type.XDGSystem, "system", 0},
+		{"//system", xdg_location_type.XDGSystem, "system", 0},
 		{"%scratch", xdg_location_type.XDGCache, "scratch", 0},
 		{"_custom", xdg_location_type.Unknown, "custom", 0},
 		{"~legacy", xdg_location_type.XDGUser, "legacy", 0},
@@ -66,6 +67,75 @@ func TestId_Set_AllDotsRejected(t *testing.T) {
 	}
 }
 
+// TestId_SystemScopeSpellings pins the FDR-0019 system-scope grammar:
+// `//name` is the forced-system spelling (remoteFirst=false) and
+// `/name` is remote-first (remoteFirst=true). Both parse to XDGSystem
+// and round-trip through String/Canonical to their own spelling. madder
+// resolves both to the system scope; the marker exists for dodder.
+func TestId_SystemScopeSpellings(t *testing.T) {
+	cases := []struct {
+		input           string
+		wantRemoteFirst bool
+	}{
+		{"//system", false},
+		{"/system", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.input, func(t *testing.T) {
+			var id Id
+			if err := id.Set(tc.input); err != nil {
+				t.Fatalf("Set(%q): %v", tc.input, err)
+			}
+
+			if id.GetLocationType() != xdg_location_type.XDGSystem {
+				t.Errorf("location = %v, want XDGSystem", id.GetLocationType())
+			}
+			if id.GetName() != "system" {
+				t.Errorf("name = %q, want %q", id.GetName(), "system")
+			}
+			if id.IsRemoteFirst() != tc.wantRemoteFirst {
+				t.Errorf("IsRemoteFirst() = %v, want %v",
+					id.IsRemoteFirst(), tc.wantRemoteFirst)
+			}
+			if got := id.String(); got != tc.input {
+				t.Errorf("String() = %q, want %q", got, tc.input)
+			}
+			if got := id.Canonical(); got != tc.input {
+				t.Errorf("Canonical() = %q, want %q", got, tc.input)
+			}
+		})
+	}
+}
+
+// TestId_Set_AllSlashesRejected: `//` with no name is rejected, mirroring
+// the all-dots guard.
+func TestId_Set_AllSlashesRejected(t *testing.T) {
+	var id Id
+	if err := id.Set("//"); err == nil {
+		t.Fatalf("Set(\"//\"): want error, got nil")
+	}
+}
+
+// TestId_Less_RemoteFirstTiebreaker: same name+location, plain system
+// (`//name`) sorts before remote-first (`/name`).
+func TestId_Less_RemoteFirstTiebreaker(t *testing.T) {
+	var plain, remote Id
+	if err := plain.Set("//system"); err != nil {
+		t.Fatal(err)
+	}
+	if err := remote.Set("/system"); err != nil {
+		t.Fatal(err)
+	}
+
+	if !plain.Less(remote) {
+		t.Errorf("//system should sort before /system")
+	}
+	if remote.Less(plain) {
+		t.Errorf("/system should not sort before //system")
+	}
+}
+
 // TestId_Set_NameCharsetEnforced pins the second half of #227:
 // blob-store(7) declares the name portion may contain only
 // [a-zA-Z0-9_-], but Set never enforced it. A path-shaped value like
@@ -104,6 +174,7 @@ func TestId_Set_NameCharsetEnforced(t *testing.T) {
 		"_custom",
 		"~legacy",
 		"/system",
+		"//system",
 	}
 
 	for _, input := range valid {
@@ -134,6 +205,7 @@ func TestId_DisambiguatedString(t *testing.T) {
 		{"%scratch", "%scratch"},
 		{"_custom", "_custom"},
 		{"/system", "/system"},
+		{"//system", "//system"},
 	}
 
 	for _, tc := range cases {

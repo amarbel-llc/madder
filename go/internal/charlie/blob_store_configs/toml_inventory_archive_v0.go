@@ -3,7 +3,7 @@ package blob_store_configs
 import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -11,10 +11,10 @@ import (
 
 //go:generate tommy generate
 type TomlInventoryArchiveV0 struct {
-	HashTypeId       HashType         `toml:"hash_type-id"`
-	CompressionType  string           `toml:"compression-type"`
-	LooseBlobStoreId blob_store_id.Id `toml:"loose-blob-store-id"`
-	Encryption       markl.Id         `toml:"encryption"`
+	HashTypeId       HashType     `toml:"hash_type-id"`
+	CompressionType  string       `toml:"compression-type"`
+	LooseBlobStoreId scoped_id.Id `toml:"loose-blob-store-id"`
+	Encryption       markl.Id     `toml:"encryption"`
 }
 
 func (TomlInventoryArchiveV0) GetBlobStoreType() string {
@@ -78,7 +78,7 @@ func (config TomlInventoryArchiveV0) GetBlobEncryption() domain_interfaces.Markl
 	return config.Encryption
 }
 
-func (config TomlInventoryArchiveV0) GetLooseBlobStoreId() blob_store_id.Id {
+func (config TomlInventoryArchiveV0) GetLooseBlobStoreId() scoped_id.Id {
 	return config.LooseBlobStoreId
 }
 

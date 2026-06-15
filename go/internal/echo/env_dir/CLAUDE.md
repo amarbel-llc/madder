@@ -17,8 +17,12 @@ in env_dir for the env-construction `Config` proposed in [#123].
 - `EnvVarNames` — bundle of env-var names env_dir reads/writes
   (`BIN_*`, `*_XDG_UTILITY_OVERRIDE`, `*_VERIFY_ON_COLLISION`)
 - `TemporaryFS` — per-process tempfs anchor (handed to blob_io.MoveOptions)
-- `RepoId`, `RelativePath`
+- `RelativePath`
 - `ErrTempAlreadyExists`
+
+The location-only `RepoId` selector was removed under FDR-0019 (June
+2026); its role is subsumed by `scoped_id.Id` (name + scope + cwd-depth),
+which `MakeDefaultAndInitialize` now takes directly.
 
 ## Features
 

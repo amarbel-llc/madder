@@ -3,6 +3,7 @@ package env_dir
 import (
 	"os"
 
+	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
 )
@@ -74,13 +75,17 @@ func MakeDefaultAndInitialize(
 	context errors.Context,
 	cfg Config,
 	xdgScope string,
-	repoId RepoId,
+	repoId scoped_id.Id,
 ) env {
-	if repoId.IsSystem() {
+	switch repoId.GetLocationType() {
+	case scoped_id.LocationTypeXDGSystem:
+		// FDR-0019: system-scope resolution (the `//name` forced-system
+		// spelling and the remote-first `/name` fallback) is not yet
+		// wired in madder. dodder reads the remote-first marker; madder
+		// has no remote transport.
 		panic(errors.WithoutStack(errors.Err501NotImplemented))
-	}
 
-	if repoId.IsCwd() {
+	case scoped_id.LocationTypeCwd:
 		var cwd string
 
 		{
@@ -99,6 +104,7 @@ func MakeDefaultAndInitialize(
 		)
 	}
 
+	// XDGUser, unknown, and the zero value all resolve against $HOME.
 	var home string
 
 	{
