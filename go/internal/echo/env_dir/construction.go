@@ -247,5 +247,11 @@ func MakeWithXDG(
 		return env
 	}
 
+	// madder#239: register temp-dir cleanup like the sibling constructors
+	// (MakeWithDefaultHome, MakeWith...RootOverride..., MakeWithHome...).
+	// Without this an env built from an externally-supplied xdg.XDG (e.g.
+	// via MakeFromXDGDotenvPath) leaks its per-pid temp dir on exit.
+	env.After(env.resetTempOnExit)
+
 	return env
 }
