@@ -183,26 +183,38 @@ func (env env) GetCwd() string {
 	return env.XDG.Cwd.ActualValue
 }
 
+// GetXDG returns the env's metadata XDG, nested under repos/<repoName>/
+// for a named FDR-0019 repo (madder#241) so the repo's metadata tree
+// (data/config/state/cache/runtime) is isolated — matching the blob-store
+// accessors below. No-op for the default/unnamed env.
+//
+// The nest is applied on read off the raw env.XDG field. The blob-store
+// accessors derive from that same raw field via xdgForBlobStoresBase (not
+// via GetXDG), so each re-applies the nest exactly once — reading the base
+// metadata XDG through this method never double-nests the blob path.
 func (env env) GetXDG() xdg.XDG {
-	return env.XDG
+	return env.nestForRepo(env.XDG)
 }
 
-// nestForRepo appends repos/<repoName> to the blob-store XDG's category
-// dirs when this env addresses a named FDR-0019 repo (madder#240), so the
-// repo gets an isolated blob pool. No-op for the default/unnamed env.
+// nestForRepo appends repos/<repoName> to an XDG's category dirs when this
+// env addresses a named FDR-0019 repo, isolating both the repo's metadata
+// tree (via GetXDG, madder#241) and its blob pool (via the blob-store
+// accessors, madder#240). No-op for the default/unnamed env.
 //
-// It MUST be applied as the final step after any XDG re-derivation
-// (CloneWithUtilityName / CloneWithoutOverride / CloneWithOverridePath),
-// because those rebuild every category ActualValue from templates and
-// would discard the suffix. That is why the nest-aware accessors below
-// (and GetXDGForBlobStoreId) re-apply it after their own clones, rather
-// than relying on a single nested base.
+// At the blob-store boundaries it MUST be applied as the final step after
+// the XDG re-derivation (CloneWithUtilityName / CloneWithoutOverride /
+// CloneWithOverridePath), because those rebuild every category ActualValue
+// from templates and would discard the suffix. That is why each blob-XDG
+// accessor (and GetXDGForBlobStoreId) re-applies it after its own clone
+// rather than relying on a single nested base. GetXDG applies it to the
+// raw env.XDG field, which the blob base re-derives from — so the two
+// paths nest independently and exactly once each.
 //
 // Direction: env_dir is slated to move upstream into dewey as a generic
 // xdg utility base; at that point this repo-name nesting is a candidate
 // to fold into dewey's XDG itself so clones preserve it natively (closing
 // the "future call site forgets to re-nest" gap). See
-// project_env_dir_upstream_to_dewey and the Option-2 follow-up.
+// project_env_dir_upstream_to_dewey.
 func (env env) nestForRepo(x xdg.XDG) xdg.XDG {
 	if env.repoName == "" {
 		return x

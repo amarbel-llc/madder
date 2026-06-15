@@ -85,3 +85,58 @@ func TestBlobStoreXDG_NestsUnderRepoName(t *testing.T) {
 		}
 	}
 }
+
+// TestMetadataXDG_NestsUnderRepoName is the madder#241 regression test:
+// a named repo nests its base (metadata) XDG — the tree dodder's
+// config-seed / object-index / inventory-list / lock live under — beneath
+// repos/<name>/ via GetXDG(), mirroring the blob-store accessors that #240
+// already nest. An unnamed env stays flat. This convergence is what lets
+// dodder delete its own NestUnderRepoName and delegate the whole layout to
+// madder (FDR-0019 Phase 2 Option 2). All five categories nest.
+//
+// Same named-vs-unnamed comparison strategy as the #240 test above (the
+// test runs inside .../repos/madder, so a bare "repos/" Contains check
+// would false-positive); sandboxed under t.TempDir() via root override.
+func TestMetadataXDG_NestsUnderRepoName(t *testing.T) {
+	root := t.TempDir()
+
+	makeEnv := func(repoName string) env {
+		return MakeWithXDGRootOverrideHomeAndInitialize(
+			errors.MakeContextDefault(),
+			Config{RepoName: repoName},
+			"madder",
+			root,
+		)
+	}
+
+	named := makeEnv("foo")
+	unnamed := makeEnv("")
+
+	categories := []struct {
+		name string
+		path func(e env) string
+	}{
+		{"Data", func(e env) string { return e.GetXDG().Data.MakePath("seed").String() }},
+		{"Config", func(e env) string { return e.GetXDG().Config.MakePath("seed").String() }},
+		{"State", func(e env) string { return e.GetXDG().State.MakePath("seed").String() }},
+		{"Cache", func(e env) string { return e.GetXDG().Cache.MakePath("seed").String() }},
+		{"Runtime", func(e env) string { return e.GetXDG().Runtime.MakePath("seed").String() }},
+	}
+
+	for _, c := range categories {
+		namedPath := c.path(named)
+		unnamedPath := c.path(unnamed)
+
+		// Named path is exactly the unnamed path with repos/foo inserted
+		// before the trailing seed segment.
+		want := strings.TrimSuffix(unnamedPath, "seed") + "repos/foo/seed"
+		if namedPath != want {
+			t.Errorf("GetXDG().%s: named = %q, want %q (unnamed base: %q)",
+				c.name, namedPath, want, unnamedPath)
+		}
+
+		if strings.Contains(unnamedPath, "repos/foo") {
+			t.Errorf("GetXDG().%s: unnamed leaked repos/foo: %q", c.name, unnamedPath)
+		}
+	}
+}
