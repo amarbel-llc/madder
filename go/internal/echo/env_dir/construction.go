@@ -77,6 +77,11 @@ func MakeDefaultAndInitialize(
 	xdgScope string,
 	repoId scoped_id.Id,
 ) env {
+	// madder#240: a named repo nests its blob-store XDG under
+	// repos/<name>/. Empty name (the default/legacy id) leaves the
+	// shared layout untouched.
+	cfg.RepoName = repoId.GetName()
+
 	switch repoId.GetLocationType() {
 	case scoped_id.LocationTypeXDGSystem:
 		// FDR-0019: system-scope resolution (the `//name` forced-system
@@ -127,6 +132,7 @@ func MakeWithDefaultHome(
 ) (env env) {
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
+	env.repoName = cfg.RepoName
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -173,6 +179,7 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 ) (env env) {
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
+	env.repoName = cfg.RepoName
 	env.xdgInitArgs.Cwd = xdgRootOverride
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
@@ -206,6 +213,7 @@ func MakeWithHomeAndInitialize(
 ) (env env) {
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
+	env.repoName = cfg.RepoName
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -235,6 +243,7 @@ func MakeWithXDG(
 ) (env env) {
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
+	env.repoName = cfg.RepoName
 	env.XDG = xdg
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdg.UtilityName); err != nil {

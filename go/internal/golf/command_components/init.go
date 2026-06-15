@@ -32,7 +32,7 @@ func (cmd Init) InitBlobStore(
 	if id.GetLocationType() == scoped_id.LocationTypeCwd {
 		// Explicit `.`-prefix: root the store in the *current*
 		// directory, not the deepest ancestor override.
-		xdgForId = envBlobStore.GetXDGForBlobStores().CloneWithOverridePath(
+		xdgForId = envBlobStore.GetXDGForBlobStoresWithOverridePath(
 			envBlobStore.GetCwd(),
 		)
 	} else {

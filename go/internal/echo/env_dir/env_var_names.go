@@ -67,4 +67,11 @@ type EnvVarNames struct {
 type Config struct {
 	EnvVarNames  EnvVarNames
 	DebugOptions debug.Options
+
+	// RepoName, when non-empty, nests this env's blob-store XDG under
+	// repos/<RepoName>/ so a named FDR-0019 repo gets an isolated blob
+	// pool (madder#240). Empty means the shared, un-nested layout. Only
+	// the blob-store XDG is affected; metadata XDG nesting (if any) is
+	// the caller's concern.
+	RepoName string
 }

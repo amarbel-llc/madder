@@ -24,6 +24,19 @@ The location-only `RepoId` selector was removed under FDR-0019 (June
 2026); its role is subsumed by `scoped_id.Id` (name + scope + cwd-depth),
 which `MakeDefaultAndInitialize` now takes directly.
 
+`Config.RepoName` (madder#240): when set, the env's blob-store XDG nests
+under `repos/<name>/`, giving a named FDR-0019 repo an isolated blob pool.
+The nest (`nestForRepo`) is applied as the final step in every blob-XDG
+accessor — `GetXDGForBlobStores`, `GetXDGForBlobStoresWithoutOverride`,
+`GetXDGForBlobStoresWithOverridePath`, `GetXDGForBlobStoreId` — because
+the dewey XDG clones (`CloneWithUtilityName`/`CloneWithoutOverride`/
+`CloneWithOverridePath`) re-derive every category dir and would discard
+an `ActualValue` suffix. Empty `RepoName` → unchanged shared layout.
+Phase 2 is blob-only; metadata nesting stays with the caller (dodder)
+until the Option-2 consolidation. When env_dir moves upstream to dewey,
+this nesting is a candidate to fold into dewey's XDG so clones preserve
+it natively.
+
 ## Features
 
 - XDG directory resolution (with CWD-override and dotenv variants)

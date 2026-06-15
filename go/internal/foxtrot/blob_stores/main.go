@@ -109,7 +109,7 @@ func makeAncestorOverrideStores(
 		} else {
 			cloned, err := directory_layout.CloneBlobStoreWithXDG(
 				directoryLayout,
-				envDir.GetXDGForBlobStores().CloneWithOverridePath(ancestor),
+				envDir.GetXDGForBlobStoresWithOverridePath(ancestor),
 			)
 			if err != nil {
 				ctx.Cancel(err)
@@ -152,7 +152,7 @@ func MakeBlobStores(
 		// Cwd entries above — the merge below cannot collide.
 		if directoryLayoutForUser, err := directory_layout.CloneBlobStoreWithXDG(
 			directoryLayout,
-			envDir.GetXDGForBlobStores().CloneWithoutOverride(),
+			envDir.GetXDGForBlobStoresWithoutOverride(),
 		); err != nil {
 			ctx.Cancel(err)
 			return blobStores

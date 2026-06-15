@@ -26,6 +26,8 @@ type Env interface {
 
 	GetXDG() xdg.XDG
 	GetXDGForBlobStores() xdg.XDG
+	GetXDGForBlobStoresWithoutOverride() xdg.XDG
+	GetXDGForBlobStoresWithOverridePath(overridePath string) xdg.XDG
 	GetXDGForBlobStoreId(scoped_id.Id) xdg.XDG
 
 	GetExecPath() string
@@ -65,6 +67,10 @@ type Env interface {
 type env struct {
 	errors.Context
 	beforeXDG
+
+	// repoName, when non-empty, nests the blob-store XDG under
+	// repos/<repoName>/ (madder#240). Set from Config.RepoName.
+	repoName string
 
 	TempLocal, TempOS TemporaryFS
 
@@ -181,25 +187,73 @@ func (env env) GetXDG() xdg.XDG {
 	return env.XDG
 }
 
-func (env env) GetXDGForBlobStores() xdg.XDG {
+// nestForRepo appends repos/<repoName> to the blob-store XDG's category
+// dirs when this env addresses a named FDR-0019 repo (madder#240), so the
+// repo gets an isolated blob pool. No-op for the default/unnamed env.
+//
+// It MUST be applied as the final step after any XDG re-derivation
+// (CloneWithUtilityName / CloneWithoutOverride / CloneWithOverridePath),
+// because those rebuild every category ActualValue from templates and
+// would discard the suffix. That is why the nest-aware accessors below
+// (and GetXDGForBlobStoreId) re-apply it after their own clones, rather
+// than relying on a single nested base.
+//
+// Direction: env_dir is slated to move upstream into dewey as a generic
+// xdg utility base; at that point this repo-name nesting is a candidate
+// to fold into dewey's XDG itself so clones preserve it natively (closing
+// the "future call site forgets to re-nest" gap). See
+// project_env_dir_upstream_to_dewey and the Option-2 follow-up.
+func (env env) nestForRepo(x xdg.XDG) xdg.XDG {
+	if env.repoName == "" {
+		return x
+	}
+
+	x.Data.ActualValue = filepath.Join(x.Data.ActualValue, "repos", env.repoName)
+	x.Config.ActualValue = filepath.Join(x.Config.ActualValue, "repos", env.repoName)
+	x.State.ActualValue = filepath.Join(x.State.ActualValue, "repos", env.repoName)
+	x.Cache.ActualValue = filepath.Join(x.Cache.ActualValue, "repos", env.repoName)
+	x.Runtime.ActualValue = filepath.Join(x.Runtime.ActualValue, "repos", env.repoName)
+
+	return x
+}
+
+// xdgForBlobStoresBase is the un-nested blob-store XDG: a fresh derivation
+// keyed by the utility name (preserving any cwd/ancestor override). Repo
+// nesting is layered on at each public boundary via nestForRepo.
+func (env env) xdgForBlobStoresBase() xdg.XDG {
 	return env.XDG.CloneWithUtilityName(env.XDG.UtilityName)
 }
 
+func (env env) GetXDGForBlobStores() xdg.XDG {
+	return env.nestForRepo(env.xdgForBlobStoresBase())
+}
+
+// GetXDGForBlobStoresWithoutOverride drops any cwd/ancestor override
+// (resolving against $HOME) and re-applies repo nesting. Discovery uses
+// this for non-cwd (XDG user) stores (madder#240).
+func (env env) GetXDGForBlobStoresWithoutOverride() xdg.XDG {
+	return env.nestForRepo(env.xdgForBlobStoresBase().CloneWithoutOverride())
+}
+
+// GetXDGForBlobStoresWithOverridePath roots the blob-store XDG at a
+// specific ancestor/cwd path and re-applies repo nesting. Discovery (per
+// ancestor) and init (cwd) use this (madder#240).
+func (env env) GetXDGForBlobStoresWithOverridePath(overridePath string) xdg.XDG {
+	return env.nestForRepo(
+		env.xdgForBlobStoresBase().CloneWithOverridePath(overridePath),
+	)
+}
+
 func (env env) GetXDGForBlobStoreId(id scoped_id.Id) xdg.XDG {
-	xdg := env.GetXDGForBlobStores()
+	base := env.xdgForBlobStoresBase()
 
 	switch id.GetLocationType() {
-	case scoped_id.LocationTypeXDGUser:
-		return xdg.CloneWithoutOverride()
-
-	case scoped_id.LocationTypeXDGCache:
-		return xdg.CloneWithoutOverride()
-
-	case scoped_id.LocationTypeCwd:
-		return xdg
+	case scoped_id.LocationTypeXDGUser, scoped_id.LocationTypeXDGCache:
+		return env.nestForRepo(base.CloneWithoutOverride())
 
 	default:
-		return xdg
+		// Cwd (and other) ids keep the ancestor/cwd override.
+		return env.nestForRepo(base)
 	}
 }
 
