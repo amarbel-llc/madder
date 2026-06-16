@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
@@ -259,4 +260,88 @@ func (env BlobStoreEnv) GetDefaultBlobStoreAndRemaining() (blob_stores.BlobStore
 	)
 
 	return defaultBlobStore, remaining
+}
+
+// OpenBlob returns a reader for the blob, searching the default store
+// first and then the remaining configured stores in order, returning the
+// first store that reports HasBlob. A store backend that panics while
+// being asked (e.g. an unreachable SFTP store, #134) is skipped rather
+// than failing the lookup, so one broken backend can't block reads of
+// blobs other backends can serve. Returns a not-found error when no store
+// has the blob.
+func (env BlobStoreEnv) OpenBlob(
+	id domain_interfaces.MarklId,
+) (domain_interfaces.BlobReader, error) {
+	def, remaining := env.GetDefaultBlobStoreAndRemaining()
+
+	if reader, ok, err := tryOpenInStore(def, id); ok {
+		return reader, err
+	}
+
+	for _, s := range remaining {
+		if reader, ok, err := tryOpenInStore(s, id); ok {
+			return reader, err
+		}
+	}
+
+	return nil, errors.MakeErrNotFoundString(
+		"blob not found in any blob store: " + id.String(),
+	)
+}
+
+// HasBlobInAnyStore reports whether any configured store holds the blob,
+// searching default-then-remaining with the same per-store panic
+// tolerance as OpenBlob.
+func (env BlobStoreEnv) HasBlobInAnyStore(id domain_interfaces.MarklId) bool {
+	def, remaining := env.GetDefaultBlobStoreAndRemaining()
+
+	if storeHasBlob(def, id) {
+		return true
+	}
+
+	for _, s := range remaining {
+		if storeHasBlob(s, id) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// tryOpenInStore checks one store and returns a reader if it has the
+// blob. A per-store panic is converted to a skip (ok=false, no error) so
+// callers iterate cleanly regardless of a misbehaving backend.
+func tryOpenInStore(
+	store blob_stores.BlobStoreInitialized,
+	id domain_interfaces.MarklId,
+) (reader domain_interfaces.BlobReader, ok bool, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			ok = false
+			reader = nil
+			err = nil
+		}
+	}()
+
+	if !store.HasBlob(id) {
+		return nil, false, nil
+	}
+
+	reader, err = store.MakeBlobReader(id)
+	return reader, true, err
+}
+
+// storeHasBlob is the existence-only peer of tryOpenInStore: a per-store
+// panic is treated as "couldn't ask this store" and yields false.
+func storeHasBlob(
+	store blob_stores.BlobStoreInitialized,
+	id domain_interfaces.MarklId,
+) (has bool) {
+	defer func() {
+		if r := recover(); r != nil {
+			has = false
+		}
+	}()
+
+	return store.HasBlob(id)
 }

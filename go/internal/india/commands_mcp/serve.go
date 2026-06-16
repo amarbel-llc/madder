@@ -15,7 +15,6 @@ import (
 	"syscall"
 
 	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -238,7 +237,7 @@ func (p *resourceProvider) readBlob(uri, digest string) (_ *protocol.ResourceRea
 		return nil, errors.Wrapf(err, "invalid digest %q", digest)
 	}
 
-	reader, err := openBlob(p.env, &id)
+	reader, err := p.env.OpenBlob(&id)
 	if err != nil {
 		return nil, err
 	}
@@ -467,56 +466,6 @@ func jsonResourceResult(uri string, payload any) (*protocol.ResourceReadResult, 
 	}, nil
 }
 
-// openBlob walks the default blob store first, then any remaining
-// configured stores, returning a reader for the first store that
-// reports HasBlob. Returns a not-found error if no store has it. A
-// store backend that panics during HasBlob (e.g. an unreachable SFTP
-// store, see #134) is treated as "couldn't ask this store" — we skip
-// it and try the next. The semantic matches openBlob's job ("find the
-// first store with this blob"), and means a single broken backend
-// can't fail reads of blobs that other backends can serve.
-func openBlob(
-	env command_components.BlobStoreEnv,
-	id domain_interfaces.MarklId,
-) (domain_interfaces.BlobReader, error) {
-	def, remaining := env.GetDefaultBlobStoreAndRemaining()
-
-	if reader, ok, err := tryOpenInStore(def, id); ok {
-		return reader, err
-	}
-
-	for _, s := range remaining {
-		if reader, ok, err := tryOpenInStore(s, id); ok {
-			return reader, err
-		}
-	}
-
-	return nil, errors.MakeErrNotFoundString(
-		"blob not found in any blob store: " + id.String(),
-	)
-}
-
-// tryOpenInStore checks whether one store has the blob and returns a
-// reader if it does. Per-store panics (treated as "couldn't ask this
-// store") are caught and converted to a skip — ok=false, no error —
-// so openBlob's caller sees a clean per-store iteration regardless of
-// which backend is misbehaving.
-func tryOpenInStore(
-	store blob_stores.BlobStoreInitialized,
-	id domain_interfaces.MarklId,
-) (reader domain_interfaces.BlobReader, ok bool, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			ok = false
-			reader = nil
-			err = nil
-		}
-	}()
-
-	if !store.HasBlob(id) {
-		return nil, false, nil
-	}
-
-	reader, err = store.MakeBlobReader(id)
-	return reader, true, err
-}
+// Blob lookup across the configured stores (default-then-remaining,
+// with per-store panic tolerance) lives on the shared BlobStoreEnv as
+// OpenBlob — see blob_store_env. readBlob above calls p.env.OpenBlob.

@@ -875,3 +875,75 @@ debug-mcp-resources:
     fi
   done
   echo "OK: received responses for ids $expected_ids"
+
+# debug-serve-blob-api drives `madder serve`'s unix-socket HTTP blob API
+# (GET/HEAD/PUT /blobs/<digest>) against the worktree's .default store —
+# the integration smoke test for the circus admin daemon (FDR-0007).
+# Requires `just build` first to populate result/.
+[group("debug")]
+debug-serve-blob-api:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{ justfile_directory() }}
+
+  worktree="{{ justfile_directory() }}"
+  bin_madder="$worktree/result/bin/madder"
+  if [ ! -x "$bin_madder" ]; then
+    echo "missing $bin_madder — run \`just build\` first" >&2
+    exit 1
+  fi
+
+  run_madder() { env MADDER_CEILING_DIRECTORIES="$worktree" "$bin_madder" "$@"; }
+
+  tmp=$(mktemp -d)
+  sock="$tmp/madder.sock"
+  srv_pid=""
+  trap '[ -n "$srv_pid" ] && kill "$srv_pid" 2>/dev/null || true; rm -rf "$tmp"' EXIT
+
+  # Seed a throwaway blob into .default (timestamped so reruns differ).
+  payload="madder serve smoke $(date -u +%Y-%m-%dT%H:%M:%SZ) $$"
+  digest=$(printf '%s' "$payload" | run_madder write -format json .default - | head -n 1 | jq -r '.id')
+  echo "=== seeded blob ==="; echo "  digest: $digest"; echo
+
+  # Start the daemon; wait for the socket to appear. Its stderr (store
+  # discovery chatter — in a dev env that includes remote SFTP stores) is
+  # captured to a log and only surfaced on failure.
+  run_madder serve --socket "$sock" >"$tmp/serve.log" 2>&1 &
+  srv_pid=$!
+  for _ in $(seq 1 50); do [ -S "$sock" ] && break; sleep 0.1; done
+  [ -S "$sock" ] || { echo "FAIL: socket never appeared (daemon crashed?)" >&2; cat "$tmp/serve.log" >&2; exit 1; }
+
+  echo "=== HEAD seeded (expect 200) ==="
+  code=$(curl -s -o /dev/null -w '%{http_code}' -I --unix-socket "$sock" "http://localhost/blobs/$digest")
+  echo "  $code"; [ "$code" = "200" ] || { echo "FAIL: HEAD seeded = $code" >&2; exit 1; }
+
+  echo "=== GET seeded (expect body match) ==="
+  got=$(curl -s --unix-socket "$sock" "http://localhost/blobs/$digest")
+  [ "$got" = "$payload" ] || { echo "FAIL: GET body mismatch: $got" >&2; exit 1; }
+  echo "  body matches"
+
+  echo "=== HEAD absent (expect 404) ==="
+  missing="blake2b256-c5xgv9eyuv6g49mcwqks24gd3dh39w8220l0kl60qxt60rnt60lsc8fqv0"
+  code=$(curl -s -o /dev/null -w '%{http_code}' -I --unix-socket "$sock" "http://localhost/blobs/$missing")
+  echo "  $code"; [ "$code" = "404" ] || { echo "FAIL: HEAD absent = $code" >&2; exit 1; }
+
+  echo "=== PUT then GET round-trip (expect 201, match) ==="
+  newbody="put-roundtrip $(date -u +%Y-%m-%dT%H:%M:%SZ) $$"
+  newdigest=$(printf '%s' "$newbody" | run_madder write -format json .default - | head -n 1 | jq -r '.id')
+  code=$(printf '%s' "$newbody" | curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @- --unix-socket "$sock" "http://localhost/blobs/$newdigest")
+  echo "  PUT: $code"; [ "$code" = "201" ] || { echo "FAIL: PUT = $code" >&2; exit 1; }
+  back=$(curl -s --unix-socket "$sock" "http://localhost/blobs/$newdigest")
+  [ "$back" = "$newbody" ] || { echo "FAIL: PUT->GET mismatch: $back" >&2; exit 1; }
+  echo "  round-trip matches"
+
+  echo "=== PUT digest mismatch (expect 409) ==="
+  code=$(printf 'unrelated bytes' | curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @- --unix-socket "$sock" "http://localhost/blobs/$missing")
+  echo "  $code"; [ "$code" = "409" ] || { echo "FAIL: mismatch PUT = $code" >&2; exit 1; }
+
+  echo "OK: serve blob API GET/HEAD/PUT/404/409 all pass"
+  # Stop the daemon and reap it so its SIGTERM exit code doesn't leak as
+  # the recipe's status; the EXIT trap is the cleanup backstop.
+  kill "$srv_pid" 2>/dev/null || true
+  wait "$srv_pid" 2>/dev/null || true
+  srv_pid=""
+  exit 0

@@ -9,6 +9,13 @@ Low-level "madder" CLI commands for blob and repository operations.
 - `complete`: Shell completion support
 - `fsck`: Filesystem consistency check
 - `info_repo`: Repository information display
+- `serve`: Long-lived admin daemon exposing the configured blob store(s)
+  over an HTTP blob API (`GET`/`HEAD`/`PUT /blobs/<digest>`) bound to a
+  unix socket (`--socket`). The cross-process coordination surface for
+  clients that can't embed `go/pkgs` in-process; see the circus nix-cache
+  backend (FDR-0007). Blob lookup reuses `blob_store_env.OpenBlob` /
+  `HasBlobInAnyStore` (shared with the MCP server). Not MCP — MCP
+  (`madder-mcp`) stays the stdio browse/traverse surface.
 
 ## Features
 
