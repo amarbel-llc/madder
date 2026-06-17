@@ -58,6 +58,14 @@ disables system-scope resolution (no-op). dewey has no system concept, so
 `directory_layout.v3System` hard-codes `LocationTypeXDGSystem` (v3/v3Cache
 derive scope from `xdg.IsOverridden`, which can't represent it).
 
+`GetXDGForSystemBlobStores() (xdg.XDG, bool)` (madder#230 increment 2) is
+the *discovery* counterpart: it returns the same system-rooted XDG that
+`GetXDGForBlobStoreId`'s XDGSystem case produces, plus `ok=false` when
+`SystemRoot` is unset. The bool is load-bearing — `blob_stores`'
+`MakeBlobStores` must skip the system glob entirely when `ok=false`, since
+`rootAtSystem` would no-op and the XDG would point at the *user* layout,
+mis-keying user stores as `//name`.
+
 `Config.SystemScoped` (madder#230 follow-up): when set (with `SystemRoot`),
 `initializeXDG` applies `rootAtSystem` to the BASE XDG — not just the per-id
 store path — so the env's per-pid `TempLocal` also lands under `SystemRoot`.
