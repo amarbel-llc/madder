@@ -72,6 +72,12 @@ type env struct {
 	// repos/<repoName>/ (madder#240). Set from Config.RepoName.
 	repoName string
 
+	// systemRoot is the filesystem root an XDG-system (`//name`) blob
+	// store resolves under (madder#230). Set from Config.SystemRoot;
+	// empty disables system-scope resolution. Application-injected so
+	// env_dir stays agnostic (it's slated to move to dewey).
+	systemRoot string
+
 	TempLocal, TempOS TemporaryFS
 
 	verifyOnCollisionOverride bool
@@ -263,10 +269,41 @@ func (env env) GetXDGForBlobStoreId(id scoped_id.Id) xdg.XDG {
 	case scoped_id.LocationTypeXDGUser, scoped_id.LocationTypeXDGCache:
 		return env.nestForRepo(base.CloneWithoutOverride())
 
+	case scoped_id.LocationTypeXDGSystem:
+		// madder#230: system stores resolve under the injected system
+		// root, dropping any cwd/ancestor override. Flat (addressed by
+		// store-id, never repo-nested), so no nestForRepo.
+		return env.rootAtSystem(base.CloneWithoutOverride())
+
 	default:
 		// Cwd (and other) ids keep the ancestor/cwd override.
 		return env.nestForRepo(base)
 	}
+}
+
+// rootAtSystem re-roots every XDG category dir at env.systemRoot for an
+// XDG-system (`//name`) blob store (madder#230), so the store resolves to
+// <systemRoot>/blob_stores/<name> (e.g. /var/lib/madder/blob_stores/shared).
+// Categories share the root (Data drives blob_stores/, Cache drives the
+// per-pid temp dir), keeping them on one mount — which satisfies the
+// link(2) same-mount durability invariant (blob-store(7)). No-op when
+// systemRoot is unset.
+//
+// Like nestForRepo, it mutates ActualValue directly and MUST be applied
+// after any XDG re-derivation (the clones rebuild category dirs from
+// templates and would discard the root).
+func (env env) rootAtSystem(x xdg.XDG) xdg.XDG {
+	if env.systemRoot == "" {
+		return x
+	}
+
+	x.Data.ActualValue = env.systemRoot
+	x.Config.ActualValue = env.systemRoot
+	x.State.ActualValue = env.systemRoot
+	x.Cache.ActualValue = env.systemRoot
+	x.Runtime.ActualValue = env.systemRoot
+
+	return x
 }
 
 func (env *env) SetXDG(x xdg.XDG) {

@@ -90,6 +90,7 @@ func (cmd EnvBlobStore) makeEnvLocal(
 		env_dir.Config{
 			EnvVarNames:  madder_env.DefaultEnvVarNames,
 			DebugOptions: debugOptions,
+			SystemRoot:   madder_env.DefaultSystemRoot,
 		},
 		xdgScope,
 	)

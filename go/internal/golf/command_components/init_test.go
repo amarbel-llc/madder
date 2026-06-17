@@ -37,6 +37,18 @@ func makeEnvLocalAt(
 	ceiling, dir, xdgDataHome string,
 ) env_local.Env {
 	t.Helper()
+	return makeEnvLocalAtWithSystemRoot(t, ceiling, dir, xdgDataHome, "")
+}
+
+// makeEnvLocalAtWithSystemRoot is makeEnvLocalAt plus an injected
+// env_dir.Config.SystemRoot, so XDG-system (`//name`) init tests can
+// sandbox the system root under t.TempDir() rather than /var/lib/madder
+// (madder#230).
+func makeEnvLocalAtWithSystemRoot(
+	t *testing.T,
+	ceiling, dir, xdgDataHome, systemRoot string,
+) env_local.Env {
+	t.Helper()
 
 	sandbox := t.TempDir()
 	t.Setenv("HOME", filepath.Join(sandbox, "home"))
@@ -60,7 +72,7 @@ func makeEnvLocalAt(
 
 	ctx := errors.MakeContextDefault()
 
-	dirEnv := env_dir.MakeDefault(ctx, env_dir.Config{}, "madder")
+	dirEnv := env_dir.MakeDefault(ctx, env_dir.Config{SystemRoot: systemRoot}, "madder")
 
 	return env_local.Make(env_ui.MakeDefault(ctx), &dirEnv)
 }
@@ -222,12 +234,14 @@ func recoverInitPanic(f func()) (r any) {
 // decision: id scopes the utility's store layout cannot represent are
 // rejected with a clear error instead of silently retargeted. Under
 // the `madder` (user-data) layout that means '%' (XDG cache — owned by
-// madder-cache), '/' (XDG system — unimplemented), and '_' (Unknown —
-// root comes from configuration, not a name). Pre-#230 these were
-// quietly created in the user-data layout and registered under a
-// DIFFERENT scope than the user named.
+// madder-cache) and '_' (Unknown — root comes from configuration, not a
+// name). ('/'/'//' XDG system is now implemented as of madder#230 — it
+// resolves via the v3System layout rather than being rejected — so it is
+// no longer in this list; see TestInitBlobStore_SystemScopeSucceeds.)
+// Pre-#230 these were quietly created in the user-data layout and
+// registered under a DIFFERENT scope than the user named.
 func TestInitBlobStore_RejectsScopesTheLayoutCannotRepresent(t *testing.T) {
-	for _, input := range []string{"%scratch", "/system", "_custom"} {
+	for _, input := range []string{"%scratch", "_custom"} {
 		t.Run(input, func(t *testing.T) {
 			// Fresh env per case: a cancelled context keeps its first
 			// cause, so sharing one env would cross-contaminate the
@@ -292,5 +306,50 @@ func TestInitBlobStore_RejectsScopesTheLayoutCannotRepresent(t *testing.T) {
 				)
 			}
 		})
+	}
+}
+
+// TestInitBlobStore_SystemScopeSucceeds pins madder#230: an XDG-system
+// (`//name`) id is now accepted by init (it resolves via the v3System
+// layout instead of being rejected) and creates the store under the
+// injected system root — <root>/blob_stores/<name>. The system root is
+// sandboxed under t.TempDir(); production uses /var/lib/madder via
+// madder_env.DefaultSystemRoot.
+func TestInitBlobStore_SystemScopeSucceeds(t *testing.T) {
+	root := t.TempDir()
+	leaf := filepath.Join(root, "leaf")
+	if err := os.MkdirAll(leaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	systemRoot := t.TempDir()
+
+	envLocal := makeEnvLocalAtWithSystemRoot(
+		t, filepath.Dir(root), leaf, t.TempDir(), systemRoot,
+	)
+	envBlobStore := blob_store_env.MakeBlobStoreEnvWithoutStores(envLocal)
+
+	var id scoped_id.Id
+	if err := id.Set("//shared"); err != nil {
+		t.Fatalf("Set(//shared): %v", err)
+	}
+
+	var cmd Init
+	var basePath string
+	r := recoverInitPanic(func() {
+		basePath = cmd.InitBlobStore(
+			envLocal,
+			envBlobStore,
+			id,
+			makeDefaultTypedConfig(),
+		).GetBase()
+	})
+
+	if r != nil {
+		t.Fatalf("InitBlobStore(//shared) rejected the system scope: %v", r)
+	}
+
+	want := filepath.Join(systemRoot, "blob_stores", "shared")
+	if !strings.HasPrefix(basePath, want) {
+		t.Errorf("system store base = %q, want under %q", basePath, want)
 	}
 }

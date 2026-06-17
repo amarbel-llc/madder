@@ -46,6 +46,18 @@ no per-repo isolation value). Empty `RepoName` → unchanged shared layout.
 moves upstream to dewey, this nesting is a candidate to fold into dewey's
 XDG so clones preserve it natively.
 
+`Config.SystemRoot` (madder#230): the filesystem root an XDG-system
+(`//name`) blob store resolves under. `GetXDGForBlobStoreId`'s
+`LocationTypeXDGSystem` case re-roots the XDG category dirs at it via
+`rootAtSystem` (the same `ActualValue`-mutation pattern as `nestForRepo`),
+so a system store lands at `<SystemRoot>/blob_stores/<name>` (flat,
+store-id addressed — never `repos/`-nested). Injected by the caller so
+env_dir stays application-agnostic; the madder layer passes
+`madder_env.DefaultSystemRoot` (`/var/lib/madder`). Empty `SystemRoot`
+disables system-scope resolution (no-op). dewey has no system concept, so
+`directory_layout.v3System` hard-codes `LocationTypeXDGSystem` (v3/v3Cache
+derive scope from `xdg.IsOverridden`, which can't represent it).
+
 ## Features
 
 - XDG directory resolution (with CWD-override and dotenv variants)

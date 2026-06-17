@@ -74,4 +74,13 @@ type Config struct {
 	// the blob-store XDG is affected; metadata XDG nesting (if any) is
 	// the caller's concern.
 	RepoName string
+
+	// SystemRoot is the filesystem root an XDG-system (`//name`) blob
+	// store resolves under (madder#230) — its category dirs are rooted
+	// here by rootAtSystem, so a system store lands at
+	// <SystemRoot>/blob_stores/<name>. Injected by the caller (env_dir
+	// stays application-agnostic for its eventual move to dewey); the
+	// madder layer passes madder_env.DefaultSystemRoot (/var/lib/madder).
+	// Empty disables system-scope resolution. Tests inject a sandbox dir.
+	SystemRoot string
 }

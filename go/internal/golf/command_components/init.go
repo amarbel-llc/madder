@@ -27,25 +27,37 @@ func (cmd Init) InitBlobStore(
 	// explicit Cwd ids. Before #227 an unprefixed (XDG user) id was
 	// silently created inside the ancestor override — where discovery
 	// (and therefore `write`) would never resolve it.
-	var xdgForId directory_layout.XDG
+	var (
+		xdgForId directory_layout.XDG
+		layout   directory_layout.BlobStore
+		err      error
+	)
 
-	if id.GetLocationType() == scoped_id.LocationTypeCwd {
+	switch id.GetLocationType() {
+	case scoped_id.LocationTypeCwd:
 		// Explicit `.`-prefix: root the store in the *current*
 		// directory, not the deepest ancestor override.
 		xdgForId = envBlobStore.GetXDGForBlobStoresWithOverridePath(
 			envBlobStore.GetCwd(),
 		)
-	} else {
+		layout, err = directory_layout.CloneBlobStoreWithXDG(envBlobStore, xdgForId)
+
+	case scoped_id.LocationTypeXDGSystem:
+		// madder#230: system stores use the dedicated v3System layout
+		// (which reports XDGSystem) over the system-rooted XDG, so the
+		// scope check below passes and the store lands at
+		// <system-root>/blob_stores/<name>.
+		xdgForId = envBlobStore.GetXDGForBlobStoreId(id)
+		layout, err = directory_layout.MakeBlobStoreSystem(xdgForId)
+
+	default:
 		// Non-Cwd scopes drop any ancestor override (XDG user/cache);
 		// see env_dir.GetXDGForBlobStoreId — the same mapping
 		// discovery uses to resolve these ids.
 		xdgForId = envBlobStore.GetXDGForBlobStoreId(id)
+		layout, err = directory_layout.CloneBlobStoreWithXDG(envBlobStore, xdgForId)
 	}
 
-	layout, err := directory_layout.CloneBlobStoreWithXDG(
-		envBlobStore,
-		xdgForId,
-	)
 	if err != nil {
 		err = errors.Wrap(err)
 		envBlobStore.Cancel(err)

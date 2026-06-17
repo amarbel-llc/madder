@@ -21,6 +21,15 @@ import internal "github.com/amarbel-llc/madder/go/internal/echo/madder_env"
 // doc-comment for why madder doesn't honor any such env var.
 var DefaultEnvVarNames = internal.DefaultEnvVarNames
 
+// DefaultSystemRoot is the filesystem root an XDG-system (`//name`) blob
+// store resolves under (madder#230) — a fixed FHS path for writable
+// system state (NOT $XDG_DATA_DIRS, which are read-only search dirs). A
+// system store lands at <DefaultSystemRoot>/blob_stores/<name>, e.g.
+// /var/lib/madder/blob_stores/shared. Passed into env_dir.Config.SystemRoot;
+// env_dir stays agnostic so it can move to dewey. Tests inject a sandbox
+// dir instead.
+const DefaultSystemRoot = internal.DefaultSystemRoot
+
 // EnvBin is the env-var name madder publishes to subprocesses so
 // they can locate the binary that spawned them. Read by external
 // scripts that wrap madder; never read by madder itself.

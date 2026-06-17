@@ -48,6 +48,15 @@ const EnvVerifyOnCollision = "MADDER_VERIFY_ON_COLLISION"
 // env_dir; see env_dir.EnvVarNames.XDGUserLocationOnly for behavior.
 const EnvXDGUserLocationOnly = "MADDER_XDG_USER_LOCATION_ONLY"
 
+// DefaultSystemRoot is the filesystem root an XDG-system (`//name`) blob
+// store resolves under (madder#230) — a fixed FHS path for writable
+// system state (NOT $XDG_DATA_DIRS, which are read-only search dirs). A
+// system store lands at <DefaultSystemRoot>/blob_stores/<name>, e.g.
+// /var/lib/madder/blob_stores/shared. Passed into env_dir.Config.SystemRoot;
+// env_dir stays agnostic so it can move to dewey. Tests inject a sandbox
+// dir instead.
+const DefaultSystemRoot = "/var/lib/madder"
+
 // DefaultEnvVarNames is madder's env-var contract bundled for
 // passing into `env_dir.Config.EnvVarNames`. Wrapper utilities that
 // want to honor madder's env-var contract (e.g. when constructing

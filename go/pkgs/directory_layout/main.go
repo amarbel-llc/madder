@@ -40,7 +40,15 @@ var (
 	MakeBlobStore                 = internal.MakeBlobStore
 	MakeBlobStoreCache            = internal.MakeBlobStoreCache
 	MakeBlobStorePath             = internal.MakeBlobStorePath
-	PathBlobStore                 = internal.PathBlobStore
+)
+
+// MakeBlobStoreSystem builds the XDG-system (`//name`) layout (madder#230).
+// The xdg must already be rooted at the system path (env_dir.rootAtSystem);
+// the layout reports LocationTypeXDGSystem so init/discovery accept `//name`
+// ids against it.
+var (
+	MakeBlobStoreSystem = internal.MakeBlobStoreSystem
+	PathBlobStore       = internal.PathBlobStore
 )
 
 const FileNameBlobStoreConfig = internal.FileNameBlobStoreConfig

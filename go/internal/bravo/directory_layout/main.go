@@ -61,6 +61,23 @@ func MakeBlobStoreCache(
 	return blobStore, nil
 }
 
+// MakeBlobStoreSystem builds the XDG-system (`//name`) layout (madder#230).
+// The xdg must already be rooted at the system path (env_dir.rootAtSystem);
+// the layout reports LocationTypeXDGSystem so init/discovery accept `//name`
+// ids against it.
+func MakeBlobStoreSystem(
+	xdg XDG,
+) (BlobStore, error) {
+	var blobStore blobStoreUninitialized = &v3System{}
+
+	if err := blobStore.initialize(xdg); err != nil {
+		err = errors.Wrap(err)
+		return nil, err
+	}
+
+	return blobStore, nil
+}
+
 func CloneBlobStoreWithXDG(layout BlobStore, xdg XDG) (BlobStore, error) {
 	clone := layout.cloneUninitialized()
 

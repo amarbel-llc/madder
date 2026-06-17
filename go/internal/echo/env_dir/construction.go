@@ -133,6 +133,7 @@ func MakeWithDefaultHome(
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
 	env.repoName = cfg.RepoName
+	env.systemRoot = cfg.SystemRoot
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -180,6 +181,7 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
 	env.repoName = cfg.RepoName
+	env.systemRoot = cfg.SystemRoot
 	env.xdgInitArgs.Cwd = xdgRootOverride
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
@@ -214,6 +216,7 @@ func MakeWithHomeAndInitialize(
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
 	env.repoName = cfg.RepoName
+	env.systemRoot = cfg.SystemRoot
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdgScope); err != nil {
 		env.Cancel(err)
@@ -244,6 +247,7 @@ func MakeWithXDG(
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
 	env.repoName = cfg.RepoName
+	env.systemRoot = cfg.SystemRoot
 	env.XDG = xdg
 
 	if err := env.beforeXDG.initialize(cfg.DebugOptions, xdg.UtilityName); err != nil {
