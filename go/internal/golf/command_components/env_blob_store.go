@@ -46,7 +46,18 @@ type EnvBlobStore struct {
 func (cmd EnvBlobStore) MakeEnvBlobStore(
 	req futility.Request,
 ) BlobStoreEnv {
-	return blob_store_env.MakeBlobStoreEnv(cmd.makeEnvLocal(req))
+	return blob_store_env.MakeBlobStoreEnv(cmd.makeEnvLocal(req, false))
+}
+
+// MakeEnvBlobStoreSystemScoped is MakeEnvBlobStore with the env's base XDG
+// (and thus its per-pid link(2) temp) rooted under the system root
+// (madder#230). Used by `madder serve --store //name` so the daemon's
+// staging temp colocates with the system store it serves — EXDEV-safe and
+// ProtectSystem-safe. See env_dir.Config.SystemScoped.
+func (cmd EnvBlobStore) MakeEnvBlobStoreSystemScoped(
+	req futility.Request,
+) BlobStoreEnv {
+	return blob_store_env.MakeBlobStoreEnv(cmd.makeEnvLocal(req, true))
 }
 
 // MakeEnvBlobStoreWithoutStores returns a BlobStoreEnv with the directory
@@ -56,11 +67,12 @@ func (cmd EnvBlobStore) MakeEnvBlobStore(
 func (cmd EnvBlobStore) MakeEnvBlobStoreWithoutStores(
 	req futility.Request,
 ) BlobStoreEnv {
-	return blob_store_env.MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req))
+	return blob_store_env.MakeBlobStoreEnvWithoutStores(cmd.makeEnvLocal(req, false))
 }
 
 func (cmd EnvBlobStore) makeEnvLocal(
 	req futility.Request,
+	systemScoped bool,
 ) env_local.Env {
 	config := DefaultConfig
 
@@ -91,6 +103,7 @@ func (cmd EnvBlobStore) makeEnvLocal(
 			EnvVarNames:  madder_env.DefaultEnvVarNames,
 			DebugOptions: debugOptions,
 			SystemRoot:   madder_env.DefaultSystemRoot,
+			SystemScoped: systemScoped,
 		},
 		xdgScope,
 	)

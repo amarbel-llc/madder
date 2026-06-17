@@ -58,6 +58,14 @@ disables system-scope resolution (no-op). dewey has no system concept, so
 `directory_layout.v3System` hard-codes `LocationTypeXDGSystem` (v3/v3Cache
 derive scope from `xdg.IsOverridden`, which can't represent it).
 
+`Config.SystemScoped` (madder#230 follow-up): when set (with `SystemRoot`),
+`initializeXDG` applies `rootAtSystem` to the BASE XDG — not just the per-id
+store path — so the env's per-pid `TempLocal` also lands under `SystemRoot`.
+This colocates a system-store daemon's link(2) staging with the store
+(EXDEV-safe; ProtectSystem-safe). Set by `madder serve --store //name` via
+`command_components.MakeEnvBlobStoreSystemScoped`; plain (non-daemon)
+system-store resolution doesn't need it.
+
 ## Features
 
 - XDG directory resolution (with CWD-override and dotenv variants)

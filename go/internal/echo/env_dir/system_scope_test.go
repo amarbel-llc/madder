@@ -90,3 +90,35 @@ func TestSystemScopeXDG_EmptyRootIsNoOp(t *testing.T) {
 		)
 	}
 }
+
+// TestSystemScopedEnv_TempRootsUnderSystemRoot is the madder#10 regression
+// test: a Config.SystemScoped env roots its base XDG — and therefore its
+// per-pid TempLocal — under SystemRoot, so a system-store daemon's link(2)
+// staging colocates with the store (EXDEV-safe; ProtectSystem-safe). A
+// non-system-scoped env (control) keeps its temp under the override root.
+// initializeXDG applies the rooting, so every constructor (serve's
+// MakeDefault and this override constructor alike) gets it.
+func TestSystemScopedEnv_TempRootsUnderSystemRoot(t *testing.T) {
+	homeRoot := t.TempDir()   // base override; discarded for categories by rootAtSystem
+	systemRoot := t.TempDir() // the injected system root
+
+	sys := MakeWithXDGRootOverrideHomeAndInitialize(
+		errors.MakeContextDefault(),
+		Config{SystemRoot: systemRoot, SystemScoped: true},
+		"madder",
+		homeRoot,
+	)
+	if got := sys.GetTempLocal().BasePath; !strings.HasPrefix(got, systemRoot) {
+		t.Errorf("system-scoped TempLocal = %q, want under systemRoot %q", got, systemRoot)
+	}
+
+	plain := MakeWithXDGRootOverrideHomeAndInitialize(
+		errors.MakeContextDefault(),
+		Config{SystemRoot: systemRoot}, // SystemRoot set but NOT SystemScoped
+		"madder",
+		homeRoot,
+	)
+	if got := plain.GetTempLocal().BasePath; strings.HasPrefix(got, systemRoot) {
+		t.Errorf("non-system-scoped temp %q leaked into systemRoot %q", got, systemRoot)
+	}
+}

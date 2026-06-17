@@ -940,7 +940,22 @@ debug-serve-blob-api:
   code=$(printf 'unrelated bytes' | curl -s -o /dev/null -w '%{http_code}' -X PUT --data-binary @- --unix-socket "$sock" "http://localhost/blobs/$missing")
   echo "  $code"; [ "$code" = "409" ] || { echo "FAIL: mismatch PUT = $code" >&2; exit 1; }
 
-  echo "OK: serve blob API GET/HEAD/PUT/404/409 all pass"
+  echo "=== --store .default: single-store backend serves that store by id ==="
+  # Restart as a single-store daemon (--store) on a fresh socket and GET the
+  # seeded blob through it — exercises makeBackend + storeBackend + the
+  # open-by-id path. (.default is a writable cwd store; the //default system
+  # path needs /var/lib/madder and is covered by the Go tests, not here.)
+  kill "$srv_pid" 2>/dev/null || true; wait "$srv_pid" 2>/dev/null || true
+  sock2="$tmp/madder-store.sock"
+  run_madder serve --store .default --socket "$sock2" >"$tmp/serve-store.log" 2>&1 &
+  srv_pid=$!
+  for _ in $(seq 1 50); do [ -S "$sock2" ] && break; sleep 0.1; done
+  [ -S "$sock2" ] || { echo "FAIL: --store socket never appeared" >&2; cat "$tmp/serve-store.log" >&2; exit 1; }
+  got=$(curl -s --unix-socket "$sock2" "http://localhost/blobs/$digest")
+  [ "$got" = "$payload" ] || { echo "FAIL: --store .default GET body mismatch: $got" >&2; exit 1; }
+  echo "  --store .default serves the seeded blob"
+
+  echo "OK: serve blob API (ambient + --store) GET/HEAD/PUT/404/409 all pass"
   # Stop the daemon and reap it so its SIGTERM exit code doesn't leak as
   # the recipe's status; the EXIT trap is the cleanup backstop.
   kill "$srv_pid" 2>/dev/null || true

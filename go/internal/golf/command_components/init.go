@@ -20,47 +20,17 @@ func (cmd Init) InitBlobStore(
 	id scoped_id.Id,
 	config *blob_store_configs.TypedConfig,
 ) (path directory_layout.BlobStorePath) {
-	// The id's location prefix selects the XDG scope (blob-store(7)),
-	// so the layout must be re-derived from the id rather than taken
-	// from the env as-is: the env's XDG may be overridden by an
-	// ancestor `.<utility>/` walk-up, which is only the right root for
-	// explicit Cwd ids. Before #227 an unprefixed (XDG user) id was
-	// silently created inside the ancestor override — where discovery
-	// (and therefore `write`) would never resolve it.
-	var (
-		xdgForId directory_layout.XDG
-		layout   directory_layout.BlobStore
-		err      error
-	)
-
-	switch id.GetLocationType() {
-	case scoped_id.LocationTypeCwd:
-		// Explicit `.`-prefix: root the store in the *current*
-		// directory, not the deepest ancestor override.
-		xdgForId = envBlobStore.GetXDGForBlobStoresWithOverridePath(
-			envBlobStore.GetCwd(),
-		)
-		layout, err = directory_layout.CloneBlobStoreWithXDG(envBlobStore, xdgForId)
-
-	case scoped_id.LocationTypeXDGSystem:
-		// madder#230: system stores use the dedicated v3System layout
-		// (which reports XDGSystem) over the system-rooted XDG, so the
-		// scope check below passes and the store lands at
-		// <system-root>/blob_stores/<name>.
-		xdgForId = envBlobStore.GetXDGForBlobStoreId(id)
-		layout, err = directory_layout.MakeBlobStoreSystem(xdgForId)
-
-	default:
-		// Non-Cwd scopes drop any ancestor override (XDG user/cache);
-		// see env_dir.GetXDGForBlobStoreId — the same mapping
-		// discovery uses to resolve these ids.
-		xdgForId = envBlobStore.GetXDGForBlobStoreId(id)
-		layout, err = directory_layout.CloneBlobStoreWithXDG(envBlobStore, xdgForId)
-	}
-
+	// The id's location prefix selects the XDG scope (blob-store(7)), so
+	// the layout is re-derived from the id rather than taken from the env
+	// as-is: a Cwd id roots in the *current* dir, a system id uses v3System
+	// (madder#230), and an XDG-user id drops any ancestor `.<utility>/`
+	// walk-up override (the pre-#227 bug, where such a store was created
+	// inside the override and discovery/`write` could never resolve it).
+	// Shared with `serve --store` via layoutForId so both resolve a store
+	// to the SAME path.
+	layout, err := layoutForId(envBlobStore, id)
 	if err != nil {
-		err = errors.Wrap(err)
-		envBlobStore.Cancel(err)
+		envBlobStore.Cancel(errors.Wrap(err))
 		return path
 	}
 

@@ -78,6 +78,12 @@ type env struct {
 	// env_dir stays agnostic (it's slated to move to dewey).
 	systemRoot string
 
+	// systemScoped, when true, roots the base XDG (and TempLocal) under
+	// systemRoot at construction (madder#230 increment) so a system-store
+	// daemon's link(2) temp colocates with the store. Set from
+	// Config.SystemScoped.
+	systemScoped bool
+
 	TempLocal, TempOS TemporaryFS
 
 	verifyOnCollisionOverride bool
@@ -98,6 +104,15 @@ var _ Env = &env{}
 
 // sets XDG and creates tmp local
 func (env *env) initializeXDG() (err error) {
+	// madder#230: a system-scoped env roots its base XDG here — after the
+	// caller's Initialize* populated the categories, before TempLocal is
+	// derived from env.Cache — so the per-pid link(2) staging colocates
+	// with the system store it serves (EXDEV-safe; ProtectSystem-safe).
+	// No-op unless both Config.SystemScoped and Config.SystemRoot are set.
+	if env.systemScoped && env.systemRoot != "" {
+		env.XDG = env.rootAtSystem(env.XDG)
+	}
+
 	env.TempLocal.BasePath = env.Cache.MakePath(
 		fmt.Sprintf("tmp-%d", env.GetPid()),
 	).String()

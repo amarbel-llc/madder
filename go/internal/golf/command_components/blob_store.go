@@ -58,6 +58,91 @@ func (cmd *BlobStore) MakeBlobStoreFromConfigPath(
 	return blobStore
 }
 
+// layoutForId resolves the directory_layout for a blob-store-id, honoring
+// its scope: a Cwd (`.`) id roots in the *current* dir (not the deepest
+// ancestor `.<utility>/` override); a system (`//`) id uses the v3System
+// layout (madder#230); every other scope clones the env's layout with the
+// id's XDG (the same mapping discovery uses). Shared by init (InitBlobStore)
+// and single-store open (MakeBlobStoreByScopedId) so both resolve a store
+// to the SAME path.
+func layoutForId(
+	envBlobStore BlobStoreEnv,
+	id scoped_id.Id,
+) (directory_layout.BlobStore, error) {
+	switch id.GetLocationType() {
+	case scoped_id.LocationTypeCwd:
+		return directory_layout.CloneBlobStoreWithXDG(
+			envBlobStore,
+			envBlobStore.GetXDGForBlobStoresWithOverridePath(
+				envBlobStore.GetCwd(),
+			),
+		)
+
+	case scoped_id.LocationTypeXDGSystem:
+		return directory_layout.MakeBlobStoreSystem(
+			envBlobStore.GetXDGForBlobStoreId(id),
+		)
+
+	default:
+		return directory_layout.CloneBlobStoreWithXDG(
+			envBlobStore,
+			envBlobStore.GetXDGForBlobStoreId(id),
+		)
+	}
+}
+
+// MakeBlobStoreByScopedId opens a single blob store addressed by its
+// scoped id, reading the on-disk blob_store-config WITHOUT discovery — so
+// an XDG-system (`//name`) store resolves via #230's v3System even though
+// system-store discovery is unbuilt (#230 inc-2). Resolves the layout
+// identically to init (layoutForId), so the served store path matches what
+// `madder init` created. The nil cross-ref map suits a plain local store
+// (the system `//default` case); a system store that itself composes others
+// (multi/inventory-archive) is out of scope. Used by `madder serve --store`.
+func (cmd *BlobStore) MakeBlobStoreByScopedId(
+	envBlobStore BlobStoreEnv,
+	id scoped_id.Id,
+) (blobStore blob_stores.BlobStoreInitialized) {
+	layout, err := layoutForId(envBlobStore, id)
+	if err != nil {
+		envBlobStore.Cancel(errors.Wrap(err))
+		return blobStore
+	}
+
+	blobStore.Path = directory_layout.GetBlobStorePath(layout, id.GetName())
+
+	{
+		var err error
+
+		if blobStore.Config, err = blob_store_configs.DecodeAndVerifyFromFile(
+			blobStore.Path.GetConfig(),
+		); err != nil {
+			envBlobStore.Cancel(errors.Wrapf(
+				err,
+				"blob store %q config at %q",
+				id,
+				blobStore.Path.GetConfig(),
+			))
+			return blobStore
+		}
+	}
+
+	{
+		var err error
+
+		if blobStore.BlobStore, err = blob_stores.MakeBlobStore(
+			envBlobStore,
+			blobStore.ConfigNamed,
+			nil,
+		); err != nil {
+			envBlobStore.Cancel(err)
+			return blobStore
+		}
+	}
+
+	return blobStore
+}
+
 func (cmd *BlobStore) MakeBlobStoreFromIdOrConfigPath(
 	envBlobStore BlobStoreEnv,
 	basePath string,

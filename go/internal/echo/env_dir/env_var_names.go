@@ -83,4 +83,14 @@ type Config struct {
 	// madder layer passes madder_env.DefaultSystemRoot (/var/lib/madder).
 	// Empty disables system-scope resolution. Tests inject a sandbox dir.
 	SystemRoot string
+
+	// SystemScoped, when true (with SystemRoot set), roots this env's BASE
+	// XDG — and therefore its per-pid TempLocal — under SystemRoot at
+	// construction (madder#230 increment). A plain system store's blob
+	// path is already system-rooted per-id via GetXDGForBlobStoreId; this
+	// additionally colocates the link(2) staging temp under SystemRoot so
+	// writes to a system store don't cross filesystems (EXDEV) and a
+	// hardened systemd unit (ProtectSystem=strict, ProtectHome) doesn't
+	// fail temp creation. Set by `madder serve --store //name`.
+	SystemScoped bool
 }

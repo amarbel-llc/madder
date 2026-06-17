@@ -353,3 +353,56 @@ func TestInitBlobStore_SystemScopeSucceeds(t *testing.T) {
 		t.Errorf("system store base = %q, want under %q", basePath, want)
 	}
 }
+
+// TestMakeBlobStoreByScopedId_SystemStore pins madder#10's single-store
+// open-by-id: after `madder init //shared` creates the store + on-disk
+// config under the (sandboxed) system root, MakeBlobStoreByScopedId opens
+// it WITHOUT discovery — the resolution `madder serve --store //shared`
+// relies on (system-store discovery is unbuilt, #230 inc-2).
+func TestMakeBlobStoreByScopedId_SystemStore(t *testing.T) {
+	root := t.TempDir()
+	leaf := filepath.Join(root, "leaf")
+	if err := os.MkdirAll(leaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	systemRoot := t.TempDir()
+
+	envLocal := makeEnvLocalAtWithSystemRoot(
+		t, filepath.Dir(root), leaf, t.TempDir(), systemRoot,
+	)
+	envBlobStore := blob_store_env.MakeBlobStoreEnvWithoutStores(envLocal)
+
+	var id scoped_id.Id
+	if err := id.Set("//shared"); err != nil {
+		t.Fatalf("Set(//shared): %v", err)
+	}
+
+	var initCmd Init
+	if r := recoverInitPanic(func() {
+		initCmd.InitBlobStore(envLocal, envBlobStore, id, makeDefaultTypedConfig())
+	}); r != nil {
+		t.Fatalf("init //shared: %v", r)
+	}
+
+	var (
+		bsCmd       BlobStore
+		storeOpened bool
+		storeBase   string
+	)
+	if r := recoverInitPanic(func() {
+		s := bsCmd.MakeBlobStoreByScopedId(envBlobStore, id)
+		storeOpened = s.GetBlobStore() != nil
+		storeBase = s.Path.GetBase()
+	}); r != nil {
+		t.Fatalf("MakeBlobStoreByScopedId(//shared): %v", r)
+	}
+
+	if !storeOpened {
+		t.Fatal("MakeBlobStoreByScopedId returned an uninitialized store")
+	}
+
+	want := filepath.Join(systemRoot, "blob_stores", "shared")
+	if !strings.HasPrefix(storeBase, want) {
+		t.Errorf("opened store base = %q, want under %q", storeBase, want)
+	}
+}
