@@ -101,12 +101,15 @@ let
       #   the TLS-client-cert tests.
       # unixtools.xxd: sftp.bash / webdav.bash generate per-test
       #   cookies via `xxd -p`; webdav.bats also reads file magic bytes.
+      # curl: serve.bats drives the `madder serve` HTTP API over its
+      #   AF_UNIX socket (curl --unix-socket); bash has no AF_UNIX client.
       nativeBuildInputs = [
         pkgs-master.jq
         pkgs-master.git
         pkgs-master.openssh
         pkgs-master.openssl
         pkgs-master.unixtools.xxd
+        pkgs-master.curl
       ];
     };
 
@@ -296,6 +299,7 @@ let
     extraNativeInstallCheckInputs = [
       pkgs-master.jq
       pkgs.parallel
+      pkgs-master.curl # serve.bats drives the serve HTTP API (see mkBatsLane)
     ];
     coverIntegrationCommand = cliCoverIntegrationCommand;
   };
@@ -460,6 +464,7 @@ in
       pkgs-master.shellcheck
     ]
     ++ (with pkgs-master; [
+      curl # serve.bats drives `madder serve` over its AF_UNIX socket
       delve
       gofumpt
       gopls
