@@ -29,6 +29,7 @@ type Env interface {
 	GetXDGForBlobStoresWithoutOverride() xdg.XDG
 	GetXDGForBlobStoresWithOverridePath(overridePath string) xdg.XDG
 	GetXDGForBlobStoreId(scoped_id.Id) xdg.XDG
+	GetXDGForSystemBlobStores() (xdg.XDG, bool)
 
 	GetExecPath() string
 	GetTempLocal() TemporaryFS
@@ -294,6 +295,21 @@ func (env env) GetXDGForBlobStoreId(id scoped_id.Id) xdg.XDG {
 		// Cwd (and other) ids keep the ancestor/cwd override.
 		return env.nestForRepo(base)
 	}
+}
+
+// GetXDGForSystemBlobStores returns the XDG rooted at the system root for
+// discovering XDG-system (`//name`) stores, and whether system scope is
+// configured. ok is false when no SystemRoot is set: discovery must then
+// skip the system pass, since rootAtSystem would no-op and the returned XDG
+// would point at the *user* layout — mis-keying user stores as `//name`.
+// The returned XDG drops any cwd/ancestor override, matching the per-id
+// XDGSystem case of GetXDGForBlobStoreId (madder#230 increment 2).
+func (env env) GetXDGForSystemBlobStores() (xdg.XDG, bool) {
+	if env.systemRoot == "" {
+		return xdg.XDG{}, false
+	}
+
+	return env.rootAtSystem(env.xdgForBlobStoresBase().CloneWithoutOverride()), true
 }
 
 // rootAtSystem re-roots every XDG category dir at env.systemRoot for an

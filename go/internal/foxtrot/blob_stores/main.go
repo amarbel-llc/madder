@@ -164,6 +164,27 @@ func MakeBlobStores(
 		blobStores = makeBlobStoreConfigs(ctx, directoryLayout)
 	}
 
+	// madder#230 increment 2: also discover XDG-system (`//name`) stores
+	// under the fixed system root, keyed by their `//name` id. This is
+	// global — independent of the cwd ancestor walk-up above and never
+	// tagged with cwd-depth — and `//`-prefixed keys are disjoint from the
+	// user (unprefixed) and cwd (`.name`) entries, so the merge can't
+	// collide. ok is false when no system root is configured (e.g. a
+	// non-madder env), in which case the glob is skipped entirely rather
+	// than mis-keying user stores as system. A missing system dir globs to
+	// nothing, so this is a no-op on hosts without /var/lib/madder.
+	if systemXDG, ok := envDir.GetXDGForSystemBlobStores(); ok {
+		if systemLayout, err := directory_layout.MakeBlobStoreSystem(
+			systemXDG,
+		); err != nil {
+			ctx.Cancel(err)
+			return blobStores
+		} else {
+			blobStoresForSystem := makeBlobStoreConfigs(ctx, systemLayout)
+			maps.Insert(blobStores, maps.All(blobStoresForSystem))
+		}
+	}
+
 	// Two-pass initialization: first pass creates stores that have no
 	// cross-references (e.g. local hash-bucketed, SFTP), second pass creates
 	// stores that depend on other stores (e.g. inventory archives that

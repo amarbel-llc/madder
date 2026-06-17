@@ -358,7 +358,9 @@ func TestInitBlobStore_SystemScopeSucceeds(t *testing.T) {
 // open-by-id: after `madder init //shared` creates the store + on-disk
 // config under the (sandboxed) system root, MakeBlobStoreByScopedId opens
 // it WITHOUT discovery — the resolution `madder serve --store //shared`
-// relies on (system-store discovery is unbuilt, #230 inc-2).
+// relies on (it reads the on-disk config directly, so it works even where
+// discovery doesn't run). See TestMakeBlobStores_DiscoversSystemStore for
+// the discovery side (#230 inc-2).
 func TestMakeBlobStoreByScopedId_SystemStore(t *testing.T) {
 	root := t.TempDir()
 	leaf := filepath.Join(root, "leaf")
@@ -404,5 +406,58 @@ func TestMakeBlobStoreByScopedId_SystemStore(t *testing.T) {
 	want := filepath.Join(systemRoot, "blob_stores", "shared")
 	if !strings.HasPrefix(storeBase, want) {
 		t.Errorf("opened store base = %q, want under %q", storeBase, want)
+	}
+}
+
+// TestMakeBlobStores_DiscoversSystemStore pins madder#230 increment 2:
+// after `madder init //shared` creates a system store under the (sandboxed)
+// system root, full discovery (MakeBlobStores via MakeBlobStoreEnv) surfaces
+// it in the BlobStoreMap under its `//shared` key — alongside, and disjoint
+// from, the unprefixed user store created in the same env. This is what
+// `madder list` and store-switch arg resolution see.
+func TestMakeBlobStores_DiscoversSystemStore(t *testing.T) {
+	root := t.TempDir()
+	leaf := filepath.Join(root, "leaf")
+	if err := os.MkdirAll(leaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	systemRoot := t.TempDir()
+	xdgDataHome := t.TempDir()
+
+	envLocal := makeEnvLocalAtWithSystemRoot(
+		t, filepath.Dir(root), leaf, xdgDataHome, systemRoot,
+	)
+	envInit := blob_store_env.MakeBlobStoreEnvWithoutStores(envLocal)
+
+	var initCmd Init
+	for _, name := range []string{"//shared", "user-store"} {
+		var id scoped_id.Id
+		if err := id.Set(name); err != nil {
+			t.Fatalf("Set(%q): %v", name, err)
+		}
+		if r := recoverInitPanic(func() {
+			initCmd.InitBlobStore(envLocal, envInit, id, makeDefaultTypedConfig())
+		}); r != nil {
+			t.Fatalf("init %q: %v", name, r)
+		}
+	}
+
+	envDiscovery := blob_store_env.MakeBlobStoreEnv(envLocal)
+	stores := envDiscovery.GetBlobStores()
+
+	if _, ok := stores["//shared"]; !ok {
+		t.Errorf(
+			"discovery did not surface the system store under %q; available: %v",
+			"//shared", storeKeys(envDiscovery),
+		)
+	}
+
+	// The user store must still be discovered under its unprefixed key —
+	// the system pass merges in, it does not replace the user/cwd entries.
+	if _, ok := stores["user-store"]; !ok {
+		t.Errorf(
+			"discovery dropped the user store %q after the system pass; available: %v",
+			"user-store", storeKeys(envDiscovery),
+		)
 	}
 }
