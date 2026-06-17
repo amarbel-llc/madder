@@ -349,6 +349,17 @@ Blob store configurations are persisted as hyphence-encoded files (see
 **madder info-repo** to inspect the current configuration and **madder
 init-from** to initialize a store from an existing configuration file.
 
+**madder config-gen** emits a digest-pinned **blob_store-config** to stdout
+without creating any store — stage one of a two-stage, idempotent init.
+Binding it with **madder init-from** *blob-store-id*\ **@**\ *digest* *config*
+is idempotent and drift-detecting: an absent store is created, an existing
+store whose on-disk config matches the pinned digest is a no-op, and a
+mismatch is a hard error. This is the form a deploy (e.g. a systemd
+**ExecStartPre** with the config + digest baked in at build time) should use so
+a redeploy never fails on the immutable-config write. Without a digest pin,
+**madder init** and **madder init-from** accept **--if-not-exists** for the
+same idempotent-by-existence behaviour (no digest verification).
+
 # SEE ALSO
 
 **madder**(1), **blob-store-multi**(7), **markl-id**(7)

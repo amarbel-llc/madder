@@ -3,6 +3,7 @@
 package command_components
 
 import (
+	"bytes"
 	stderrors "errors"
 	"fmt"
 	"os"
@@ -406,6 +407,82 @@ func TestMakeBlobStoreByScopedId_SystemStore(t *testing.T) {
 	want := filepath.Join(systemRoot, "blob_stores", "shared")
 	if !strings.HasPrefix(storeBase, want) {
 		t.Errorf("opened store base = %q, want under %q", storeBase, want)
+	}
+}
+
+// TestEnsureBlobStoreVerbatim_WriteIdempotentDrift pins the two-stage init
+// primitive: writing a digest-pinned config-gen artifact is verbatim and
+// idempotent-by-digest. (a) absent → bytes written byte-identical; (b)
+// re-run same artifact → no-op success; (c) a different config at the same
+// id → drift error. This is the engine behind `init-from <id>@<digest>`.
+func TestEnsureBlobStoreVerbatim_WriteIdempotentDrift(t *testing.T) {
+	root := t.TempDir()
+	leaf := filepath.Join(root, "leaf")
+	if err := os.MkdirAll(leaf, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	envLocal := makeEnvLocalAt(t, filepath.Dir(root), leaf, t.TempDir())
+	envBlobStore := blob_store_env.MakeBlobStoreEnvWithoutStores(envLocal)
+
+	var id scoped_id.Id
+	if err := id.Set(".verbatim"); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	// Stage 1: a digest-stamped artifact (EncodeWithDigest populates
+	// BlobDigest). Copy the bytes — buf is reused below.
+	tc := makeDefaultTypedConfig()
+	var buf bytes.Buffer
+	if _, err := blob_store_configs.EncodeWithDigest(tc, &buf); err != nil {
+		t.Fatalf("EncodeWithDigest: %v", err)
+	}
+	raw := append([]byte(nil), buf.Bytes()...)
+
+	var cmd Init
+
+	// (a) absent → writes verbatim.
+	var configPath string
+	if r := recoverInitPanic(func() {
+		configPath = cmd.EnsureBlobStoreVerbatim(
+			envLocal, envBlobStore, id, raw, tc.BlobDigest,
+		).GetConfig()
+	}); r != nil {
+		t.Fatalf("first EnsureBlobStoreVerbatim rejected: %v", r)
+	}
+
+	onDisk, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read on-disk config: %v", err)
+	}
+	if !bytes.Equal(onDisk, raw) {
+		t.Fatal("on-disk config is not byte-verbatim with the artifact")
+	}
+
+	// (b) present + same digest → idempotent no-op.
+	if r := recoverInitPanic(func() {
+		cmd.EnsureBlobStoreVerbatim(envLocal, envBlobStore, id, raw, tc.BlobDigest)
+	}); r != nil {
+		t.Fatalf("idempotent re-run rejected: %v", r)
+	}
+
+	// (c) present + different config → drift error.
+	tcOther := makeDefaultTypedConfig()
+	tcOther.Blob.(*blob_store_configs.DefaultType).CompressionType = "none"
+	var bufOther bytes.Buffer
+	if _, err := blob_store_configs.EncodeWithDigest(tcOther, &bufOther); err != nil {
+		t.Fatalf("EncodeWithDigest (other): %v", err)
+	}
+	if tcOther.BlobDigest.String() == tc.BlobDigest.String() {
+		t.Fatal("test setup: expected differing digests for zstd vs none")
+	}
+
+	if r := recoverInitPanic(func() {
+		cmd.EnsureBlobStoreVerbatim(
+			envLocal, envBlobStore, id, bufOther.Bytes(), tcOther.BlobDigest,
+		)
+	}); r == nil {
+		t.Fatal("a different config at the same id did not error (drift undetected)")
 	}
 }
 

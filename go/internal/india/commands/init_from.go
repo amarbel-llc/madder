@@ -1,10 +1,13 @@
 package commands
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
@@ -21,6 +24,8 @@ func init() {
 }
 
 type InitFrom struct {
+	ifNotExists bool
+
 	command_components.EnvBlobStore
 	command_components.Init
 }
@@ -59,6 +64,14 @@ func (cmd InitFrom) GetDescription() futility.Description {
 func (cmd *InitFrom) SetFlagDefinitions(
 	flagDefinitions interfaces.CLIFlagDefinitions,
 ) {
+	flagDefinitions.BoolVar(
+		&cmd.ifNotExists,
+		"if-not-exists",
+		false,
+		"exit 0 (no-op) if the store already exists, instead of erroring. "+
+			"Ignored for a digest-pinned id, which is always idempotent "+
+			"(and additionally drift-detecting) by digest.",
+	)
 }
 
 func (cmd InitFrom) Complete(
@@ -87,6 +100,79 @@ func (cmd *InitFrom) Run(req futility.Request) {
 	tw := tap.NewWriter(os.Stdout)
 
 	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	// Pinned id (`name@<digest>`): the two-stage idempotent path. Install
+	// the artifact bytes VERBATIM and verify by digest — drift-detecting,
+	// and robust against non-deterministic re-encoding (see
+	// command_components.EnsureBlobStoreVerbatim).
+	if blobStoreId.HasDigest() {
+		raw, err := readConfigArtifact(configPathFD)
+		if err != nil {
+			errors.ContextCancelWithError(req, errors.Wrap(err))
+			return
+		}
+
+		var artifact blob_store_configs.TypedConfig
+		if _, err := blob_store_configs.DecodeAndVerify(
+			&artifact,
+			bytes.NewReader(raw),
+		); err != nil {
+			errors.ContextCancelWithError(req, errors.Wrapf(
+				err, "config artifact %q", configPathFD.String(),
+			))
+			return
+		}
+
+		if artifact.BlobDigest.IsNull() {
+			errors.ContextCancelWithBadRequestf(
+				req,
+				"config artifact %q has no digest; a pinned init-from needs a "+
+					"digest-stamped config (generate one with `madder config-gen`)",
+				configPathFD.String(),
+			)
+			return
+		}
+
+		// The id's pin must match the artifact — same assertion the
+		// open-by-id path makes (blob_store_env).
+		idDigest := blobStoreId.GetDigest()
+		if err := markl.AssertEqual(&idDigest, &artifact.BlobDigest); err != nil {
+			errors.ContextCancelWithBadRequestf(
+				req,
+				"id pin %s does not match config artifact digest %s",
+				idDigest,
+				artifact.BlobDigest,
+			)
+			return
+		}
+
+		pathConfig := cmd.EnsureBlobStoreVerbatim(
+			req,
+			envBlobStore,
+			blobStoreId,
+			raw,
+			artifact.BlobDigest,
+		)
+
+		tw.Ok(fmt.Sprintf("init-from %s", pathConfig.GetConfig()))
+		tw.Plan()
+		return
+	}
+
+	// Unpinned + --if-not-exists: a pre-existing store is a no-op
+	// (idempotent-by-existence, no digest check).
+	if cmd.ifNotExists {
+		path, ok := cmd.ResolveBlobStorePath(envBlobStore, blobStoreId)
+		if !ok {
+			return
+		}
+
+		if _, err := os.Stat(path.GetConfig()); err == nil {
+			tw.Ok(fmt.Sprintf("init-from %s (already exists)", path.GetConfig()))
+			tw.Plan()
+			return
+		}
+	}
 
 	var typedConfig blob_store_configs.TypedConfig
 
@@ -128,4 +214,16 @@ func (cmd *InitFrom) Run(req futility.Request) {
 
 	tw.Ok(fmt.Sprintf("init-from %s", pathConfig.GetConfig()))
 	tw.Plan()
+}
+
+// readConfigArtifact reads the raw bytes of a config-gen artifact for the
+// pinned (verbatim) path, mirroring DecodeAndVerifyFromFile's "-" = stdin
+// convention. The raw bytes are written to the store unchanged, so the
+// on-disk digest equals the artifact's.
+func readConfigArtifact(configPathFD fd.FD) ([]byte, error) {
+	if configPathFD.String() == "-" {
+		return io.ReadAll(os.Stdin)
+	}
+
+	return os.ReadFile(configPathFD.String())
 }

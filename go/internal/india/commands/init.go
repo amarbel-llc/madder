@@ -223,6 +223,7 @@ type Init struct {
 	tipe            ids.TypeStruct
 	blobStoreConfig blob_store_configs.ConfigMutable
 	discover        bool
+	ifNotExists     bool
 	desc            futility.Description
 
 	// encryption is the value of -encryption when the typed config is
@@ -260,6 +261,14 @@ func (cmd *Init) SetFlagDefinitions(
 ) {
 	cmd.blobStoreConfig.SetFlagDefinitions(flagDefinitions)
 
+	flagDefinitions.BoolVar(
+		&cmd.ifNotExists,
+		"if-not-exists",
+		false,
+		"exit 0 (no-op) if the store already exists, instead of erroring; "+
+			"makes re-running init idempotent (e.g. a systemd ExecStartPre)",
+	)
+
 	if _, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); isSftp {
 		flagDefinitions.BoolVar(
 			&cmd.discover,
@@ -295,6 +304,21 @@ func (cmd *Init) Run(req futility.Request) {
 	}
 
 	req.AssertNoMoreArgs()
+
+	// A digest pin (`name@<digest>`) selects the two-stage, drift-detecting
+	// path, which `init` can't honor — its config is generated from flags,
+	// not supplied, so there is nothing to verify the pin against. Direct
+	// the user to the config-gen + init-from flow instead of silently
+	// ignoring the pin.
+	if blobStoreId.HasDigest() {
+		errors.ContextCancelWithBadRequestf(
+			req,
+			"`init` does not support a digest-pinned id; generate the config "+
+				"with `madder config-gen` and bind it idempotently with "+
+				"`madder init-from <id>@<digest> <config>` instead",
+		)
+		return
+	}
 
 	tw := tap.NewWriter(os.Stdout)
 
@@ -332,6 +356,23 @@ func (cmd *Init) Run(req futility.Request) {
 	}
 
 	envBlobStore := cmd.MakeEnvBlobStore(req)
+
+	// --if-not-exists: a pre-existing store is a successful no-op so a
+	// redeploy can re-run init without the immutable-config write erroring.
+	// Unpinned, so no digest verification — see `init-from <id>@<digest>`
+	// for the drift-detecting variant.
+	if cmd.ifNotExists {
+		path, ok := cmd.ResolveBlobStorePath(envBlobStore, blobStoreId)
+		if !ok {
+			return
+		}
+
+		if _, err := os.Stat(path.GetConfig()); err == nil {
+			tw.Ok(fmt.Sprintf("init %s (already exists)", path.GetConfig()))
+			tw.Plan()
+			return
+		}
+	}
 
 	pathConfig := cmd.InitBlobStore(
 		req,
