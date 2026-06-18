@@ -345,12 +345,14 @@ run-bats-tags *tags:
 
 codemod: codemod-fmt codemod-facades codemod-tommy
 
-# Format all source files via conformist (the treefmt successor): Go
-# (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt). Config is
-# Nix-generated from ./conformist.nix. The read-only counterpart is `lint-fmt`.
+# Format + repair all source files via conformist (the treefmt successor): Go
+# (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt), plus the
+# eng-convention linters' repair actions. Uses the Nix-generated config
+# ($MADDER_CONFORMIST_CONFIG, from ./conformist.nix + presets.eng) passed to the
+# bare conformist via --config-file. The read-only counterpart is `lint-fmt`.
 [group("codemod")]
 codemod-fmt:
-  nix develop {{justfile_directory()}} --command conformist
+  nix develop {{justfile_directory()}} --command sh -c 'conformist --config-file "$MADDER_CONFORMIST_CONFIG"'
 
 #   _     _       _
 #  | |   (_)_ __ | |_
@@ -370,12 +372,12 @@ lint-flake:
 
 # Read-only format + lint gate via conformist (the treefmt successor).
 # Verifies formatter drift (Go/Nix/shell) plus the eng-convention linters,
-# per the Nix-generated config (./conformist.nix + presets.eng). Runs inside
-# the nix devshell where the wrapped conformist is on PATH. `just codemod-fmt`
-# is the write mode.
+# per the Nix-generated config ($MADDER_CONFORMIST_CONFIG, from ./conformist.nix
+# + presets.eng) passed to the bare conformist via --config-file. `just
+# codemod-fmt` is the write mode.
 [group("pre-build")]
 lint-fmt:
-  nix develop {{justfile_directory()}} --command conformist check
+  nix develop {{justfile_directory()}} --command sh -c 'conformist check --config-file "$MADDER_CONFORMIST_CONFIG"'
 
 # Fail if the committed pkgs/ facades have drifted from their internal/
 # sources. The nix build runs `dagnabit export` in preBuild

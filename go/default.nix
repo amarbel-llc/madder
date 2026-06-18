@@ -9,15 +9,16 @@
   # `import ./go/default.nix` callers without a flake context still
   # work — the devShell just won't carry doppelgang in that mode.
   doppelgang ? null,
-  # conformist (treefmt successor) — format + lint gate. Defaulted to null
-  # so non-flake callers still work; the devShell just won't carry it.
+  # conformist (treefmt successor) — format + lint gate. The BARE binary goes
+  # on the devShell PATH (not the Nix wrapper): dagnabit's facade formatter
+  # runs `conformist --tree-root <outdir>`, which collides with the wrapper's
+  # baked --tree-root-file. Defaulted to null so non-flake callers still work.
   conformist ? null,
-  # The conformist binary wrapped with the Nix-generated config (built from
-  # ./conformist.nix + presets.eng in flake.nix). When set, it goes on the
-  # devShell PATH AS `conformist`, so `just lint-fmt` / `just fmt` use the
-  # generated config instead of searching for a conformist.toml (now deleted).
-  # Defaulted null so non-flake callers fall back to the bare `conformist`.
-  conformistWrapper ? null,
+  # The Nix-generated conformist config file (./conformist.nix + presets.eng,
+  # full eng roster). Exposed on the devShell as $MADDER_CONFORMIST_CONFIG so
+  # `just lint-fmt` / `just codemod-fmt` pass it to the bare conformist via
+  # --config-file. Defaulted null so non-flake callers degrade gracefully.
+  conformistConfig ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -461,19 +462,16 @@ in
     ++ pkgs-master.lib.optionals (doppelgang != null) [
       doppelgang.packages.${system}.default
     ]
-    # Prefer the Nix-generated wrapper (config + every tool baked in as store
-    # paths) so `conformist` / `conformist check` use ./conformist.nix's config
-    # with no reliance on the devShell PATH for the formatter/linter binaries.
-    # Fall back to the bare conformist + its formatter/linter binaries for
-    # non-flake callers (conformistWrapper == null), which still read a
-    # conformist.toml if one is present.
-    ++ pkgs-master.lib.optionals (conformistWrapper != null) [
-      conformistWrapper
-    ]
-    ++ pkgs-master.lib.optionals (conformist != null && conformistWrapper == null) [
+    # The BARE conformist binary (not the Nix wrapper) plus the formatter/linter
+    # tools its on-disk ./conformist.toml drives by bare name. The bare binary is
+    # required so dagnabit's `conformist --tree-root <outdir>` (facade
+    # formatting) doesn't collide with the wrapper's baked --tree-root-file. The
+    # full eng-roster lint gate reaches the Nix-generated config via
+    # $MADDER_CONFORMIST_CONFIG (see env below); `nix fmt` uses the wrapper
+    # (flake.nix `formatter`). gofumpt/gotools/shfmt are in the pkgs-master block
+    # below; nixfmt/shellcheck are added here.
+    ++ pkgs-master.lib.optionals (conformist != null) [
       conformist.packages.${system}.default
-      # nixfmt and shellcheck are the formatter/linter binaries conformist
-      # drives; goimports/gofumpt/shfmt are already in the devshell above.
       pkgs.nixfmt
       pkgs-master.shellcheck
     ]
@@ -489,5 +487,11 @@ in
     ]);
 
     GOTOOLCHAIN = "local";
+
+    # The Nix-generated conformist config (full eng-convention roster). The
+    # lint-fmt / codemod-fmt recipes pass it to the bare conformist via
+    # --config-file. Empty string when not flake-built (non-flake callers fall
+    # back to the on-disk ./conformist.toml's formatter-only set).
+    MADDER_CONFORMIST_CONFIG = if conformistConfig == null then "" else "${conformistConfig}";
   };
 }

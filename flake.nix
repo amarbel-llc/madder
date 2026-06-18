@@ -135,12 +135,18 @@
         inherit (gomod.goPkgs) go-pkgs go-pkgs-test;
 
         # conformist config, Nix-generated from ./conformist.nix merged with the
-        # eng-convention preset (conformist.lib.presets.eng). The build.wrapper
-        # is the `nix fmt` entry point: a conformist binary with --config-file +
-        # every enabled tool baked in as /nix/store paths, so no hand-maintained
-        # formatter PATH is needed. `just lint-fmt` runs `conformist check`
-        # against the same config (the wrapped binary is on the devShell PATH —
-        # see go/default.nix). See conformist-nix(7).
+        # eng-convention preset (conformist.lib.presets.eng). Two consumers:
+        #   - `nix fmt` uses build.wrapper (config + every tool baked as
+        #     /nix/store paths).
+        #   - `just lint-fmt` / `just codemod-fmt` pass build.configFile to a
+        #     BARE conformist via --config-file (see go/default.nix devShell).
+        # We expose the BARE conformist (not the wrapper) on the devShell PATH
+        # because dagnabit's facade formatter (`dagnabit export`) invokes
+        # `conformist --tree-root <outdir>`, which collides with the wrapper's
+        # baked --tree-root-file. The bare binary + an on-disk ./conformist.toml
+        # (formatter-only, for dagnabit's upward config search) keep the facade
+        # lane working until dagnabit integrates with a Nix-generated config
+        # directly (amarbel-llc/purse-first#159). See conformist-nix(7).
         conformistEval = conformist.lib.evalModule pkgs {
           imports = [
             conformist.lib.presets.eng
@@ -168,10 +174,10 @@
           # drops a file the build needs, this build breaks (#212).
           goPkgsTest = go-pkgs-test;
           inherit (gomod) goFlakeInputs;
-          # The wrapped conformist (config baked in) for the devShell, so
-          # `just lint-fmt` / `just fmt` resolve `conformist` to the generated
-          # config rather than searching for a (now-deleted) conformist.toml.
-          conformistWrapper = conformistEval.config.build.wrapper;
+          # The Nix-generated conformist config file (full eng roster). The
+          # devShell exposes it as $MADDER_CONFORMIST_CONFIG so `just lint-fmt` /
+          # `just codemod-fmt` pass it to the bare conformist via --config-file.
+          conformistConfig = conformistEval.config.build.configFile;
           man7Src = ./docs/man.7;
           # Test-only inputs for the bats lanes' installCheckPhase.
           # Kept out of the build-time `src` closure so test-only
