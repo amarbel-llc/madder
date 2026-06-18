@@ -362,7 +362,7 @@ codemod-fmt:
 #
 
 [group("pre-build")]
-lint: lint-flake lint-fmt lint-facades lint-tommy
+lint: lint-flake lint-fmt lint-facades lint-tommy lint-worktree
 
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift.
@@ -409,6 +409,19 @@ lint-tommy:
     GOFILE="$f" tommy generate --check || rc=1
   done
   exit "$rc"
+
+# Non-sandbox lane: the IMPURE eng-convention git-state checks (git-remotes,
+# git-default-branch, sweatfile, agents-md, gomod2nix) run against the WORKING
+# TREE, where .git + host tools (spinclass, gomod2nix) are available. These
+# can't run in the sandboxed pure config (which sees only a /nix/store copy of
+# tracked files), so they live in a separate config ($MADDER_CONFORMIST_IMPURE_CONFIG,
+# from conformist.lib.presets.eng-impure) run with --tree-root . here. The
+# agents-md repair (`nix fmt` won't reach it) is `codemod-fmt`-adjacent; run
+# `conformist --config-file "$MADDER_CONFORMIST_IMPURE_CONFIG" --tree-root .`
+# by hand for its autofix.
+[group("pre-build")]
+lint-worktree:
+  nix develop {{justfile_directory()}} --command sh -c 'conformist check --config-file "$MADDER_CONFORMIST_IMPURE_CONFIG" --tree-root .'
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_

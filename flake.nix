@@ -155,6 +155,17 @@
           package = conformist.packages.${system}.default;
         };
 
+        # Impure lane: the eng-convention checks that need a live working tree /
+        # host tools (git-remotes, git-default-branch, sweatfile, agents-md,
+        # gomod2nix). They CANNOT run in the sandboxed pure config, so `just
+        # lint-worktree` runs them against the real worktree via this config.
+        # See conformist.lib.presets.eng-impure.
+        conformistImpureEval = conformist.lib.evalModule pkgs {
+          imports = [ conformist.lib.presets.eng-impure ];
+          package = conformist.packages.${system}.default;
+          projectRootFile = "flake.nix";
+        };
+
         result = import ./go/default.nix {
           nixpkgs = igloo;
           inherit
@@ -178,6 +189,9 @@
           # devShell exposes it as $MADDER_CONFORMIST_CONFIG so `just lint-fmt` /
           # `just codemod-fmt` pass it to the bare conformist via --config-file.
           conformistConfig = conformistEval.config.build.configFile;
+          # The impure-lane config (git-state checks). Exposed as
+          # $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
+          conformistImpureConfig = conformistImpureEval.config.build.configFile;
           man7Src = ./docs/man.7;
           # Test-only inputs for the bats lanes' installCheckPhase.
           # Kept out of the build-time `src` closure so test-only

@@ -262,7 +262,7 @@ Madder was extracted from **dodder** (an immutable cryptographic object
 graph inspired by Git, Nix, and Zettelkasten) so the blob-store layer
 could be built and released on its own cadence; the two are now peers.
 Some `dodder-*` strings remain as intentional wire-format identifiers —
-see `CLAUDE.md` for how to read them. The filesystem-tree capture/restore
+see `AGENTS.md` for how to read them. The filesystem-tree capture/restore
 tool **cutting-garden** was likewise extracted (madder#216, May 2026) and
 now consumes madder's public `pkgs/` surface. Extraction details live in
 `docs/plans/`.

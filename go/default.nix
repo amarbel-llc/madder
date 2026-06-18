@@ -19,6 +19,10 @@
   # `just lint-fmt` / `just codemod-fmt` pass it to the bare conformist via
   # --config-file. Defaulted null so non-flake callers degrade gracefully.
   conformistConfig ? null,
+  # The impure-lane conformist config (presets.eng-impure: git-state checks).
+  # Exposed as $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
+  # Defaulted null so non-flake callers degrade gracefully.
+  conformistImpureConfig ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -493,5 +497,11 @@ in
     # --config-file. Empty string when not flake-built (non-flake callers fall
     # back to the on-disk ./conformist.toml's formatter-only set).
     MADDER_CONFORMIST_CONFIG = if conformistConfig == null then "" else "${conformistConfig}";
+
+    # The impure-lane config (git-state checks: git-remotes, git-default-branch,
+    # sweatfile, agents-md, gomod2nix). `just lint-worktree` passes it to the
+    # bare conformist via --config-file against the working tree.
+    MADDER_CONFORMIST_IMPURE_CONFIG =
+      if conformistImpureConfig == null then "" else "${conformistImpureConfig}";
   };
 }

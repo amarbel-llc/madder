@@ -66,9 +66,11 @@
   # particular version.env (eng-versioning), sweatfile (the eng-impure
   # sweatfile linter), and gomod2nix.toml/go.* (the gomod2nix linter) are
   # deliberately NOT excluded; no formatter matches them anyway. Only genuine
-  # build/scratch/prose artifacts are excluded. *.md stays excluded for now (no
-  # md formatter enabled); revisit if the agents-md linter (which keys on
-  # CLAUDE.md) is adopted — see Phase 5.
+  # build/scratch/prose artifacts are excluded. *.md is excluded here (no md
+  # formatter enabled); this does NOT affect the agents-md linter, which lives
+  # in the separate IMPURE config (presets.eng-impure, run via just
+  # lint-worktree) with its own excludes — so AGENTS.md/CLAUDE.md are still seen
+  # there.
   settings.excludes = [
     "*.md"
     "result"
