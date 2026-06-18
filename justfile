@@ -360,7 +360,7 @@ codemod-fmt:
 #
 
 [group("pre-build")]
-lint: lint-flake lint-fmt lint-facades
+lint: lint-flake lint-fmt lint-facades lint-tommy
 
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift.
@@ -388,6 +388,25 @@ lint-fmt:
 [group("pre-build")]
 lint-facades:
   cd go && dagnabit export --check
+
+# Fail if the committed *_tommy.go codegen has drifted from its hand-written
+# structs (or was produced by a different tommy version — the header carries a
+# `tommy <version> (<hash>)` stamp). Uses tommy's native `tommy generate
+# --check`, which regenerates in memory and compares without writing, per
+# directive-bearing source file (it reads GOFILE like `go generate` does). The
+# write-mode counterpart is `codemod-tommy`. NB the devshell tommy must match
+# the version that produced the committed files; `codemod-tommy` restamps to
+# the current devshell tommy.
+[group("pre-build")]
+lint-tommy:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  cd {{justfile_directory()}}/go/internal/charlie/blob_store_configs
+  rc=0
+  for f in $(grep -lF '//go:generate tommy generate' *.go); do
+    GOFILE="$f" tommy generate --check || rc=1
+  done
+  exit "$rc"
 
 #   __  __       _       _
 #  |  \/  | __ _(_)_ __ | |_
