@@ -12,6 +12,12 @@
   # conformist (treefmt successor) — format + lint gate. Defaulted to null
   # so non-flake callers still work; the devShell just won't carry it.
   conformist ? null,
+  # The conformist binary wrapped with the Nix-generated config (built from
+  # ./conformist.nix + presets.eng in flake.nix). When set, it goes on the
+  # devShell PATH AS `conformist`, so `just lint-fmt` / `just fmt` use the
+  # generated config instead of searching for a conformist.toml (now deleted).
+  # Defaulted null so non-flake callers fall back to the bare `conformist`.
+  conformistWrapper ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -455,11 +461,19 @@ in
     ++ pkgs-master.lib.optionals (doppelgang != null) [
       doppelgang.packages.${system}.default
     ]
-    ++ pkgs-master.lib.optionals (conformist != null) [
+    # Prefer the Nix-generated wrapper (config + every tool baked in as store
+    # paths) so `conformist` / `conformist check` use ./conformist.nix's config
+    # with no reliance on the devShell PATH for the formatter/linter binaries.
+    # Fall back to the bare conformist + its formatter/linter binaries for
+    # non-flake callers (conformistWrapper == null), which still read a
+    # conformist.toml if one is present.
+    ++ pkgs-master.lib.optionals (conformistWrapper != null) [
+      conformistWrapper
+    ]
+    ++ pkgs-master.lib.optionals (conformist != null && conformistWrapper == null) [
       conformist.packages.${system}.default
       # nixfmt and shellcheck are the formatter/linter binaries conformist
-      # drives from conformist.toml; goimports/gofumpt/shfmt are already
-      # in the devshell above.
+      # drives; goimports/gofumpt/shfmt are already in the devshell above.
       pkgs.nixfmt
       pkgs-master.shellcheck
     ]

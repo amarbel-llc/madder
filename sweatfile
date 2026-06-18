@@ -2,3 +2,13 @@
 
 [hooks]
 pre-merge = "just"
+
+# Per-commit repair: format the index-staged content at authoring time so every
+# commit is conformant in history. `--exit-zero-on-fix` maps the restage's
+# exit-3 signal to 0, so a successful repair lets the commit proceed (a
+# pre-commit hook treats nonzero as "block"); partial-stage files are formatted
+# in isolation rather than refused. Uses the PATH `conformist` (the
+# home-manager-installed binary). Same canonical line as conformist's and
+# spinclass's own sweatfiles. The `pre-merge = "just"` lint-fmt gate stays as
+# the loud backstop that surfaces any drift the hook missed.
+pre-commit = "conformist --staged --exit-zero-on-fix"

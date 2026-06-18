@@ -9,10 +9,15 @@ default: lint build test
 #  |____/ \__,_|_|_|\__,_|
 #
 
+build: build-nix build-go build-gomod2nix
+
+# Build all binaries (madder, madder-cache, madder-mcp, hyphence) + man pages
+# via nix. The full release build; `build-go` is the faster compile-only check.
 [group("build")]
-build:
+build-nix:
   nix build --show-trace
 
+# Compile-only Go build (no nix, no man pages) — the fast inner-loop check.
 [group("build")]
 build-go:
   cd go && go build ./...
@@ -24,17 +29,17 @@ build-go:
 # a fresh export is already lint-fmt-clean. No post-export `nix fmt` is
 # needed: `dagnabit export` alone leaves pkgs/ byte-identical to a
 # committed, formatted tree (this is also what `lint-facades` relies on).
-[group("build")]
-generate-facades:
+[group("codemod")]
+codemod-facades:
   cd go && dagnabit export
 
 # Regenerate facades and show what dewey imports landed in the three
 # facades that import dewey directly (domain_interfaces, hyphence,
 # markl). Used to debug dagnabit import resolution (e.g. internal/ vs
-# pkgs/ path choice). Depends on generate-facades so regeneration is
+# pkgs/ path choice). Depends on codemod-facades so regeneration is
 # expressed once, not duplicated inline.
 [group("debug")]
-debug-check-facade-imports: generate-facades
+debug-check-facade-imports: codemod-facades
   grep purse-first go/pkgs/domain_interfaces/main.go || true
   grep purse-first go/pkgs/hyphence/main.go || true
   grep purse-first go/pkgs/markl/main.go || true
@@ -45,10 +50,10 @@ debug-check-facade-imports: generate-facades
 # regeneration from whatever stale state the previous generated files
 # happened to be in.
 #
-# Chains `conformist` last (like generate-facades): tommy emits no blank
+# Chains `conformist` last (like codemod-facades): tommy emits no blank
 # lines between top-level functions, but gofumpt restores them, so the
 # raw `goimports -w` output is not conformist-clean. Running the formatter
-# here keeps generate-tommy a one-step process and prevents merge-hook
+# here keeps codemod-tommy a one-step process and prevents merge-hook
 # (lint-fmt) surprises.
 #
 # Uses the `tommy` CLI from the devshell (the tommy flake input). The CLI
@@ -56,8 +61,8 @@ debug-check-facade-imports: generate-facades
 # pull deps (e.g. dave/jennifer) that madder doesn't import, so `go mod
 # tidy` prunes them from go.sum and an in-module build fails. Keep the
 # devshell tommy in sync with go.mod's tommy via `nix flake update tommy`.
-[group("build")]
-generate-tommy:
+[group("codemod")]
+codemod-tommy:
   find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \
     -maxdepth 1 -type f -name '*_tommy.go' -delete
   cd go && go generate ./internal/charlie/blob_store_configs/...
@@ -83,7 +88,6 @@ clean-go-cache:
 clean-go-modcache:
   cd go && go clean -modcache
 
-# Both Go cleans together.
 [group("maintenance")]
 clean-go: clean-go-cache clean-go-modcache
 
@@ -93,11 +97,6 @@ clean-go: clean-go-cache clean-go-modcache
 clean-nix-result:
   rm -f {{justfile_directory()}}/result
 
-# Full sweep: Go caches + nix-build symlink. Recovers from most
-# stale-build states without touching git-tracked files or the nix
-# store (use `nix store gc` for the latter). Does NOT wipe .tmp/
-# — long-running clients (Clown, devshell tools) hold open files
-# there and rely on $TMPDIR pointing at it.
 [group("maintenance")]
 clean: clean-go clean-nix-result
 
@@ -108,41 +107,35 @@ clean: clean-go clean-nix-result
 #    |_|\___||___/\__|
 #
 
-# Run all tests (unit + integration) with the race detector enabled.
-# Concurrent-write paths (pack_parallel, blob_mover link publish) are
-# load-bearing, so default verification runs them under -race.
-# vet-go-analyzers runs first because it's cheap and catches issues
-# the test suites would not (deferred error drops, pool leaks,
-# discarded iter.Seq2 errors).
 [group("post-build")]
-test: vet-go-analyzers test-go-race test-bats test-bats-net-cap
+test: verify-go-analyzers test-go-race test-bats test-bats-net-cap
 
-# Run Go unit tests only.
+# Run Go unit tests only. Usage: just run-go-test ./internal/foo
 [group("post-build")]
-test-go *flags:
+run-go-test *flags:
   cd go && go test -tags test {{flags}} ./...
 
-# Run Go benchmarks. Usage: just bench-go ./internal/foxtrot/blob_stores
+# Run Go benchmarks. Usage: just run-bench ./internal/foxtrot/blob_stores
 # Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
 # in flags for real timing. -run=^$ suppresses test functions.
 [group("post-build")]
-bench-go pkg="./..." *flags="-benchtime=1x":
+run-bench pkg="./..." *flags="-benchtime=1x":
   cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
 
 # Run `go vet` across the module with the test build tag, which gates
 # several internal test-only symbols. Without -tags test, vet reports
 # false positives on test-tagged source files.
 [group("post-build")]
-vet-go *flags:
+run-go-vet *flags:
   cd go && go vet -tags test {{flags}} ./...
 
-# Build a dewey go/analysis analyzer (defererr, repool, or seqerror)
-# from the module cache into .tmp/analyzers/, then run it via
+# Build a dewey go/analysis analyzer (e.g. defererr, repool, seqerror, actx,
+# testui, paramobj) from the module cache into .tmp/analyzers/, then run it via
 # `go vet -vettool`. Strict: any analyzer finding fails the recipe.
 # The analyzer cmds are pinned via go.mod `tool` directives so
 # `go mod tidy` does not drop their transitive deps.
 [group("post-build")]
-vet-go-analyzer name:
+verify-go-analyzer name:
   #!/usr/bin/env bash
   set -euo pipefail
   bin="{{justfile_directory()}}/.tmp/analyzers/{{name}}"
@@ -151,18 +144,15 @@ vet-go-analyzer name:
   go build -o "$bin" github.com/amarbel-llc/purse-first/libs/dewey/cmd/{{name}}
   go vet -tags test -vettool="$bin" ./...
 
-# Run every dewey analyzer in sequence. Wired into the top-level
-# `test` aggregate; runs first so analyzer findings break the loop
-# before the slower bats lanes start.
 [group("post-build")]
-vet-go-analyzers: (vet-go-analyzer "seqerror") (vet-go-analyzer "repool") (vet-go-analyzer "defererr")
+verify-go-analyzers: (verify-go-analyzer "seqerror") (verify-go-analyzer "repool") (verify-go-analyzer "defererr")
 
 # Build, vet, and test a single internal subpackage tree — the standard
 # verification triple, but scoped to ./internal/<subpath>/... so we don't
 # wait for the whole module when iterating on one package.
-# Usage: just verify-internal-pkg futility
+# Usage: just run-internal-pkg futility
 [group("post-build")]
-verify-internal-pkg subpath:
+run-internal-pkg subpath:
   cd go && go build ./internal/{{subpath}}/...
   cd go && go vet -tags test ./internal/{{subpath}}/...
   cd go && go test -tags test ./internal/{{subpath}}/...
@@ -174,12 +164,12 @@ test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
 
 # Run Go unit tests with coverage collection. Writes covdata fragments
-# to .tmp/cover-data/unit/ (mergeable with the bats lane via cover-all)
+# to .tmp/cover-data/unit/ (mergeable with the bats lane via run-cover-merged)
 # and a textfmt profile to .tmp/go-cover.out (the legacy interface).
 # View the full HTML report with
 # `cd go && go tool cover -html=../.tmp/go-cover.out`.
 [group("post-build")]
-test-go-cover *flags:
+run-go-cover *flags:
   #!/usr/bin/env bash
   set -euo pipefail
   unit_dir="{{justfile_directory()}}/.tmp/cover-data/unit"
@@ -224,7 +214,7 @@ test-bats-net-cap:
 # scenarios are filtered out — the SFTP harness those tests need is
 # a devshell-only derivation not exposed to nix-driven bats lanes.
 [group("post-build")]
-test-bats-race:
+run-bats-race:
   nix build .#bats-race --print-build-logs --no-link
 
 # Run bats integration tests against a coverage-instrumented binary.
@@ -240,7 +230,7 @@ test-bats-race:
 # net_cap-tagged scenarios are filtered out by the derivation — they
 # need loopback binding the nix sandbox doesn't grant.
 [group("post-build")]
-test-bats-cover:
+run-bats-cover:
   #!/usr/bin/env bash
   set -euo pipefail
   out_path="$(nix build .#madder-cli-cover --no-link --print-out-paths --print-build-logs)"
@@ -259,12 +249,12 @@ test-bats-cover:
   (cd go && go tool cover -func="$out" | tail -n 1)
 
 # Merge unit-test and bats coverage into a combined profile at
-# .tmp/cover-data/merged.out. Depends on test-go-cover and test-bats-cover
+# .tmp/cover-data/merged.out. Depends on run-go-cover and run-bats-cover
 # having produced fragments under .tmp/cover-data/{unit,bats}/. Use this
 # to see the full coverage picture across both lanes — anything still
 # uncovered after both passes is a real gap.
 [group("post-build")]
-cover-merged: test-go-cover test-bats-cover
+run-cover-merged: run-go-cover run-bats-cover
   #!/usr/bin/env bash
   set -euo pipefail
   cover_data="{{justfile_directory()}}/.tmp/cover-data"
@@ -281,9 +271,9 @@ cover-merged: test-go-cover test-bats-cover
 # Per-package coverage rollup with delta columns. Shows unit %, bats %,
 # merged %, and bats-delta (how much bats adds beyond unit). Sorted
 # ascending by merged % so the worst-covered packages surface first.
-# Depends on cover-merged so all three profiles exist.
+# Depends on run-cover-merged so all three profiles exist.
 [group("post-build")]
-cover-summary: cover-merged
+run-cover-summary: run-cover-merged
   #!/usr/bin/env bash
   set -euo pipefail
   cover_data="{{justfile_directory()}}/.tmp/cover-data"
@@ -322,9 +312,9 @@ cover-summary: cover-merged
     | sort -t $'\t' -k4 -n \
     | awk -F $'\t' '{ printf "%-72s %6.1f%% %6.1f%% %7.1f%% %+9.1f\n", $1, $2, $3, $4, $3-$2 }'
 
-# Run specific bats test files.
+# Run specific bats test files. Usage: just run-bats-targets foo.bats bar.bats
 [group("post-build")]
-test-bats-targets *targets: build
+run-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
     HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test-targets {{targets}}
@@ -336,7 +326,7 @@ test-bats-targets *targets: build
 # dev-loop and release share one cache. `nix flake show` lists every
 # available bats lane.
 [group("post-build")]
-test-bats-tags *tags:
+run-bats-tags *tags:
   nix build --print-build-logs --no-link .#bats-{{tags}}
 
 #   _____                          _
@@ -346,11 +336,13 @@ test-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
+codemod: codemod-fmt codemod-facades codemod-tommy
+
 # Format all source files via conformist (the treefmt successor): Go
-# (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt). Config lives
-# in ./conformist.toml. The read-only counterpart is `lint-fmt`.
+# (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt). Config is
+# Nix-generated from ./conformist.nix. The read-only counterpart is `lint-fmt`.
 [group("codemod")]
-fmt:
+codemod-fmt:
   nix develop {{justfile_directory()}} --command conformist
 
 #   _     _       _
@@ -370,9 +362,10 @@ lint-flake:
   doppelgang lint --flake .
 
 # Read-only format + lint gate via conformist (the treefmt successor).
-# Verifies formatter drift (Go/Nix/shell, per ./conformist.toml) plus
-# shellcheck. Runs inside the nix devshell so all formatter binaries
-# (nixfmt, gofumpt, etc.) are on PATH. `just fmt` is the write mode.
+# Verifies formatter drift (Go/Nix/shell) plus the eng-convention linters,
+# per the Nix-generated config (./conformist.nix + presets.eng). Runs inside
+# the nix devshell where the wrapped conformist is on PATH. `just codemod-fmt`
+# is the write mode.
 [group("pre-build")]
 lint-fmt:
   nix develop {{justfile_directory()}} --command conformist check
@@ -396,15 +389,16 @@ lint-facades:
 #  |_|  |_|\__,_|_|_| |_|\__|
 #
 
+# Tidy go.mod/go.sum (`go mod tidy`) — prune unused deps, add missing ones.
 [group("maintenance")]
-tidy:
+update-go-mod:
   cd go && go mod tidy
 
 # Update dewey to a version (e.g. just update-dewey v0.0.3).
 [group("maintenance")]
 update-dewey version:
   cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
-  just gomod2nix
+  just build-gomod2nix
 
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
 # the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
@@ -434,12 +428,12 @@ tag version message:
 bump-version new_version:
   #!/usr/bin/env bash
   set -euo pipefail
-  current=$(grep '^MADDER_VERSION=' version.env | cut -d= -f2)
+  current=$(grep '^export MADDER_VERSION=' version.env | cut -d= -f2)
   if [[ "$current" == "{{new_version}}" ]]; then
     gum log --level info "already at {{new_version}}"
     exit 0
   fi
-  sed -i.bak 's/^MADDER_VERSION=.*/MADDER_VERSION={{new_version}}/' version.env && rm version.env.bak
+  sed -i.bak 's/^export MADDER_VERSION=.*/export MADDER_VERSION={{new_version}}/' version.env && rm version.env.bak
   gum log --level info "bumped MADDER_VERSION: $current → {{new_version}}"
 
 # Cut a release: must be run on master. Bumps MADDER_VERSION in
@@ -492,8 +486,9 @@ release version:
   git push origin "$tag"
   gum log --level info "Pushed $tag"
 
+# Regenerate gomod2nix.toml from go.mod/go.sum (the nix build's dep lockfile).
 [group("maintenance")]
-gomod2nix:
+build-gomod2nix:
   cd go && gomod2nix
 
 # Print the version subcommand output from the nix-built binaries.
@@ -510,9 +505,9 @@ debug-version:
 # so we can iterate on it in-tree without a purse-first release cycle.
 # Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,
 # copies recursively, and chmods writable. Destination must not exist.
-# Usage: just incubate-dewey-pkg golf/command futility
+# Usage: just debug-incubate-dewey-pkg golf/command futility
 [group("debug")]
-incubate-dewey-pkg subpath dest:
+debug-incubate-dewey-pkg subpath dest:
   #!/usr/bin/env bash
   set -euo pipefail
   cd {{justfile_directory()}}
@@ -538,13 +533,13 @@ incubate-dewey-pkg subpath dest:
 # Use to migrate consumers after moving a package (e.g. incubation ->
 # upstream swap, or this repo's golf/command -> futility cutover).
 # Usage:
-#   just rename-go-import \
+#   just debug-rename-go-import \
 #     github.com/amarbel-llc/madder/go/internal/golf/command \
 #     github.com/amarbel-llc/madder/go/internal/futility \
 #     command futility \
 #     'go/internal/golf/command/*' 'go/internal/futility/*'
 [group("debug")]
-rename-go-import old_path new_path old_ident new_ident *skips:
+debug-rename-go-import old_path new_path old_ident new_ident *skips:
   #!/usr/bin/env bash
   set -euo pipefail
   set -f  # disable globbing so skip patterns with `*` aren't expanded against CWD
@@ -563,9 +558,9 @@ rename-go-import old_path new_path old_ident new_ident *skips:
 # Rewrite `package <old>` → `package <new>` in every .go file under a
 # directory tree. Also rewrites `package <old>_test` for external test
 # files. Does not touch import statements — rename consumers separately.
-# Usage: just rename-go-package go/internal/futility command futility
+# Usage: just debug-rename-go-package go/internal/futility command futility
 [group("debug")]
-rename-go-package dir old new:
+debug-rename-go-package dir old new:
   #!/usr/bin/env bash
   set -euo pipefail
   cd {{justfile_directory()}}

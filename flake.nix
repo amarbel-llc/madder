@@ -37,7 +37,8 @@
     };
 
     # conformist: the linter + formatter multiplexer (treefmt successor).
-    # Config lives in ./conformist.toml.
+    # Config is Nix-generated from ./conformist.nix (+ presets.eng) via
+    # conformist.lib.evalModule.
     conformist = {
       url = "github:amarbel-llc/conformist";
       inputs.igloo.follows = "igloo";
@@ -133,21 +134,19 @@
 
         inherit (gomod.goPkgs) go-pkgs go-pkgs-test;
 
-        # `nix fmt` entry point: conformist (the treefmt successor) wrapped
-        # with the formatter binaries its ./conformist.toml drives on PATH.
-        # Formatting drift is gated by `just lint-fmt` (conformist check).
-        pkgs-master = import nixpkgs-master { inherit system; };
-        conformistFmt = pkgs.writeShellApplication {
-          name = "conformist-fmt";
-          runtimeInputs = [
-            conformist.packages.${system}.default
-            pkgs-master.gofumpt
-            pkgs-master.gotools
-            pkgs.nixfmt
-            pkgs.shfmt
-            pkgs.shellcheck
+        # conformist config, Nix-generated from ./conformist.nix merged with the
+        # eng-convention preset (conformist.lib.presets.eng). The build.wrapper
+        # is the `nix fmt` entry point: a conformist binary with --config-file +
+        # every enabled tool baked in as /nix/store paths, so no hand-maintained
+        # formatter PATH is needed. `just lint-fmt` runs `conformist check`
+        # against the same config (the wrapped binary is on the devShell PATH —
+        # see go/default.nix). See conformist-nix(7).
+        conformistEval = conformist.lib.evalModule pkgs {
+          imports = [
+            conformist.lib.presets.eng
+            ./conformist.nix
           ];
-          text = ''exec conformist "$@"'';
+          package = conformist.packages.${system}.default;
         };
 
         result = import ./go/default.nix {
@@ -169,6 +168,10 @@
           # drops a file the build needs, this build breaks (#212).
           goPkgsTest = go-pkgs-test;
           inherit (gomod) goFlakeInputs;
+          # The wrapped conformist (config baked in) for the devShell, so
+          # `just lint-fmt` / `just fmt` resolve `conformist` to the generated
+          # config rather than searching for a (now-deleted) conformist.toml.
+          conformistWrapper = conformistEval.config.build.wrapper;
           man7Src = ./docs/man.7;
           # Test-only inputs for the bats lanes' installCheckPhase.
           # Kept out of the build-time `src` closure so test-only
@@ -186,8 +189,8 @@
           inherit go-pkgs go-pkgs-test;
         };
         devShells.default = result.devShells.default;
-        # `nix fmt` runs conformist (see conformistFmt above).
-        formatter = conformistFmt;
+        # `nix fmt` runs the generated conformist wrapper (see conformistEval).
+        formatter = conformistEval.config.build.wrapper;
       }
     ));
 }

@@ -34,7 +34,7 @@ function version_matches_source_of_truth { # @test
   got_version="$(echo "$output" | head -n1 | cut -d+ -f1)"
 
   local expected_version
-  expected_version="$(grep '^MADDER_VERSION=' "${BATS_TEST_DIRNAME}/../version.env" | cut -d= -f2)"
+  expected_version="$(grep '^export MADDER_VERSION=' "${BATS_TEST_DIRNAME}/../version.env" | cut -d= -f2)"
 
   assert_equal "$got_version" "$expected_version"
 }

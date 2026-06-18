@@ -5,7 +5,7 @@ go 1.26
 require (
 	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/crap/go-crap/v2 v2.2.2
-	github.com/amarbel-llc/purse-first/libs/dewey v0.3.0
+	github.com/amarbel-llc/purse-first/libs/dewey v0.3.2
 	github.com/amarbel-llc/tap/go v0.1.8
 	github.com/amarbel-llc/tommy v0.3.4-0.20260608131104-42624689df9b
 	github.com/aws/aws-sdk-go-v2 v1.41.7
@@ -80,7 +80,10 @@ require (
 )
 
 tool (
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/actx
 	github.com/amarbel-llc/purse-first/libs/dewey/cmd/defererr
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/paramobj
 	github.com/amarbel-llc/purse-first/libs/dewey/cmd/repool
 	github.com/amarbel-llc/purse-first/libs/dewey/cmd/seqerror
+	github.com/amarbel-llc/purse-first/libs/dewey/cmd/testui
 )
