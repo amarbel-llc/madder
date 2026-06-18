@@ -183,13 +183,20 @@ run-go-cover *flags:
   echo "==> Coverage written to $out (fragments at $unit_dir)"
   go tool cover -func="$out" | tail -n 1
 
-# Run bats integration tests. Excludes net_cap-tagged tests (loopback-
-# binding scenarios) — those run under `test-bats-net-cap`.
+# Run bats integration tests via the nix-sandbox lane (.#bats-default,
+# the `!net_cap` filter). Excludes net_cap-tagged tests — those run under
+# `test-bats-net-cap`.
+#
+# Runs in the nix build sandbox, NOT the devshell, on purpose: serve.bats
+# binds an AF_UNIX socket, and under clown's fence sandbox (TMPDIR=/tmp/fence
+# on darwin) a devshell `bats` run's child `madder serve` is denied
+# `bind: operation not permitted`. The nix sandbox gives a clean fresh
+# namespace where the bind succeeds — same rationale as test-bats-net-cap.
+# For fast local iteration against result/bin, use `run-bats-targets` /
+# `run-bats-tags` in the devshell instead.
 [group("post-build")]
-test-bats: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
-    HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
-    just zz-tests_bats/test
+test-bats:
+  nix build .#bats-default --no-link --print-build-logs
 
 # Run net_cap-tagged bats tests (SFTP + WebDAV harnesses, future
 # loopback-binding harnesses) via the nix-sandbox lane. The lane bundles
