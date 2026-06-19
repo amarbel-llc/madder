@@ -343,7 +343,7 @@ run-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
-codemod: codemod-fmt codemod-facades codemod-tommy
+codemod: codemod-fmt codemod-facades codemod-tommy codemod-flake
 
 # Format + repair all source files via conformist (the treefmt successor): Go
 # (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt), plus the
@@ -365,10 +365,21 @@ codemod-fmt:
 lint: lint-flake lint-fmt lint-facades lint-tommy lint-worktree
 
 # Lint flake.lock for reducible input duplication (madder#214,
-# doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift.
+# doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift. The
+# write-mode counterpart is `codemod-flake`.
 [group("pre-build")]
 lint-flake:
   doppelgang lint --flake .
+
+# Repair reducible flake-input duplication: `doppelgang lint --fix` splices the
+# computed `inputs.X.follows = "Y"` lines into flake.nix, re-locks via
+# `nix flake lock`, and git-adds the touched files (doppelgang#9). Auto-fixes
+# only byte-identical follows opportunities; multi-version inputs stay
+# report-only and still exit nonzero (choosing a rev changes behavior — resolve
+# those by hand). Needs nix on PATH. The read-only counterpart is `lint-flake`.
+[group("codemod")]
+codemod-flake:
+  doppelgang lint --fix --flake .
 
 # Read-only format + lint gate via conformist (the treefmt successor).
 # Verifies formatter drift (Go/Nix/shell) plus the eng-convention linters,
