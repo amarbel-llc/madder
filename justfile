@@ -31,7 +31,7 @@ build-go:
 # committed, formatted tree (this is also what `lint-facades` relies on).
 [group("codemod")]
 codemod-facades:
-  cd go && dagnabit export
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && dagnabit export'
 
 # Regenerate facades and show what dewey imports landed in the three
 # facades that import dewey directly (domain_interfaces, hyphence,
@@ -369,7 +369,7 @@ lint: lint-flake lint-fmt lint-facades lint-tommy lint-worktree
 # write-mode counterpart is `codemod-flake`.
 [group("pre-build")]
 lint-flake:
-  doppelgang lint --flake .
+  nix develop {{justfile_directory()}} --command sh -c 'doppelgang lint --flake .'
 
 # Repair reducible flake-input duplication: `doppelgang lint --fix` splices the
 # computed `inputs.X.follows = "Y"` lines into flake.nix, re-locks via
@@ -379,7 +379,7 @@ lint-flake:
 # those by hand). Needs nix on PATH. The read-only counterpart is `lint-flake`.
 [group("codemod")]
 codemod-flake:
-  doppelgang lint --fix --flake .
+  nix develop {{justfile_directory()}} --command sh -c 'doppelgang lint --fix --flake .'
 
 # Read-only format + lint gate via conformist (the treefmt successor).
 # Verifies formatter drift (Go/Nix/shell) plus the eng-convention linters,
@@ -400,7 +400,7 @@ lint-fmt:
 # dir under the module root and exits nonzero if it differs from committed.
 [group("pre-build")]
 lint-facades:
-  cd go && dagnabit export --check
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && dagnabit export --check'
 
 # Fail if the committed *_tommy.go codegen has drifted from its hand-written
 # structs (or was produced by a different tommy version — the header carries a
@@ -412,14 +412,7 @@ lint-facades:
 # the current devshell tommy.
 [group("pre-build")]
 lint-tommy:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd {{justfile_directory()}}/go/internal/charlie/blob_store_configs
-  rc=0
-  for f in $(grep -lF '//go:generate tommy generate' *.go); do
-    GOFILE="$f" tommy generate --check || rc=1
-  done
-  exit "$rc"
+  nix develop {{justfile_directory()}} --command bash -c 'set -euo pipefail; cd {{justfile_directory()}}/go/internal/charlie/blob_store_configs; rc=0; for f in $(grep -lF "//go:generate tommy generate" *.go); do GOFILE="$f" tommy generate --check || rc=1; done; exit "$rc"'
 
 # Non-sandbox lane: the IMPURE eng-convention git-state checks (git-remotes,
 # git-default-branch, sweatfile, agents-md, gomod2nix) run against the WORKING
