@@ -467,13 +467,15 @@ in
       doppelgang.packages.${system}.default
     ]
     # The BARE conformist binary (not the Nix wrapper) plus the formatter/linter
-    # tools its on-disk ./conformist.toml drives by bare name. The bare binary is
-    # required so dagnabit's `conformist --tree-root <outdir>` (facade
-    # formatting) doesn't collide with the wrapper's baked --tree-root-file. The
-    # full eng-roster lint gate reaches the Nix-generated config via
-    # $MADDER_CONFORMIST_CONFIG (see env below); `nix fmt` uses the wrapper
-    # (flake.nix `formatter`). gofumpt/gotools/shfmt are in the pkgs-master block
-    # below; nixfmt/shellcheck are added here.
+    # tools the generated config drives. The bare binary is required because
+    # dagnabit's facade formatter (runConformist) appends `--tree-root <outdir>`
+    # + `--config-file <generated>` to whatever `conformist` is on PATH; the Nix
+    # wrapper already bakes --tree-root-file/--config-file, so those would
+    # collide. lint-fmt / codemod-fmt reach the generated config via
+    # $MADDER_CONFORMIST_CONFIG; dagnabit reaches it via $DAGNABIT_CONFORMIST_CONFIG
+    # (see env below); `nix fmt` uses the wrapper (flake.nix `formatter`).
+    # gofumpt/gotools/shfmt are in the pkgs-master block below; nixfmt/shellcheck
+    # are added here.
     ++ pkgs-master.lib.optionals (conformist != null) [
       conformist.packages.${system}.default
       pkgs.nixfmt
@@ -494,8 +496,8 @@ in
 
     # The Nix-generated conformist config (full eng-convention roster). The
     # lint-fmt / codemod-fmt recipes pass it to the bare conformist via
-    # --config-file. Empty string when not flake-built (non-flake callers fall
-    # back to the on-disk ./conformist.toml's formatter-only set).
+    # --config-file. Empty string when not flake-built; a non-flake caller would
+    # need conformist's own upward config search (there is no on-disk config).
     MADDER_CONFORMIST_CONFIG = if conformistConfig == null then "" else "${conformistConfig}";
 
     # The impure-lane config (git-state checks: git-remotes, git-default-branch,
@@ -503,5 +505,16 @@ in
     # bare conformist via --config-file against the working tree.
     MADDER_CONFORMIST_IMPURE_CONFIG =
       if conformistImpureConfig == null then "" else "${conformistImpureConfig}";
+
+    # dagnabit's facade formatter (`dagnabit export`, run by lint-facades /
+    # codemod-facades) honors this to format generated facades with madder's
+    # REAL (Nix-generated) conformist config — instead of searching upward for a
+    # conformist.toml that no longer exists on disk and escalating to a stray
+    # ancestor (~/eng/conformist.toml). Setting it short-circuits the upward
+    # search entirely (purse-first#159). Reuses the full eng config: dagnabit
+    # runs it in repair/format mode, where the check-only eng linters (eng-
+    # versioning, justfile-*, …) are no-ops, so only the formatters touch the
+    # generated Go. Replaces the former on-disk ./conformist.toml stopgap.
+    DAGNABIT_CONFORMIST_CONFIG = if conformistConfig == null then "" else "${conformistConfig}";
   };
 }

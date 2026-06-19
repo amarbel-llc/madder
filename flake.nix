@@ -147,12 +147,12 @@
         #   - `just lint-fmt` / `just codemod-fmt` pass build.configFile to a
         #     BARE conformist via --config-file (see go/default.nix devShell).
         # We expose the BARE conformist (not the wrapper) on the devShell PATH
-        # because dagnabit's facade formatter (`dagnabit export`) invokes
-        # `conformist --tree-root <outdir>`, which collides with the wrapper's
-        # baked --tree-root-file. The bare binary + an on-disk ./conformist.toml
-        # (formatter-only, for dagnabit's upward config search) keep the facade
-        # lane working until dagnabit integrates with a Nix-generated config
-        # directly (amarbel-llc/purse-first#159). See conformist-nix(7).
+        # because dagnabit's facade formatter (`dagnabit export`) appends
+        # `--tree-root <outdir>` + `--config-file <generated>` to the on-PATH
+        # conformist, which would collide with the wrapper's baked flags.
+        # dagnabit reaches the generated config via $DAGNABIT_CONFORMIST_CONFIG
+        # (purse-first#159); lint-fmt/codemod-fmt via $MADDER_CONFORMIST_CONFIG.
+        # See conformist-nix(7).
         conformistEval = conformist.lib.evalModule pkgs {
           imports = [
             conformist.lib.presets.eng
