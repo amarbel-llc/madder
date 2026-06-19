@@ -34,6 +34,12 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
+      # purse-first gained a `conformist` input (its dagnabit facade-format lane
+      # points `dagnabit export` at conformist's generated config — purse-first#159).
+      # Collapse it onto madder's top-level conformist so the lock has ONE
+      # conformist node (doppelgang lint dedup). No cycle: conformist no longer
+      # consumes purse-first (it builds golangci-lint-dewey from a pinned FOD).
+      inputs.conformist.follows = "conformist";
     };
 
     # conformist: the linter + formatter multiplexer (treefmt successor).
