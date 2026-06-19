@@ -150,8 +150,11 @@
         # because dagnabit's facade formatter (`dagnabit export`) appends
         # `--tree-root <outdir>` + `--config-file <generated>` to the on-PATH
         # conformist, which would collide with the wrapper's baked flags.
-        # dagnabit reaches the generated config via $DAGNABIT_CONFORMIST_CONFIG
-        # (purse-first#159); lint-fmt/codemod-fmt via $MADDER_CONFORMIST_CONFIG.
+        # lint-fmt/codemod-fmt reach the generated config via
+        # $MADDER_CONFORMIST_CONFIG (those recipes self-enter the devShell).
+        # dagnabit reaches it via the dagnabitWrapped shim (go/default.nix),
+        # which bakes the config + a runtime ceiling so the facade lane is
+        # hermetic even in the env-less pre-merge hook (purse-first#159, #163).
         # See conformist-nix(7).
         conformistEval = conformist.lib.evalModule pkgs {
           imports = [
