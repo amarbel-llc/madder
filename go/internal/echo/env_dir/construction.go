@@ -84,11 +84,30 @@ func MakeDefaultAndInitialize(
 
 	switch repoId.GetLocationType() {
 	case scoped_id.LocationTypeXDGSystem:
-		// FDR-0019: system-scope resolution (the `//name` forced-system
-		// spelling and the remote-first `/name` fallback) is not yet
-		// wired in madder. dodder reads the remote-first marker; madder
-		// has no remote transport.
-		panic(errors.WithoutStack(errors.Err501NotImplemented))
+		// madder#280: a //name (system) id roots its XDG at the injected
+		// system root (Config.SystemRoot, e.g. /var/lib/madder) instead of
+		// the user $HOME. Force SystemScoped so initializeXDG re-roots the
+		// base XDG at SystemRoot — the same rootAtSystem path
+		// GetXDGForBlobStoreId applies per store (madder#230). When
+		// SystemRoot is unset the re-root no-ops and the env resolves like a
+		// user env, consistent with GetXDGForBlobStoreId's empty-SystemRoot
+		// no-op. (Previously this branch panicked Err501NotImplemented; the
+		// remote-first `/name` marker stays a dodder concern — madder has no
+		// remote transport and resolves both `/name` and `//name` to the
+		// system scope.)
+		cfg.SystemScoped = true
+
+		var home string
+
+		{
+			var err error
+
+			if home, err = os.UserHomeDir(); err != nil {
+				context.Cancel(err)
+			}
+		}
+
+		return MakeWithHomeAndInitialize(context, cfg, xdgScope, home)
 
 	case scoped_id.LocationTypeCwd:
 		var cwd string
