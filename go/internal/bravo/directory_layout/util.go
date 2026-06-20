@@ -134,3 +134,53 @@ func FindAllCwdOverridePaths(
 
 	return ancestors
 }
+
+// ResolveNthAncestorMatch walks up from cwd via FindAllCwdOverridePaths
+// (deepest-first, ceiling-respecting ancestors carrying `.<utilityName>/`)
+// and returns the depth-th ancestor for which matches reports true: depth 0
+// is the deepest match, depth 1 the next match up, etc. This is the
+// store-aware, depth-ranked OPERATE-path resolver (dodder#281) — the
+// counterpart to env_dir.MakeDefaultAndInitialize's literal Nth-parent
+// walk-up (madder#153), which is the INIT-path resolver. Operate stays
+// nearest-ancestor so a command can run from a child directory below the
+// addressed root.
+//
+// It ERRORS (does not clamp) when fewer than depth+1 matching ancestors
+// exist, mirroring scoped_id's strict posture and #153's overflow policy.
+//
+// matches is the caller's name/identity check for a candidate ancestor:
+// madder would pass "this ancestor hosts a blob store named <name>"; dodder
+// passes its own ".dodder repo named <name>" check. Injecting it keeps this
+// single deepest-first walk utility-agnostic (it never needs to know either
+// layout's store/repo model) while reusing the discovery walk rather than
+// duplicating it. matches must be non-nil.
+func ResolveNthAncestorMatch(
+	cwd, utilityName string,
+	depth uint,
+	ceilings []string,
+	matches func(ancestorPath string) bool,
+) (string, error) {
+	ancestors := FindAllCwdOverridePaths(cwd, utilityName, ceilings)
+
+	var seen uint
+
+	for _, ancestor := range ancestors {
+		if !matches(ancestor) {
+			continue
+		}
+
+		if seen == depth {
+			return ancestor, nil
+		}
+
+		seen++
+	}
+
+	return "", errors.Errorf(
+		"cwd dot-depth %d exceeds the available same-named ancestors of %q: "+
+			"found %d matching ancestor(s)",
+		depth,
+		cwd,
+		seen,
+	)
+}
