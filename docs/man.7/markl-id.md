@@ -129,6 +129,11 @@ Common purposes:
 :   Encryption recipient (PIV slot 9D ECDH key, or an age recipient).
     Formats: pivy_ecdh_p256_pub, age_x25519_pub.
 
+**papi-doc-sig-v1**
+:   PAPI document signature: a slot-9A ecdsa-sha2-nistp256 SSH signature over
+    a PAPI document's canonicalized (JCS) bytes. Format: ecdsa_p256_sig.
+    Jointly owned with amarbel-llc/papi; produced by `piggy papi sign`.
+
 See RFC 0002 (docs/rfcs/0002-markl-id-format.md) for the normative wire-format
 spec and the cross-language stable purpose registry. The Go reference
 implementation registers additional dodder/madder-internal purposes that are

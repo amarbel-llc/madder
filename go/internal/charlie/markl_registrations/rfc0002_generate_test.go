@@ -40,6 +40,7 @@ var rfc0002StablePurposes = []string{
 	markl.PurposePiggyPivSigV1,
 	markl.PurposePiggyPivCardAuthV1,
 	markl.PurposePiggyRecipientV1,
+	markl.PurposePapiDocSigV1,
 }
 
 // rfc0002StableFormats lists every format ID currently registered.

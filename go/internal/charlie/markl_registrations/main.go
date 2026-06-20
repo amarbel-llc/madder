@@ -230,6 +230,22 @@ var (
 			markl.FormatIdAgeX25519Pub,
 		},
 	}
+
+	// Papi document signature (jointly owned with amarbel-llc/papi;
+	// mirrored in the piggy-markl crate for the producer side). A slot-9A
+	// ecdsa-sha2-nistp256 SSH signature over a PAPI document's JCS bytes,
+	// carried as the 64-byte r‖s ecdsa_p256_sig payload after SSH-wire
+	// framing is stripped. Reuses PurposeTypeObjectSig (the type label is
+	// descriptive only; no production path branches on it). Spans only
+	// ecdsa_p256_sig — PAPI's slot-9A YubiKey co-sign world is all P-256;
+	// widening to ed25519_sig later is backward-compatible (existing IDs
+	// still validate), so start narrow and amend if a software signer
+	// appears.
+	PurposePapiDocSigV1Opts = markl.RegisterPurposeOpts{
+		Id:        markl.PurposePapiDocSigV1,
+		Type:      markl.PurposeTypeObjectSig,
+		FormatIds: []string{markl.FormatIdEcdsaP256Sig},
+	}
 )
 
 // AllPurposes is the canonical, ordered list of purposes madder
@@ -262,6 +278,7 @@ var AllPurposes = []markl.RegisterPurposeOpts{
 	PurposePiggyPivSigV1Opts,
 	PurposePiggyPivCardAuthV1Opts,
 	PurposePiggyRecipientV1Opts,
+	PurposePapiDocSigV1Opts,
 }
 
 // Canonical purpose-id → format-id aliases. See AllPurposes for the

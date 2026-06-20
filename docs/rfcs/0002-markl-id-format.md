@@ -283,6 +283,7 @@ others.
 | `piggy-piv_sig-v1`               | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9C public key (Digital Signature) |
 | `piggy-piv_card_auth-v1`         | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9E public key (Card Authentication) |
 | `piggy-recipient-v1`             | `pivy_ecdh_p256_pub`, `age_x25519_pub`          | Encryption recipient (PIV slot 9D ECDH key, or age recipient) |
+| `papi-doc-sig-v1`                | `ecdsa_p256_sig`                                | PAPI document signature (slot-9A SSH sig over JCS bytes) |
 
 The `piggy-*` purposes are owned jointly with
 [`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy) and mirrored
@@ -290,6 +291,17 @@ in its `piggy-markl` Rust crate
 (`crates/piggy-markl/src/{format,purpose}.rs`). They are surfaced by
 `piggy list` and consumed by madder wherever a piggy-issued key appears
 in a markl-id slot.
+
+The `papi-doc-sig-v1` purpose is owned jointly with
+[`amarbel-llc/papi`](https://github.com/amarbel-llc/papi) and mirrored in
+the `piggy-markl` Rust crate for the producer side (`piggy papi sign`).
+Its payload is the 64-byte `ecdsa_p256_sig` (r ‖ s, fixed-width) produced
+by a YubiKey PIV slot-9A `ecdsa-sha2-nistp256` key signing a PAPI
+document's canonicalized (JCS) bytes, with the SSH-wire signature framing
+stripped. It spans only `ecdsa_p256_sig`: PAPI's slot-9A co-sign model is
+P-256 throughout, and widening a purpose's compatible-format set is a
+backward-compatible amendment (existing IDs still validate), so the
+registration starts narrow.
 
 *(test: `TestRFC0002VectorsRoundTrip/purpose/...` plus
 `TestAllPurposes_Registered`,

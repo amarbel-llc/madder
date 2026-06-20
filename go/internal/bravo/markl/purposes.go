@@ -53,6 +53,13 @@ const (
 	PurposePiggyPivCardAuthV1 = "piggy-piv_card_auth-v1" // PIV slot 9E
 	PurposePiggyPivSigV1      = "piggy-piv_sig-v1"       // PIV slot 9C
 	PurposePiggyRecipientV1   = "piggy-recipient-v1"     // PIV slot 9D / age
+
+	// Papi document signature (jointly owned with amarbel-llc/papi; see
+	// RFC 0002 §6.1). A slot-9A ecdsa-sha2-nistp256 SSH signature over a
+	// PAPI document's canonicalized (JCS) bytes, carried as the 64-byte
+	// r‖s payload once SSH-wire framing is stripped. Mirrored in the
+	// piggy-markl crate for the producer side (`piggy papi sign`).
+	PurposePapiDocSigV1 = "papi-doc-sig-v1"
 )
 
 // Production registrations live in internal/charlie/markl_registrations

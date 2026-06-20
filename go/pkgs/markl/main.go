@@ -325,6 +325,13 @@ const (
 	PurposeObjectSigV2 = internal.PurposeObjectSigV2
 )
 
+// Papi document signature (jointly owned with amarbel-llc/papi; see
+// RFC 0002 §6.1). A slot-9A ecdsa-sha2-nistp256 SSH signature over a
+// PAPI document's canonicalized (JCS) bytes, carried as the 64-byte
+// r‖s payload once SSH-wire framing is stripped. Mirrored in the
+// piggy-markl crate for the producer side (`piggy papi sign`).
+const PurposePapiDocSigV1 = internal.PurposePapiDocSigV1
+
 // Piggy keys (jointly owned with amarbel-llc/piggy; see RFC 0002 §6.1
 // and the piggy-markl crate). The piggy-piv_* purposes carry a PIV
 // slot's SSH-suitable public key; piggy-recipient-v1 carries an
