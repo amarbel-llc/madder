@@ -33,7 +33,11 @@ This is deliberately distinct from the discovery walk-up
 name-ranked): resolution may be *initializing* a store that does not
 exist yet, so it roots at the literal Nth parent regardless of whether a
 `.<scope>/` store is present there. Callers must pass the raw id (not
-`scoped_id.EffectiveId`, which drops `cwdDepth`).
+`scoped_id.EffectiveId`, which drops `cwdDepth`). The store-aware
+*operate*-path counterpart — the Nth same-named ancestor that already
+exists — is `directory_layout.ResolveNthAncestorMatch` (dodder#281); the
+two-semantics split (literal for init, store-aware-depth-ranked for
+operate) is deliberate.
 
 `Config.RepoName` (madder#240, #241): when set, the env nests both its
 metadata XDG (via `GetXDG`, #241) and its blob-store XDG (via the blob
@@ -68,6 +72,15 @@ env_dir stays application-agnostic; the madder layer passes
 disables system-scope resolution (no-op). dewey has no system concept, so
 `directory_layout.v3System` hard-codes `LocationTypeXDGSystem` (v3/v3Cache
 derive scope from `xdg.IsOverridden`, which can't represent it).
+
+madder#280: `MakeDefaultAndInitialize`'s `LocationTypeXDGSystem` branch
+(the dodder-facing init constructor) forces `Config.SystemScoped` so the
+constructed env's base XDG roots at `SystemRoot` via `initializeXDG` —
+previously it panicked `Err501NotImplemented`. Empty `SystemRoot` no-ops
+there too (resolves like a user env), consistent with the per-store
+`GetXDGForBlobStoreId` no-op above. The remote-first `/name` marker stays
+a dodder concern; madder resolves both `/name` and `//name` to the system
+scope.
 
 `GetXDGForSystemBlobStores() (xdg.XDG, bool)` (madder#230 increment 2) is
 the *discovery* counterpart: it returns the same system-rooted XDG that
