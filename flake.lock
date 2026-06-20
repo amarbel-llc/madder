@@ -68,19 +68,16 @@
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
-        "purse-first": [
-          "purse-first"
-        ],
         "utils": [
           "utils"
         ]
       },
       "locked": {
-        "lastModified": 1781525016,
-        "narHash": "sha256-vg0KLqWtez9mtWzjtytlcu6Z1Qf1/uGIwijyPKiKc9k=",
+        "lastModified": 1781889045,
+        "narHash": "sha256-i3r9RfnQw9qcF0NxTisxFEuGfc6DAMmSoLNOC7uUiDo=",
         "owner": "amarbel-llc",
         "repo": "conformist",
-        "rev": "8007288d12649cb2746cefb53f9923b6efc38cfc",
+        "rev": "00950ff58c099e0f36aff790025ced5e034887ac",
         "type": "github"
       },
       "original": {

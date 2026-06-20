@@ -14,6 +14,14 @@
   # runs `conformist --tree-root <outdir>`, which collides with the wrapper's
   # baked --tree-root-file. Defaulted to null so non-flake callers still work.
   conformist ? null,
+  # The module-generated, toolchain-hermetic per-commit hook wrapper
+  # (conformistEval.config.build.preCommit). Goes on the devShell PATH as
+  # `conformist-pre-commit`, named by the sweatfile [hooks].pre-commit command.
+  # Unlike the bare conformist it BAKES the generated store-path config (no
+  # on-disk conformist.toml / no --config-file needed) and store-pins the
+  # formatter toolchain (no silent-skip on a PATH-missing formatter).
+  # conformist#47/#51; see conformist-nix(7). Defaulted null for non-flake callers.
+  conformistPreCommit ? null,
   # The Nix-generated conformist config file (./conformist.nix + presets.eng,
   # full eng roster). Exposed on the devShell as $MADDER_CONFORMIST_CONFIG so
   # `just lint-fmt` / `just codemod-fmt` pass it to the bare conformist via
@@ -513,6 +521,11 @@ in
       conformist.packages.${system}.default
       pkgs.nixfmt
       pkgs-master.shellcheck
+    ]
+    # The module-generated per-commit hook wrapper, on PATH as
+    # `conformist-pre-commit` for the sweatfile [hooks].pre-commit command.
+    ++ pkgs-master.lib.optionals (conformistPreCommit != null) [
+      conformistPreCommit
     ]
     ++ (with pkgs-master; [
       curl # serve.bats drives `madder serve` over its AF_UNIX socket

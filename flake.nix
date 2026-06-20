@@ -50,7 +50,11 @@
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
-      inputs.purse-first.follows = "purse-first";
+      # NB: conformist no longer consumes purse-first (it builds
+      # golangci-lint-dewey from a pinned FOD), so there is no
+      # inputs.purse-first.follows override here — that would warn on a
+      # non-existent input. purse-first still follows conformist (above) to
+      # keep ONE conformist node in the lock (doppelgang lint dedup).
     };
 
     # Sourced via goFlakeInputs (see madder#208) so a tap bump only
@@ -198,6 +202,12 @@
           # devShell exposes it as $MADDER_CONFORMIST_CONFIG so `just lint-fmt` /
           # `just codemod-fmt` pass it to the bare conformist via --config-file.
           conformistConfig = conformistEval.config.build.configFile;
+          # The module-generated, toolchain-hermetic per-commit hook wrapper,
+          # exposed on the devShell PATH as `conformist-pre-commit` — the
+          # sweatfile [hooks].pre-commit command. Replaces the old bare
+          # `conformist --staged`, which failed to find a config after the
+          # on-disk conformist.toml was dropped for ./conformist.nix.
+          conformistPreCommit = conformistEval.config.build.preCommit;
           # The impure-lane config (git-state checks). Exposed as
           # $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
           conformistImpureConfig = conformistImpureEval.config.build.configFile;
@@ -216,6 +226,10 @@
       {
         packages = result.packages // {
           inherit go-pkgs go-pkgs-test;
+          # Dogfood build.preCommit: `nix build .#conformist-pre-commit` forces
+          # the module output to build (verifies the pinned conformist exposes
+          # it), and it is the same wrapper the devShell puts on PATH.
+          conformist-pre-commit = conformistEval.config.build.preCommit;
         };
         devShells.default = result.devShells.default;
         # `nix fmt` runs the generated conformist wrapper (see conformistEval).

@@ -4,11 +4,16 @@
 pre-merge = "just"
 
 # Per-commit repair: format the index-staged content at authoring time so every
-# commit is conformant in history. `--exit-zero-on-fix` maps the restage's
-# exit-3 signal to 0, so a successful repair lets the commit proceed (a
-# pre-commit hook treats nonzero as "block"); partial-stage files are formatted
-# in isolation rather than refused. Uses the PATH `conformist` (the
-# home-manager-installed binary). Same canonical line as conformist's and
-# spinclass's own sweatfiles. The `pre-merge = "just"` lint-fmt gate stays as
-# the loud backstop that surfaces any drift the hook missed.
-pre-commit = "conformist --staged --exit-zero-on-fix"
+# commit is conformant in history. Uses `conformist-pre-commit` — the
+# config-specific, toolchain-hermetic wrapper the conformist Nix module exposes
+# (conformistEval.config.build.preCommit, put on the devShell PATH via flake.nix
+# + go/default.nix). It BAKES this repo's generated store-path config (madder
+# has no on-disk conformist.toml — the config moved to ./conformist.nix) and
+# store-pins the formatter toolchain, with `--exit-zero-on-fix` baked in. So
+# per-commit repair can't fail on a missing config (the bare `conformist
+# --staged` errored "could not find config file" here) and can't silently skip
+# a file type whose formatter isn't on PATH (conformist#47/#51; the eng template
+# warns "Do NOT use a bare conformist --staged"). The `pre-merge = "just"`
+# lint-fmt gate stays as the loud backstop. Requires the devShell active
+# (direnv) so `conformist-pre-commit` is on PATH.
+pre-commit = "conformist-pre-commit"
