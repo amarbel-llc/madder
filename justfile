@@ -50,11 +50,13 @@ debug-check-facade-imports: codemod-facades
 # regeneration from whatever stale state the previous generated files
 # happened to be in.
 #
-# Chains `conformist` last (like codemod-facades): tommy emits no blank
-# lines between top-level functions, but gofumpt restores them, so the
+# Chains `conformist` last (config-aware, like codemod-fmt): tommy emits no
+# blank lines between top-level functions, but gofumpt restores them, so the
 # raw `goimports -w` output is not conformist-clean. Running the formatter
 # here keeps codemod-tommy a one-step process and prevents merge-hook
-# (lint-fmt) surprises.
+# (lint-fmt) surprises. It MUST pass --config-file "$MADDER_CONFORMIST_CONFIG"
+# (not bare `conformist`): the on-disk conformist.toml was dropped for
+# ./conformist.nix, so a bare invocation fails "could not find config file".
 #
 # Uses the `tommy` CLI from the devshell (the tommy flake input). The CLI
 # can't be `go build`'d from madder's own module: tommy's codegen packages
@@ -67,7 +69,7 @@ codemod-tommy:
     -maxdepth 1 -type f -name '*_tommy.go' -delete
   cd go && go generate ./internal/charlie/blob_store_configs/...
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
-  nix develop {{justfile_directory()}} --command conformist
+  nix develop {{justfile_directory()}} --command sh -c 'conformist --config-file "$MADDER_CONFORMIST_CONFIG"'
 
 # Regenerate the RFC 0002 conformance fixture
 # (go/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json)
