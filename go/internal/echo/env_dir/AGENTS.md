@@ -24,6 +24,17 @@ The location-only `RepoId` selector was removed under FDR-0019 (June
 2026); its role is subsumed by `scoped_id.Id` (name + scope + cwd-depth),
 which `MakeDefaultAndInitialize` now takes directly.
 
+madder#153: `MakeDefaultAndInitialize`'s `LocationTypeCwd` branch
+resolves the id's `cwdDepth` by walking up that many *literal* parent
+directories from cwd (`resolveCwdAncestorOrError`), erroring — not
+clamping — when the depth overruns the available ancestors or a ceiling.
+This is deliberately distinct from the discovery walk-up
+(`directory_layout.FindAllCwdOverridePaths`, which is store-aware and
+name-ranked): resolution may be *initializing* a store that does not
+exist yet, so it roots at the literal Nth parent regardless of whether a
+`.<scope>/` store is present there. Callers must pass the raw id (not
+`scoped_id.EffectiveId`, which drops `cwdDepth`).
+
 `Config.RepoName` (madder#240, #241): when set, the env nests both its
 metadata XDG (via `GetXDG`, #241) and its blob-store XDG (via the blob
 accessors, #240) under `repos/<name>/`, fully isolating a named FDR-0019

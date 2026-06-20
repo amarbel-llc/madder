@@ -101,11 +101,29 @@ func MakeDefaultAndInitialize(
 			}
 		}
 
+		// madder#153: resolve a multi-dot id (`..name`, `...name`) by
+		// walking up cwdDepth literal parent directories from cwd before
+		// rooting the XDG. depth 0 (`.name`) stays at cwd, preserving the
+		// constructor's prior single-dot behavior. Errors (not clamps)
+		// when the depth overruns the available ancestors or a ceiling.
+		ceilings := xdg.ParseCeilingDirectories(
+			os.Getenv(xdg.CeilingEnvVarName(xdgScope)),
+		)
+
+		root, err := resolveCwdAncestorOrError(
+			cwd,
+			repoId.GetCwdDepth(),
+			ceilings,
+		)
+		if err != nil {
+			context.Cancel(err)
+		}
+
 		return MakeWithXDGRootOverrideHomeAndInitialize(
 			context,
 			cfg,
 			xdgScope,
-			cwd,
+			root,
 		)
 	}
 
