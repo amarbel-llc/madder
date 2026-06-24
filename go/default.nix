@@ -67,35 +67,16 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # dagnabitBin is the upstream dagnabit (facade generator + drift check).
+  # dagnabitBin is the upstream dagnabit (facade generator + drift check). Put
+  # on the devShell PATH bare: the facade-format config is now threaded by the
+  # conformist dewey-facade-export module (purse-first#163), which bakes
+  # DAGNABIT_CONFORMIST_CONFIG into its own check/repair scripts — so the old
+  # `dagnabitWrapped` shim (config + ceiling baked, shadowing dagnabit on PATH
+  # for the bare-env merge hook) is retired. The facade drift CHECK runs via the
+  # conformist impure lane (`just lint-worktree`); the facade REPAIR runs via the
+  # conformist pre-commit hook (conformistCodegenEval). Bare dagnabit stays on
+  # PATH for the build's `dagnabit export` preBuild and ad-hoc `dagnabit export`.
   dagnabitBin = purse-first.packages.${system}.dagnabit;
-
-  # dagnabitWrapped shadows `dagnabit` on the devShell PATH with a hermetic
-  # wrapper so the facade lane (lint-facades / codemod-facades, run by the
-  # pre-merge hook via `sh -c just` with a BARE env — no devShell/direnv) does
-  # not depend on $DAGNABIT_CONFORMIST_CONFIG leaking in. It bakes the
-  # Nix-generated conformist config (purse-first#159: dagnabit runs
-  # `conformist --config-file <that>` and skips the upward conformist.toml
-  # search) and sets a runtime DAGNABIT_CEILING_DIRECTORIES at the git toplevel
-  # as belt-and-suspenders so the walk can never escalate to a stray ancestor
-  # (~/eng/conformist.toml). It execs the real dagnabit by store path (no PATH
-  # recursion). When conformistConfig is null (non-flake), it is just the bare
-  # binary. Interim until dagnabit is a first-class conformist module
-  # (amarbel-llc/purse-first#163).
-  dagnabitWrapped =
-    if conformistConfig == null then
-      dagnabitBin
-    else
-      pkgs.writeShellApplication {
-        name = "dagnabit";
-        runtimeInputs = [ pkgs.git ];
-        text = ''
-          export DAGNABIT_CONFORMIST_CONFIG=${conformistConfig}
-          DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-          export DAGNABIT_CEILING_DIRECTORIES
-          exec ${dagnabitBin}/bin/dagnabit "$@"
-        '';
-      };
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
@@ -489,10 +470,11 @@ in
       })
       tommy.packages.${system}.default
       bats.packages.${system}.default
-      # The hermetic dagnabit wrapper (config baked, ceiling set) — see
-      # dagnabitWrapped above. Shadows the bare dagnabit so the facade lane
-      # works in the env-less pre-merge hook.
-      dagnabitWrapped
+      # Bare dagnabit (the shim is retired — see dagnabitBin above): the facade
+      # lane's config threading now lives in the conformist dewey-facade-export
+      # module. Kept on PATH for the build's `dagnabit export` preBuild and
+      # ad-hoc `dagnabit export` / debug-check-facade-imports.
+      dagnabitBin
       # NOTE: the madder-test-* fixture binaries (sftp/webdav servers,
       # craft-legacy-blob) are intentionally NOT listed here. Each is a
       # buildGoApplication that compiles madder, so putting them in the
@@ -508,13 +490,12 @@ in
       doppelgang.packages.${system}.default
     ]
     # The BARE conformist binary (not the Nix wrapper) plus the formatter/linter
-    # tools the generated config drives. The bare binary is required because
-    # dagnabit's facade formatter (runConformist) appends `--tree-root <outdir>`
-    # + `--config-file <generated>` to whatever `conformist` is on PATH; the Nix
-    # wrapper already bakes --tree-root-file/--config-file, so those would
-    # collide. lint-fmt / codemod-fmt reach the generated config via
-    # $MADDER_CONFORMIST_CONFIG; dagnabit reaches it via the dagnabitWrapped
-    # shim (config baked, not env-leaked); `nix fmt` uses the wrapper (flake.nix
+    # tools the generated config drives. The bare binary is required because the
+    # dewey-facade-export linter's facade-format pass runs `conformist` with its
+    # own flags (and `dagnabit export` likewise), which would collide with the
+    # Nix wrapper's baked --tree-root-file/--config-file. lint-fmt / codemod-fmt
+    # / lint-worktree reach the generated config via $MADDER_CONFORMIST_CONFIG /
+    # $MADDER_CONFORMIST_IMPURE_CONFIG; `nix fmt` uses the wrapper (flake.nix
     # `formatter`). gofumpt/gotools/shfmt are in the pkgs-master block below;
     # nixfmt/shellcheck are added here.
     ++ pkgs-master.lib.optionals (conformist != null) [
@@ -552,13 +533,12 @@ in
     MADDER_CONFORMIST_IMPURE_CONFIG =
       if conformistImpureConfig == null then "" else "${conformistImpureConfig}";
 
-    # NB: dagnabit's config is NOT plumbed via a devShell env var. The pre-merge
-    # hook runs `sh -c just` with a BARE env (no devShell/direnv), so a leaked
-    # $DAGNABIT_CONFORMIST_CONFIG would be absent there and dagnabit would walk
-    # up to a stray ~/eng/conformist.toml. Instead the config is BAKED into the
-    # dagnabitWrapped shim on PATH (see the let-binding above), which is
-    # env-independent. lint-fmt/codemod-fmt/lint-worktree DO use the
-    # MADDER_CONFORMIST_*_CONFIG vars above because those recipes self-enter the
-    # devShell via `nix develop --command`.
+    # NB: the facade lane's conformist config is no longer plumbed via a devShell
+    # env var or a baked shim. The conformist dewey-facade-export module
+    # (purse-first#163) bakes DAGNABIT_CONFORMIST_CONFIG into its own
+    # check/repair scripts (store-pinned), so the lane is env-independent in both
+    # the pre-commit hook and the impure merge lane. lint-fmt/codemod-fmt/
+    # lint-worktree still use the MADDER_CONFORMIST_*_CONFIG vars above because
+    # those recipes self-enter the devShell via `nix develop --command`.
   };
 }

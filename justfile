@@ -22,24 +22,20 @@ build-nix:
 build-go:
   cd go && go build ./...
 
-# Regenerate pkgs/ facades from internal/ packages via dagnabit.
-# dagnabit now emits conformist-compatible output directly — it folds
-# consecutive same-kind decls into grouped blocks and runs the project
-# formatter on its output (amarbel-llc/purse-first#108, since closed), so
-# a fresh export is already lint-fmt-clean. No post-export `nix fmt` is
-# needed: `dagnabit export` alone leaves pkgs/ byte-identical to a
-# committed, formatted tree (this is also what `lint-facades` relies on).
-[group("codemod")]
-codemod-facades:
-  nix develop {{justfile_directory()}} --command sh -c 'cd go && dagnabit export'
-
 # Regenerate facades and show what dewey imports landed in the three
 # facades that import dewey directly (domain_interfaces, hyphence,
 # markl). Used to debug dagnabit import resolution (e.g. internal/ vs
-# pkgs/ path choice). Depends on codemod-facades so regeneration is
-# expressed once, not duplicated inline.
+# pkgs/ path choice). Facade regen itself is no longer a standalone recipe:
+# the conformist dewey-facade-export lane owns it (repair at pre-commit;
+# the merge-gate CHECK runs via lint-worktree; purse-first#163). This debug
+# recipe inlines the export, threading $DAGNABIT_CONFORMIST_CONFIG (=the
+# generated pure config) + a git-toplevel ceiling so dagnabit's facade-format
+# pass uses madder's config and does NOT walk up to a stray ancestor
+# ~/eng/conformist.toml (which enables rustfmt/prettier/… absent from PATH).
+# This is the env the retired dagnabitWrapped shim used to bake.
 [group("debug")]
-debug-check-facade-imports: codemod-facades
+debug-check-facade-imports:
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
   grep purse-first go/pkgs/domain_interfaces/main.go || true
   grep purse-first go/pkgs/hyphence/main.go || true
   grep purse-first go/pkgs/markl/main.go || true
@@ -355,7 +351,7 @@ run-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
-codemod: codemod-fmt codemod-facades codemod-tommy codemod-flake codemod-rfc0002-fixture
+codemod: codemod-fmt codemod-tommy codemod-flake codemod-rfc0002-fixture
 
 # Format + repair all source files via conformist (the treefmt successor): Go
 # (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt), plus the
@@ -374,7 +370,7 @@ codemod-fmt:
 #
 
 [group("pre-build")]
-lint: lint-flake lint-fmt lint-facades lint-tommy lint-worktree
+lint: lint-flake lint-fmt lint-tommy lint-worktree
 
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift. The
@@ -402,17 +398,14 @@ codemod-flake:
 lint-fmt:
   nix develop {{justfile_directory()}} --command sh -c 'conformist check --config-file "$MADDER_CONFORMIST_CONFIG"'
 
-# Fail if the committed pkgs/ facades have drifted from their internal/
-# sources. The nix build runs `dagnabit export` in preBuild
-# (go/default.nix), so `just build` compiles against freshly generated
-# facades and CANNOT catch committed drift — this is the only gate that
-# does. Uses dagnabit's native, side-effect-free check (added in
-# amarbel-llc/purse-first#123; the false-positive-on-a-correct-tree bug
-# was fixed in #125): it renders a comparison copy into a dot-prefixed
-# dir under the module root and exits nonzero if it differs from committed.
-[group("pre-build")]
-lint-facades:
-  nix develop {{justfile_directory()}} --command sh -c 'cd go && dagnabit export --check'
+# NOTE: the standalone `lint-facades` recipe (`dagnabit export --check`) was
+# retired (purse-first#163 / FDR 0013). Facade drift is now CAUGHT by the
+# conformist dewey-facade-export linter in the IMPURE lane, run by
+# `lint-worktree` (in the `lint` aggregate the pre-merge hook runs) — the
+# merge-gate safety net — and REPAIRED by the conformist pre-commit hook
+# (regenerate + stage at authoring time). Manual repair: `dagnabit export`
+# (or the `debug-check-facade-imports` recipe). NB `just codemod-fmt` does NOT
+# repair facades — `nix fmt` uses the PURE eval, which omits the facade lane.
 
 # Fail if the committed *_tommy.go codegen has drifted from its hand-written
 # structs (or was produced by a different tommy version — the header carries a
