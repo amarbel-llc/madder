@@ -223,7 +223,25 @@
               "repair-command" =
                 pkgs.lib.getExe' tommy.packages.${system}.conformist-tommy-codegen
                   "conformist-tommy-codegen";
-              includes = [ "*.go" ];
+              # Trigger gate (passes-files = false ⇒ includes only decide WHETHER
+              # the whole-tree repair fires, never WHAT it sees — the repair
+              # script regenerates every *_tommy.go in the package regardless).
+              # `flake.lock` is here, not just `*.go`, to close the recurring
+              # `lint-tommy` merge-gate failure: the generated header embeds
+              # tommy's build-commit hash, so bumping the `tommy` flake input
+              # re-stamps every *_tommy.go without touching a single source file.
+              # A flake.lock-only commit then stages no `*.go`, so a `*.go`-only
+              # trigger would never fire the repair and the stale stamp would
+              # survive to the merge gate. Triggering on the lock means the
+              # commit that moves the tommy pin is the very commit that restamps
+              # + restages the generated files. A globally-excluded path still
+              # reaches a passes-files=false linter's trigger gate (conformist
+              # match() skips global-excludes only for per-file linters), so this
+              # works even though flake.lock is not a formatter target.
+              includes = [
+                "*.go"
+                "flake.lock"
+              ];
               "passes-files" = false;
               "restage-repair-outputs" = true; # tier 2 (#55): restage modified *_tommy.go
               "stage-new-outputs" = true; # tier 3 (#56): stage a brand-new companion
