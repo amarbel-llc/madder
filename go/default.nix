@@ -80,7 +80,7 @@ let
 
   # mkBatsLane wraps bats.lib.${system}.batsLane (from amarbel-llc/bats)
   # with madder's parameter shape: vanilla bats, bats-libs on
-  # BATS_LIB_PATH, MADDER_BIN / HYPHENCE_BIN exported via the
+  # BATS_LIB_PATH, MADDER_BIN exported via the
   # binaries-map form, version.env staged sibling-of-bats, jq for
   # cli_contract.bats's JSON helpers, git for bats-island's
   # setup_test_home, BATS_TEST_TIMEOUT=30 to mirror zz-tests_bats/justfile.
@@ -106,10 +106,6 @@ let
         MADDER_BIN = {
           inherit base;
           name = "madder";
-        };
-        HYPHENCE_BIN = {
-          inherit base;
-          name = "hyphence";
         };
       }
       // extraBinaries;
@@ -175,7 +171,6 @@ let
     cp ${versionEnv} stage/version.env
 
     export MADDER_BIN="$out/bin/madder"
-    export HYPHENCE_BIN="$out/bin/hyphence"
     export BATS_LIB_PATH="''${BATS_LIB_PATH:+$BATS_LIB_PATH:}${
       bats.packages.${system}.bats-libs.batsLibPath
     }"
@@ -203,7 +198,6 @@ let
       "cmd/madder-cache"
       "cmd/madder-gen_man"
       "cmd/madder-mcp"
-      "cmd/hyphence"
     ];
     modules = ./gomod2nix.toml;
     go = pkgs-master.go_1_26;

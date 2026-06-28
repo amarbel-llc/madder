@@ -8,7 +8,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/india/commands"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
-	"github.com/amarbel-llc/madder/go/internal/india/commands_hyphence"
 	"github.com/amarbel-llc/madder/go/internal/india/commands_mcp"
 )
 
@@ -35,7 +34,6 @@ func main() {
 	utilities := []*futility.Utility{
 		commands.GetUtility(),
 		commands_cache.GetUtility(),
-		commands_hyphence.GetUtility(),
 		commands_mcp.GetUtility(),
 	}
 

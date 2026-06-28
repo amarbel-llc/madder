@@ -331,7 +331,6 @@ run-cover-summary: run-cover-merged
 [group("post-build")]
 run-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
-    HYPHENCE_BIN={{justfile_directory()}}/result/bin/hyphence \
     just zz-tests_bats/test-targets {{targets}}
 
 # Run bats tests filtered by file_tag. Drives the auto-generated

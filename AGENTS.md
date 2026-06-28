@@ -2,8 +2,8 @@
 
 Madder is a content-addressable blob storage CLI. The entry point is
 `go/cmd/madder/`; the build also produces sibling binaries
-`madder-cache`, `madder-mcp`, and `hyphence` from the same Go module,
-plus their man pages.
+`madder-cache` and `madder-mcp` from the same Go module, plus their
+man pages.
 
 ## External consumer: cutting-garden
 
