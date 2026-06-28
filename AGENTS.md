@@ -72,9 +72,11 @@ References that describe dodder's data model or link back to dodder for
 context. Madder operates on that data model, so the prose is accurate
 domain description.
 
-- `docs/man.7/{blob-store,hyphence,markl-id}.md` — describe "dodder
+- `docs/man.7/{blob-store,markl-id}.md` — describe "dodder
   objects", "dodder repositories", and the `dodder-*` markl-id scheme.
-  Dodder is the canonical owner of these concepts.
+  Dodder is the canonical owner of these concepts. (The `hyphence.md`
+  man page is now a redirect stub; the format moved to
+  `amarbel-llc/hyphence` — see madder#253.)
 - `go/internal/charlie/hyphence/coder_metadata_test.go` links
   `github.com/amarbel-llc/dodder/issues/41` for context on a hyphence
   edge case.

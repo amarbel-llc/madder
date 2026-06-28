@@ -235,8 +235,10 @@ see `madder-inventory-log(7)` for wiring patterns. Breaking changes to
 command-reference pages `madder(1)` / `madder-cache(1)` are generated
 from the CLI definitions (`just debug-gen_man`).
 
-**RFCs** (`docs/rfcs/`) — normative wire formats: hyphence (0001),
-markl-id format (0002), capture/restore rules (0003).
+**RFCs** (`docs/rfcs/`) — `markl-id` format (0002) is madder's own
+normative wire format. The hyphence format (0001) and capture/restore
+rules (0003) are redirect stubs to their own repos (`amarbel-llc/hyphence`
+and `amarbel-llc/cutting-garden`).
 
 **ADRs** (`docs/decisions/`) — accepted architecture decisions
 (0001–0007), e.g. content-addressed overwrite semantics and `link(2)`
