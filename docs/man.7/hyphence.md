@@ -1,4 +1,6 @@
 ---
+status: moved
+moved-to: amarbel-llc/hyphence docs/man.7/hyphence.md
 author:
 -
 date: April 2026
@@ -7,168 +9,29 @@ title: HYPHENCE(7) Madder \| Miscellaneous
 
 # NAME
 
-hyphence - text-based metadata + body serialization format
-
-# SYNOPSIS
-
-    ---
-    # description text
-    - tag-name
-    @ markl-id
-    ! type-string
-    ---
-
-    body content
+hyphence - text-based metadata + body serialization format (moved to the
+hyphence repository)
 
 # DESCRIPTION
 
-Hyphence (hyphen-fence) is a text-based serialization format that uses **---**
-boundary lines to enclose a metadata section followed by an optional body. It
-is used by madder for blob-store metadata and by cutting-garden for
-capture-receipt metadata, and by dodder for
-repository configs, blob store configs, workspace configs, type definitions,
-and user-facing zettels.
+The hyphence (hyphen-fence) format and its documentation moved out of madder
+into their own repository, **amarbel-llc/hyphence**, so the format can host
+multiple implementations (Go, with Rust to follow) of one canonical wire
+format. Madder still uses hyphence for blob-store metadata, but no longer owns
+its specification.
 
-# DOCUMENT STRUCTURE
+The canonical, maintained reference manual lives at:
 
-A hyphence document has two parts:
+<https://github.com/amarbel-llc/hyphence/blob/master/docs/man.7/hyphence.md>
 
-1.  **Metadata section** (required): enclosed by two **---** boundary lines
-2.  **Body section** (optional): content after the closing boundary
+and the normative specification (RFC 0001) at:
 
-A minimal document:
+<https://github.com/amarbel-llc/hyphence/blob/master/docs/rfcs/0001-hyphence.md>
 
-    ---
-    ! toml-type-v1
-    ---
-
-A document with inline body:
-
-    ---
-    # my description
-    ! md
-    ---
-
-    Body content goes here.
-
-A document with a blob reference (no inline body):
-
-    ---
-    # my description
-    @ blake2b256-9ft3...
-    ! md
-    ---
-
-A document must not have both a blob reference in the metadata and inline body
-content after the closing boundary.
-
-# BOUNDARY LINE
-
-A boundary line is exactly three ASCII hyphen-minus characters followed by a
-newline:
-
-    ---\n
-
-No trailing spaces, carriage returns, or additional hyphens.
-
-# BODY SEPARATOR
-
-When a body follows the metadata section, there must be exactly one empty line
-between the closing **---** and the start of the body:
-
-    ---
-    ! md
-    ---
-                    <-- required blank line
-    Body starts here.
-
-Decoders MUST reject input that omits this blank line. Implementations MAY
-expose an opt-in lenient mode for reading legacy data (see the
-**AllowMissingSeparator** field on the Go reference implementation), but that
-mode is NOT part of the format spec --- emitters MUST always include the
-separator.
-
-# METADATA LINES
-
-Each metadata line begins with a single-character prefix, a space, and the
-content:
-
-**! type-string**
-:   Object type identifier. Determines how the body is decoded. May include a
-    lock: **! type-string@markl-id**. Should be the last non-comment line.
-
-**@ markl-id** or **@ file-path**
-:   Blob reference. Alternative to inline body --- references content by
-    digest or file path.
-
-**# text**
-:   Description. Multiple description lines are space-concatenated.
-
-**- value**
-:   Tag or object reference. The value is any UTF-8 text with no newlines;
-    framing parsers treat it as opaque. Convention: bare values like **todo**
-    are tags, values containing **/** are object references, and either may
-    carry a lock as **- value < markl-id**.
-
-**< object-id**
-:   Explicit object reference. Same syntax as **-** references.
-
-**% text**
-:   Comment. Opaque, preserved during round-trips. Each comment is entangled
-    with the non-comment line that follows it.
-
-# CANONICAL LINE ORDER
-
-When encoding, metadata lines should follow this order:
-
-1.  Description lines (**#**)
-2.  Locked object references
-3.  Aliased object references
-4.  Bare object references
-5.  Tags (**-**)
-6.  Blob line (**@**)
-7.  Type line (**!**)
-
-Lines may appear in any order during decoding --- order does not affect
-semantics.
-
-# VERSIONING
-
-Hyphence has no version indicator. Format evolution uses type strings: new
-versions introduce new type strings (e.g. **toml-blob_store_config-v2**
-succeeds **-v1**) while old type strings retain their decoders. Old versions
-remain decodable indefinitely.
-
-# EXAMPLES
-
-A zettel with tags:
-
-    ---
-    # purchase izipizi glasses
-    - area-home
-    - todo
-    - urgency-2_week
-    ! task
-    ---
-
-A blob store configuration:
-
-    ---
-    ! toml-blob_store_config-v3
-    ---
-
-    [blob-store]
-    compression-type = "zstd"
-    hash_type-id = "blake2b256"
-
-A type definition with a lock:
-
-    ---
-    @ blake2b256-76m5...
-    ! toml-type-v1@ed25519_sig-1qxyz...
-    ---
+This page is a redirect stub kept so existing **hyphence**(7) cross-references
+resolve. See the madder git history for the prior in-tree content. Tracked in
+madder issue #253.
 
 # SEE ALSO
 
-**markl-id**(7), **organize-text**(7), **blob-store**(7). For the normative
-format specification, see `docs/rfcs/0001-hyphence.md`.
+**markl-id**(7), **blob-store**(7), **madder-inventory-log**(7).
