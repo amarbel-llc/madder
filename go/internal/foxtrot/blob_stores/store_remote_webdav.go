@@ -18,7 +18,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -232,7 +231,7 @@ func (blobStore *remoteWebdav) readRemoteConfig() (err error) {
 		return err
 	}
 
-	var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
+	var typedConfig blob_store_configs.TypedConfig
 
 	if _, err = blob_store_configs.DecodeAndVerify(
 		&typedConfig,

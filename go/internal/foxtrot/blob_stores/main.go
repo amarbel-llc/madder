@@ -12,7 +12,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -464,7 +463,7 @@ func MakeBlobStore(
 		)
 
 	case blob_store_configs.ConfigPointer:
-		var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
+		var typedConfig blob_store_configs.TypedConfig
 		otherStorePath := config.GetPath()
 
 		if typedConfig, err = blob_store_configs.DecodeAndVerifyFromFile(

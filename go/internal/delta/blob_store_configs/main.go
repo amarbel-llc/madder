@@ -5,9 +5,10 @@ package blob_store_configs
 import (
 	"fmt"
 
+	"github.com/amarbel-llc/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 )
 
 // Re-export all types from charlie/blob_store_configs
@@ -51,8 +52,8 @@ type (
 	TomlInventoryArchiveV0      = charlie_bsc.TomlInventoryArchiveV0
 	TomlInventoryArchiveV1      = charlie_bsc.TomlInventoryArchiveV1
 	TomlInventoryArchiveV2      = charlie_bsc.TomlInventoryArchiveV2
-	TypedConfig                 = hyphence.TypedBlob[Config]
-	TypedMutableConfig          = hyphence.TypedBlob[ConfigMutable]
+	TypedConfig                 = hyphence.TypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config]
+	TypedMutableConfig          = hyphence.TypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, ConfigMutable]
 )
 
 // Re-export constants

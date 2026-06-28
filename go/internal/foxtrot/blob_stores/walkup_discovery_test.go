@@ -8,10 +8,10 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/amarbel-llc/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	delta_blob_store_configs "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -29,7 +29,7 @@ func writeStoreConfig(t *testing.T, madderDir, name string) {
 
 	configPath := filepath.Join(storeDir, directory_layout.FileNameBlobStoreConfig)
 
-	typedBlob := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+	typedBlob := &delta_blob_store_configs.TypedConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigV3).TypeStruct,
 		Blob: &blob_store_configs.TomlV3{
 			HashTypeId:      "sha256",

@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/amarbel-llc/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 

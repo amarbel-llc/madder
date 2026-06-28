@@ -28,7 +28,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	deweyerrors "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -229,7 +228,7 @@ func (blobStore *remoteS3) readRemoteConfig() (err error) {
 	}
 	defer out.Body.Close() //defer:err-checked
 
-	var typedConfig hyphence.TypedBlob[blob_store_configs.Config]
+	var typedConfig blob_store_configs.TypedConfig
 
 	if _, err = blob_store_configs.DecodeAndVerify(&typedConfig, out.Body); err != nil {
 		err = deweyerrors.Wrapf(err, "failed to decode remote blob store config at s3://%s/%s", bucket, key)
@@ -1029,7 +1028,7 @@ func WriteRemoteConfigS3(
 	}
 
 	config := configFromDiscoveredConfig(discovered)
-	typedConfig := &hyphence.TypedBlob[blob_store_configs.Config]{
+	typedConfig := &blob_store_configs.TypedConfig{
 		Type: typeStructForCurrentLocalConfig(),
 		Blob: config,
 	}

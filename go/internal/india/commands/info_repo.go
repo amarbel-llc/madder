@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
@@ -120,7 +119,7 @@ func (cmd InfoRepo) Run(req futility.Request) {
 			// route it to the right per-type encoder.
 			cfg, _ := getStoreConfig()
 
-			immutableTyped := &hyphence.TypedBlob[blob_store_configs.Config]{
+			immutableTyped := &blob_store_configs.TypedConfig{
 				Type: blob_store_configs.TypeStructForConfig(cfg),
 				Blob: cfg,
 			}

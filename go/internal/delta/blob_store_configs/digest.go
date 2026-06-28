@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"io"
 
+	"github.com/amarbel-llc/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 

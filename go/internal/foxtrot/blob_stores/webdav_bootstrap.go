@@ -7,7 +7,6 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
@@ -98,7 +97,7 @@ func BootstrapWebdavRemoteConfig(
 	}
 
 	configBlob := configFromDiscoveredConfig(discovered)
-	typedConfig := &hyphence.TypedBlob[blob_store_configs.Config]{
+	typedConfig := &blob_store_configs.TypedConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		Blob: configBlob,
 	}

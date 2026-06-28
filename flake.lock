@@ -209,6 +209,44 @@
         "type": "github"
       }
     },
+    "hyphence": {
+      "inputs": {
+        "bats": [
+          "bats"
+        ],
+        "conformist": [
+          "conformist"
+        ],
+        "doppelgang": [
+          "doppelgang"
+        ],
+        "igloo": [
+          "igloo"
+        ],
+        "nixpkgs-master": [
+          "nixpkgs-master"
+        ],
+        "purse-first": [
+          "purse-first"
+        ],
+        "utils": [
+          "utils"
+        ]
+      },
+      "locked": {
+        "lastModified": 1782651726,
+        "narHash": "sha256-lp2MAt6lBbHbm3ARqEXBwwL+U/sHncPhvcbAkZu2OLk=",
+        "owner": "amarbel-llc",
+        "repo": "hyphence",
+        "rev": "58d066d517180d9aebab826771c1dfcb36bc408d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "amarbel-llc",
+        "repo": "hyphence",
+        "type": "github"
+      }
+    },
     "igloo": {
       "inputs": {
         "bun2nix": "bun2nix",
@@ -288,6 +326,7 @@
         "conformist": "conformist",
         "crap": "crap",
         "doppelgang": "doppelgang",
+        "hyphence": "hyphence",
         "igloo": "igloo",
         "nixpkgs-master": "nixpkgs-master",
         "purse-first": "purse-first",

@@ -22,7 +22,6 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	delta_blob_store_configs "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
@@ -729,7 +728,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) tryReadExistingConfig(
 	// been decoded is not actionable.
 	defer configFile.Close() //defer:err-checked
 
-	var typedConfig hyphence.TypedBlob[delta_blob_store_configs.Config]
+	var typedConfig delta_blob_store_configs.TypedConfig
 	if _, err := delta_blob_store_configs.DecodeAndVerify(
 		&typedConfig, configFile,
 	); err != nil {
@@ -982,7 +981,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 		if err != nil {
 			return errors.Wrapf(err, "create %q", configPath)
 		}
-		typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+		typedConfig := &delta_blob_store_configs.TypedConfig{
 			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 			Blob: cand.StoreConfig,
 		}
@@ -1011,7 +1010,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 	// candidate's config to land instead. So we replicate
 	// WriteRemoteConfig's atomic-write dance with our typed
 	// blob.
-	typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+	typedConfig := &delta_blob_store_configs.TypedConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		Blob: cand.StoreConfig,
 	}
@@ -1043,7 +1042,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 }
 
 func writeCandidateFile(filePath string, c sftp_probe.Candidate) (err error) {
-	typedConfig := &hyphence.TypedBlob[delta_blob_store_configs.Config]{
+	typedConfig := &delta_blob_store_configs.TypedConfig{
 		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 		Blob: c.StoreConfig,
 	}

@@ -23,6 +23,7 @@
   tap,
   tommy,
   crap,
+  hyphence,
   system,
 }:
 let
@@ -47,6 +48,11 @@ let
     "github.com/amarbel-llc/crap/go-crap/v2" = {
       src = crap.packages.${system}.go-pkgs;
       subPath = "go-crap";
+    };
+    # hyphence's go-pkgs producer is scoped to its go/ subdir, so the module
+    # root maps with no subPath (like tommy). See madder#253.
+    "github.com/amarbel-llc/hyphence/go" = {
+      src = hyphence.packages.${system}.go-pkgs;
     };
   };
 in

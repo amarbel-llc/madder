@@ -1,15 +1,16 @@
 package blob_store_configs
 
 import (
+	"github.com/amarbel-llc/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
-var Coder = hyphence.CoderToTypedBlob[Config]{
-	Metadata: hyphence.TypedMetadataCoder[Config]{},
-	Blob: hyphence.CoderTypeMapWithoutType[Config](
+var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config]{
+	Metadata: hyphence.TypedMetadataCoder[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config]{},
+	Blob: hyphence.CoderTypeMapWithoutType[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config](
 		map[string]interfaces.CoderBufferedReadWriter[*Config]{
 			ids.TypeTomlBlobStoreConfigV1: hyphence.CoderTommy[
 				Config,

@@ -72,7 +72,9 @@ belongs in a layer above madder.
   An optional `@<markl-id>` suffix pins the expected on-disk config
   digest (see Config integrity). See `blob-store(7)`.
 - **hyphence** — the `---`-fenced text format madder uses for
-  `blob_store-config` files and the inventory log. See `hyphence(7)`.
+  `blob_store-config` files and the inventory log, now consumed as a
+  library from [amarbel-llc/hyphence](https://github.com/amarbel-llc/hyphence).
+  See `hyphence(7)`.
 
 ## Install & build
 

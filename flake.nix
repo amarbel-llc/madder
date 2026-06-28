@@ -81,6 +81,20 @@
       inputs.conformist.follows = "conformist";
     };
 
+    # The hyphence format library, sourced via goFlakeInputs (madder#253)
+    # so a hyphence bump only touches flake.lock — no go.mod / gomod2nix.toml
+    # lockstep edits. Its go-pkgs producer is scoped to go/ (no subPath).
+    hyphence = {
+      url = "github:amarbel-llc/hyphence";
+      inputs.igloo.follows = "igloo";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+      inputs.bats.follows = "bats";
+      inputs.purse-first.follows = "purse-first";
+      inputs.conformist.follows = "conformist";
+      inputs.doppelgang.follows = "doppelgang";
+    };
+
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "github:amarbel-llc/doppelgang";
@@ -102,6 +116,7 @@
       purse-first,
       tap,
       crap,
+      hyphence,
       doppelgang,
       conformist,
       ...
@@ -134,6 +149,7 @@
             tap
             tommy
             crap
+            hyphence
             ;
           # Scope the producer at go/ so downstream consumers reference
           # go-pkgs directly with no subPath. Madder's repo root has

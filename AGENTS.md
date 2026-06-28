@@ -77,9 +77,6 @@ domain description.
   Dodder is the canonical owner of these concepts. (The `hyphence.md`
   man page is now a redirect stub; the format moved to
   `amarbel-llc/hyphence` — see madder#253.)
-- `go/internal/charlie/hyphence/coder_metadata_test.go` links
-  `github.com/amarbel-llc/dodder/issues/41` for context on a hyphence
-  edge case.
 - Subpackage AGENTS.md files and `futility` comments refer to "dodder" or
   "dodder-style commands" because the text hasn't been re-homed; these are
   stale prose, not active couplings.
