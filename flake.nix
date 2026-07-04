@@ -353,6 +353,13 @@
           # stage-mutation tiers. (The pure conformistEval still drives `nix fmt`
           # + the sandboxed check + the eng linters at the merge gate.)
           conformistPreCommit = conformistCodegenEval.config.build.preCommit;
+          # The merge-repair sibling from the SAME codegen eval, on the
+          # devShell PATH as `conformist-repair` (sweatfile [hooks].repair):
+          # heals bump-commit codegen drift at merge time with the post-bump
+          # drivers — the tier-B self-healing the 2026-07-03/04 cascade runs
+          # showed pre-commit alone cannot provide (its store-pinned driver
+          # predates the very bump it would need to heal).
+          conformistRepair = conformistCodegenEval.config.build.repair;
           # The impure-lane config (git-state checks). Exposed as
           # $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
           conformistImpureConfig = conformistImpureEval.config.build.configFile;
@@ -376,6 +383,8 @@
           # exposes it + the tommy/facade lanes resolve), and it is the same
           # wrapper the devShell puts on PATH.
           conformist-pre-commit = conformistCodegenEval.config.build.preCommit;
+          # Likewise for the merge-repair sibling: `nix build .#conformist-repair`.
+          conformist-repair = conformistCodegenEval.config.build.repair;
         };
         devShells.default = result.devShells.default;
         # `nix fmt` runs the generated conformist wrapper (see conformistEval).

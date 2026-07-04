@@ -22,6 +22,15 @@
   # formatter toolchain (no silent-skip on a PATH-missing formatter).
   # conformist#47/#51; see conformist-nix(7). Defaulted null for non-flake callers.
   conformistPreCommit ? null,
+  # The `--commit --amend` sibling (build.repair from the same codegen eval),
+  # on the devShell PATH as `conformist-repair` — the spinclass merge-repair
+  # phase resolves it from there, so a cascade bump commit whose store-pinned
+  # pre-commit driver predates the bump still self-heals at merge time (the
+  # post-bump devshell bakes the NEW tommy/dagnabit drivers). Without it the
+  # eng-sweatfile repair hook falls through to eng's severed fallback, which
+  # skips module-config repos entirely — no healing (eng#222, eng tier-B
+  # convergence). Defaulted null for non-flake callers.
+  conformistRepair ? null,
   # The Nix-generated conformist config file (./conformist.nix + presets.eng,
   # full eng roster). Exposed on the devShell as $MADDER_CONFORMIST_CONFIG so
   # `just lint-fmt` / `just codemod-fmt` pass it to the bare conformist via
@@ -501,6 +510,11 @@ in
     # `conformist-pre-commit` for the sweatfile [hooks].pre-commit command.
     ++ pkgs-master.lib.optionals (conformistPreCommit != null) [
       conformistPreCommit
+    ]
+    # Its merge-repair sibling, on PATH as `conformist-repair` for the
+    # sweatfile [hooks].repair command (see the conformistRepair param doc).
+    ++ pkgs-master.lib.optionals (conformistRepair != null) [
+      conformistRepair
     ]
     ++ (with pkgs-master; [
       curl # serve.bats drives `madder serve` over its AF_UNIX socket
