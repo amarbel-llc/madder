@@ -294,6 +294,12 @@
             linters.dewey-facade-export.conformistConfig = conformistEval.config.build.configFile;
             # Layer the stage-mutation tiers onto the module's generated linter.
             settings.linter.dewey-facade-export = {
+              # flake.lock joins the module's go-glob trigger (list options
+              # merge): the facades embed dagnabit's version stamp, so a
+              # purse-first bump restamps them all from a flake.lock-only
+              # commit — which stages no *.go and would never fire the lane.
+              # Same shape as tommy-codegen's flake.lock trigger above.
+              includes = [ "flake.lock" ];
               "restage-repair-outputs" = true; # tier 2: restage modified facades
               "stage-new-outputs" = true; # tier 3: stage a brand-new pkgs/ facade
               "stage-deleted-outputs" = true; # tier 4: stage a removed/relocated facade
