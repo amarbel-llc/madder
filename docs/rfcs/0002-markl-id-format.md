@@ -276,7 +276,10 @@ others.
 |----------------------------------|-------------------------------------------------|--------------------------|
 | `dodder-blob-digest-sha256-v1`   | `sha256`, `blake2b256`                          | Blob content hash        |
 | `dodder-object-digest-v2`        | `sha256`, `blake2b256`                          | Object metadata hash     |
+| `dodder-object-digest-v3`        | `sha256`, `blake2b256`                          | Object metadata hash (covers typed blob references) |
 | `dodder-object-sig-v2`           | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature         |
+| `dodder-object-sig-v3`           | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature (over the v3 digest) |
+| `dodder-object-mother-sig-v3`    | `ed25519_sig`                                   | Object mother signature (v3 lineage) |
 | `dodder-repo-public_key-v1`      | `ed25519_pub`, `ecdsa_p256_pub`                 | Repository public key    |
 | `dodder-repo-private_key-v1`     | `ed25519_sec`, `ed25519_ssh`, `ecdsa_p256_ssh`  | Repository private key   |
 | `piggy-piv_auth-v1`              | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9A public key (Authentication) |

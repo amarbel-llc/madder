@@ -82,6 +82,7 @@ func TestGetDigestTypeForSigType_Canonical(t *testing.T) {
 	}{
 		{markl.PurposeObjectSigV1, markl.PurposeObjectDigestV1},
 		{markl.PurposeObjectSigV2, markl.PurposeObjectDigestV2},
+		{markl.PurposeObjectSigV3, markl.PurposeObjectDigestV3},
 	}
 
 	for _, c := range cases {
@@ -102,6 +103,7 @@ func TestGetMotherSigTypeForSigType_Canonical(t *testing.T) {
 	}{
 		{markl.PurposeObjectSigV1, markl.PurposeObjectMotherSigV1},
 		{markl.PurposeObjectSigV2, markl.PurposeObjectMotherSigV2},
+		{markl.PurposeObjectSigV3, markl.PurposeObjectMotherSigV3},
 	}
 
 	for _, c := range cases {

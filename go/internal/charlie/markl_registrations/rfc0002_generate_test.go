@@ -33,7 +33,10 @@ import (
 var rfc0002StablePurposes = []string{
 	markl.PurposeBlobDigestV1,
 	markl.PurposeObjectDigestV2,
+	markl.PurposeObjectDigestV3,
 	markl.PurposeObjectSigV2,
+	markl.PurposeObjectSigV3,
+	markl.PurposeObjectMotherSigV3,
 	markl.PurposeRepoPubKeyV1,
 	markl.PurposeRepoPrivateKeyV1,
 	markl.PurposePiggyPivAuthV1,

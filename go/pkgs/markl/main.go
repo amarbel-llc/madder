@@ -310,12 +310,14 @@ const (
 const (
 	PurposeObjectDigestV1 = internal.PurposeObjectDigestV1
 	PurposeObjectDigestV2 = internal.PurposeObjectDigestV2
+	PurposeObjectDigestV3 = internal.PurposeObjectDigestV3
 )
 
 // Object Mother Sigs
 const (
 	PurposeObjectMotherSigV1 = internal.PurposeObjectMotherSigV1
 	PurposeObjectMotherSigV2 = internal.PurposeObjectMotherSigV2
+	PurposeObjectMotherSigV3 = internal.PurposeObjectMotherSigV3
 )
 
 // Object Sigs
@@ -323,6 +325,7 @@ const (
 	PurposeObjectSigV0 = internal.PurposeObjectSigV0
 	PurposeObjectSigV1 = internal.PurposeObjectSigV1
 	PurposeObjectSigV2 = internal.PurposeObjectSigV2
+	PurposeObjectSigV3 = internal.PurposeObjectSigV3
 )
 
 // Papi document signature (jointly owned with amarbel-llc/papi; see

@@ -72,6 +72,20 @@ var (
 		},
 	}
 
+	// v3 object digest/sig purposes: the signed object digest gains typed
+	// blob-reference coverage on the dodder side (see
+	// https://github.com/amarbel-llc/madder/issues/255 for the ownership
+	// decoupling this motivates). Registration shape is identical to v2 —
+	// the version bump changes what the digest covers, not the formats.
+	PurposeObjectDigestV3Opts = markl.RegisterPurposeOpts{
+		Id:   markl.PurposeObjectDigestV3,
+		Type: markl.PurposeTypeObjectDigest,
+		FormatIds: []string{
+			markl.FormatIdHashSha256,
+			markl.FormatIdHashBlake2b256,
+		},
+	}
+
 	PurposeV5MetadataDigestWithoutTaiOpts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeV5MetadataDigestWithoutTai,
 		Type: markl.PurposeTypeObjectDigest,
@@ -89,6 +103,12 @@ var (
 
 	PurposeObjectMotherSigV2Opts = markl.RegisterPurposeOpts{
 		Id:        markl.PurposeObjectMotherSigV2,
+		Type:      markl.PurposeTypeObjectMotherSig,
+		FormatIds: []string{markl.FormatIdEd25519Sig},
+	}
+
+	PurposeObjectMotherSigV3Opts = markl.RegisterPurposeOpts{
+		Id:        markl.PurposeObjectMotherSigV3,
 		Type:      markl.PurposeTypeObjectMotherSig,
 		FormatIds: []string{markl.FormatIdEd25519Sig},
 	}
@@ -122,6 +142,19 @@ var (
 		Related: map[string]string{
 			markl.RelatedRoleDigest:    markl.PurposeObjectDigestV2,
 			markl.RelatedRoleMotherSig: markl.PurposeObjectMotherSigV2,
+		},
+	}
+
+	PurposeObjectSigV3Opts = markl.RegisterPurposeOpts{
+		Id:   markl.PurposeObjectSigV3,
+		Type: markl.PurposeTypeObjectSig,
+		FormatIds: []string{
+			markl.FormatIdEd25519Sig,
+			markl.FormatIdEcdsaP256Sig,
+		},
+		Related: map[string]string{
+			markl.RelatedRoleDigest:    markl.PurposeObjectDigestV3,
+			markl.RelatedRoleMotherSig: markl.PurposeObjectMotherSigV3,
 		},
 	}
 
@@ -260,12 +293,15 @@ var AllPurposes = []markl.RegisterPurposeOpts{
 	PurposeBlobStoreConfigDigestV1Opts,
 	PurposeObjectDigestV1Opts,
 	PurposeObjectDigestV2Opts,
+	PurposeObjectDigestV3Opts,
 	PurposeV5MetadataDigestWithoutTaiOpts,
 	PurposeObjectMotherSigV1Opts,
 	PurposeObjectMotherSigV2Opts,
+	PurposeObjectMotherSigV3Opts,
 	PurposeObjectSigV0Opts,
 	PurposeObjectSigV1Opts,
 	PurposeObjectSigV2Opts,
+	PurposeObjectSigV3Opts,
 	PurposeRepoPrivateKeyV1Opts,
 	PurposeRepoPubKeyV1Opts,
 	PurposeRequestAuthChallengeV1Opts,
