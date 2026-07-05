@@ -195,8 +195,11 @@ Given an input string `S`:
 9. Resolve `formatId` against the format registry (§5), applying the
    purpose-id alias table (§6.4) if present. If unresolvable, fail
    with `UnknownFormat`.
-10. If `purpose != ""`, validate `(purpose, formatId)` is a registered
-    pair (§6.1). If not, fail with `IncompatiblePurposeAndFormat`.
+10. If `purpose != ""` and `purpose` is present in the decoder's
+    purpose registry (§6), validate `formatId` is among that purpose's
+    compatible formats. If not, fail with
+    `IncompatiblePurposeAndFormat`. If `purpose` is absent from the
+    registry, accept the ID and carry the purpose opaquely (§6.6).
 11. Validate `len(payload)` matches the resolved format's declared size
     (§5). If not, fail with `WrongSize`.
 
@@ -268,25 +271,34 @@ checksum.
 
 ### 6.1. Registered Purposes
 
-This subsection pins the **stable cross-language subset** of purpose
-IDs. Independent implementations MUST support these and MAY ignore any
-others.
+Purpose IDs are **owned by the system named by their prefix**: madder
+owns the registration *mechanism* (§6.3) and the `madder-*` namespace;
+every other purpose is owned by its consumer system (`dodder-*` by
+dodder, `piggy-*` by piggy, `papi-*` by papi). The table below is the
+consumer-owned registry snapshot mirrored by the Go reference
+implementation; each row's semantics are authoritative in the owning
+system's documentation.
 
-| Purpose                          | Compatible Formats                              | Description              |
-|----------------------------------|-------------------------------------------------|--------------------------|
-| `dodder-blob-digest-sha256-v1`   | `sha256`, `blake2b256`                          | Blob content hash        |
-| `dodder-object-digest-v2`        | `sha256`, `blake2b256`                          | Object metadata hash     |
-| `dodder-object-digest-v3`        | `sha256`, `blake2b256`                          | Object metadata hash (covers typed blob references) |
-| `dodder-object-sig-v2`           | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature         |
-| `dodder-object-sig-v3`           | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature (over the v3 digest) |
-| `dodder-object-mother-sig-v3`    | `ed25519_sig`                                   | Object mother signature (v3 lineage) |
-| `dodder-repo-public_key-v1`      | `ed25519_pub`, `ecdsa_p256_pub`                 | Repository public key    |
-| `dodder-repo-private_key-v1`     | `ed25519_sec`, `ed25519_ssh`, `ecdsa_p256_ssh`  | Repository private key   |
-| `piggy-piv_auth-v1`              | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9A public key (Authentication) |
-| `piggy-piv_sig-v1`               | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9C public key (Digital Signature) |
-| `piggy-piv_card_auth-v1`         | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9E public key (Card Authentication) |
-| `piggy-recipient-v1`             | `pivy_ecdh_p256_pub`, `age_x25519_pub`          | Encryption recipient (PIV slot 9D ECDH key, or age recipient) |
-| `papi-doc-sig-v1`                | `ecdsa_p256_sig`                                | PAPI document signature (slot-9A SSH sig over JCS bytes) |
+This subsection pins the **stable cross-language subset** of purpose
+IDs. Independent implementations MUST support these. IDs bearing any
+other purpose MUST NOT be rejected merely for being unknown — they
+decode opaquely per §6.6.
+
+| Purpose                          | Owner  | Compatible Formats                              | Description              |
+|----------------------------------|--------|-------------------------------------------------|--------------------------|
+| `dodder-blob-digest-sha256-v1`   | dodder | `sha256`, `blake2b256`                          | Blob content hash        |
+| `dodder-object-digest-v2`        | dodder | `sha256`, `blake2b256`                          | Object metadata hash     |
+| `dodder-object-digest-v3`        | dodder | `sha256`, `blake2b256`                          | Object metadata hash (covers typed blob references) |
+| `dodder-object-sig-v2`           | dodder | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature         |
+| `dodder-object-sig-v3`           | dodder | `ed25519_sig`, `ecdsa_p256_sig`                 | Object signature (over the v3 digest) |
+| `dodder-object-mother-sig-v3`    | dodder | `ed25519_sig`                                   | Object mother signature (v3 lineage) |
+| `dodder-repo-public_key-v1`      | dodder | `ed25519_pub`, `ecdsa_p256_pub`                 | Repository public key    |
+| `dodder-repo-private_key-v1`     | dodder | `ed25519_sec`, `ed25519_ssh`, `ecdsa_p256_ssh`  | Repository private key   |
+| `piggy-piv_auth-v1`              | piggy  | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9A public key (Authentication) |
+| `piggy-piv_sig-v1`               | piggy  | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9C public key (Digital Signature) |
+| `piggy-piv_card_auth-v1`         | piggy  | `ssh_ecdsa_nistp256_pub`                        | PIV slot 9E public key (Card Authentication) |
+| `piggy-recipient-v1`             | piggy  | `pivy_ecdh_p256_pub`, `age_x25519_pub`          | Encryption recipient (PIV slot 9D ECDH key, or age recipient) |
+| `papi-doc-sig-v1`                | papi   | `ecdsa_p256_sig`                                | PAPI document signature (slot-9A SSH sig over JCS bytes) |
 
 The `piggy-*` purposes are owned jointly with
 [`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy) and mirrored
@@ -331,8 +343,10 @@ A new purpose ID MUST be added by amendment. The purpose ID MUST:
    implementations can verify they're using the right key in the right
    context.
 
-Implementations MUST reject markl IDs whose `(purpose, formatId)` pair
-is not registered.
+Implementations MUST reject markl IDs whose purpose is registered but
+whose `formatId` is not among that purpose's compatible formats
+(`IncompatiblePurposeAndFormat`). IDs bearing a purpose absent from
+the registry MUST be accepted and carried opaquely (§6.6).
 
 ### 6.3. Per-Binary Registration
 
@@ -387,6 +401,26 @@ The `Related` map is part of the registration API, not the wire
 format. *(test: `TestAllPurposes_RelatedRoundTrip`,
 `TestPurposeRepoPrivateKeyV1_RelatedPublicKey` in
 `go/internal/charlie/markl_registrations/`.)*
+
+### 6.6. Unknown Purposes
+
+A decoder MUST accept a syntactically valid markl ID whose purpose is
+absent from its registry, carrying the purpose as an opaque string:
+round-tripping the ID MUST preserve the purpose byte-for-byte, and the
+§4 structural validations (checksum, charset, payload size) still
+apply in full. Purpose-format compatibility (§4 step 10) is only
+enforceable for registered purposes.
+
+This rule is what decouples consumers: an owning system may mint IDs
+under a newly registered purpose (§6.2, §6.3) without requiring every
+other implementation to upgrade in lockstep. Opacity licenses
+transport and storage, not interpretation — contexts that need the
+purpose's *semantics* (signature verification, key derivation,
+Related-role walks per §6.5) MUST still fail on an unknown purpose.
+
+*(test: `TestSetMarklId_UnknownPurposeAcceptedOpaquely` in
+`go/internal/bravo/markl/`; fixture vector
+`purpose/example-unregistered-purpose-v1/sha256`.)*
 
 ## 7. Test Vectors
 
@@ -454,6 +488,8 @@ The fixture covers, at minimum:
   canonical null state).
 - One round-trip vector per `(purpose, compatible-format)` pair from
   §6.1.
+- One round-trip vector bearing a purpose absent from every registry,
+  pinning the §6.6 opaque-carry rule.
 - Invalid vectors covering: mixed case, missing separator, wrong
   checksum, charset violation, wrong payload size, incompatible
   `(purpose, format)` pair.
