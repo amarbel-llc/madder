@@ -15,10 +15,10 @@ import (
 	"syscall"
 
 	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/madder/go/internal/futility"
 	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"

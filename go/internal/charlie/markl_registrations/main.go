@@ -6,9 +6,12 @@
 // AllPurposes and AllAliases are the data that init() iterates to
 // install everything in markl's registry.
 //
-// Format registrations stay inside markl proper — those are
-// infrastructure, not vocabulary, and they cannot be safely moved out
-// without exposing the package-private formats map.
+// Format registrations and the piggy-* purposes live upstream in
+// piggy's go/markl module (piggy#183 ownership inversion); the blank
+// import below activates them. This package registers only the
+// purposes madder speaks for: madder-*, the dodder-* vocabulary
+// (transitionally, until dodder registers its own — madder#255), and
+// papi-doc-sig-v1 (until papi has a registration site).
 //
 // To activate the registrations, blank-import this package from a
 // binary's main package:
@@ -19,7 +22,16 @@ package markl_registrations
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	// The age and agent blank imports swap the real age/pivy-backed
+	// implementations over the core's erroring stubs at their inits
+	// (idempotent), restoring the always-on age + pivy recipients the
+	// pre-cutover core registered directly. The SSH signing formats stay
+	// stubs here — connecting a signer is a consumer-side call (see
+	// agent.RegisterSSHEd25519Format).
+	_ "github.com/amarbel-llc/piggy/go/markl/age"
+	_ "github.com/amarbel-llc/piggy/go/markl/agent"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	_ "github.com/amarbel-llc/piggy/go/markl/pkgs/markl_registrations"
 )
 
 // PurposeIdAlias names a purposeId-shaped string that
@@ -115,13 +127,13 @@ var (
 
 	PurposeObjectSigV0Opts = markl.RegisterPurposeOpts{
 		Id:        markl.PurposeObjectSigV0,
-		Type:      markl.PurposeTypeObjectSig,
+		Type:      markl.PurposeTypeDodderObjectSig,
 		FormatIds: []string{markl.FormatIdEd25519Sig},
 	}
 
 	PurposeObjectSigV1Opts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeObjectSigV1,
-		Type: markl.PurposeTypeObjectSig,
+		Type: markl.PurposeTypeDodderObjectSig,
 		FormatIds: []string{
 			markl.FormatIdEd25519Sig,
 			markl.FormatIdEcdsaP256Sig,
@@ -134,7 +146,7 @@ var (
 
 	PurposeObjectSigV2Opts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeObjectSigV2,
-		Type: markl.PurposeTypeObjectSig,
+		Type: markl.PurposeTypeDodderObjectSig,
 		FormatIds: []string{
 			markl.FormatIdEd25519Sig,
 			markl.FormatIdEcdsaP256Sig,
@@ -147,7 +159,7 @@ var (
 
 	PurposeObjectSigV3Opts = markl.RegisterPurposeOpts{
 		Id:   markl.PurposeObjectSigV3,
-		Type: markl.PurposeTypeObjectSig,
+		Type: markl.PurposeTypeDodderObjectSig,
 		FormatIds: []string{
 			markl.FormatIdEd25519Sig,
 			markl.FormatIdEcdsaP256Sig,
@@ -232,51 +244,25 @@ var (
 		},
 	}
 
-	// Piggy PIV-slot public keys (auth 9A, sig 9C, card-auth 9E). Each
-	// carries the slot's SSH-suitable compressed P-256 point; jointly
-	// owned with amarbel-llc/piggy and mirrored in its piggy-markl crate.
-	PurposePiggyPivAuthV1Opts = markl.RegisterPurposeOpts{
-		Id:        markl.PurposePiggyPivAuthV1,
-		Type:      markl.PurposeTypePubKey,
-		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
-	}
-
-	PurposePiggyPivSigV1Opts = markl.RegisterPurposeOpts{
-		Id:        markl.PurposePiggyPivSigV1,
-		Type:      markl.PurposeTypePubKey,
-		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
-	}
-
-	PurposePiggyPivCardAuthV1Opts = markl.RegisterPurposeOpts{
-		Id:        markl.PurposePiggyPivCardAuthV1,
-		Type:      markl.PurposeTypePubKey,
-		FormatIds: []string{markl.FormatIdSshEcdsaNistp256Pub},
-	}
-
-	// Piggy encryption recipient (PIV slot 9D ECDH key, or an age
-	// recipient). This is the key madder encrypts blobs to.
-	PurposePiggyRecipientV1Opts = markl.RegisterPurposeOpts{
-		Id:   markl.PurposePiggyRecipientV1,
-		Type: markl.PurposeTypePubKey,
-		FormatIds: []string{
-			markl.FormatIdPivyEcdhP256Pub,
-			markl.FormatIdAgeX25519Pub,
-		},
-	}
+	// The piggy-* purposes are no longer registered here: piggy's own
+	// go/markl module registers them in its init (piggy#183 ownership
+	// inversion) — see the blank import of piggy's markl_registrations
+	// above. Registering them here too would panic on duplicate.
 
 	// Papi document signature (jointly owned with amarbel-llc/papi;
 	// mirrored in the piggy-markl crate for the producer side). A slot-9A
 	// ecdsa-sha2-nistp256 SSH signature over a PAPI document's JCS bytes,
 	// carried as the 64-byte r‖s ecdsa_p256_sig payload after SSH-wire
-	// framing is stripped. Reuses PurposeTypeObjectSig (the type label is
-	// descriptive only; no production path branches on it). Spans only
-	// ecdsa_p256_sig — PAPI's slot-9A YubiKey co-sign world is all P-256;
-	// widening to ed25519_sig later is backward-compatible (existing IDs
-	// still validate), so start narrow and amend if a software signer
-	// appears.
+	// framing is stripped. Registered here transitionally — papi has no
+	// Go registration site yet and piggy's module registers only piggy-*
+	// purposes; it moves to its owner per madder#255's ownership model.
+	// Spans only ecdsa_p256_sig — PAPI's slot-9A YubiKey co-sign world is
+	// all P-256; widening to ed25519_sig later is backward-compatible
+	// (existing IDs still validate), so start narrow and amend if a
+	// software signer appears.
 	PurposePapiDocSigV1Opts = markl.RegisterPurposeOpts{
 		Id:        markl.PurposePapiDocSigV1,
-		Type:      markl.PurposeTypeObjectSig,
+		Type:      markl.PurposeTypePapiSig,
 		FormatIds: []string{markl.FormatIdEcdsaP256Sig},
 	}
 )
@@ -310,10 +296,6 @@ var AllPurposes = []markl.RegisterPurposeOpts{
 	PurposeMadderPubKeyV1Opts,
 	PurposeMadderPrivateKeyV0Opts,
 	PurposeMadderPrivateKeyV1Opts,
-	PurposePiggyPivAuthV1Opts,
-	PurposePiggyPivSigV1Opts,
-	PurposePiggyPivCardAuthV1Opts,
-	PurposePiggyRecipientV1Opts,
 	PurposePapiDocSigV1Opts,
 }
 

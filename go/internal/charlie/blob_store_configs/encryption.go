@@ -1,7 +1,7 @@
 package blob_store_configs
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"

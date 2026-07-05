@@ -6,6 +6,7 @@ require (
 	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/crap/go-crap/v2 v2.2.2
 	github.com/amarbel-llc/hyphence/go v0.2.0
+	github.com/amarbel-llc/piggy/go/markl v0.1.21-0.20260705210039-6c5ad9f8f4fd
 	github.com/amarbel-llc/purse-first/libs/dewey v0.3.2
 	github.com/amarbel-llc/tap/go v0.1.8
 	github.com/amarbel-llc/tommy v0.3.4-0.20260608131104-42624689df9b
@@ -20,7 +21,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/pkg/sftp v1.13.10
 	golang.org/x/crypto v0.51.0
-	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f
 	golang.org/x/net v0.54.0
 	golang.org/x/sys v0.44.0
 	mvdan.cc/sh/v3 v3.13.1
@@ -72,6 +72,7 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/term v0.43.0 // indirect

@@ -6,7 +6,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // blobWriteRecord is the on-disk JSON shape for blob-write-published-v1

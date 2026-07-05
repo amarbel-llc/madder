@@ -5,7 +5,7 @@ package blob_stores
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // TestConfigFromDiscoveredConfig_PropagatesSingleHash pins #149: the

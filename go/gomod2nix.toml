@@ -27,6 +27,11 @@ schema = 3
     hash = 'sha256-MUI7bEdFr6OMHwzxs/DIjyin+37B4pfs3ICzEWaQwyw='
     goVersion = '1.26'
 
+[mod.'github.com/amarbel-llc/piggy/go/markl']
+    version = 'v0.1.21-0.20260705210039-6c5ad9f8f4fd'
+    hash = 'sha256-LaSl75Hbs4cLqmvuB5qTJKC0mY81gENNXoopz5WiyzA='
+    goVersion = '1.26'
+
 [mod.'github.com/amarbel-llc/purse-first/libs/dewey']
     version = 'v0.3.2'
     hash = 'sha256-qCPYqLkjtbqAaCX3nPxP4cGTTjBbub6iIWiOJG8ejWk='

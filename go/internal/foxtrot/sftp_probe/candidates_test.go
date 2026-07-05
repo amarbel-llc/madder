@@ -3,8 +3,8 @@ package sftp_probe
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 func TestEnumerateCandidates_NoKeys(t *testing.T) {

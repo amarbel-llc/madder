@@ -60,27 +60,15 @@ var (
 // mirrored in the piggy-markl crate for the producer side). A slot-9A
 // ecdsa-sha2-nistp256 SSH signature over a PAPI document's JCS bytes,
 // carried as the 64-byte r‖s ecdsa_p256_sig payload after SSH-wire
-// framing is stripped. Reuses PurposeTypeObjectSig (the type label is
-// descriptive only; no production path branches on it). Spans only
-// ecdsa_p256_sig — PAPI's slot-9A YubiKey co-sign world is all P-256;
-// widening to ed25519_sig later is backward-compatible (existing IDs
-// still validate), so start narrow and amend if a software signer
-// appears.
-var PurposePapiDocSigV1Opts = internal.PurposePapiDocSigV1Opts
-
-// Piggy PIV-slot public keys (auth 9A, sig 9C, card-auth 9E). Each
-// carries the slot's SSH-suitable compressed P-256 point; jointly
-// owned with amarbel-llc/piggy and mirrored in its piggy-markl crate.
+// framing is stripped. Registered here transitionally — papi has no
+// Go registration site yet and piggy's module registers only piggy-*
+// purposes; it moves to its owner per madder#255's ownership model.
+// Spans only ecdsa_p256_sig — PAPI's slot-9A YubiKey co-sign world is
+// all P-256; widening to ed25519_sig later is backward-compatible
+// (existing IDs still validate), so start narrow and amend if a
+// software signer appears.
 var (
-	PurposePiggyPivAuthV1Opts     = internal.PurposePiggyPivAuthV1Opts
-	PurposePiggyPivCardAuthV1Opts = internal.PurposePiggyPivCardAuthV1Opts
-	PurposePiggyPivSigV1Opts      = internal.PurposePiggyPivSigV1Opts
-)
-
-// Piggy encryption recipient (PIV slot 9D ECDH key, or an age
-// recipient). This is the key madder encrypts blobs to.
-var (
-	PurposePiggyRecipientV1Opts           = internal.PurposePiggyRecipientV1Opts
+	PurposePapiDocSigV1Opts               = internal.PurposePapiDocSigV1Opts
 	PurposeRepoPrivateKeyV1Opts           = internal.PurposeRepoPrivateKeyV1Opts
 	PurposeRepoPubKeyV1Opts               = internal.PurposeRepoPubKeyV1Opts
 	PurposeRequestAuthChallengeV1Opts     = internal.PurposeRequestAuthChallengeV1Opts

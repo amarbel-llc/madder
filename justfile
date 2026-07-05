@@ -67,16 +67,6 @@ codemod-tommy:
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
   nix develop {{justfile_directory()}} --command sh -c 'conformist --config-file "$MADDER_CONFORMIST_CONFIG"'
 
-# Regenerate the RFC 0002 conformance fixture
-# (go/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json)
-# from the live markl purpose/format registry. Run this after adding or changing
-# a §6.1 stable purpose (rfc0002StablePurposes) so the committed cross-language
-# vectors match the registry. The default suite never runs this generator;
-# TestRFC0002VectorsRoundTrip verifies the committed artifact on every CI run.
-[group("codemod")]
-codemod-rfc0002-fixture:
-  cd go && go test -tags 'test rfc0002_generate' -run TestGenerateRFC0002Vectors ./internal/charlie/markl_registrations/...
-
 #    ____ _
 #   / ___| | ___  __ _ _ __
 #  | |   | |/ _ \/ _` | '_ \
@@ -350,7 +340,7 @@ run-bats-tags *tags:
 #  |_|  \___/|_|  |_| |_| |_|\__,_|\__|
 #
 
-codemod: codemod-fmt codemod-tommy codemod-flake codemod-rfc0002-fixture
+codemod: codemod-fmt codemod-tommy codemod-flake
 
 # Format + repair all source files via conformist (the treefmt successor): Go
 # (goimports → gofumpt), Nix (nixfmt), shell/bats (shfmt), plus the

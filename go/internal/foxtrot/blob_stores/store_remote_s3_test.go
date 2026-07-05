@@ -11,8 +11,8 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 func mustParseBlobStoreId(t *testing.T, s string) scoped_id.Id {

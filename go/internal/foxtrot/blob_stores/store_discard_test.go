@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // TestDiscardBlobStore_HashMatchesDirectDigester pins the discard store's

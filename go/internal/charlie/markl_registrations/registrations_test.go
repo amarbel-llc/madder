@@ -8,8 +8,8 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // AllPurposes is the canonical, ordered list of madder's purposes.

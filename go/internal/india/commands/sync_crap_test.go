@@ -10,8 +10,8 @@ import (
 	"github.com/amarbel-llc/crap/go-crap/v2/crap"
 	"github.com/amarbel-llc/crap/go-crap/v2/ndjsoncrap"
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // testMarklId returns a deterministic sha256 markl id seeded from a

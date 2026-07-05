@@ -8,12 +8,12 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // candidateNoneNoneSha256 is the simplest candidate: no compression,

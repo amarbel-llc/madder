@@ -56,12 +56,16 @@ Protocol identifiers that are written into files and read by dodder itself.
 Renaming them in madder desyncs the wire format. Tracked separately in
 [#16](https://github.com/amarbel-llc/madder/issues/16).
 
-- `go/internal/bravo/markl/purposes.go` — constants like
-  `PurposeRepoPubKeyV1 = "dodder-repo-public_key-v1"`,
-  `PurposeObjectDigestV2 = "dodder-object-digest-v2"`,
-  `PurposeRequestAuthResponseV1 = "dodder-request_auth-response-v1"`, etc.
-- `go/internal/bravo/markl/format.go` — legacy-name case handling the same
-  scheme.
+- `go/internal/charlie/markl_registrations/main.go` — registers the
+  `dodder-*` purposes (`dodder-repo-public_key-v1`,
+  `dodder-object-digest-v2`, `dodder-request_auth-response-v1`, etc.)
+  against the markl framework, transitionally until dodder registers
+  its own ([#255](https://github.com/amarbel-llc/madder/issues/255)).
+  The purpose string constants themselves now live upstream in piggy's
+  `go/markl` module (`github.com/amarbel-llc/piggy/go/markl/pkgs/markl`
+  — the markl core moved there under piggy#183; madder's
+  `go/internal/bravo/markl/` and `go/internal/alfa/blech32/` were
+  deleted in the cutover).
 - `go/internal/bravo/directory_layout/util.go` —
   `fileNameBlobStoreConfigLegacy = "dodder-blob_store-config"` kept for
   reading pre-rename on-disk blob stores.

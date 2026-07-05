@@ -9,8 +9,8 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 // TestEncodeWithDigestRoundTrip: encoding a config through

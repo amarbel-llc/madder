@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 type CopyResult struct {

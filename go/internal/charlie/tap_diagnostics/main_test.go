@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
 )
 
 func TestFromErrNotEqual(t *testing.T) {

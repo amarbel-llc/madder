@@ -14,14 +14,17 @@ revisions:
 
 Proposed. Will move to `accepted` upon merge of this RFC.
 
-This RFC pins the wire format the Go reference implementation in
-`go/internal/bravo/markl/` already produces and consumes. No on-disk
-bytes change. The motivation is that
-[`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy) is preparing
-the first non-Go markl implementation (a Rust port for the
-`pivy_ecdh_p256_pub` recipient-key path), and a normative spec plus
-portable test vectors are a precondition for cross-language
-compatibility without silent drift.
+This RFC pins the wire format the Go reference implementation already
+produces and consumes. No on-disk bytes change. The reference
+implementation lives in
+[`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy)'s
+`go/markl` module (`go/markl/internal/bravo/markl/`; moved from
+madder's `go/internal/bravo/markl/` under the piggy#183 ownership
+inversion), alongside piggy's Rust `piggy-markl` crate. A normative
+spec plus portable test vectors are the precondition for cross-language
+compatibility without silent drift. Paths of the form `go/markl/...`
+below are relative to the piggy repository; paths of the form
+`go/internal/...` are relative to this (madder) repository.
 
 ## Abstract
 
@@ -48,8 +51,8 @@ normative requirement in this RFC has such a reference.
 Markl IDs are used as content-addressable blob digests in object
 metadata, as signatures in inventory lists, as type locks in hyphence
 documents, and as repository public keys. The Go reference
-implementation (`go/internal/bravo/markl/`) is the de-facto behaviour;
-this RFC formalises it.
+implementation (piggy's `go/markl/internal/bravo/markl/`) is the
+de-facto behaviour; this RFC formalises it.
 
 ## 2. Structure
 
@@ -81,7 +84,7 @@ its canonical text form is the empty string. Implementations MUST NOT
 produce a markl ID whose `data` portion is non-empty without an
 accompanying format. *(test:
 `TestInvariant_ZeroValueIdIsNullState`,
-`TestIdNullAndEqual` in `go/internal/bravo/markl/`.)*
+`TestIdNullAndEqual` in `go/markl/internal/bravo/markl/`.)*
 
 ### 2.1. ABNF Grammar
 
@@ -106,9 +109,9 @@ Blech32 is identical to BIP173 bech32 except the separator between HRP
 and data is the ASCII hyphen `-` (0x2D) instead of `1`. Like BIP173
 bech32 (and unlike bech32m), the polymod XOR target is the constant
 `1`. *(test: `TestBlech32` in
-`go/internal/alfa/blech32/main_test.go`, plus
+`go/markl/internal/alfa/blech32/main_test.go`, plus
 `TestRFC0002VectorsRoundTrip` in
-`go/internal/charlie/markl_registrations/`.)*
+`go/markl/internal/charlie/markl_registrations/`.)*
 
 ### 3.1. Charset
 
@@ -220,7 +223,7 @@ reject markl IDs whose decoded payload does not equal the registered
 size for the named format. *(test:
 `TestInvariant_SetMarklId_WrongSize_Errors`,
 `TestInvariant_SetHexBytes_WrongSize_Errors` in
-`go/internal/bravo/markl/`.)*
+`go/markl/internal/bravo/markl/`.)*
 
 | Format ID            | Size (bytes) | Description                                  |
 |----------------------|--------------|----------------------------------------------|
@@ -318,9 +321,10 @@ P-256 throughout, and widening a purpose's compatible-format set is a
 backward-compatible amendment (existing IDs still validate), so the
 registration starts narrow.
 
-*(test: `TestRFC0002VectorsRoundTrip/purpose/...` plus
+*(test: `TestRFC0002VectorsRoundTrip/purpose/...` in piggy's
+`go/markl/internal/charlie/markl_registrations/`, plus
 `TestAllPurposes_Registered`,
-`TestAllPurposes_RelatedRoundTrip` in
+`TestAllPurposes_RelatedRoundTrip` in madder's
 `go/internal/charlie/markl_registrations/`.)*
 
 The Go reference implementation registers additional purposes
@@ -350,10 +354,13 @@ the registry MUST be accepted and carried opaquely (§6.6).
 
 ### 6.3. Per-Binary Registration
 
-The framework code (`go/internal/bravo/markl/`) does not contain the
-purpose registrations; the data lives in
-`go/internal/charlie/markl_registrations/` and is installed on init.
-A consumer (e.g. dodder, piggy) MAY register additional purposes via
+The framework code (piggy's `go/markl/internal/bravo/markl/`) does not
+contain the purpose registrations; each consumer installs its own on
+init. Piggy's module registers the formats and the `piggy-*` purposes
+(`go/markl/internal/charlie/markl_registrations/`); madder registers
+the `madder-*`, transitional `dodder-*`, and `papi-doc-sig-v1`
+purposes (madder's `go/internal/charlie/markl_registrations/`). Any
+consumer (e.g. dodder) MAY register additional purposes via
 `markl.RegisterPurpose` without forking the framework. See
 [ADR 0006](../decisions/0006-markl-registration-api-shape.md). This
 property is normative for the registration API, not the wire format —
@@ -377,9 +384,10 @@ registered aliases are:
 | `dodder-repo-private_key-v1`  | `ed25519_sec`       |
 | `zit-repo-private_key-v1`     | `ed25519_sec`       |
 
-*(test: `TestAllAliases_ResolveViaGetFormatOrError`,
-`TestRFC0002AliasResolution` in
-`go/internal/charlie/markl_registrations/`.)*
+*(test: `TestAllAliases_ResolveViaGetFormatOrError` in madder's
+`go/internal/charlie/markl_registrations/`;
+`TestRFC0002AliasResolution` in piggy's
+`go/markl/internal/charlie/markl_registrations/`.)*
 
 Note that the alias table and the §6.1 purpose registry are separate
 namespaces that happen to share the `dodder-repo-private_key-v1`
@@ -399,7 +407,7 @@ role-agnostic per ADR 0006.
 
 The `Related` map is part of the registration API, not the wire
 format. *(test: `TestAllPurposes_RelatedRoundTrip`,
-`TestPurposeRepoPrivateKeyV1_RelatedPublicKey` in
+`TestPurposeRepoPrivateKeyV1_RelatedPublicKey` in madder's
 `go/internal/charlie/markl_registrations/`.)*
 
 ### 6.6. Unknown Purposes
@@ -418,16 +426,18 @@ transport and storage, not interpretation — contexts that need the
 purpose's *semantics* (signature verification, key derivation,
 Related-role walks per §6.5) MUST still fail on an unknown purpose.
 
-*(test: `TestSetMarklId_UnknownPurposeAcceptedOpaquely` in
-`go/internal/bravo/markl/`; fixture vector
+*(test: `TestSetMarklId_UnknownPurposeAcceptedOpaquely` in piggy's
+`go/markl/internal/bravo/markl/`; fixture vector
 `purpose/example-unregistered-purpose-v1/sha256`.)*
 
 ## 7. Test Vectors
 
 Independent implementations MUST round-trip the conformance fixture at
-`go/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json`.
-The fixture is the canonical artifact; this section documents only its
-schema. The file lives under Go's `testdata/` convention so it travels
+piggy's
+`go/markl/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json`
+(canonical home since the piggy#183 ownership inversion; madder's copy
+was retired with the cutover). The fixture is the canonical artifact;
+this section documents only its schema. The file lives under Go's `testdata/` convention so it travels
 with the Go module's build sandbox; it is otherwise readable as plain
 JSON by any consumer.
 
@@ -494,10 +504,10 @@ The fixture covers, at minimum:
   checksum, charset violation, wrong payload size, incompatible
   `(purpose, format)` pair.
 
-To regenerate after a registry change:
+To regenerate after a registry change (in the piggy repository):
 
 ```sh
-cd go && go test -tags 'test rfc0002_generate' \
+cd go/markl && go test -tags 'test rfc0002_generate' \
   -run TestGenerateRFC0002Vectors \
   ./internal/charlie/markl_registrations/...
 ```
@@ -538,7 +548,8 @@ without purposes for blob digests, with purposes for object metadata,
 signatures, and repository keys, and with bare purpose-id-shaped HRPs
 for legacy private-key references (resolved via §6.4). This RFC does
 not change any wire byte; it pins the behaviour already implemented by
-`go/internal/bravo/markl/`. Existing data remains valid.
+the Go reference implementation (piggy's
+`go/markl/internal/bravo/markl/`). Existing data remains valid.
 
 The conformance work in
 [#150](https://github.com/amarbel-llc/madder/issues/150) tightened
@@ -582,11 +593,14 @@ split-HRP form.
 - BIP 350 — Bech32m format for v1+ witness addresses (cited only to
   clarify that blech32 uses bech32's polymod-XOR target `1`, not
   bech32m's `0x2bc830a3`)
-- `go/internal/bravo/markl/` — Go reference implementation
-- `go/internal/alfa/blech32/` — Go reference blech32 implementation
-- `go/internal/charlie/markl_registrations/` — canonical purpose and
-  alias registrations
-- `go/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json` —
+- piggy `go/markl/internal/bravo/markl/` — Go reference implementation
+- piggy `go/markl/internal/alfa/blech32/` — Go reference blech32
+  implementation
+- piggy `go/markl/internal/charlie/markl_registrations/` — format and
+  `piggy-*` purpose registrations; madder's
+  `go/internal/charlie/markl_registrations/` — `madder-*`,
+  transitional `dodder-*`, and papi purpose/alias registrations
+- piggy `go/markl/internal/charlie/markl_registrations/testdata/0002-markl-id-format-vectors.json` —
   conformance fixture (this RFC §7)
 - `docs/man.7/markl-id.md` — informal manual page; this RFC supersedes
   it for normative purposes
