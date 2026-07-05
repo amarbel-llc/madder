@@ -327,14 +327,15 @@ registration starts narrow.
 `TestAllPurposes_RelatedRoundTrip` in madder's
 `go/internal/charlie/markl_registrations/`.)*
 
-The Go reference implementation registers additional purposes
-(`dodder-object-{digest-sha256,sig,mother-sig}-v1`,
+The owning systems register additional purposes outside this table
+(dodder: `dodder-object-{digest-sha256,sig,mother-sig}-v1`,
 `dodder-object-metadata-digest-without_tai-v1`, `dodder-repo-sig-v1`,
-`dodder-request_auth-{challenge,response,repo-sig}-v1`,
-`madder-public_key-v1`, `madder-private_key-{v0,v1}`). These are
-**out of scope** for this RFC: they remain valid wire-format markl
-IDs, but their semantics are not pinned cross-language. Future RFCs
-MAY promote any of them into §6.1.
+`dodder-request_auth-{challenge,response,repo-sig}-v1`; madder:
+`madder-public_key-v1`, `madder-private_key-{v0,v1}`,
+`madder-blob_store-config-digest-v1`). These are **out of scope** for
+this RFC: they remain valid wire-format markl IDs, but their
+semantics are not pinned cross-language. Future RFCs MAY promote any
+of them into §6.1.
 
 ### 6.2. Registering New Purposes
 
@@ -358,9 +359,11 @@ The framework code (piggy's `go/markl/internal/bravo/markl/`) does not
 contain the purpose registrations; each consumer installs its own on
 init. Piggy's module registers the formats and the `piggy-*` purposes
 (`go/markl/internal/charlie/markl_registrations/`); madder registers
-the `madder-*`, transitional `dodder-*`, and `papi-doc-sig-v1`
-purposes (madder's `go/internal/charlie/markl_registrations/`). Any
-consumer (e.g. dodder) MAY register additional purposes via
+the `madder-*` and (transitionally) `papi-doc-sig-v1` purposes plus
+the legacy purpose-id aliases (madder's
+`go/internal/charlie/markl_registrations/`); dodder registers the
+`dodder-*` purposes in its own tree. Any
+consumer MAY register additional purposes via
 `markl.RegisterPurpose` without forking the framework. See
 [ADR 0006](../decisions/0006-markl-registration-api-shape.md). This
 property is normative for the registration API, not the wire format —

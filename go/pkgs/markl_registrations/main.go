@@ -31,29 +31,10 @@ var AllAliases = internal.AllAliases
 // a new Purpose*Opts entry doesn't require a manual append.
 var (
 	AllPurposes                        = internal.AllPurposes
-	PurposeBlobDigestV1Opts            = internal.PurposeBlobDigestV1Opts
 	PurposeBlobStoreConfigDigestV1Opts = internal.PurposeBlobStoreConfigDigestV1Opts
 	PurposeMadderPrivateKeyV0Opts      = internal.PurposeMadderPrivateKeyV0Opts
 	PurposeMadderPrivateKeyV1Opts      = internal.PurposeMadderPrivateKeyV1Opts
 	PurposeMadderPubKeyV1Opts          = internal.PurposeMadderPubKeyV1Opts
-	PurposeObjectDigestV1Opts          = internal.PurposeObjectDigestV1Opts
-	PurposeObjectDigestV2Opts          = internal.PurposeObjectDigestV2Opts
-)
-
-// v3 object digest/sig purposes: the signed object digest gains typed
-// blob-reference coverage on the dodder side (see
-// https://github.com/amarbel-llc/madder/issues/255 for the ownership
-// decoupling this motivates). Registration shape is identical to v2 —
-// the version bump changes what the digest covers, not the formats.
-var (
-	PurposeObjectDigestV3Opts    = internal.PurposeObjectDigestV3Opts
-	PurposeObjectMotherSigV1Opts = internal.PurposeObjectMotherSigV1Opts
-	PurposeObjectMotherSigV2Opts = internal.PurposeObjectMotherSigV2Opts
-	PurposeObjectMotherSigV3Opts = internal.PurposeObjectMotherSigV3Opts
-	PurposeObjectSigV0Opts       = internal.PurposeObjectSigV0Opts
-	PurposeObjectSigV1Opts       = internal.PurposeObjectSigV1Opts
-	PurposeObjectSigV2Opts       = internal.PurposeObjectSigV2Opts
-	PurposeObjectSigV3Opts       = internal.PurposeObjectSigV3Opts
 )
 
 // Papi document signature (jointly owned with amarbel-llc/papi;
@@ -67,12 +48,4 @@ var (
 // all P-256; widening to ed25519_sig later is backward-compatible
 // (existing IDs still validate), so start narrow and amend if a
 // software signer appears.
-var (
-	PurposePapiDocSigV1Opts               = internal.PurposePapiDocSigV1Opts
-	PurposeRepoPrivateKeyV1Opts           = internal.PurposeRepoPrivateKeyV1Opts
-	PurposeRepoPubKeyV1Opts               = internal.PurposeRepoPubKeyV1Opts
-	PurposeRequestAuthChallengeV1Opts     = internal.PurposeRequestAuthChallengeV1Opts
-	PurposeRequestAuthResponseV1Opts      = internal.PurposeRequestAuthResponseV1Opts
-	PurposeRequestRepoSigV1Opts           = internal.PurposeRequestRepoSigV1Opts
-	PurposeV5MetadataDigestWithoutTaiOpts = internal.PurposeV5MetadataDigestWithoutTaiOpts
-)
+var PurposePapiDocSigV1Opts = internal.PurposePapiDocSigV1Opts

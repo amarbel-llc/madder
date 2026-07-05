@@ -3,9 +3,6 @@
 package markl_registrations_test
 
 import (
-	"bytes"
-	"crypto/ed25519"
-	"crypto/rand"
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
@@ -55,66 +52,9 @@ func TestAllPurposes_RelatedRoundTrip(t *testing.T) {
 	}
 }
 
-// PurposeRepoPrivateKeyV1's Related[public_key] mapping is what
-// Id.GetPublicKey reads to stamp the result. Pin the canonical pairing
-// so a registration drift in markl_registrations would surface here.
-func TestPurposeRepoPrivateKeyV1_RelatedPublicKey(t *testing.T) {
-	priv := markl.GetPurpose(markl.PurposeRepoPrivateKeyV1)
-
-	got, ok := priv.GetRelated(markl.RelatedRolePublicKey)
-	if !ok {
-		t.Fatalf("GetRelated(RelatedRolePublicKey) on %q: not found",
-			markl.PurposeRepoPrivateKeyV1)
-	}
-
-	if got != markl.PurposeRepoPubKeyV1 {
-		t.Errorf("Related[public_key] = %q, want %q", got, markl.PurposeRepoPubKeyV1)
-	}
-}
-
-// markl.GetDigestTypeForSigType is a thin wrapper over the registered
-// Related["digest"] entry. Verify it returns the canonical mapping for
-// each sig that declares one.
-func TestGetDigestTypeForSigType_Canonical(t *testing.T) {
-	cases := []struct {
-		sigId    string
-		digestId string
-	}{
-		{markl.PurposeObjectSigV1, markl.PurposeObjectDigestV1},
-		{markl.PurposeObjectSigV2, markl.PurposeObjectDigestV2},
-		{markl.PurposeObjectSigV3, markl.PurposeObjectDigestV3},
-	}
-
-	for _, c := range cases {
-		c := c
-		t.Run(c.sigId, func(t *testing.T) {
-			if got := markl.GetDigestTypeForSigType(c.sigId); got != c.digestId {
-				t.Errorf("got %q, want %q", got, c.digestId)
-			}
-		})
-	}
-}
-
-// Same shape as GetDigestTypeForSigType but for the mother_sig role.
-func TestGetMotherSigTypeForSigType_Canonical(t *testing.T) {
-	cases := []struct {
-		sigId       string
-		motherSigId string
-	}{
-		{markl.PurposeObjectSigV1, markl.PurposeObjectMotherSigV1},
-		{markl.PurposeObjectSigV2, markl.PurposeObjectMotherSigV2},
-		{markl.PurposeObjectSigV3, markl.PurposeObjectMotherSigV3},
-	}
-
-	for _, c := range cases {
-		c := c
-		t.Run(c.sigId, func(t *testing.T) {
-			if got := markl.GetMotherSigTypeForSigType(c.sigId); got != c.motherSigId {
-				t.Errorf("got %q, want %q", got, c.motherSigId)
-			}
-		})
-	}
-}
+// The repo-private-key Related[public_key] pairing test and the
+// canonical sig→digest / sig→mother-sig mapping tests moved to dodder
+// alongside the dodder-* registrations (madder#255 step 3).
 
 // Each AllAliases entry resolves to its target format via
 // GetFormatOrError. This exercises markl's purpose-id-alias indirection
@@ -150,32 +90,6 @@ func TestBlobStoreConfigDigestV1Registered(t *testing.T) {
 	}
 }
 
-// End-to-end: Id.GetPublicKey delegates to the registered FormatSec via
-// PurposeRepoPrivateKeyV1, stamps the result with PurposeRepoPubKeyV1,
-// and the result bytes match Go's stdlib ed25519. Originally lived in
-// internal/bravo/markl; relocated here because markl's tests don't
-// register the dodder vocabulary that this path crosses.
-func TestIdGetPublicKey_Ed25519_MatchesStdlib(t *testing.T) {
-	_, priv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var secId markl.Id
-	if err := secId.SetPurposeId(markl.PurposeRepoPrivateKeyV1); err != nil {
-		t.Fatal(err)
-	}
-	if err := secId.SetMarklId(markl.FormatIdEd25519Sec, priv); err != nil {
-		t.Fatal(err)
-	}
-
-	pubId, err := secId.GetPublicKey(markl.PurposeRepoPrivateKeyV1)
-	if err != nil {
-		t.Fatalf("Id.GetPublicKey: %v", err)
-	}
-
-	want := priv.Public().(ed25519.PublicKey)
-	if !bytes.Equal(pubId.GetBytes(), want) {
-		t.Errorf("pubkey mismatch:\n got  %x\n want %x", pubId.GetBytes(), want)
-	}
-}
+// The end-to-end Id.GetPublicKey test (ed25519 vs stdlib) crossed the
+// dodder-repo-private_key-v1 purpose and moved to dodder alongside the
+// dodder-* registrations (madder#255 step 3).
