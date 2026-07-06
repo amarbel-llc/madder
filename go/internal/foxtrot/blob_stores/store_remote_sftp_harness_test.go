@@ -15,7 +15,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

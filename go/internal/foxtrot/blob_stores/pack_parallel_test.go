@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 
 func TestCollectBlobMetasParallelBasic(t *testing.T) {

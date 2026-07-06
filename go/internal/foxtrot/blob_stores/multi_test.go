@@ -17,7 +17,7 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
 	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

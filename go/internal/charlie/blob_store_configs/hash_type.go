@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 
 type ErrUnsupportedHashType string

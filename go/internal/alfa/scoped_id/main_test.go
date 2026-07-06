@@ -8,7 +8,7 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
 	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 
 func TestId_Set_String_RoundTrip(t *testing.T) {

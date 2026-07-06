@@ -6,7 +6,7 @@
 // data that init() iterates to install everything in markl's registry.
 //
 // Ownership (madder#255): format registrations and the piggy-*
-// purposes live upstream in piggy's go/markl module (piggy#183); the
+// purposes live upstream in piggy's go module (piggy#183); the
 // blank import below activates them. The dodder-* purposes are
 // registered by dodder itself. This package registers only madder-*
 // purposes, papi-doc-sig-v1 (until papi has a registration site), and
@@ -30,10 +30,10 @@ import (
 	// pre-cutover core registered directly. The SSH signing formats stay
 	// stubs here — connecting a signer is a consumer-side call (see
 	// agent.RegisterSSHEd25519Format).
-	_ "github.com/amarbel-llc/piggy/go/markl/age"
-	_ "github.com/amarbel-llc/piggy/go/markl/agent"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
-	_ "github.com/amarbel-llc/piggy/go/markl/pkgs/markl_registrations"
+	_ "github.com/amarbel-llc/piggy/go/pkgs/age"
+	_ "github.com/amarbel-llc/piggy/go/pkgs/agent"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	_ "github.com/amarbel-llc/piggy/go/pkgs/markl_registrations"
 )
 
 // PurposeIdAlias names a purposeId-shaped string that
@@ -93,7 +93,7 @@ var (
 	}
 
 	// The piggy-* purposes are no longer registered here: piggy's own
-	// go/markl module registers them in its init (piggy#183 ownership
+	// go module registers them in its init (piggy#183 ownership
 	// inversion) — see the blank import of piggy's markl_registrations
 	// above. Registering them here too would panic on duplicate.
 

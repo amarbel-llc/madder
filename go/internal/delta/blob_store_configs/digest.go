@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/amarbel-llc/hyphence/go/hyphence"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 

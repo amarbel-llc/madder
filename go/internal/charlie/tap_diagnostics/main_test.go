@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/markl"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 
 func TestFromErrNotEqual(t *testing.T) {

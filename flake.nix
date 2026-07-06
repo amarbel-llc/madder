@@ -95,6 +95,20 @@
       inputs.doppelgang.follows = "doppelgang";
     };
 
+    # The markl-id framework home (piggy#183 ownership inversion),
+    # sourced via goFlakeInputs so a piggy bump only touches flake.lock
+    # — no go.mod / gomod2nix.toml lockstep edits. Its go-pkgs producer
+    # is scoped to go/ (no subPath) and carries a passthru dewey bridge.
+    piggy = {
+      url = "github:amarbel-llc/piggy";
+      inputs.igloo.follows = "igloo";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+      inputs.bats.follows = "bats";
+      inputs.purse-first.follows = "purse-first";
+      inputs.conformist.follows = "conformist";
+    };
+
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "github:amarbel-llc/doppelgang";
@@ -117,6 +131,7 @@
       tap,
       crap,
       hyphence,
+      piggy,
       doppelgang,
       conformist,
       ...
@@ -150,6 +165,7 @@
             tommy
             crap
             hyphence
+            piggy
             ;
           # Scope the producer at go/ so downstream consumers reference
           # go-pkgs directly with no subPath. Madder's repo root has

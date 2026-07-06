@@ -1,6 +1,6 @@
 package domain_interfaces
 
-// The markl interface vocabulary is owned upstream by piggy's go/markl
+// The markl interface vocabulary is owned upstream by piggy's go
 // module (piggy#183 ownership inversion). These aliases keep madder's
 // domain_interfaces as the single import for domain interfaces — the
 // blob-store and config interfaces in this package reference MarklId
@@ -8,7 +8,7 @@ package domain_interfaces
 // forcing dual imports on every consumer.
 
 import (
-	"github.com/amarbel-llc/piggy/go/markl/pkgs/domain_interfaces"
+	"github.com/amarbel-llc/piggy/go/pkgs/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

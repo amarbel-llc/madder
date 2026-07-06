@@ -24,6 +24,7 @@
   tommy,
   crap,
   hyphence,
+  piggy,
   system,
 }:
 let
@@ -54,6 +55,14 @@ let
     "github.com/amarbel-llc/hyphence/go" = {
       src = hyphence.packages.${system}.go-pkgs;
     };
+    # piggy owns the markl-id framework (piggy#183 inversion). Its
+    # producer is scoped to go/ (module root, no subPath); piggy's own
+    # passthru bridges dewey for consumers that need it — madder's
+    # dewey dep stays on its organic gomod2nix pin (dewey tags are
+    # public), so no bridge entry is added here.
+    "github.com/amarbel-llc/piggy/go" = {
+      src = piggy.packages.${system}.go-pkgs;
+    };
   };
 in
 {
@@ -65,6 +74,12 @@ in
   # them (RFC 0001 § Multi-producer closures; amarbel-llc/igloo#39
   # workspace-mode chaining). mkGoPkgs uses it only to attach the
   # passthru — the filtered source tree is unchanged.
-  goPkgs = pkgs.mkGoPkgs { inherit src goFlakeInputs; };
+  # Explicit name per RFC 0001 Appendix A (nixpkgs#49): madder's module
+  # path ends in /go, so the inferred store-path prefix would be the
+  # unhelpful "go-go-pkgs".
+  goPkgs = pkgs.mkGoPkgs {
+    inherit src goFlakeInputs;
+    name = "madder";
+  };
   inherit goFlakeInputs;
 }
