@@ -215,6 +215,35 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 	cfg Config,
 	xdgScope string,
 	xdgRootOverride string,
+) env {
+	return MakeWithXDGRootOverrideHome(context, cfg, xdgScope, xdgRootOverride, true)
+}
+
+// MakeWithXDGRootOverrideHomeNoInit mirrors
+// MakeWithXDGRootOverrideHomeAndInitialize but omits initializeXDG's mkdir,
+// pairing with MakeDefaultNoInit the same way MakeWithXDGRootOverrideHomeAndInitialize
+// pairs with MakeDefault. It lets callers read GetXDG().Data.ActualValue (and
+// the other category dirs) for a root that may not exist yet — e.g. a
+// pre-existence check — without the side effect of creating it.
+func MakeWithXDGRootOverrideHomeNoInit(
+	context errors.Context,
+	cfg Config,
+	xdgScope string,
+	xdgRootOverride string,
+) env {
+	return MakeWithXDGRootOverrideHome(context, cfg, xdgScope, xdgRootOverride, false)
+}
+
+// MakeWithXDGRootOverrideHome is the shared body behind
+// MakeWithXDGRootOverrideHomeAndInitialize / MakeWithXDGRootOverrideHomeNoInit,
+// mirroring the initialize-bool parameterization MakeWithDefaultHome already
+// uses for the MakeDefault / MakeDefaultNoInit pair.
+func MakeWithXDGRootOverrideHome(
+	context errors.Context,
+	cfg Config,
+	xdgScope string,
+	xdgRootOverride string,
+	initialize bool,
 ) (env env) {
 	env.Context = context
 	env.envVarNames = cfg.EnvVarNames
@@ -233,6 +262,10 @@ func MakeWithXDGRootOverrideHomeAndInitialize(
 		xdgRootOverride,
 	); err != nil {
 		env.Cancel(err)
+		return env
+	}
+
+	if !initialize {
 		return env
 	}
 

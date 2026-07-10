@@ -66,7 +66,21 @@ var (
 
 // MakeWithXDG accepts an externally-supplied xdg.XDG; the scope is read
 // from xdg.UtilityName. cfg carries only EnvVarNames and DebugOptions.
+var MakeWithXDG = internal.MakeWithXDG
+
+// MakeWithXDGRootOverrideHome is the shared body behind
+// MakeWithXDGRootOverrideHomeAndInitialize / MakeWithXDGRootOverrideHomeNoInit,
+// mirroring the initialize-bool parameterization MakeWithDefaultHome already
+// uses for the MakeDefault / MakeDefaultNoInit pair.
 var (
-	MakeWithXDG                              = internal.MakeWithXDG
+	MakeWithXDGRootOverrideHome              = internal.MakeWithXDGRootOverrideHome
 	MakeWithXDGRootOverrideHomeAndInitialize = internal.MakeWithXDGRootOverrideHomeAndInitialize
 )
+
+// MakeWithXDGRootOverrideHomeNoInit mirrors
+// MakeWithXDGRootOverrideHomeAndInitialize but omits initializeXDG's mkdir,
+// pairing with MakeDefaultNoInit the same way MakeWithXDGRootOverrideHomeAndInitialize
+// pairs with MakeDefault. It lets callers read GetXDG().Data.ActualValue (and
+// the other category dirs) for a root that may not exist yet — e.g. a
+// pre-existence check — without the side effect of creating it.
+var MakeWithXDGRootOverrideHomeNoInit = internal.MakeWithXDGRootOverrideHomeNoInit

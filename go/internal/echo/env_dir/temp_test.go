@@ -4,6 +4,7 @@ package env_dir
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
@@ -54,5 +55,36 @@ func TestMakeWithXDG_RegistersTempCleanup(t *testing.T) {
 				"MakeWithXDG did not register resetTempOnExit",
 			tempDir,
 		)
+	}
+}
+
+// TestMakeWithXDGRootOverrideHomeNoInit_NoMkdir is the madder#260
+// regression test: the no-init counterpart to
+// MakeWithXDGRootOverrideHomeAndInitialize must compute the XDG paths
+// (GetXDG().Data.ActualValue etc.) for a possibly-nonexistent root
+// WITHOUT creating any directories — mirroring the MakeDefault /
+// MakeDefaultNoInit pairing (initialize=false skips initializeXDG's
+// mkdir). Root is a path under a t.TempDir() that is never created, so
+// any mkdir side effect would be observable via os.Stat.
+func TestMakeWithXDGRootOverrideHomeNoInit_NoMkdir(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "does-not-exist")
+
+	env := MakeWithXDGRootOverrideHomeNoInit(
+		errors.MakeContextDefault(),
+		Config{},
+		"madder",
+		root,
+	)
+
+	dataDir := env.GetXDG().Data.ActualValue
+	if dataDir == "" {
+		t.Fatal("GetXDG().Data.ActualValue is empty")
+	}
+
+	if _, err := os.Stat(root); !os.IsNotExist(err) {
+		t.Errorf("root %q was created; expected no mkdir side effect", root)
+	}
+	if _, err := os.Stat(dataDir); !os.IsNotExist(err) {
+		t.Errorf("data dir %q was created; expected no mkdir side effect", dataDir)
 	}
 }
