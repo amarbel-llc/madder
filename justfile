@@ -540,6 +540,11 @@ debug-version:
   echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
   echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
 
+# Display ANSI 256-color palette with lipgloss styling to pick colors for UI.
+[group("debug")]
+debug-color-demo:
+  cd {{justfile_directory()}}/go && go run {{justfile_directory()}}/.tmp/color-demo.go
+
 # Copy a subpackage from the cached dewey module into go/internal/<dest>/
 # so we can iterate on it in-tree without a purse-first release cycle.
 # Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,
