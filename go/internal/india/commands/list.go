@@ -48,9 +48,11 @@ func (cmd List) GetDescription() futility.Description {
 			"(absolute). In json mode (-format=json) the same per-store " +
 			"records are emitted as values of a single top-level JSON " +
 			"object keyed by store ID (the PWD-resolved form, e.g. " +
-			"\".default\"). Output defaults to text on an interactive " +
-			"terminal and to ndjson when stdout is piped; pass -format to " +
-			"force a specific encoding. Store IDs use prefixes to indicate " +
+			"\".default\"). Output defaults to a styled table on an " +
+			"interactive terminal and to ndjson when stdout is piped; " +
+			"pass -format=tap to force the plain '<id>: <description> " +
+			"# path: <rel>' text lines regardless of TTY, or -format to " +
+			"pick another encoding. Store IDs use prefixes to indicate " +
 			"scope: unprefixed for XDG user stores, '.' for CWD-relative " +
 			"stores, and '/' for XDG system stores.",
 	}
@@ -95,10 +97,17 @@ func (cmd List) Run(req futility.Request) {
 		return
 	}
 
-	// list is not a streaming TAP producer: tap-mode and the
-	// auto-on-TTY default both render the same human text. ndjson
-	// emits one record per line; json wraps the same records in a
-	// single top-level object keyed by store id.
+	// auto + TTY renders the styled lipgloss table natively (mirrors
+	// sync's viewport guard, sync.go:266-273); -format=tap explicitly
+	// requested still yields the legacy plain-text lines regardless of
+	// TTY, so scripts redirecting `-format=tap` output stay stable.
+	if cmd.Format == output_format.FormatAuto && output_format.IsTTY(os.Stdout) {
+		emitListTable(envBlobStore, blobStores)
+		return
+	}
+
+	// ndjson emits one record per line; json wraps the same records in
+	// a single top-level object keyed by store id.
 	var err error
 	switch cmd.Format.Resolve(os.Stdout) {
 	case output_format.FormatJSON:
@@ -138,19 +147,30 @@ func emitListText(
 		)
 	}
 
-	if len(unmigrated) > 0 {
-		envBlobStore.GetUI().Printf("")
-		envBlobStore.GetUI().Printf(
-			"NOTE: %d store(s) above are missing tamper-detection digests.",
-			len(unmigrated),
-		)
-		envBlobStore.GetUI().Printf("      Run this to migrate them:")
-		envBlobStore.GetUI().Printf("")
-		envBlobStore.GetUI().Printf(
-			"        madder config-pin_digest %s",
-			strings.Join(unmigrated, " "),
-		)
+	printUnmigratedNote(envBlobStore, unmigrated)
+}
+
+// printUnmigratedNote prints the remediation hint shared by the text and
+// table renderers when one or more stores are missing tamper-detection
+// digests. No-op when unmigrated is empty.
+func printUnmigratedNote(
+	envBlobStore command_components.BlobStoreEnv,
+	unmigrated []string,
+) {
+	if len(unmigrated) == 0 {
+		return
 	}
+	envBlobStore.GetUI().Printf("")
+	envBlobStore.GetUI().Printf(
+		"NOTE: %d store(s) above are missing tamper-detection digests.",
+		len(unmigrated),
+	)
+	envBlobStore.GetUI().Printf("      Run this to migrate them:")
+	envBlobStore.GetUI().Printf("")
+	envBlobStore.GetUI().Printf(
+		"        madder config-pin_digest %s",
+		strings.Join(unmigrated, " "),
+	)
 }
 
 func emitListNDJSON(blobStores blob_stores.BlobStoreMap) (err error) {
