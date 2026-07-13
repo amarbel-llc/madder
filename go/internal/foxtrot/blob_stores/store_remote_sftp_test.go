@@ -51,8 +51,10 @@ func TestSftpMoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 	observer := &recordingObserver{}
 
 	store := &remoteSftp{
-		id:       id,
-		observer: observer,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			id:       id,
+			observer: observer,
+		},
 	}
 	mover := &sftpMover{
 		store: store,
@@ -220,7 +222,7 @@ func TestSftpInitializeOnce_DoesNotPoisonContext(t *testing.T) {
 	tracker := &spyActiveContext{}
 
 	store := &remoteSftp{
-		ctx: tracker,
+		remoteBlobStoreBase: remoteBlobStoreBase{ctx: tracker},
 		sshClientInitializer: func() (*ssh.Client, error) {
 			return nil, errors.Errorf("ssh dial blew up")
 		},
@@ -444,15 +446,17 @@ func newSftpHashTestStore(
 		tb.Fatalf("scoped_id.Set: %v", err)
 	}
 	store := &remoteSftp{
-		ctx:             benchContext{},
-		id:              id,
-		config:          benchRemotePathConfig{remotePath: remotePath},
-		buckets:         defaultBuckets,
-		multiHash:       multiHash,
-		defaultHashType: defaultHash,
-		blobIOWrapper:   nopHashTestBlobIOWrapper{},
-		blobCache:       map[string]struct{}{},
-		sftpClient:      client,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			ctx:             benchContext{},
+			id:              id,
+			buckets:         defaultBuckets,
+			multiHash:       multiHash,
+			defaultHashType: defaultHash,
+			blobIOWrapper:   nopHashTestBlobIOWrapper{},
+			blobCache:       map[string]struct{}{},
+		},
+		config:     benchRemotePathConfig{remotePath: remotePath},
+		sftpClient: client,
 	}
 	store.once.Do(func() {}) // latch: initialize() will not run
 	return store

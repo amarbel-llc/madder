@@ -13,7 +13,6 @@ import (
 	"os"
 	stdpath "path"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -37,38 +36,19 @@ import (
 )
 
 type remoteS3 struct {
-	ctx       interfaces.ActiveContext
-	uiPrinter ui.Printer
-	once      sync.Once
+	// remoteBlobStoreBase carries the state and behavior shared with
+	// remoteSftp / remoteWebdav (id, buckets, multiHash, defaultHashType,
+	// blobIOWrapper, remoteConfig, observer, initErr/once, blob cache,
+	// makeEnvDirConfig). Embedded anonymously so those promote to the
+	// store; see #263.
+	remoteBlobStoreBase
 
-	id scoped_id.Id
-
-	buckets []int
-
+	// config is transport ONLY per ADR 0005; the authoritative
+	// blob-store properties live in remoteConfig (decoded from the s3
+	// object at <prefix>/blob_store-config).
 	config blob_store_configs.ConfigS3
 
-	// remoteConfig is the authoritative blob-store-properties config
-	// decoded from the s3 object at <prefix>/blob_store-config (ADR 0005).
-	// nil before initializeOnce runs.
-	remoteConfig blob_store_configs.Config
-
-	multiHash       bool
-	defaultHashType markl.FormatHash
-
-	blobIOWrapper domain_interfaces.BlobIOWrapper
-
 	s3Client *s3.Client
-
-	// initErr is the sticky error captured by initializeOnce when
-	// initialize() fails. sync.Once doesn't re-run after a panic, so
-	// cache the wrapped error and re-panic on each subsequent call
-	// rather than proceeding with s3Client = nil.
-	initErr error
-
-	observer domain_interfaces.BlobWriteObserver
-
-	blobCacheLock sync.RWMutex
-	blobCache     map[string]struct{}
 }
 
 var _ domain_interfaces.BlobStore = &remoteS3{}
@@ -100,14 +80,16 @@ func makeS3Store(
 	}
 
 	blobStore = &remoteS3{
-		ctx:             ctx,
-		id:              id,
-		defaultHashType: defaultHashType,
-		uiPrinter:       uiPrinter,
-		buckets:         defaultBuckets,
-		config:          config,
-		blobCache:       make(map[string]struct{}),
-		observer:        observer,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			ctx:             ctx,
+			id:              id,
+			defaultHashType: defaultHashType,
+			uiPrinter:       uiPrinter,
+			buckets:         defaultBuckets,
+			blobCache:       make(map[string]struct{}),
+			observer:        observer,
+		},
+		config: config,
 	}
 
 	return blobStore, err
@@ -300,21 +282,6 @@ func (blobStore *remoteS3) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper {
 
 func (blobStore *remoteS3) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
-}
-
-func (blobStore *remoteS3) makeEnvDirConfig(
-	hashFormat domain_interfaces.FormatHash,
-) blob_io.Config {
-	if hashFormat == nil {
-		hashFormat = blobStore.defaultHashType
-	}
-
-	return blob_io.MakeConfig(
-		hashFormat,
-		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
-		blobStore.blobIOWrapper.GetBlobCompression(),
-		blobStore.blobIOWrapper.GetBlobEncryption(),
-	)
 }
 
 // keyForMarklId returns the S3 object key for the given blob id, mirroring

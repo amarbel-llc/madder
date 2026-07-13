@@ -510,13 +510,15 @@ func newBenchStore(
 		tb.Fatalf("scoped_id.Set: %v", err)
 	}
 	store := &remoteSftp{
-		ctx:             benchContext{},
-		id:              id,
-		config:          benchRemotePathConfig{remotePath: remotePath},
-		buckets:         defaultBuckets,
-		defaultHashType: markl.FormatHashSha256,
-		blobCache:       map[string]struct{}{},
-		sftpClient:      client,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			ctx:             benchContext{},
+			id:              id,
+			buckets:         defaultBuckets,
+			defaultHashType: markl.FormatHashSha256,
+			blobCache:       map[string]struct{}{},
+		},
+		config:     benchRemotePathConfig{remotePath: remotePath},
+		sftpClient: client,
 	}
 	store.once.Do(func() {}) // latch: initialize() will not run
 	return store

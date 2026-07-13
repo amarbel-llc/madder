@@ -23,9 +23,11 @@ import (
 // the live-connection path).
 func TestS3MakeBlobWriter_SingleHashRejectsForeignType(t *testing.T) {
 	store := &remoteS3{
-		id:              mustParseBlobStoreId(t, "s3-hashtest"),
-		multiHash:       false,
-		defaultHashType: markl.FormatHashSha256,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			id:              mustParseBlobStoreId(t, "s3-hashtest"),
+			multiHash:       false,
+			defaultHashType: markl.FormatHashSha256,
+		},
 	}
 	store.once.Do(func() {}) // latch: initialize() will not run
 
@@ -105,9 +107,11 @@ func TestKeyForMarklId_SingleHash(t *testing.T) {
 	}
 
 	store := &remoteS3{
-		buckets:   []int{2},
-		multiHash: false,
-		config:    &blob_store_configs.TomlS3V0{Prefix: "blobs"},
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			buckets:   []int{2},
+			multiHash: false,
+		},
+		config: &blob_store_configs.TomlS3V0{Prefix: "blobs"},
 	}
 
 	got := store.keyForMarklId(id)
@@ -131,9 +135,11 @@ func TestKeyForMarklId_MultiHash(t *testing.T) {
 	}
 
 	store := &remoteS3{
-		buckets:   []int{2},
-		multiHash: true,
-		config:    &blob_store_configs.TomlS3V0{Prefix: ""},
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			buckets:   []int{2},
+			multiHash: true,
+		},
+		config: &blob_store_configs.TomlS3V0{Prefix: ""},
 	}
 
 	got := store.keyForMarklId(id)
@@ -173,8 +179,10 @@ func TestS3MoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 	observer := &recordingObserver{}
 
 	store := &remoteS3{
-		id:       id,
-		observer: observer,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			id:       id,
+			observer: observer,
+		},
 	}
 	mover := &s3Mover{store: store}
 
@@ -193,7 +201,9 @@ func TestS3MoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 
 func TestS3MoverEmitWriteEvent_NilObserverIsNoop(t *testing.T) {
 	id := mustParseBlobStoreId(t, "s3-default")
-	store := &remoteS3{id: id, observer: nil}
+	store := &remoteS3{
+		remoteBlobStoreBase: remoteBlobStoreBase{id: id, observer: nil},
+	}
 	mover := &s3Mover{store: store}
 	mover.emitWriteEvent(domain_interfaces.BlobWriteOpWritten, 1) // must not panic
 }

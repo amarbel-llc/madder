@@ -50,58 +50,21 @@ const sftpKeepaliveInterval = 30 * time.Second
 const sftpAllBlobsWorkerCount = 8
 
 type remoteSftp struct {
-	ctx       interfaces.ActiveContext
-	uiPrinter ui.Printer
-	once      sync.Once
+	// remoteBlobStoreBase carries the state and behavior shared with
+	// remoteS3 / remoteWebdav (id, buckets, multiHash, defaultHashType,
+	// blobIOWrapper, remoteConfig, observer, initErr/once, blob cache,
+	// makeEnvDirConfig). Embedded anonymously so those promote to the
+	// store; see #263. The initErr/once lesson (Cancel poisons the
+	// shared context — pre-#134) is documented on initializeOnce below.
+	remoteBlobStoreBase
 
-	id scoped_id.Id
-
-	buckets []int
-
+	// config (TomlSFTPV0) is transport ONLY per ADR 0005; the
+	// authoritative blob-store properties live in remoteConfig.
 	config blob_store_configs.ConfigSFTPRemotePath
 
-	// remoteConfig is the authoritative blob-store-properties config
-	// decoded from the SFTP remote's blob_store-config file. Per ADR
-	// 0005, the local `config` (TomlSFTPV0) above is transport only;
-	// hash type, buckets, compression, and encryption all live here.
-	// Populated by readRemoteConfig; nil before initializeOnce runs.
-	remoteConfig blob_store_configs.Config
-
-	multiHash       bool
-	defaultHashType markl.FormatHash
-
-	// blobIOWrapper holds the remote config's compression / encryption
-	// view per ADR 0005. Populated by readRemoteConfig; nil before
-	// initializeOnce runs.
-	blobIOWrapper        domain_interfaces.BlobIOWrapper
 	sshClientInitializer func() (*ssh.Client, error)
 	sshClient            *ssh.Client
 	sftpClient           *sftp.Client
-
-	// initErr is the sticky error captured by initializeOnce when
-	// initialize() fails. Cached here so that subsequent
-	// initializeOnce calls (sync.Once does not re-run f after a
-	// panic) can re-panic the same error rather than silently
-	// proceeding against a half-initialized struct. Pre-#134 the
-	// store called ctx.Cancel(err) to surface init failures, which
-	// throws via dewey's Run-frame machinery; that pattern broke
-	// long-lived embeddings (e.g. madder-mcp serve) because Cancel
-	// closes the shared context's Done channel as a side effect.
-	// Panicking directly defers the catch to the caller's Run frame
-	// without poisoning the env's context.
-	initErr error
-
-	// observer receives one BlobWriteEvent per successful upload. Set
-	// at store-construction time from envDir.GetBlobWriteObserver().
-	// Nil means no audit logging; the mover's emitWriteEvent handles
-	// that case cleanly. Per ADR 0004 and issue #50 this currently
-	// only reports op=written — existing-target and error dispositions
-	// are tracked as a follow-up.
-	observer domain_interfaces.BlobWriteObserver
-
-	// TODO extract below into separate struct
-	blobCacheLock sync.RWMutex
-	blobCache     map[string]struct{}
 
 	// dirsKnown remembers directories the store has already confirmed
 	// exist on the remote (either by creating them at init or by a
@@ -132,15 +95,17 @@ func makeSftpStore(
 	}
 
 	blobStore = &remoteSftp{
-		ctx:                  ctx,
-		id:                   id,
-		defaultHashType:      defaultHashType,
-		uiPrinter:            uiPrinter,
-		buckets:              defaultBuckets,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			ctx:             ctx,
+			id:              id,
+			defaultHashType: defaultHashType,
+			uiPrinter:       uiPrinter,
+			buckets:         defaultBuckets,
+			blobCache:       make(map[string]struct{}),
+			observer:        observer,
+		},
 		config:               config,
-		blobCache:            make(map[string]struct{}),
 		sshClientInitializer: sshClientInitializer,
-		observer:             observer,
 	}
 
 	return blobStore, err
@@ -466,21 +431,6 @@ func (blobStore *remoteSftp) GetBlobIOWrapper() domain_interfaces.BlobIOWrapper 
 
 func (blobStore *remoteSftp) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
-}
-
-func (blobStore *remoteSftp) makeEnvDirConfig(
-	hashFormat domain_interfaces.FormatHash,
-) blob_io.Config {
-	if hashFormat == nil {
-		hashFormat = blobStore.defaultHashType
-	}
-
-	return blob_io.MakeConfig(
-		hashFormat,
-		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
-		blobStore.blobIOWrapper.GetBlobCompression(),
-		blobStore.blobIOWrapper.GetBlobEncryption(),
-	)
 }
 
 func (blobStore *remoteSftp) remotePathForMerkleId(

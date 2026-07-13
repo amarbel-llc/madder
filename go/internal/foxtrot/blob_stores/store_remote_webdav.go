@@ -27,50 +27,20 @@ import (
 )
 
 type remoteWebdav struct {
-	ctx       interfaces.ActiveContext
-	uiPrinter ui.Printer
-	once      sync.Once
+	// remoteBlobStoreBase carries the state and behavior shared with
+	// remoteSftp / remoteS3 (id, buckets, multiHash, defaultHashType,
+	// blobIOWrapper, remoteConfig, observer, initErr/once, blob cache,
+	// makeEnvDirConfig). Embedded anonymously so those promote to the
+	// store; see #263.
+	remoteBlobStoreBase
 
-	id scoped_id.Id
-
-	buckets []int
-
+	// config (TomlWebDAVV0) is transport ONLY per ADR 0005; the
+	// authoritative blob-store properties live in remoteConfig.
 	config  blob_store_configs.ConfigWebDAV
 	baseURL *url.URL
 
-	// remoteConfig is the authoritative blob-store-properties config
-	// decoded from the WebDAV remote's blob_store-config file. Per ADR
-	// 0005, the local `config` (TomlWebDAVV0) above is transport only;
-	// hash type, buckets, compression, and encryption all live here.
-	// Populated by readRemoteConfig; nil before initializeOnce runs.
-	remoteConfig blob_store_configs.Config
-
-	multiHash       bool
-	defaultHashType markl.FormatHash
-
-	// blobIOWrapper holds the remote config's compression / encryption
-	// view per ADR 0005. Populated by readRemoteConfig; nil before
-	// initializeOnce runs.
-	blobIOWrapper         domain_interfaces.BlobIOWrapper
 	httpClientInitializer func() (*http.Client, error)
 	httpClient            *http.Client
-
-	// initErr is the sticky error captured by initializeOnce when
-	// initialize() fails. Cached here so that subsequent
-	// initializeOnce calls (sync.Once does not re-run f after a
-	// panic) can re-panic the same error rather than silently
-	// proceeding against a half-initialized struct. Mirrors SFTP's
-	// initErr handling per the issue #134 lessons.
-	initErr error
-
-	// observer receives one BlobWriteEvent per successful upload. Set
-	// at store-construction time from envDir.GetBlobWriteObserver().
-	// Nil means no audit logging; the mover's emitWriteEvent handles
-	// that case cleanly.
-	observer domain_interfaces.BlobWriteObserver
-
-	blobCacheLock sync.RWMutex
-	blobCache     map[string]struct{}
 
 	// mkcolledPaths caches URLs we've successfully MKCOL'd (or
 	// confirmed-as-collection) so subsequent writes don't pay
@@ -118,16 +88,18 @@ func makeWebdavStore(
 	}
 
 	blobStore = &remoteWebdav{
-		ctx:                   ctx,
-		id:                    id,
-		defaultHashType:       defaultHashType,
-		uiPrinter:             uiPrinter,
-		buckets:               defaultBuckets,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			ctx:             ctx,
+			id:              id,
+			defaultHashType: defaultHashType,
+			uiPrinter:       uiPrinter,
+			buckets:         defaultBuckets,
+			blobCache:       make(map[string]struct{}),
+			observer:        observer,
+		},
 		config:                config,
 		baseURL:               baseURL,
-		blobCache:             make(map[string]struct{}),
 		httpClientInitializer: httpClientInitializer,
-		observer:              observer,
 	}
 
 	return blobStore, err
@@ -302,21 +274,6 @@ func (blobStore *remoteWebdav) GetBlobIOWrapper() domain_interfaces.BlobIOWrappe
 
 func (blobStore *remoteWebdav) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
-}
-
-func (blobStore *remoteWebdav) makeEnvDirConfig(
-	hashFormat domain_interfaces.FormatHash,
-) blob_io.Config {
-	if hashFormat == nil {
-		hashFormat = blobStore.defaultHashType
-	}
-
-	return blob_io.MakeConfig(
-		hashFormat,
-		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
-		blobStore.blobIOWrapper.GetBlobCompression(),
-		blobStore.blobIOWrapper.GetBlobEncryption(),
-	)
 }
 
 func (blobStore *remoteWebdav) setAuth(req *http.Request) {

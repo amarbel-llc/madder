@@ -25,9 +25,11 @@ func TestWebdavMakeBlobWriter_SingleHashRejectsForeignType(t *testing.T) {
 	}
 
 	store := &remoteWebdav{
-		id:              id,
-		multiHash:       false,
-		defaultHashType: markl.FormatHashSha256,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			id:              id,
+			multiHash:       false,
+			defaultHashType: markl.FormatHashSha256,
+		},
 	}
 	store.once.Do(func() {}) // latch: initialize() will not run
 
@@ -57,8 +59,10 @@ func TestWebdavMoverEmitWriteEvent_FiresOnceWithWrittenOp(t *testing.T) {
 	observer := &recordingObserver{}
 
 	store := &remoteWebdav{
-		id:       id,
-		observer: observer,
+		remoteBlobStoreBase: remoteBlobStoreBase{
+			id:       id,
+			observer: observer,
+		},
 	}
 	mover := &webdavMover{
 		store: store,
@@ -200,7 +204,7 @@ func TestWebdavInitializeOnce_DoesNotPoisonContext(t *testing.T) {
 	tracker := &spyActiveContext{}
 
 	store := &remoteWebdav{
-		ctx: tracker,
+		remoteBlobStoreBase: remoteBlobStoreBase{ctx: tracker},
 		httpClientInitializer: func() (*http.Client, error) {
 			return nil, errors.Errorf("http client init blew up")
 		},
