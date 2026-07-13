@@ -115,7 +115,6 @@
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
-      inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
   };
 

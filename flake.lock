@@ -86,6 +86,35 @@
         "type": "github"
       }
     },
+    "conformist_2": {
+      "inputs": {
+        "igloo": [
+          "doppelgang",
+          "igloo"
+        ],
+        "nixpkgs-master": [
+          "doppelgang",
+          "nixpkgs-master"
+        ],
+        "utils": [
+          "doppelgang",
+          "utils"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783949730,
+        "narHash": "sha256-ilEJ9Wp+yrc1/3CK7NRQDdmJ0PTB+xJoS8Grslo7itg=",
+        "ref": "refs/heads/master",
+        "rev": "1985c0c5fd4197ae944526ea9700caed259e1fe8",
+        "revCount": 153,
+        "type": "git",
+        "url": "https://code.linenisgreat.com/conformist.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "https://code.linenisgreat.com/conformist.git"
+      }
+    },
     "crane": {
       "locked": {
         "lastModified": 1783203018,
@@ -135,26 +164,23 @@
     },
     "doppelgang": {
       "inputs": {
+        "conformist": "conformist_2",
         "igloo": [
           "igloo"
         ],
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
-        "treefmt-nix": [
-          "bats",
-          "treefmt-nix"
-        ],
         "utils": [
           "utils"
         ]
       },
       "locked": {
-        "lastModified": 1783342537,
-        "narHash": "sha256-HQQc7jSRgkmTShzyOJYxJ7h/IPg3+l7hgMiFBgNYgZ0=",
+        "lastModified": 1783950862,
+        "narHash": "sha256-fsiElpufWfGHwmr2EXrvr2KAVAv95Tk3FGtgr5v9+QU=",
         "owner": "amarbel-llc",
         "repo": "doppelgang",
-        "rev": "9a66f12721463f261b17359c907f0346a70af2e9",
+        "rev": "6a807f46a4ef4b138962049bac29737055f0f397",
         "type": "github"
       },
       "original": {
