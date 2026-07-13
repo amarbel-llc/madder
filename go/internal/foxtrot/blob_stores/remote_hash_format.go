@@ -51,12 +51,12 @@ func resolveWriteHashFormat(
 	return hashFormat, err
 }
 
-// readHashFormatForDigest resolves the hash format a remote store's
+// readHashFormatForDigest resolves the hash format a store's
 // MakeBlobReader should verify with: the blob id's own markl format,
 // not the store default. A multi-hash store holds blobs of several
 // types, so digesting a non-default blob under defaultHashType would
-// reconstruct the wrong id (#261, #262). Mirrors
-// localHashBucketed.blobReaderFrom.
+// reconstruct the wrong id (#261, #262). Shared by the SFTP, S3,
+// WebDAV, and local hash-bucketed stores.
 func readHashFormatForDigest(
 	digest domain_interfaces.MarklId,
 ) (hashFormat markl.FormatHash, err error) {

@@ -230,15 +230,10 @@ func (blobStore localHashBucketed) blobReaderFrom(
 		return readCloser, err
 	}
 
-	marklType := digest.GetMarklFormat()
-
-	if marklType == nil {
-		err = errors.Errorf("empty markl type")
-		return readCloser, err
-	}
-
-	if marklType.GetMarklFormatId() == "" {
-		err = errors.Errorf("empty markl type id")
+	// Verify under the digest's own hash type — shared with the remote
+	// stores via readHashFormatForDigest.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = readHashFormatForDigest(digest); err != nil {
 		return readCloser, err
 	}
 
@@ -248,15 +243,6 @@ func (blobStore localHashBucketed) blobReaderFrom(
 		blobStore.multiHash,
 		basePath,
 	)
-
-	var hashFormat markl.FormatHash
-
-	if hashFormat, err = markl.GetFormatHashOrError(
-		marklType.GetMarklFormatId(),
-	); err != nil {
-		err = errors.Wrap(err)
-		return readCloser, err
-	}
 
 	if readCloser, err = blob_io.NewFileReaderOrErrNotExist(
 		blobStore.makeEnvDirConfig(hashFormat),
