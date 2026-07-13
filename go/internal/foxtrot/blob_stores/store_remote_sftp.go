@@ -784,33 +784,15 @@ func (blobStore *remoteSftp) MakeBlobWriter(
 ) (blobWriter domain_interfaces.BlobWriter, err error) {
 	blobStore.initializeOnce()
 
-	// Honor the caller-requested hash type when the remote is
-	// configured multi-hash: the blob is digested with it and, via
-	// remotePathForMerkleId at Close, lands under the matching
-	// <format-id>/ subtree that AllBlobs' allBlobsMultiHash walk
-	// expects. A single-hash remote can only ever hold its configured
-	// type, so a mismatching request must fail loudly rather than
-	// silently substitute the default and write a blob the store's own
-	// layout and read path cannot address (#261).
-	hashFormat := blobStore.defaultHashType
-	if marklHashType != nil {
-		if hashFormat, err = markl.GetFormatHashOrError(
-			marklHashType.GetMarklFormatId(),
-		); err != nil {
-			err = errors.Wrap(err)
-			return blobWriter, err
-		}
-	}
-
-	if !blobStore.multiHash &&
-		hashFormat.GetMarklFormatId() != blobStore.defaultHashType.GetMarklFormatId() {
-		err = errors.Errorf(
-			"sftp blob store %q is single-hash (%s); "+
-				"cannot write requested hash type %s",
-			blobStore.id.String(),
-			blobStore.defaultHashType.GetMarklFormatId(),
-			hashFormat.GetMarklFormatId(),
-		)
+	// Digest with the caller-requested hash type (multi-hash) or fail
+	// loudly on a single-hash mismatch — see resolveWriteHashFormat.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = resolveWriteHashFormat(
+		marklHashType,
+		blobStore.defaultHashType,
+		blobStore.multiHash,
+		blobStore.id.String(),
+	); err != nil {
 		return blobWriter, err
 	}
 
@@ -873,24 +855,10 @@ func (blobStore *remoteSftp) MakeBlobReader(
 	blobStore.blobCache[string(digest.GetBytes())] = struct{}{}
 	blobStore.blobCacheLock.Unlock()
 
-	// Verify under the digest's own hash type rather than the store
-	// default: a multi-hash remote holds blobs of several types (see
-	// AllBlobs' allBlobsMultiHash walk and the multi-hash write path),
-	// and digesting a non-default blob with defaultHashType would
-	// reconstruct the wrong id (#261). Mirrors localHashBucketed's
-	// blobReaderFrom.
-	marklType := digest.GetMarklFormat()
-	if marklType == nil || marklType.GetMarklFormatId() == "" {
-		err = errors.Errorf("blob id has no markl hash format: %s", digest)
-		remoteFile.Close()
-		return readCloser, err
-	}
-
+	// Verify under the digest's own hash type, not the store default —
+	// see readHashFormatForDigest.
 	var hashFormat markl.FormatHash
-	if hashFormat, err = markl.GetFormatHashOrError(
-		marklType.GetMarklFormatId(),
-	); err != nil {
-		err = errors.Wrap(err)
+	if hashFormat, err = readHashFormatForDigest(digest); err != nil {
 		remoteFile.Close()
 		return readCloser, err
 	}

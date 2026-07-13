@@ -304,9 +304,15 @@ func (blobStore *remoteWebdav) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
 }
 
-func (blobStore *remoteWebdav) makeEnvDirConfig() blob_io.Config {
+func (blobStore *remoteWebdav) makeEnvDirConfig(
+	hashFormat domain_interfaces.FormatHash,
+) blob_io.Config {
+	if hashFormat == nil {
+		hashFormat = blobStore.defaultHashType
+	}
+
 	return blob_io.MakeConfig(
-		blobStore.defaultHashType,
+		hashFormat,
 		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
 		blobStore.blobIOWrapper.GetBlobCompression(),
 		blobStore.blobIOWrapper.GetBlobEncryption(),
@@ -519,13 +525,24 @@ func (blobStore *remoteWebdav) MakeBlobWriter(
 ) (blobWriter domain_interfaces.BlobWriter, err error) {
 	blobStore.initializeOnce()
 
-	// TODO use hash type
-	mover := &webdavMover{
-		store:  blobStore,
-		config: blobStore.makeEnvDirConfig(),
+	// Digest with the caller-requested hash type (multi-hash) or fail
+	// loudly on a single-hash mismatch — see resolveWriteHashFormat.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = resolveWriteHashFormat(
+		marklHashType,
+		blobStore.defaultHashType,
+		blobStore.multiHash,
+		blobStore.id.String(),
+	); err != nil {
+		return blobWriter, err
 	}
 
-	hash, _ := blobStore.defaultHashType.Get() //repool:owned
+	mover := &webdavMover{
+		store:  blobStore,
+		config: blobStore.makeEnvDirConfig(hashFormat),
+	}
+
+	hash, _ := hashFormat.Get() //repool:owned
 
 	if err = mover.initialize(hash); err != nil {
 		err = errors.Wrap(err)
@@ -587,13 +604,21 @@ func (blobStore *remoteWebdav) MakeBlobReader(
 	blobStore.blobCache[string(digest.GetBytes())] = struct{}{}
 	blobStore.blobCacheLock.Unlock()
 
-	config := blobStore.makeEnvDirConfig()
+	// Verify under the digest's own hash type, not the store default —
+	// see readHashFormatForDigest.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = readHashFormatForDigest(digest); err != nil {
+		resp.Body.Close() //nolint:errcheck
+		return readCloser, err
+	}
+
+	config := blobStore.makeEnvDirConfig(hashFormat)
 	reader := &webdavReader{
 		body:   resp.Body,
 		config: config,
 	}
 
-	readerHash, _ := blobStore.defaultHashType.Get() //repool:owned
+	readerHash, _ := hashFormat.Get() //repool:owned
 
 	if err = reader.initialize(readerHash); err != nil {
 		resp.Body.Close() //nolint:errcheck

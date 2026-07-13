@@ -9,8 +9,39 @@ import (
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
+
+// TestWebdavMakeBlobWriter_SingleHashRejectsForeignType pins the #262
+// loud-fail guard for WebDAV: a single-hash store must reject a request
+// for a hash type other than its configured one before any network call
+// (the guard runs ahead of mover.initialize, so once is latched to skip
+// the live-connection path).
+func TestWebdavMakeBlobWriter_SingleHashRejectsForeignType(t *testing.T) {
+	var id scoped_id.Id
+	if err := id.Set("webdav-hashtest"); err != nil {
+		t.Fatalf("scoped_id.Set: %v", err)
+	}
+
+	store := &remoteWebdav{
+		id:              id,
+		multiHash:       false,
+		defaultHashType: markl.FormatHashSha256,
+	}
+	store.once.Do(func() {}) // latch: initialize() will not run
+
+	writer, err := store.MakeBlobWriter(markl.FormatHashBlake2b256)
+	if writer != nil {
+		t.Fatalf("MakeBlobWriter: got non-nil writer on rejected request")
+	}
+	if err == nil {
+		t.Fatal("MakeBlobWriter: got nil error requesting a foreign hash type")
+	}
+	if !strings.Contains(err.Error(), "single-hash") {
+		t.Errorf("error %q missing 'single-hash' anchor", err.Error())
+	}
+}
 
 // TestWebdavMoverEmitWriteEvent_FiresOnceWithWrittenOp mirrors the
 // SFTP pin: the mover must call observer.OnBlobPublished exactly

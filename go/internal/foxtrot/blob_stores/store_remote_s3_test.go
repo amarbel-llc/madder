@@ -5,6 +5,7 @@ package blob_stores
 import (
 	stderrors "errors"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/aws/smithy-go"
@@ -14,6 +15,31 @@ import (
 	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
+
+// TestS3MakeBlobWriter_SingleHashRejectsForeignType pins the #262
+// loud-fail guard for S3: a single-hash store must reject a request for
+// a hash type other than its configured one before any network call
+// (the guard runs ahead of mover.initialize, so once is latched to skip
+// the live-connection path).
+func TestS3MakeBlobWriter_SingleHashRejectsForeignType(t *testing.T) {
+	store := &remoteS3{
+		id:              mustParseBlobStoreId(t, "s3-hashtest"),
+		multiHash:       false,
+		defaultHashType: markl.FormatHashSha256,
+	}
+	store.once.Do(func() {}) // latch: initialize() will not run
+
+	writer, err := store.MakeBlobWriter(markl.FormatHashBlake2b256)
+	if writer != nil {
+		t.Fatalf("MakeBlobWriter: got non-nil writer on rejected request")
+	}
+	if err == nil {
+		t.Fatal("MakeBlobWriter: got nil error requesting a foreign hash type")
+	}
+	if !strings.Contains(err.Error(), "single-hash") {
+		t.Errorf("error %q missing 'single-hash' anchor", err.Error())
+	}
+}
 
 func mustParseBlobStoreId(t *testing.T, s string) scoped_id.Id {
 	t.Helper()

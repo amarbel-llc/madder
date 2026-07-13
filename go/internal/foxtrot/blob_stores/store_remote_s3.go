@@ -302,9 +302,15 @@ func (blobStore *remoteS3) GetLocalBlobStore() domain_interfaces.BlobStore {
 	return blobStore
 }
 
-func (blobStore *remoteS3) makeEnvDirConfig() blob_io.Config {
+func (blobStore *remoteS3) makeEnvDirConfig(
+	hashFormat domain_interfaces.FormatHash,
+) blob_io.Config {
+	if hashFormat == nil {
+		hashFormat = blobStore.defaultHashType
+	}
+
 	return blob_io.MakeConfig(
-		blobStore.defaultHashType,
+		hashFormat,
 		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
 		blobStore.blobIOWrapper.GetBlobCompression(),
 		blobStore.blobIOWrapper.GetBlobEncryption(),
@@ -514,12 +520,24 @@ func (blobStore *remoteS3) MakeBlobWriter(
 ) (blobWriter domain_interfaces.BlobWriter, err error) {
 	blobStore.initializeOnce()
 
-	mover := &s3Mover{
-		store:  blobStore,
-		config: blobStore.makeEnvDirConfig(),
+	// Digest with the caller-requested hash type (multi-hash) or fail
+	// loudly on a single-hash mismatch — see resolveWriteHashFormat.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = resolveWriteHashFormat(
+		marklHashType,
+		blobStore.defaultHashType,
+		blobStore.multiHash,
+		blobStore.id.String(),
+	); err != nil {
+		return blobWriter, err
 	}
 
-	hash, _ := blobStore.defaultHashType.Get() //repool:owned
+	mover := &s3Mover{
+		store:  blobStore,
+		config: blobStore.makeEnvDirConfig(hashFormat),
+	}
+
+	hash, _ := hashFormat.Get() //repool:owned
 
 	if err = mover.initialize(hash); err != nil {
 		err = deweyerrors.Wrap(err)
@@ -594,13 +612,22 @@ func (blobStore *remoteS3) MakeBlobReader(
 	blobStore.blobCache[string(digest.GetBytes())] = struct{}{}
 	blobStore.blobCacheLock.Unlock()
 
-	cfg := blobStore.makeEnvDirConfig()
+	// Verify under the digest's own hash type, not the store default —
+	// see readHashFormatForDigest.
+	var hashFormat markl.FormatHash
+	if hashFormat, err = readHashFormatForDigest(digest); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return readCloser, err
+	}
+
+	cfg := blobStore.makeEnvDirConfig(hashFormat)
 	reader := &s3Reader{
 		file:   tmpFile,
 		config: cfg,
 	}
 
-	readerHash, _ := blobStore.defaultHashType.Get() //repool:owned
+	readerHash, _ := hashFormat.Get() //repool:owned
 	if err = reader.initialize(readerHash); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
