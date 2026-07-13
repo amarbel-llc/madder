@@ -5,10 +5,13 @@ package blob_stores
 import (
 	"bytes"
 	"context"
+	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
 	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
@@ -17,6 +20,7 @@ import (
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
 )
 
 // recordingObserver captures every event handed to OnBlobPublished so
@@ -402,5 +406,233 @@ func TestShouldSkipBlobWalkEntry(t *testing.T) {
 			t.Errorf("shouldSkipBlobWalkEntry(%q) = %v, want %v",
 				tc.name, got, tc.want)
 		}
+	}
+}
+
+// nopHashTestBlobIOWrapper is a no-compression / no-encryption
+// BlobIOWrapper for the hash-type write/read tests below.
+// makeEnvDirConfig needs a non-nil wrapper; nil encryption makes
+// MakeConfig fall back to its nop wrapper, and NopeIOWrapper leaves
+// bytes verbatim so the harness server stores exactly what was
+// written.
+type nopHashTestBlobIOWrapper struct{}
+
+func (nopHashTestBlobIOWrapper) GetBlobEncryption() domain_interfaces.MarklId {
+	return nil
+}
+
+func (nopHashTestBlobIOWrapper) GetBlobCompression() interfaces.IOWrapper {
+	return ohio.NopeIOWrapper{}
+}
+
+// newSftpHashTestStore builds a remoteSftp wired to a harness client
+// with the hash-type knobs the #261 multi-hash tests exercise. Like
+// newBenchStore it latches once.Do so initialize() (which needs a real
+// ssh.Client and a remote blob_store-config) is skipped; unlike it, the
+// caller controls multiHash / defaultHashType and a nop blobIOWrapper is
+// attached so the write and read paths can build an env-dir config.
+func newSftpHashTestStore(
+	tb testing.TB,
+	client *sftp.Client,
+	remotePath string,
+	multiHash bool,
+	defaultHash markl.FormatHash,
+) *remoteSftp {
+	tb.Helper()
+	var id scoped_id.Id
+	if err := id.Set("sftp-hashtest"); err != nil {
+		tb.Fatalf("scoped_id.Set: %v", err)
+	}
+	store := &remoteSftp{
+		ctx:             benchContext{},
+		id:              id,
+		config:          benchRemotePathConfig{remotePath: remotePath},
+		buckets:         defaultBuckets,
+		multiHash:       multiHash,
+		defaultHashType: defaultHash,
+		blobIOWrapper:   nopHashTestBlobIOWrapper{},
+		blobCache:       map[string]struct{}{},
+		sftpClient:      client,
+	}
+	store.once.Do(func() {}) // latch: initialize() will not run
+	return store
+}
+
+// TestSftpMakeBlobWriter_MultiHashHonorsRequestedType pins the #261
+// write-side fix: a multi-hash SFTP store must digest the blob with the
+// caller-requested hash type and land it under the matching <format-id>/
+// subtree, not silently substitute the store default. Pre-fix the writer
+// dropped the argument and always used defaultHashType.
+func TestSftpMakeBlobWriter_MultiHashHonorsRequestedType(t *testing.T) {
+	h := newSFTPBenchHarness(t, 0)
+	defer h.Close()
+
+	store := newSftpHashTestStore(
+		t, h.client, h.remotePath, true, markl.FormatHashSha256,
+	)
+
+	writer, err := store.MakeBlobWriter(markl.FormatHashBlake2b256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter(blake2b256): %v", err)
+	}
+
+	payload := []byte("multi-hash-sftp-write-payload")
+	if _, err = writer.Write(payload); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err = writer.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	id := writer.GetMarklId()
+	wantFormat := markl.FormatHashBlake2b256.GetMarklFormatId()
+	if got := id.GetMarklFormat().GetMarklFormatId(); got != wantFormat {
+		t.Fatalf(
+			"written blob id format = %q, want %q (requested type ignored)",
+			got, wantFormat,
+		)
+	}
+
+	// The blob must physically land under the requested type's subtree
+	// — proof the multi-hash path layout followed the digest's format,
+	// not the store default.
+	blobPath := store.remotePathForMerkleId(id)
+	if !strings.Contains(blobPath, wantFormat) {
+		t.Fatalf(
+			"blob path %q is not under the %q subtree",
+			blobPath, wantFormat,
+		)
+	}
+	if _, err = os.Stat(blobPath); err != nil {
+		t.Fatalf("blob not written at %q: %v", blobPath, err)
+	}
+}
+
+// TestSftpMultiHash_RoundTrip pins the read-side half of the #261 fix:
+// once a multi-hash store can write a non-default hash type, it must also
+// read it back verifying under that same type. Pre-fix MakeBlobReader
+// hardcoded defaultHashType, so a blake2b blob read back yielded a sha256
+// id that never matched the requested digest.
+func TestSftpMultiHash_RoundTrip(t *testing.T) {
+	h := newSFTPBenchHarness(t, 0)
+	defer h.Close()
+
+	store := newSftpHashTestStore(
+		t, h.client, h.remotePath, true, markl.FormatHashSha256,
+	)
+
+	payload := []byte("multi-hash-sftp-roundtrip-payload")
+
+	writer, err := store.MakeBlobWriter(markl.FormatHashBlake2b256)
+	if err != nil {
+		t.Fatalf("MakeBlobWriter(blake2b256): %v", err)
+	}
+	if _, err = writer.Write(payload); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if err = writer.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	id := writer.GetMarklId()
+
+	reader, err := store.MakeBlobReader(id)
+	if err != nil {
+		t.Fatalf("MakeBlobReader: %v", err)
+	}
+	defer reader.Close()
+
+	got, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if !bytes.Equal(got, payload) {
+		t.Fatalf("read payload %q != written %q", got, payload)
+	}
+
+	// The reader must have digested under the blob's own format; its
+	// computed id must reproduce the requested blake2b digest.
+	if readID := reader.GetMarklId(); !bytes.Equal(
+		readID.GetBytes(), id.GetBytes(),
+	) {
+		t.Fatalf(
+			"reader id %x != written id %x (read verified under wrong hash)",
+			readID.GetBytes(), id.GetBytes(),
+		)
+	}
+}
+
+// TestSftpMakeBlobWriter_SingleHashRejectsForeignType pins the loud-fail
+// half of #261: a single-hash store can only ever hold its configured
+// type, so requesting a different one must return an error rather than
+// silently write a blob under the default hash. No temp file may leak.
+func TestSftpMakeBlobWriter_SingleHashRejectsForeignType(t *testing.T) {
+	h := newSFTPBenchHarness(t, 0)
+	defer h.Close()
+
+	store := newSftpHashTestStore(
+		t, h.client, h.remotePath, false, markl.FormatHashSha256,
+	)
+
+	writer, err := store.MakeBlobWriter(markl.FormatHashBlake2b256)
+	if writer != nil {
+		t.Fatalf("MakeBlobWriter: got non-nil writer on rejected request")
+	}
+	if err == nil {
+		t.Fatal("MakeBlobWriter: got nil error requesting a foreign hash type")
+	}
+	if !strings.Contains(err.Error(), "single-hash") {
+		t.Errorf("error %q missing 'single-hash' anchor", err.Error())
+	}
+
+	entries, readErr := os.ReadDir(h.remotePath)
+	if readErr != nil {
+		t.Fatalf("ReadDir(%q): %v", h.remotePath, readErr)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "tmp_") {
+			t.Errorf("stray temp file created on rejected write: %q", e.Name())
+		}
+	}
+}
+
+// TestSftpMakeBlobWriter_SingleHashAcceptsNilAndMatching guards the
+// non-mismatch paths of the #261 loud-fail check: a nil request (fall
+// back to default) and an explicit request for the store's own type must
+// both still succeed and write under the default hash.
+func TestSftpMakeBlobWriter_SingleHashAcceptsNilAndMatching(t *testing.T) {
+	wantFormat := markl.FormatHashSha256.GetMarklFormatId()
+
+	cases := []struct {
+		name    string
+		request domain_interfaces.FormatHash
+	}{
+		{"nil", nil},
+		{"matching", markl.FormatHashSha256},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newSFTPBenchHarness(t, 0)
+			defer h.Close()
+
+			store := newSftpHashTestStore(
+				t, h.client, h.remotePath, false, markl.FormatHashSha256,
+			)
+
+			writer, err := store.MakeBlobWriter(tc.request)
+			if err != nil {
+				t.Fatalf("MakeBlobWriter(%s): %v", tc.name, err)
+			}
+			if _, err = writer.Write([]byte("single-hash-payload")); err != nil {
+				t.Fatalf("Write: %v", err)
+			}
+			if err = writer.Close(); err != nil {
+				t.Fatalf("Close: %v", err)
+			}
+			if got := writer.GetMarklId().
+				GetMarklFormat().GetMarklFormatId(); got != wantFormat {
+				t.Fatalf("blob id format = %q, want %q", got, wantFormat)
+			}
+		})
 	}
 }
