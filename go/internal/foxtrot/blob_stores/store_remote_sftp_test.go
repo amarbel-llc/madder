@@ -539,7 +539,7 @@ func TestSftpMultiHash_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MakeBlobReader: %v", err)
 	}
-	defer reader.Close()
+	t.Cleanup(func() { _ = reader.Close() })
 
 	got, err := io.ReadAll(reader)
 	if err != nil {
