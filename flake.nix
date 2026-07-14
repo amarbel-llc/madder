@@ -116,6 +116,8 @@
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
     };
+    doppelgang.inputs.conformist.follows = "conformist";
+    tommy.inputs.conformist.follows = "conformist";
   };
 
   outputs =
