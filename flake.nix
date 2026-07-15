@@ -1,7 +1,7 @@
 {
   inputs = {
     igloo = {
-      url = "git+https://code.linenisgreat.com/igloo.git";
+      url = "git+https://github.com/amarbel-llc/igloo.git";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
@@ -46,7 +46,7 @@
     # Config is Nix-generated from ./conformist.nix (+ presets.eng) via
     # conformist.lib.evalModule.
     conformist = {
-      url = "git+https://code.linenisgreat.com/conformist.git";
+      url = "git+https://github.com/amarbel-llc/conformist.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
