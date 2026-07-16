@@ -1,7 +1,7 @@
 {
   inputs = {
     igloo = {
-      url = "git+https://github.com/amarbel-llc/igloo.git";
+      url = "git+https://code.linenisgreat.com/igloo.git";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
@@ -14,7 +14,7 @@
     };
 
     tommy = {
-      url = "git+https://github.com/amarbel-llc/tommy.git";
+      url = "git+https://code.linenisgreat.com/tommy.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -30,7 +30,7 @@
     };
 
     purse-first = {
-      url = "git+https://github.com/amarbel-llc/purse-first.git";
+      url = "git+https://code.linenisgreat.com/purse-first.git";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
@@ -46,7 +46,7 @@
     # Config is Nix-generated from ./conformist.nix (+ presets.eng) via
     # conformist.lib.evalModule.
     conformist = {
-      url = "git+https://github.com/amarbel-llc/conformist.git";
+      url = "git+https://code.linenisgreat.com/conformist.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -73,7 +73,7 @@
     # Sourced via goFlakeInputs (see madder#208) so a crap bump only
     # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
     crap = {
-      url = "git+https://github.com/amarbel-llc/crap.git";
+      url = "git+https://code.linenisgreat.com/crap.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -85,7 +85,7 @@
     # so a hyphence bump only touches flake.lock — no go.mod / gomod2nix.toml
     # lockstep edits. Its go-pkgs producer is scoped to go/ (no subPath).
     hyphence = {
-      url = "git+https://github.com/amarbel-llc/hyphence.git";
+      url = "git+https://code.linenisgreat.com/hyphence.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -111,7 +111,7 @@
 
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
-      url = "git+https://github.com/amarbel-llc/doppelgang.git";
+      url = "git+https://code.linenisgreat.com/doppelgang.git";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
