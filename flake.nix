@@ -117,6 +117,7 @@
     };
     doppelgang.inputs.conformist.follows = "conformist";
     tommy.inputs.conformist.follows = "conformist";
+    bats.inputs.conformist.follows = "conformist";
   };
 
   outputs =
