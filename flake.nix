@@ -3,7 +3,6 @@
     igloo = {
       url = "https://code.linenisgreat.com/igloo/archive/master.tar.gz";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
-      inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
 
     nixpkgs-master.url = "github:NixOS/nixpkgs/567a49d1913ce81ac6e9582e3553dd90a955875f";
