@@ -457,11 +457,10 @@ var _ domain_interfaces.BlobWriter = multiStoreBlobWriter{}
 func (parentWriter multiStoreBlobWriter) ReadFrom(
 	reader io.Reader,
 ) (n int64, err error) {
-	if n, err = io.Copy(parentWriter.Writer, reader); err != nil {
+	n, err = io.Copy(parentWriter.Writer, reader)
+	if err != nil {
 		err = errors.Wrap(err)
-		return n, err
 	}
-
 	return n, err
 }
 
