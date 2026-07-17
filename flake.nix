@@ -1,7 +1,7 @@
 {
   inputs = {
     igloo = {
-      url = "git+https://code.linenisgreat.com/igloo.git";
+      url = "https://code.linenisgreat.com/igloo/archive/master.tar.gz";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.treefmt-nix.follows = "bats/treefmt-nix";
     };
@@ -14,7 +14,7 @@
     };
 
     tommy = {
-      url = "git+https://code.linenisgreat.com/tommy.git";
+      url = "https://code.linenisgreat.com/tommy/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -23,14 +23,14 @@
     };
 
     bats = {
-      url = "git+https://code.linenisgreat.com/bats.git";
+      url = "https://code.linenisgreat.com/bats/archive/master.tar.gz";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
     };
 
     purse-first = {
-      url = "git+https://code.linenisgreat.com/purse-first.git";
+      url = "https://code.linenisgreat.com/purse-first/archive/master.tar.gz";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.igloo.follows = "igloo";
       inputs.utils.follows = "utils";
@@ -46,7 +46,7 @@
     # Config is Nix-generated from ./conformist.nix (+ presets.eng) via
     # conformist.lib.evalModule.
     conformist = {
-      url = "git+https://code.linenisgreat.com/conformist.git";
+      url = "https://code.linenisgreat.com/conformist/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -60,7 +60,7 @@
     # Sourced via goFlakeInputs (see madder#208) so a tap bump only
     # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
     tap = {
-      url = "git+https://code.linenisgreat.com/tap.git";
+      url = "https://code.linenisgreat.com/tap/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -73,7 +73,7 @@
     # Sourced via goFlakeInputs (see madder#208) so a crap bump only
     # touches flake.lock — no go.mod / gomod2nix.toml lockstep edits.
     crap = {
-      url = "git+https://code.linenisgreat.com/crap.git";
+      url = "https://code.linenisgreat.com/crap/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -85,7 +85,7 @@
     # so a hyphence bump only touches flake.lock — no go.mod / gomod2nix.toml
     # lockstep edits. Its go-pkgs producer is scoped to go/ (no subPath).
     hyphence = {
-      url = "git+https://code.linenisgreat.com/hyphence.git";
+      url = "https://code.linenisgreat.com/hyphence/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -100,7 +100,7 @@
     # — no go.mod / gomod2nix.toml lockstep edits. Its go-pkgs producer
     # is scoped to go/ (no subPath) and carries a passthru dewey bridge.
     piggy = {
-      url = "git+https://code.linenisgreat.com/piggy.git";
+      url = "https://code.linenisgreat.com/piggy/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
@@ -111,7 +111,7 @@
 
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
-      url = "git+https://code.linenisgreat.com/doppelgang.git";
+      url = "https://code.linenisgreat.com/doppelgang/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
