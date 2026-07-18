@@ -448,14 +448,14 @@ of them into §6.1.
 
 The rules in this subsection govern purposes seeking *registration*:
 validation against a fixed list of compatible format IDs (plus §6.5
-Related-role support). That validated compatible-format list is what
-§6 and §6.1 call a purpose's **format constraints**. It is a distinct
-thing from rule 1's `system-domain-role-version` naming convention
-below: the naming convention is a registration-time naming *policy*,
-not a format constraint, and not a wire-level constraint on purposes
-in general (§2.1). A general/unregistered purpose (§6, §6.6) need not
-conform to rule 1's naming convention — its charset is governed only
-by §2.1.
+Related-role support). That validated compatible-format list is a
+purpose's **format constraints** (linenisgreat/piggy#219's term for
+§6/§6.1's compatible-format validation). It is a distinct thing from
+rule 1's `system-domain-role-version` naming convention below: the
+naming convention is a registration-time naming *policy*, not a format
+constraint, and not a wire-level constraint on purposes in general
+(§2.1). A general/unregistered purpose (§6, §6.6) need not conform to
+rule 1's naming convention — its charset is governed only by §2.1.
 
 A new purpose ID MUST be added by amendment. The purpose ID MUST:
 
