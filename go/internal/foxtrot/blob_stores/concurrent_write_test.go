@@ -29,10 +29,15 @@ func makeTestStore(t *testing.T) localHashBucketed {
 	return makeTestStoreWithVerify(t, false)
 }
 
-// makeTestStoreWithVerify is the variant used by the #31 happy-path test.
-// When verifyOnCollision is true, the EEXIST branch in blob_mover.Close
-// opens both paths as BlobReaders and byte-compares their decoded streams.
-func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBucketed {
+// makeTestStoreConfigured is the base constructor for local hash-bucketed
+// test stores. makeTestStore, makeTestStoreBlake2b256, and
+// makeTestStoreWithVerify are thin wrappers over it.
+func makeTestStoreConfigured(
+	t *testing.T,
+	hashTypeId charlie_bsc.HashType,
+	defaultHash markl.FormatHash,
+	verifyOnCollision bool,
+) localHashBucketed {
 	t.Helper()
 
 	basePath := t.TempDir()
@@ -40,7 +45,7 @@ func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBuck
 
 	config := &blob_store_configs.DefaultType{
 		HashBuckets:       blob_store_configs.DefaultHashBuckets,
-		HashTypeId:        charlie_bsc.HashTypeSha256,
+		HashTypeId:        hashTypeId,
 		CompressionType:   "none",
 		VerifyOnCollision: verifyOnCollision,
 	}
@@ -48,7 +53,7 @@ func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBuck
 	return localHashBucketed{
 		config:            config,
 		multiHash:         config.SupportsMultiHash(),
-		defaultHashFormat: markl.FormatHashSha256,
+		defaultHashFormat: defaultHash,
 		buckets:           config.GetHashBuckets(),
 		basePath:          basePath,
 		tempFS:            env_dir.TemporaryFS{BasePath: tempPath},
@@ -56,10 +61,22 @@ func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBuck
 	}
 }
 
+// makeTestStoreBlake2b256 is like makeTestStore but with a blake2b256 default.
+func makeTestStoreBlake2b256(t *testing.T) localHashBucketed {
+	return makeTestStoreConfigured(t, charlie_bsc.HashTypeBlake2b256, markl.FormatHashBlake2b256, false)
+}
+
+// makeTestStoreWithVerify is the variant used by the #31 happy-path test.
+// When verifyOnCollision is true, the EEXIST branch in blob_mover.Close
+// opens both paths as BlobReaders and byte-compares their decoded streams.
+func makeTestStoreWithVerify(t *testing.T, verifyOnCollision bool) localHashBucketed {
+	return makeTestStoreConfigured(t, charlie_bsc.HashTypeSha256, markl.FormatHashSha256, verifyOnCollision)
+}
+
 // writeBlob writes payload via a fresh BlobWriter and returns the final
 // digest, or the first error encountered.
 func writeBlob(
-	store localHashBucketed,
+	store domain_interfaces.BlobStore,
 	payload []byte,
 ) (domain_interfaces.MarklId, error) {
 	writer, err := store.MakeBlobWriter(nil)
@@ -345,5 +362,41 @@ func TestConcurrentBlobWritesSameContent_VerifyOnCollision(t *testing.T) {
 		}
 		t.Errorf("temp dir %s has %d leftover entries after verify-on-collision run: %v",
 			store.tempFS.BasePath, len(entries), names)
+	}
+}
+
+// TestMirror_MakeBlobWriter_NilHashType_DifferingDefaults is a regression
+// test for issue #268: MakeBlobWriter(nil) through a mirror Multi whose
+// members have different default hash types previously panicked in
+// GetMarklId because each child independently fell back to its own default,
+// producing mismatched MarklIds. The fix resolves nil once to child[0]'s
+// default at Multi.MakeBlobWriter entry and forwards that same explicit
+// type to all children.
+func TestMirror_MakeBlobWriter_NilHashType_DifferingDefaults(t *testing.T) {
+	storeA := makeTestStoreBlake2b256(t) // default: blake2b256 (child[0])
+	storeB := makeTestStore(t)           // default: sha256
+
+	multi, err := NewMulti(&spyActiveContext{}).
+		Mirror(
+			BlobStoreInitialized{BlobStore: storeA},
+			BlobStoreInitialized{BlobStore: storeB},
+		).Build()
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	payload := []byte("regression for issue #268: mirror nil-hash-type panic")
+
+	// Before the fix, writeBlob panicked inside GetMarklId with a
+	// markl.AssertEqual mismatch. After the fix both children use blake2b256
+	// (child[0]'s default), so their ids agree.
+	id, err := writeBlob(multi, payload)
+	if err != nil {
+		t.Fatalf("writeBlob: %v", err)
+	}
+
+	got := id.GetMarklFormat().GetMarklFormatId()
+	if got != markl.FormatIdHashBlake2b256 {
+		t.Fatalf("GetMarklId format: got %q, want %q", got, markl.FormatIdHashBlake2b256)
 	}
 }

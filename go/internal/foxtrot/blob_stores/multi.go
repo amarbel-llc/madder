@@ -149,6 +149,17 @@ func (parentStore Multi) MakeBlobWriter(
 ) (domain_interfaces.BlobWriter, error) {
 	switch parentStore.mode {
 	case modeMirror:
+		// Resolve once so every mirror member receives the same type.
+		// Without this, each member independently falls back to its own
+		// configured default, producing mismatched MarklIds (and a panic
+		// in GetMarklId) when defaults differ across the mirror set.
+		// GetDefaultHashType() returns child[0]'s default (or nil for an
+		// empty mirror, which Build() already rejects). See issue #268.
+		resolvedHashType := marklHashType
+		if resolvedHashType == nil {
+			resolvedHashType = parentStore.GetDefaultHashType()
+		}
+
 		writers := make([]io.Writer, len(parentStore.childStores))
 
 		multiWriter := multiStoreBlobWriter{
@@ -162,7 +173,7 @@ func (parentStore Multi) MakeBlobWriter(
 			var err error
 
 			if multiWriter.blobWriters[i], err = childStore.MakeBlobWriter(
-				marklHashType,
+				resolvedHashType,
 			); err != nil {
 				err = errors.Wrap(err)
 				return nil, err
