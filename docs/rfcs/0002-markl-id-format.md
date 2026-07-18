@@ -6,6 +6,7 @@ revisions:
   - 2026-05-09: initial draft (amarbel-llc/madder#150)
   - 2026-05-10: revert combined-HRP checksum rule to split-HRP form (amarbel-llc/madder#159)
   - 2026-06-09: add ssh_ecdsa_nistp256_pub format (§5) and piggy-piv_*/piggy-recipient-v1 purposes (§6.1), promoted to the normative cross-language subset
+  - 2026-07-18: expand the purpose grammar from the `system-domain-role-version` registry convention to general identifiers (§2.1, §6); add the embedding-grammar quoting-split section (§2.2) (linenisgreat/madder#270)
 ---
 
 # RFC 0002 — Markl ID Format
@@ -64,8 +65,12 @@ A markl ID has the text form:
 The three parts are:
 
 - **purpose** (OPTIONAL) — a semantic-context label. When present it
-  MUST be followed by a literal `@` separator. Its grammar and registry
-  are given in §6.
+  MUST be followed by a literal `@` separator. Its grammar admits two
+  overlapping classes — **registered** purposes, validated against the
+  format-compatibility registry, and **general** purposes, opaque
+  identifiers resolved by the consumer's own type system — given in
+  §6. §2.2 covers how a markl ID, and its purpose slot specifically,
+  embeds into larger textual grammars.
 - **format** — the format identifier (e.g. `sha256`,
   `pivy_ecdh_p256_pub`). It MUST be one of the registered format IDs in
   §5, or a registered purpose-id alias resolving to one (§6.4).
@@ -91,7 +96,8 @@ accompanying format. *(test:
 
 ```abnf
 markl-id     = [ purpose "@" ] format "-" data
-purpose      = 1*( ALPHA / DIGIT / "_" / "-" )    ; constrained by §6
+purpose      = 1*( purpose-char )                 ; general identifier; see §6
+purpose-char = %x21-3F / %x41-7E                  ; VCHAR (%x21-7E) less "@" (%x40)
 format       = 1*( ALPHA / DIGIT / "_" )          ; HRP component; see §5
 data         = 7*( charset-char )                  ; >= 7 chars: 1+ payload + 6 checksum
 charset-char = "q" / "p" / "z" / "r" / "y" / "9" / "x" / "8" / "g" / "f" /
@@ -103,6 +109,71 @@ charset-char = "q" / "p" / "z" / "r" / "y" / "9" / "x" / "8" / "g" / "f" /
 
 Uppercase forms of every byte above are also legal, subject to §3.5's
 uniform-case rule.
+
+The `purpose` production was widened on 2026-07-18
+(linenisgreat/madder#270, ruled at
+linenisgreat/hyphence#6) from the earlier
+`system-domain-role-version` registry convention to this
+general-identifier superset. The only markl-level constraints on a
+purpose are structural: it MUST NOT contain `@` (reserved as the
+purpose/digest separator; §4 step 1), and — because a space is not a
+`VCHAR` byte — it cannot contain whitespace and still round-trip
+through markl's own bare, unquoted text form (§2.2). Beyond those two
+constraints the charset is open: `/` is explicitly legal (an
+object-id-shaped purpose such as `one/uno`), as are runes that some
+*particular* embedding grammar reserves for its own syntax (for
+example trellis's `Reserved` set and sigil runes, cutting-garden
+`docs/rfcs/0014-trellis.peg`) — such a purpose is still a legal markl
+ID; it is that embedding grammar's job, not markl's, to quote it where
+its own syntax requires (§2.2). Registered purposes (§6.1) additionally
+MUST conform to the narrower `system-domain-role-version` naming
+convention as a registration-time policy (§6.2); that convention is
+not a wire-level constraint on purposes in general (§6).
+
+### 2.2. Embedding and the Quoting Split
+
+A markl ID's own text form (§2, §2.1) is bare: there is no escaping or
+quoting mechanism defined at the markl layer itself, and it MUST NOT
+contain whitespace. This holds regardless of how permissive the
+purpose grammar becomes (§2.1) — a purpose value containing a space,
+or any byte outside markl's own `purpose-char` charset, simply has no
+direct bare-text serialization; it can be reached only through an
+embedding grammar's quoting, as described below.
+
+Larger textual grammars that embed a markl ID as a lexeme — trellis
+(cutting-garden `docs/rfcs/0014-trellis.peg`, whose `Ident`/`IdentRune`
+productions admit interior `@` so `purpose@format-data` parses as one
+opaque identifier) and hyphence (its RFC 0002 content grammar, and the
+forthcoming RFC 0003 lock-supersession) among them — MAY need to
+represent a purpose containing runes their own grammar reserves (a
+space, or a rune in that grammar's own `Reserved` set). When they do,
+the embedding grammar MUST quote **the purpose slot only**:
+
+    "my thing"@blake2b256-...
+
+never the markl ID as a whole. The digest slot (`format-data`) MUST
+remain outside any quoting — unquoted and structurally intact — so
+tooling that operates on the digest independently of the purpose
+(prefix elision, trie-abbreviation, diffing, the mother→child
+digest-extraction paths of §9) can locate it without first parsing or
+undoing the embedding grammar's quoting.
+
+The quoting mechanism itself — which runes trigger it, what escape
+sequences it supports — is defined by each embedding grammar, not by
+this RFC; markl only requires that whatever mechanism is chosen quotes
+the purpose slot in isolation, leaving the digest slot bare. A purpose
+MUST NOT contain the literal `@` character under any circumstance,
+quoted or not: `@` is markl's own purpose/digest separator (§4 step
+1), and admitting it inside a quoted purpose would reintroduce the
+ambiguity the split-HRP checksum rule (§3.3) and the first-`@` decode
+rule (§4) exist to avoid. An embedding grammar that needs a literal
+`@` as a purpose's *semantic* content — not as markl's join — has no
+representation in a markl ID's purpose slot and MUST encode that value
+some other way in its own grammar.
+
+*(Ruled 2026-07-18: linenisgreat/hyphence#6,
+linenisgreat/piggy#219, cutting-garden
+`docs/rfcs/0014-trellis.peg` interior-`@` amendment.)*
 
 ## 3. Blech32 Encoding
 
@@ -267,11 +338,29 @@ ID's interpretation.
 
 ## 6. Purpose ID Registry
 
-Purpose IDs follow the convention `system-domain-role-version` and
-constrain which format IDs are valid in their position. The purpose
-appears textually *before* the `@` separator in a markl ID; it is
-**not** part of the blech32 HRP (§3.3) and does not contribute to the
-checksum.
+A purpose is either **registered** — validated against a
+(purpose, compatible-format) entry in this section, and named per the
+`system-domain-role-version` convention (§6.2) — or **general**: an
+opaque identifier from a consumer's own type system (a hyphence type
+name, a zettel id, a typed-edge field name), unconstrained beyond
+§2.1's wire-form charset and carried opaquely per §6.6. Both classes
+share the same `purpose@format-data` text form and nothing in the wire
+syntax distinguishes them; classification is entirely a registry
+lookup at decode time (present → registered semantics apply; absent →
+general/opaque). The purpose appears textually *before* the `@`
+separator in a markl ID; it is **not** part of the blech32 HRP (§3.3)
+and does not contribute to the checksum.
+
+Purpose-full markl IDs are the canonical spelling for pinned/locked
+references across the ecosystem: a type pinned to its definition
+(`md@blake2b256-...`), an object pinned to a version
+(`one/uno@blake2b256-...`), a typed edge pinned to a target
+(`blocks=task/other@blake2b256-...`) — alongside the existing
+registered-purpose uses (`piggy-piv_auth-v1@ssh_...`). This dual role
+is what motivated the 2026-07-18 general-identifier expansion
+(linenisgreat/hyphence#6, linenisgreat/piggy#219,
+linenisgreat/madder#270): the purpose slot needed to carry not just
+registry-scheme names but arbitrary consumer-side identifiers.
 
 ### 6.1. Registered Purposes
 
@@ -339,6 +428,11 @@ semantics are not pinned cross-language. Future RFCs MAY promote any
 of them into §6.1.
 
 ### 6.2. Registering New Purposes
+
+The rules in this subsection govern purposes seeking *registration*
+(format-compatibility validation, §6.5 Related-role support). A
+general/unregistered purpose (§6, §6.6) need not conform to rule 1's
+naming convention — its charset is governed only by §2.1.
 
 A new purpose ID MUST be added by amendment. The purpose ID MUST:
 
@@ -429,6 +523,16 @@ other implementation to upgrade in lockstep. Opacity licenses
 transport and storage, not interpretation — contexts that need the
 purpose's *semantics* (signature verification, key derivation,
 Related-role walks per §6.5) MUST still fail on an unknown purpose.
+
+Since 2026-07-18 (linenisgreat/madder#270), this rule also covers
+**general identifiers used as purposes by design**, not only purposes
+awaiting registration: a hyphence type name, a zettel id
+(`one/uno`), or a typed-edge field name used as a purpose (§6 —
+`md@...`, `one/uno@...`, `blocks=task/other@...`) is never expected
+to appear in this registry; resolving it is the consuming type
+system's job, exactly as resolving any other identifier is
+(linenisgreat/hyphence#6). Decoders MUST NOT treat "purpose absent
+from registry" as an error condition or a sign of stale data.
 
 *(test: `TestSetMarklId_UnknownPurposeAcceptedOpaquely` in piggy's
 `go/internal/bravo/markl/`; fixture vector
@@ -612,6 +716,19 @@ split-HRP form.
   `RegisterPurpose` API shape
 - amarbel-llc/piggy issue #68 — original motivation for pinning the
   spec
+- [linenisgreat/hyphence#6](https://code.linenisgreat.com/linenisgreat/hyphence/issues/6) —
+  ruling that markl-id form is canonical for pinned/locked references
+  ecosystem-wide; motivates the §2.1 purpose charset expansion and the
+  §2.2 embedding-grammar quoting split
+- [linenisgreat/piggy#219](https://code.linenisgreat.com/linenisgreat/piggy/issues/219) —
+  implementation sibling tracking this amendment: piggy-side purpose
+  grammar/parser expansion
+- cutting-garden `docs/rfcs/0014-trellis.peg` — `Ident`/`IdentRune`
+  productions; the 2026-07-18 interior-`@` amendment that makes
+  `purpose@format-data` parse as one opaque identifier in trellis
+- hyphence RFC 0003 (in progress, branch `kind-fig`, not yet merged as
+  of this amendment) — supersedes hyphence RFC 0002's spaced `Lock`
+  form with the purpose-full markl-id spelling this amendment supports
 
 ## Appendix A. Differences from BIP173 bech32
 

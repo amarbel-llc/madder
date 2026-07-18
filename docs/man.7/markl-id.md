@@ -101,10 +101,21 @@ the implementation and not part of the wire format.
 
 # PURPOSE IDS
 
-Purpose IDs follow the convention *system*-*domain*-*role*-*version*. When
-present, the purpose constrains which format IDs are valid.
+A purpose is either **registered** — named per the convention
+*system*-*domain*-*role*-*version* and validated against the compatible-format
+list below — or **general**: an opaque identifier from a consumer's own type
+system (a hyphence type name, a zettel id such as `one/uno`, a typed-edge
+field name), unconstrained beyond markl's own wire-form charset and carried
+opaquely if it isn't registered. Purpose-full markl IDs are the canonical
+spelling for pinned/locked references ecosystem-wide, e.g. `md@blake2b256-...`
+(a type pinned to its definition) or `one/uno@blake2b256-...` (an object
+pinned to a version), alongside registered-purpose uses like
+`piggy-piv_auth-v1@ssh_...`. See RFC 0002 §2.1, §2.2, and §6 for the
+normative grammar and the embedding-grammar quoting split (a purpose
+containing runes an embedding grammar reserves is quoted on the purpose slot
+only, e.g. `"my thing"@blake2b256-...` — the digest slot is never quoted).
 
-Common purposes:
+Common registered purposes:
 
 **dodder-blob-digest-sha256-v1**
 :   Blob content hash. Formats: sha256, blake2b256.
