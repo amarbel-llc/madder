@@ -96,8 +96,9 @@ accompanying format. *(test:
 
 ```abnf
 markl-id     = [ purpose "@" ] format "-" data
-purpose      = 1*( purpose-char )                 ; general identifier; see §6
-purpose-char = %x21-3F / %x41-7E                  ; VCHAR (%x21-7E) less "@" (%x40)
+purpose      = 1*purpose-char                     ; general identifier; see §6, §2.2
+purpose-char = <any Unicode code point except
+                U+0040 "@" and any whitespace code point>
 format       = 1*( ALPHA / DIGIT / "_" )          ; HRP component; see §5
 data         = 7*( charset-char )                  ; >= 7 chars: 1+ payload + 6 checksum
 charset-char = "q" / "p" / "z" / "r" / "y" / "9" / "x" / "8" / "g" / "f" /
@@ -114,20 +115,31 @@ The `purpose` production was widened on 2026-07-18
 (linenisgreat/madder#270, ruled at
 linenisgreat/hyphence#6) from the earlier
 `system-domain-role-version` registry convention to this
-general-identifier superset. The only markl-level constraints on a
-purpose are structural: it MUST NOT contain `@` (reserved as the
-purpose/digest separator; §4 step 1), and — because a space is not a
-`VCHAR` byte — it cannot contain whitespace and still round-trip
-through markl's own bare, unquoted text form (§2.2). Beyond those two
-constraints the charset is open: `/` is explicitly legal (an
-object-id-shaped purpose such as `one/uno`), as are runes that some
-*particular* embedding grammar reserves for its own syntax (for
-example trellis's `Reserved` set and sigil runes, cutting-garden
-`docs/rfcs/0014-trellis.peg`) — such a purpose is still a legal markl
-ID; it is that embedding grammar's job, not markl's, to quote it where
-its own syntax requires (§2.2). Registered purposes (§6.1) additionally
-MUST conform to the narrower `system-domain-role-version` naming
-convention as a registration-time policy (§6.2); that convention is
+general-identifier superset, and deliberately admits the full range of
+Unicode code points, not merely printable ASCII. This is forced, not
+stylistic: a purpose is the spelling of a pinned reference's *target*
+(`one/uno@blake2b256-...` pins the object `one/uno`), so its charset
+MUST be a superset of whatever charset a consuming type system uses
+for its own identifiers — and those identifiers are Unicode-admitting,
+exclusion-based grammars by design (cutting-garden
+`docs/rfcs/0014-trellis.peg`'s `IdentRune`, which mirrors dodder's
+shipping scanner discipline: any code point that is not reserved or
+whitespace is identifier content). An ASCII-only purpose charset would
+make Unicode-named objects unpinnable. The only markl-level
+constraints on a purpose are structural: it MUST NOT contain `@`
+(reserved as the purpose/digest separator; §4 step 1) under any
+circumstance — quoted or not, see §2.2 — and it cannot contain
+whitespace and still round-trip through markl's own bare, unquoted
+text form (§2.2). Beyond those two constraints the charset is open:
+`/` is explicitly legal (an object-id-shaped purpose such as
+`one/uno`), as are runes that some *particular* embedding grammar
+reserves for its own syntax (for example trellis's `Reserved` set and
+sigil runes) — such a purpose is still a legal markl ID; it is that
+embedding grammar's job, not markl's, to quote it where its own syntax
+requires (§2.2). In practice ASCII remains the overwhelmingly common
+case: registered purposes (§6.1) additionally MUST conform to the
+narrower, ASCII `system-domain-role-version` naming convention as a
+registration-time policy (§6.2) — that convention is a naming policy,
 not a wire-level constraint on purposes in general (§6).
 
 ### 2.2. Embedding and the Quoting Split
@@ -136,27 +148,32 @@ A markl ID's own text form (§2, §2.1) is bare: there is no escaping or
 quoting mechanism defined at the markl layer itself, and it MUST NOT
 contain whitespace. This holds regardless of how permissive the
 purpose grammar becomes (§2.1) — a purpose value containing a space,
-or any byte outside markl's own `purpose-char` charset, simply has no
-direct bare-text serialization; it can be reached only through an
-embedding grammar's quoting, as described below.
+or the literal `@` code point, simply has no direct bare-text
+serialization; it can be reached only through an embedding grammar's
+quoting, as described below.
 
 Larger textual grammars that embed a markl ID as a lexeme — trellis
-(cutting-garden `docs/rfcs/0014-trellis.peg`, whose `Ident`/`IdentRune`
-productions admit interior `@` so `purpose@format-data` parses as one
-opaque identifier) and hyphence (its RFC 0002 content grammar, and the
-forthcoming RFC 0003 lock-supersession) among them — MAY need to
+(cutting-garden `docs/rfcs/0014-trellis.peg`'s `MarklTerm` production,
+`MarklTerm <- (String / Ident) '@' Ident`: a dedicated two-slot
+production, not an identifier-interior `@`) and hyphence (its RFC 0002
+content grammar, and RFC 0003's lock-supersession,
+`docs/rfcs/0003-markl-atomic-locks.md`) among them — MAY need to
 represent a purpose containing runes their own grammar reserves (a
 space, or a rune in that grammar's own `Reserved` set). When they do,
 the embedding grammar MUST quote **the purpose slot only**:
 
     "my thing"@blake2b256-...
 
-never the markl ID as a whole. The digest slot (`format-data`) MUST
-remain outside any quoting — unquoted and structurally intact — so
-tooling that operates on the digest independently of the purpose
-(prefix elision, trie-abbreviation, diffing, the mother→child
-digest-extraction paths of §9) can locate it without first parsing or
-undoing the embedding grammar's quoting.
+never the markl ID as a whole. Trellis's `MarklTerm` agrees with this
+split by construction, not by convention: its purpose slot is
+`(String / Ident)` — a bare `Ident`, or, when reserved runes require
+it, a quoted `String` — joined by a literal `@` to a digest `Ident`
+that is never itself an alternative inside `String`. The digest slot
+(`format-data`) MUST remain outside any quoting — unquoted and
+structurally intact — so tooling that operates on the digest
+independently of the purpose (prefix elision, trie-abbreviation,
+diffing, the mother→child digest-extraction paths of §9) can locate it
+without first parsing or undoing the embedding grammar's quoting.
 
 The quoting mechanism itself — which runes trigger it, what escape
 sequences it supports — is defined by each embedding grammar, not by
@@ -173,7 +190,7 @@ some other way in its own grammar.
 
 *(Ruled 2026-07-18: linenisgreat/hyphence#6,
 linenisgreat/piggy#219, cutting-garden
-`docs/rfcs/0014-trellis.peg` interior-`@` amendment.)*
+`docs/rfcs/0014-trellis.peg` `MarklTerm` production.)*
 
 ## 3. Blech32 Encoding
 
@@ -429,10 +446,16 @@ of them into §6.1.
 
 ### 6.2. Registering New Purposes
 
-The rules in this subsection govern purposes seeking *registration*
-(format-compatibility validation, §6.5 Related-role support). A
-general/unregistered purpose (§6, §6.6) need not conform to rule 1's
-naming convention — its charset is governed only by §2.1.
+The rules in this subsection govern purposes seeking *registration*:
+validation against a fixed list of compatible format IDs (plus §6.5
+Related-role support). That validated compatible-format list is what
+§6 and §6.1 call a purpose's **format constraints**. It is a distinct
+thing from rule 1's `system-domain-role-version` naming convention
+below: the naming convention is a registration-time naming *policy*,
+not a format constraint, and not a wire-level constraint on purposes
+in general (§2.1). A general/unregistered purpose (§6, §6.6) need not
+conform to rule 1's naming convention — its charset is governed only
+by §2.1.
 
 A new purpose ID MUST be added by amendment. The purpose ID MUST:
 
@@ -723,12 +746,13 @@ split-HRP form.
 - [linenisgreat/piggy#219](https://code.linenisgreat.com/linenisgreat/piggy/issues/219) —
   implementation sibling tracking this amendment: piggy-side purpose
   grammar/parser expansion
-- cutting-garden `docs/rfcs/0014-trellis.peg` — `Ident`/`IdentRune`
-  productions; the 2026-07-18 interior-`@` amendment that makes
-  `purpose@format-data` parse as one opaque identifier in trellis
-- hyphence RFC 0003 (in progress, branch `kind-fig`, not yet merged as
-  of this amendment) — supersedes hyphence RFC 0002's spaced `Lock`
-  form with the purpose-full markl-id spelling this amendment supports
+- cutting-garden `docs/rfcs/0014-trellis.peg` — `MarklTerm`
+  production (`(String / Ident) '@' Ident`), the structured two-slot
+  form that agrees with this RFC's §2.2 quoting split by construction
+- hyphence RFC 0003 — Markl-Atomic Locks
+  (`docs/rfcs/0003-markl-atomic-locks.md`, merged at commit `60d2ff9`) —
+  supersedes hyphence RFC 0002's spaced `Lock` form with the
+  purpose-full markl-id spelling this amendment supports
 
 ## Appendix A. Differences from BIP173 bech32
 
