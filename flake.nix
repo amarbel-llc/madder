@@ -118,6 +118,8 @@
     doppelgang.inputs.conformist.follows = "conformist";
     tommy.inputs.conformist.follows = "conformist";
     bats.inputs.conformist.follows = "conformist";
+    hyphence.inputs.langlang.inputs.tap.inputs.crane.follows = "tap/crane";
+    hyphence.inputs.langlang.inputs.tap.inputs.rust-overlay.follows = "tap/rust-overlay";
   };
 
   outputs =

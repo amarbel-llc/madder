@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/amarbel-llc/hyphence/go/hyphence"
+	"code.linenisgreat.com/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"

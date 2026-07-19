@@ -5,7 +5,7 @@ package blob_store_configs
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/hyphence/go/hyphence"
+	"code.linenisgreat.com/hyphence/go/hyphence"
 	"github.com/amarbel-llc/madder/go/internal/0/ids"
 	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"

@@ -52,7 +52,7 @@ let
     };
     # hyphence's go-pkgs producer is scoped to its go/ subdir, so the module
     # root maps with no subPath (like tommy). See madder#253.
-    "github.com/amarbel-llc/hyphence/go" = {
+    "code.linenisgreat.com/hyphence/go" = {
       src = hyphence.packages.${system}.go-pkgs;
     };
     # piggy owns the markl-id framework (piggy#183 inversion). Its
