@@ -412,6 +412,16 @@
         devShells.default = result.devShells.default;
         # `nix fmt` runs the generated conformist wrapper (see conformistEval).
         formatter = conformistEval.config.build.wrapper;
+        # Sandboxed formatting/lint gate: builds a /nix/store snapshot of the
+        # tree and runs `conformist check` against it (same pure config as
+        # `nix fmt` / $MADDER_CONFORMIST_CONFIG). This is the standard
+        # `nix flake check`-gated shape the rest of the eng fleet uses
+        # (doppelgang, moxy, dodder, ...); it sits ALONGSIDE the existing
+        # devShell `just lint-fmt` / `codemod-fmt` lane (which stays, since it
+        # is what dagnabit's facade formatter threads
+        # $MADDER_CONFORMIST_CONFIG through — see conformistEval above), not
+        # a replacement for it.
+        checks.formatting = conformistEval.config.build.check self;
       }
     ));
 }
