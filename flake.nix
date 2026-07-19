@@ -203,6 +203,43 @@
           package = conformist.packages.${system}.default;
         };
 
+        # dagnabit's dewey-facade-export check/repair scripts `cd` into deweyDir
+        # (go/) BEFORE invoking their nested conformist formatter
+        # (nix/linters/dewey-facade-export.nix, purse-first#163). That nested
+        # conformist is supposed to get its own --tree-root from dagnabit
+        # (exporter_conformist.go's runConformist), but conformistBakesTreeRoot's
+        # byte-scan false-positives on the bare devShell binary too (the
+        # substring "--tree-root" it greps for also appears in an unrelated
+        # conformist log message, conformist/config/config.go:542-547 —
+        # purse-first#170), so dagnabit omits --tree-root and the nested
+        # conformist's own tree-root discovery falls back to cwd, which is
+        # ALREADY go/. Feeding it conformistEval as-is double-applies the go/
+        # descent on top of that: conformistEval's workingDir = "go" is correct
+        # for the OUTER, repo-root-scoped invocations (`nix fmt` / `just
+        # lint-fmt`, where tree-root is genuinely the repo root), but composed
+        # with a tree root that's already go/, it produces `go/go` — a
+        # nonexistent directory (`chdir .../go/go: no such file or directory`,
+        # breaking `just lint-worktree`, and surfacing as a misleading
+        # "go/pkgs/ is out of sync" dewey-facade-export finding — FormatOutput
+        # errors before the real internal/-vs-pkgs/ comparison ever runs). This
+        # eval reuses conformistEval's formatters verbatim but forces workingDir
+        # back to "" for that already-scoped nested case. NB this mitigation is
+        # itself coupled to conformistBakesTreeRoot's current (buggy) fallback
+        # landing exactly on go/ — once purse-first#170 is fixed and dagnabit's
+        # own --tree-root is honored again, revisit whether this eval is still
+        # needed (depends what tree-root dagnabit would then pass).
+        conformistFacadeFormatEval = conformist.lib.evalModule pkgs {
+          imports = [
+            conformist.lib.presets.eng
+            ./conformist.nix
+            {
+              programs.goimports.workingDir = pkgs.lib.mkForce "";
+              programs.gofumpt.workingDir = pkgs.lib.mkForce "";
+            }
+          ];
+          package = conformist.packages.${system}.default;
+        };
+
         # Impure lane: the eng-convention checks that need a live working tree /
         # host tools (git-remotes, git-default-branch, sweatfile, agents-md,
         # gomod2nix). They CANNOT run in the sandboxed pure config, so `just
@@ -310,7 +347,12 @@
             # eval (REPAIR) and conformistImpureEval (the merge-gate CHECK via
             # lint-worktree); the pin keeps the lane self-contained in either.
             linters.dewey-facade-export.dagnabitPackage = purse-first.packages.${system}.dagnabit;
-            linters.dewey-facade-export.conformistConfig = conformistEval.config.build.configFile;
+            # conformistFacadeFormatEval, not conformistEval: dagnabit already
+            # `cd`s into deweyDir (go/) before running this nested formatting
+            # pass, so its config must NOT also carry workingDir = "go" (see
+            # conformistFacadeFormatEval's comment above — double-application
+            # produces a nonexistent go/go chdir).
+            linters.dewey-facade-export.conformistConfig = conformistFacadeFormatEval.config.build.configFile;
             # Layer the stage-mutation tiers onto the module's generated linter.
             settings.linter.dewey-facade-export = {
               # flake.lock joins the module's go-glob trigger (list options
