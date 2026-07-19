@@ -203,6 +203,7 @@ let
     src = goPkgsTest;
     pwd = goPkgsTest;
     subPackages = [
+      "cmd/mad"
       "cmd/madder"
       "cmd/madder-cache"
       "cmd/madder-gen_man"

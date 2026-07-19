@@ -10,7 +10,8 @@ deduplicated and concurrent writes are safe without coordination.
 
 Madder ships one Go module (`github.com/amarbel-llc/madder/go`) that
 builds the `madder` CLI plus the sibling binaries `madder-cache` and
-`madder-mcp`. It was extracted from
+`madder-mcp`, and `mad`, a short alias for `madder` itself (mirroring
+dodder's `der`). It was extracted from
 [dodder](https://github.com/amarbel-llc/dodder) in April 2026 and is
 consumed as a library by both dodder and
 [cutting-garden](https://github.com/amarbel-llc/cutting-garden) via the
@@ -81,7 +82,7 @@ belongs in a layer above madder.
 The build entrypoint is the justfile (see `eng(7)`):
 
 ```sh
-just build      # nix build → result/bin/{madder,madder-cache,madder-mcp}
+just build      # nix build → result/bin/{mad,madder,madder-cache,madder-mcp}
 just build-go   # plain `go build` of the module
 just test       # build + vet analyzers + go tests + bats lanes (also `just`)
 ```
@@ -200,6 +201,8 @@ expected config digest at resolve time. See FDR-0008 and `blob-store(7)`.
 
 ## Sibling binaries
 
+- **mad** — a short alias for `madder` itself (same command tree, same
+  XDG scope and man pages), mirroring dodder's `der`.
 - **madder-cache** — manages purgeable `%`-prefixed cache stores under
   `$XDG_CACHE_HOME/madder-cache/`. Subset of the madder surface
   (`init`, `list`, `write`, `has`, `cat`, `fsck`, `version`).

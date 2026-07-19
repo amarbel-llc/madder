@@ -11,8 +11,8 @@ default: lint build test
 
 build: build-nix build-go build-gomod2nix
 
-# Build all binaries (madder, madder-cache, madder-mcp, hyphence) + man pages
-# via nix. The full release build; `build-go` is the faster compile-only check.
+# Build all binaries (mad, madder, madder-cache, madder-mcp) + man pages via
+# nix. The full release build; `build-go` is the faster compile-only check.
 [group("build")]
 build-nix:
   nix build --show-trace
@@ -537,6 +537,7 @@ debug-version:
   #!/usr/bin/env bash
   set -euo pipefail
   just build >/dev/null
+  echo "mad:          $({{justfile_directory()}}/result/bin/mad version)"
   echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
   echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
 
