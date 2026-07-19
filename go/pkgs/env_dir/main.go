@@ -2,7 +2,7 @@
 
 package env_dir
 
-import internal "github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+import internal "code.linenisgreat.com/madder/go/internal/echo/env_dir"
 
 // Config bundles the construction inputs that are reusable across XDG
 // scopes. The XDG scope itself is NOT here — it is passed as its own arg

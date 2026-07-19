@@ -3,7 +3,7 @@ package directory_layout
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"

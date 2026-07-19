@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"

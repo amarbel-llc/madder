@@ -5,7 +5,7 @@ package markl_io
 import (
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"
 )

@@ -13,10 +13,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )

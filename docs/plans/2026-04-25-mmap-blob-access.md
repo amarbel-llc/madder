@@ -482,7 +482,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 var (
@@ -610,7 +610,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 	"golang.org/x/sys/unix"
 )
@@ -727,7 +727,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
 )
 
@@ -808,7 +808,7 @@ Expected: FAIL with "MakeMmapBlobFromBlobReader undefined".
 package mmap_blob
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // MakeMmapBlobFromBlobReader inspects reader. If it implements
@@ -921,7 +921,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
 )
 
 func makeMmapBlobForVerify(t *testing.T, payload []byte) (MmapBlob, string) {

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/india/commands"
-	"github.com/amarbel-llc/madder/go/internal/india/commands_cache"
-	"github.com/amarbel-llc/madder/go/internal/india/commands_mcp"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/india/commands"
+	"code.linenisgreat.com/madder/go/internal/india/commands_cache"
+	"code.linenisgreat.com/madder/go/internal/india/commands_mcp"
 )
 
 // Declared so the shared -X main.version / -X main.commit ldflags have

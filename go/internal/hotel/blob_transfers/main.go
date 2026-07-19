@@ -3,10 +3,10 @@ package blob_transfers
 import (
 	"time"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/delta/env_ui"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )

@@ -170,8 +170,8 @@ func (s Stage) String() string {
 package sftp_probe
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 )
 
 // Candidate is one (compression, encryption) hypothesis about a blob
@@ -254,7 +254,7 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 )
 
 // candidateNoneNoneSha256 is the simplest candidate: no compression,
@@ -309,7 +309,7 @@ import (
 	"encoding/hex"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -405,8 +405,8 @@ Append to `verify_test.go`:
 
 ```go
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 )
 
 // candidateForLegacyCompression builds a Candidate whose IOConfig
@@ -516,7 +516,7 @@ Append to `verify_test.go`:
 
 ```go
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
 )
 
 // generateAgeKeyForTest produces a fresh age-x25519 private key as
@@ -810,8 +810,8 @@ package sftp_probe
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 )
 
 func TestEnumerateCandidates_NoKeys(t *testing.T) {
@@ -875,11 +875,11 @@ package sftp_probe
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 )
 
 var legacyCompressionTypes = []string{"none", "gzip", "zlib", "zstd"}
@@ -1369,7 +1369,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/futility"
 )
 
 func TestSftpAnalyzeRegistered(t *testing.T) {
@@ -1404,8 +1404,8 @@ Run: `just test-go ./internal/india/commands/... -run SftpAnalyzeRegistered -v`
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
 )
@@ -1624,7 +1624,7 @@ results, rank, then emit a TAP plan to stdout.
 ```go
 import (
 	tap "github.com/amarbel-llc/tap/go"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/sftp_probe"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/sftp_probe"
 )
 
 // (inside Run)

@@ -157,9 +157,9 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/charlie/hyphence"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/charlie/hyphence"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 )
 
 // TestEncodeWithDigestRoundTrip: encoding a config through
@@ -212,7 +212,7 @@ func defaultLocalHashBucketedConfigForTest(t *testing.T) Config {
 ```
 
 (If `charlie_bsc` isn't imported in this package, add it as
-`charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"`.
+`charlie_bsc "code.linenisgreat.com/madder/go/internal/charlie/blob_store_configs"`.
 If the package already exposes a fixture helper, use that and delete
 the local helper.)
 
@@ -235,7 +235,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -509,7 +509,7 @@ import (
 	"bytes"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -987,12 +987,12 @@ package commands
 import (
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/charlie/files"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
+	"code.linenisgreat.com/madder/go/internal/charlie/files"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
@@ -1336,9 +1336,9 @@ func emitListText(
 }
 ```
 
-Add `"strings"`, `"github.com/amarbel-llc/madder/go/internal/bravo/markl"`,
-`"github.com/amarbel-llc/madder/go/internal/charlie/files"`,
-`"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"`
+Add `"strings"`, `"code.linenisgreat.com/madder/go/internal/bravo/markl"`,
+`"code.linenisgreat.com/madder/go/internal/charlie/files"`,
+`"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"`
 to the imports.
 
 > NOTE: The digest-extraction via re-reading is wasteful. A

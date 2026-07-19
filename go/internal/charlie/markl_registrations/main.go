@@ -18,7 +18,7 @@
 // To activate the registrations, blank-import this package from a
 // binary's main package:
 //
-//	import _ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+//	import _ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 package markl_registrations
 
 //go:generate dagnabit export

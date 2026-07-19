@@ -1,9 +1,9 @@
 package command_components
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"

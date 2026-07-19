@@ -5,7 +5,7 @@ package madder_env
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
 )
 
 // TestEnvBin pins the env-var-name constant that madder publishes to

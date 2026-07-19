@@ -112,7 +112,7 @@ will resolve that question.
 ### Library dependency on madder
 
 cutting-garden imports madder's public substrate at
-`github.com/amarbel-llc/madder/go/pkgs/{env_dir, env_local, env_ui,
+`code.linenisgreat.com/madder/go/pkgs/{env_dir, env_local, env_ui,
 blob_store_env, madder_env}`. Versioned via Go module semantics —
 cutting-garden pins a release tag of madder rather than tracking
 master.

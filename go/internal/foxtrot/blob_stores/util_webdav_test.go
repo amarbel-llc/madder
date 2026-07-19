@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 )
 
 // TestValidateWebdavAuth_AcceptsExactlyOneMode covers the four

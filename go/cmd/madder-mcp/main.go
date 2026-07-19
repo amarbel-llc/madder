@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
-	"github.com/amarbel-llc/madder/go/internal/charlie/cli_main"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
-	"github.com/amarbel-llc/madder/go/internal/india/commands_mcp"
+	"code.linenisgreat.com/madder/go/internal/0/buildinfo"
+	"code.linenisgreat.com/madder/go/internal/charlie/cli_main"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/india/commands_mcp"
 )
 
 // Populated at link time via `-X main.version` / `-X main.commit`.

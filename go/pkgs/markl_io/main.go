@@ -2,7 +2,7 @@
 
 package markl_io
 
-import internal "github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+import internal "code.linenisgreat.com/madder/go/internal/alfa/markl_io"
 
 var (
 	MakeNopReadCloser    = internal.MakeNopReadCloser

@@ -1,6 +1,6 @@
 package scoped_id
 
-import "github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
+import "code.linenisgreat.com/madder/go/internal/0/xdg_location_type"
 
 type (
 	LocationType       = xdg_location_type.Type

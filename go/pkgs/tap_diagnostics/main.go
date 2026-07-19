@@ -2,6 +2,6 @@
 
 package tap_diagnostics
 
-import internal "github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+import internal "code.linenisgreat.com/madder/go/internal/charlie/tap_diagnostics"
 
 var FromError = internal.FromError

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // ConfigKeyValues returns a map of TOML-tag-named keys to string-formatted

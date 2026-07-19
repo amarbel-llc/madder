@@ -265,7 +265,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 )
 
 func TestNone_RoundTrip(t *testing.T) {
@@ -325,7 +325,7 @@ package none
 import (
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
 )
@@ -352,7 +352,7 @@ The plugin's init() runs only if the package is imported. Add a blank import in 
 package builtins
 
 import (
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/none"
 )
 ```
 
@@ -405,7 +405,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 )
 
 func TestGzip_RoundTrip(t *testing.T) {
@@ -466,7 +466,7 @@ import (
 	stdgzip "compress/gzip"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
 
@@ -499,8 +499,8 @@ Modify `go/internal/bravo/plugins/builtins/builtins.go`:
 package builtins
 
 import (
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/gzip"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/gzip"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/none"
 )
 ```
 
@@ -571,7 +571,7 @@ import (
 	"io"
 
 	"github.com/DataDog/zstd"
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
 )
 
@@ -658,8 +658,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 )
 
 func TestLegacyCompressionRef(t *testing.T) {
@@ -802,7 +802,7 @@ Replace the `compressionToByteMap` and `byteToCompressionMap` plus the helpers `
 ```go
 // (in types.go — replace existing maps and helper signatures)
 import (
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )
 
@@ -865,7 +865,7 @@ The `CompressionType()` accessor on `DataReader` and `DataReaderV1` (lines 139, 
 
 `data_writer_test.go`, `data_writer_v1_test.go`, and any others in the package: replace `ct := compression_type.CompressionTypeNone` with `ref := "madder-codec-none-v1@none"` and pass `ref` (the string) instead of `ct` (the enum). Same for Zstd → `"madder-codec-zstd-v1@zstd"`.
 
-Add the import `_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"` to the test files so the registry is populated when tests run.
+Add the import `_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"` to the test files so the registry is populated when tests run.
 
 **Step 5: Run tests**
 
@@ -970,7 +970,7 @@ For each of `toml_v1.go`, `toml_v2.go`, `toml_v3.go`:
 1. Drop the `compression_type` import.
 2. Change the field type to `string`.
 3. Rewrite `GetBlobCompression()` per the pattern above.
-4. Add `import "github.com/amarbel-llc/madder/go/internal/bravo/plugins"`.
+4. Add `import "code.linenisgreat.com/madder/go/internal/bravo/plugins"`.
 
 **Step 3: Run tests**
 
@@ -1103,7 +1103,7 @@ func (factory) New() interfaces.IOWrapper { return Wrapper }
 ```go
 // In go/internal/echo/env_dir/blob_config.go:
 import (
-    "github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
+    "code.linenisgreat.com/madder/go/internal/bravo/plugins/none"
     // (drop compression_type import)
 )
 
@@ -1243,7 +1243,7 @@ Replace with:
 ref := "madder-codec-none-v1@none"  // or the matching ref for Zstd
 ```
 
-Pass `ref` instead of `ct`. Drop the `compression_type` import; add `_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"` to ensure the registry is populated (some tests may already have this from Slice 3 — confirm and avoid duplicates).
+Pass `ref` instead of `ct`. Drop the `compression_type` import; add `_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"` to ensure the registry is populated (some tests may already have this from Slice 3 — confirm and avoid duplicates).
 
 Run: `just test-go`. Commit.
 

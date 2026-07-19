@@ -2,7 +2,7 @@
 
 package output_format
 
-import internal "github.com/amarbel-llc/madder/go/internal/charlie/output_format"
+import internal "code.linenisgreat.com/madder/go/internal/charlie/output_format"
 
 // Format selects the encoding of a command's per-record result stream.
 //

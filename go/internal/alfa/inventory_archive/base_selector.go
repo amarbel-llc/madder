@@ -1,7 +1,7 @@
 package inventory_archive
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // BlobMetadata describes a blob candidate for delta packing.

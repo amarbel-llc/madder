@@ -1,7 +1,7 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
 )
 

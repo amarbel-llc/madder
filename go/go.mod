@@ -1,4 +1,4 @@
-module github.com/amarbel-llc/madder/go
+module code.linenisgreat.com/madder/go
 
 go 1.26
 

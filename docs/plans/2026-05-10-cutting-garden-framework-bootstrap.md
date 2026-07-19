@@ -70,7 +70,7 @@ Throughout the port, dodder-specific imports become dewey or stdlib:
 | `code.linenisgreat.com/dodder/go/lib/bravo/cli` | drop the `CLICompleter` alias for Phase 1 (not needed) |
 | `github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces` | unchanged |
 | `github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors` | unchanged |
-| `github.com/amarbel-llc/madder/go/pkgs/env_local` | **drop** — use `any` for the second `Completer` arg per the design doc |
+| `code.linenisgreat.com/madder/go/pkgs/env_local` | **drop** — use `any` for the second `Completer` arg per the design doc |
 
 If a substituted import doesn't exist or has drifted, run
 `go doc github.com/amarbel-llc/purse-first/libs/dewey/...` (or

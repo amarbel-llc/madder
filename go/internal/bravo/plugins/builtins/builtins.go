@@ -4,8 +4,8 @@
 package builtins
 
 import (
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/gzip"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/none"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/zlib"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/zstd"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/gzip"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/none"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/zlib"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/zstd"
 )

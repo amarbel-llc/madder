@@ -2,7 +2,7 @@
 
 package directory_layout
 
-import internal "github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+import internal "code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
 
 type (
 	BlobStore     = internal.BlobStore

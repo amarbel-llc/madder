@@ -2,7 +2,7 @@
 
 package ids
 
-import internal "github.com/amarbel-llc/madder/go/internal/0/ids"
+import internal "code.linenisgreat.com/madder/go/internal/0/ids"
 
 type (
 	BuiltinType     = internal.BuiltinType

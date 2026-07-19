@@ -1,7 +1,7 @@
 package mmap_blob
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // MakeMmapBlobFromBlobReader inspects reader. If it implements

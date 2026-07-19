@@ -9,10 +9,10 @@
 // internal package is now internal/alfa/scoped_id, whose facade is
 // pkgs/scoped_id. Do not regenerate this directory.
 //
-// Deprecated: use github.com/amarbel-llc/madder/go/pkgs/scoped_id.
+// Deprecated: use code.linenisgreat.com/madder/go/pkgs/scoped_id.
 package blob_store_id
 
-import scoped_id "github.com/amarbel-llc/madder/go/pkgs/scoped_id"
+import scoped_id "code.linenisgreat.com/madder/go/pkgs/scoped_id"
 
 // Deprecated: use scoped_id.ErrIdDigestVsLegacyConfig.
 type ErrIdDigestVsLegacyConfig = scoped_id.ErrIdDigestVsLegacyConfig

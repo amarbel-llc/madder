@@ -2,7 +2,7 @@
 
 package arg_resolver
 
-import internal "github.com/amarbel-llc/madder/go/internal/charlie/arg_resolver"
+import internal "code.linenisgreat.com/madder/go/internal/charlie/arg_resolver"
 
 // Kind tags the successful resolution (or the error) for a given arg.
 type Kind = internal.Kind

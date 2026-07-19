@@ -2,7 +2,7 @@
 
 package inventory_archive
 
-import internal "github.com/amarbel-llc/madder/go/internal/alfa/inventory_archive"
+import internal "code.linenisgreat.com/madder/go/internal/alfa/inventory_archive"
 
 // BaseSelector chooses which blobs become deltas and which become bases.
 // It reads from blobs and writes results to assignments.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	tyme "time"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
 )
 
 // withFixedClock pins nowTai/pidNow for the duration of the test and

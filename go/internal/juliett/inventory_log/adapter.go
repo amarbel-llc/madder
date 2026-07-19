@@ -1,7 +1,7 @@
 package inventory_log
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // AsBlobWriteObserver wraps an Observer so it satisfies the existing

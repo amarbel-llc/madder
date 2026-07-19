@@ -10,7 +10,7 @@ package inventory_log
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // NopObserver is a no-op Observer / BlobWriteObserver. Used when the

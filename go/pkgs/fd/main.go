@@ -2,7 +2,7 @@
 
 package fd
 
-import internal "github.com/amarbel-llc/madder/go/internal/charlie/fd"
+import internal "code.linenisgreat.com/madder/go/internal/charlie/fd"
 
 type (
 	FD         = internal.FD

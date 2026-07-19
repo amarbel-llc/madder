@@ -1,14 +1,14 @@
 package command_components
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/madder/go/internal/echo/madder_env"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_store_env"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/delta/env_ui"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/echo/madder_env"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_store_env"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/juliett/inventory_log"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/config_cli"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
 )

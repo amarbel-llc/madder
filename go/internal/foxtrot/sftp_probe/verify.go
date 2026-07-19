@@ -6,7 +6,7 @@ import (
 	"io"
 	"strings"
 
-	markl_io_alfa "github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
+	markl_io_alfa "code.linenisgreat.com/madder/go/internal/alfa/markl_io"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 

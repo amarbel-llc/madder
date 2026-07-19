@@ -154,7 +154,7 @@ import (
     "sync"
     "sync/atomic"
 
-    "github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+    "code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 // controllableBlobReader yields bytes on demand. Tests call Feed(...)
@@ -981,7 +981,7 @@ import (
     "io"
     "sync/atomic"
 
-    "github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+    "code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
     "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
     "github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
 )

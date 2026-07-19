@@ -1,8 +1,8 @@
 package sftp_probe
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 )
 
 // Candidate is one (compression, encryption) hypothesis about a

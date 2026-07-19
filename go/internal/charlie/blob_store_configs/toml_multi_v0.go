@@ -1,7 +1,7 @@
 package blob_store_configs
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )

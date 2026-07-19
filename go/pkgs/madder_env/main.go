@@ -2,7 +2,7 @@
 
 package madder_env
 
-import internal "github.com/amarbel-llc/madder/go/internal/echo/madder_env"
+import internal "code.linenisgreat.com/madder/go/internal/echo/madder_env"
 
 // DefaultEnvVarNames is madder's env-var contract bundled for
 // passing into `env_dir.Config.EnvVarNames`. Wrapper utilities that

@@ -2,7 +2,7 @@
 
 package blob_store_env
 
-import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_store_env"
+import internal "code.linenisgreat.com/madder/go/internal/foxtrot/blob_store_env"
 
 // BlobStoreEnv bundles env_local.Env + directory_layout.BlobStore +
 // the discovered BlobStoreMap with default-store and ordering machinery.

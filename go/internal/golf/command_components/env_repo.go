@@ -1,6 +1,6 @@
 package command_components
 
-import "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_store_env"
+import "code.linenisgreat.com/madder/go/internal/foxtrot/blob_store_env"
 
 // BlobStoreEnv is the composition layer that bundles env_local.Env +
 // directory_layout.BlobStore + the discovered BlobStoreMap. The

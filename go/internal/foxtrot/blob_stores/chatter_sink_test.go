@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
-	"github.com/amarbel-llc/madder/go/internal/charlie/fd"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
+	"code.linenisgreat.com/madder/go/internal/charlie/fd"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

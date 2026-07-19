@@ -43,8 +43,8 @@ madder/
 
 1. `code.linenisgreat.com/dodder/go/lib/` -> `github.com/amarbel-llc/purse-first/libs/dewey/`
 2. `code.linenisgreat.com/dodder/go/internal/golf/command` -> `github.com/amarbel-llc/purse-first/libs/dewey/golf/command`
-3. `code.linenisgreat.com/dodder/go/internal/golf/man` -> `github.com/amarbel-llc/madder/go/internal/golf/man`
-4. `code.linenisgreat.com/dodder/go/internal/` -> `github.com/amarbel-llc/madder/go/internal/`
+3. `code.linenisgreat.com/dodder/go/internal/golf/man` -> `code.linenisgreat.com/madder/go/internal/golf/man`
+4. `code.linenisgreat.com/dodder/go/internal/` -> `code.linenisgreat.com/madder/go/internal/`
 
 go-mcp imports (`github.com/amarbel-llc/purse-first/libs/go-mcp/*`) stay unchanged.
 

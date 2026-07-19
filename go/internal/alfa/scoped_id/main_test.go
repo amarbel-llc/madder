@@ -6,8 +6,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/0/xdg_location_type"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

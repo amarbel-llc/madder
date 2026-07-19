@@ -2,7 +2,7 @@
 
 package blob_io
 
-import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+import internal "code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 
 type (
 	Config               = internal.Config

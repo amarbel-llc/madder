@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/0/xdg_location_type"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/tridex"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"

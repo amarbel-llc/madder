@@ -64,7 +64,7 @@
   linters.golangci-dewey.enable = true;
 
   # eng-versioning(7) derives the version key from go.mod's module path; madder's
-  # module is github.com/amarbel-llc/madder/go, whose last segment yields the
+  # module is code.linenisgreat.com/madder/go, whose last segment yields the
   # wrong key (GO_VERSION). Pin it explicitly to match version.env.
   linters.eng-versioning.key = "MADDER_VERSION";
 

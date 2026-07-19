@@ -2,7 +2,7 @@
 
 package markl_registrations
 
-import internal "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+import internal "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 
 // PurposeIdAlias names a purposeId-shaped string that
 // markl.GetFormatOrError should resolve as if it were the named

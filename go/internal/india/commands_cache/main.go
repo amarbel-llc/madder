@@ -1,6 +1,6 @@
 package commands_cache
 
-import "github.com/amarbel-llc/madder/go/internal/futility"
+import "code.linenisgreat.com/madder/go/internal/futility"
 
 var utility = futility.NewUtility(
 	"madder-cache",

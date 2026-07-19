@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/0/xdg_location_type"
+	"code.linenisgreat.com/madder/go/internal/0/xdg_location_type"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"

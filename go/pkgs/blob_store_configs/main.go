@@ -2,7 +2,7 @@
 
 package blob_store_configs
 
-import internal "github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+import internal "code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 
 type (
 	Config                      = internal.Config

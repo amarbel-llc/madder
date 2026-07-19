@@ -8,11 +8,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )

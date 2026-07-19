@@ -8,7 +8,7 @@ self-describing **markl-id**; you read bytes by handing that id back.
 The same content always produces the same id, so storage is
 deduplicated and concurrent writes are safe without coordination.
 
-Madder ships one Go module (`github.com/amarbel-llc/madder/go`) that
+Madder ships one Go module (`code.linenisgreat.com/madder/go`) that
 builds the `madder` CLI plus the sibling binaries `madder-cache` and
 `madder-mcp`, and `mad`, a short alias for `madder` itself (mirroring
 dodder's `der`). It was extracted from

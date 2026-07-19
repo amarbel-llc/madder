@@ -3,7 +3,7 @@ package sftp_probe
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

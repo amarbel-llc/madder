@@ -8,7 +8,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 )
 
 var (

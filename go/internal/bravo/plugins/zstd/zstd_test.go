@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 )
 
 func TestZstd_RoundTrip(t *testing.T) {

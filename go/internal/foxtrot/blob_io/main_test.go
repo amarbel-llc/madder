@@ -5,8 +5,8 @@ package blob_io
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 )
 
 func TestHasIdentityWrappers_Default(t *testing.T) {

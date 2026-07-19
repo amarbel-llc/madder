@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/0/buildinfo"
-	"github.com/amarbel-llc/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/0/buildinfo"
+	"code.linenisgreat.com/madder/go/internal/futility"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
 )

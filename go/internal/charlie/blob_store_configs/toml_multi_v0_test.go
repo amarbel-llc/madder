@@ -5,8 +5,8 @@ package blob_store_configs
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 )
 
 func mustId(t *testing.T, s string) scoped_id.Id {

@@ -7,9 +7,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

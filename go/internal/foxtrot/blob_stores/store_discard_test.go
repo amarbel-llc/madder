@@ -7,8 +7,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/markl_io"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
+	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

@@ -2,7 +2,7 @@
 
 package blob_stores
 
-import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+import internal "code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 
 // ArchiveIndex is implemented by blob stores backed by archive files.
 // It exposes the in-memory index for listing archives and their blob IDs.

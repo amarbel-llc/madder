@@ -45,7 +45,7 @@ mechanical shape:
   through india).
 - Imports that used to point at dodder's `go/lib/` were rewritten to the
   shared `dewey` library (`github.com/amarbel-llc/purse-first/libs/dewey`).
-- Madder's go module is `github.com/amarbel-llc/madder/go`.
+- Madder's go module is `code.linenisgreat.com/madder/go`.
 
 ## Interpreting `dodder` references in this codebase
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/delta/env_ui"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/delta/env_ui"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"

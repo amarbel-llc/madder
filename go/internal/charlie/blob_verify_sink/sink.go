@@ -16,8 +16,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/charlie/tap_diagnostics"
 	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 

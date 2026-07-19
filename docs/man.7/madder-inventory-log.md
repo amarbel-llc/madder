@@ -11,7 +11,7 @@ madder-inventory-log - per-blob audit log: wiring patterns for Go importers
 
 # SYNOPSIS
 
-    import "github.com/amarbel-llc/madder/go/pkgs/inventory_log"
+    import "code.linenisgreat.com/madder/go/pkgs/inventory_log"
 
     obs := inventory_log.WireDefault(ctx)         // ctx is errors.Context
 
@@ -73,8 +73,8 @@ owned by inventory_log and panic on re-registration.
 
     import (
         "encoding/json"
-        "github.com/amarbel-llc/madder/go/pkgs/domain_interfaces"
-        "github.com/amarbel-llc/madder/go/pkgs/inventory_log"
+        "code.linenisgreat.com/madder/go/pkgs/domain_interfaces"
+        "code.linenisgreat.com/madder/go/pkgs/inventory_log"
     )
 
     type ImportEvent struct {

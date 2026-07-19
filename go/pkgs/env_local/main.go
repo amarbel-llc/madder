@@ -2,7 +2,7 @@
 
 package env_local
 
-import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+import internal "code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 
 type Env = internal.Env
 

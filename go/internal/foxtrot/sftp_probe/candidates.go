@@ -3,12 +3,12 @@ package sftp_probe
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

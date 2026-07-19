@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap_diagnostics"
+	"code.linenisgreat.com/madder/go/internal/charlie/tap_diagnostics"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

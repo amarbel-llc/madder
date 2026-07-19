@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/mmap_blob"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/mmap_blob"
 )
 
 // TestMakeBlobReaderPromotesToMmap exercises the public path that

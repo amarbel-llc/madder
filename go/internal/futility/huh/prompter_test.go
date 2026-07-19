@@ -3,7 +3,7 @@ package huh
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/futility"
 )
 
 func TestHuhPrompterImplementsPrompter(t *testing.T) {

@@ -11,12 +11,12 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	_ "github.com/amarbel-llc/madder/go/internal/bravo/plugins/builtins"
-	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
+	charlie_bsc "code.linenisgreat.com/madder/go/internal/charlie/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

@@ -5,8 +5,8 @@ package zstd
 import (
 	"io"
 
+	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"github.com/DataDog/zstd"
-	"github.com/amarbel-llc/madder/go/internal/bravo/plugins"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

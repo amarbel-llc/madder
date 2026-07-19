@@ -3,8 +3,8 @@ package command_components
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"

@@ -3,8 +3,8 @@
 package inventory_log
 
 import (
-	internal "github.com/amarbel-llc/madder/go/internal/juliett/inventory_log"
-	domaininterfaces "github.com/amarbel-llc/madder/go/pkgs/domain_interfaces"
+	internal "code.linenisgreat.com/madder/go/internal/juliett/inventory_log"
+	domaininterfaces "code.linenisgreat.com/madder/go/pkgs/domain_interfaces"
 )
 
 // Codec serializes one LogEvent shape to and from one NDJSON line.

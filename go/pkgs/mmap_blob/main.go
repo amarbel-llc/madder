@@ -2,7 +2,7 @@
 
 package mmap_blob
 
-import internal "github.com/amarbel-llc/madder/go/internal/foxtrot/mmap_blob"
+import internal "code.linenisgreat.com/madder/go/internal/foxtrot/mmap_blob"
 
 // MmapBlob is a zero-copy view of a blob's bytes. Bytes() returns a
 // slice valid until Close(). Close is idempotent.

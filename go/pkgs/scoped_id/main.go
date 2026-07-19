@@ -2,7 +2,7 @@
 
 package scoped_id
 
-import internal "github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+import internal "code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 
 // ErrIdDigestVsLegacyConfig is returned when a blob-store-id carries
 // a digest suffix but the resolved store's config is legacy (no `@`

@@ -5,7 +5,7 @@ package markl_registrations_test
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 )
 

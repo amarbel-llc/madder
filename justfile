@@ -579,8 +579,8 @@ debug-incubate-dewey-pkg subpath dest:
 # upstream swap, or this repo's golf/command -> futility cutover).
 # Usage:
 #   just debug-rename-go-import \
-#     github.com/amarbel-llc/madder/go/internal/golf/command \
-#     github.com/amarbel-llc/madder/go/internal/futility \
+#     code.linenisgreat.com/madder/go/internal/golf/command \
+#     code.linenisgreat.com/madder/go/internal/futility \
 #     command futility \
 #     'go/internal/golf/command/*' 'go/internal/futility/*'
 [group("debug")]

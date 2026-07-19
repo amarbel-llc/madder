@@ -1,7 +1,7 @@
 package directory_layout
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 )
 
 type BlobStorePath interface {

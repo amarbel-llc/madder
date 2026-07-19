@@ -2,8 +2,8 @@ package blob_store_configs
 
 import (
 	"code.linenisgreat.com/hyphence/go/hyphence"
-	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	charlie_bsc "github.com/amarbel-llc/madder/go/internal/charlie/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
+	charlie_bsc "code.linenisgreat.com/madder/go/internal/charlie/blob_store_configs"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )

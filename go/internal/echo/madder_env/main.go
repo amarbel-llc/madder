@@ -31,7 +31,7 @@ package madder_env
 
 //go:generate dagnabit export
 
-import "github.com/amarbel-llc/madder/go/internal/echo/env_dir"
+import "code.linenisgreat.com/madder/go/internal/echo/env_dir"
 
 // EnvBin is the env-var name madder publishes to subprocesses so
 // they can locate the binary that spawned them. Read by external

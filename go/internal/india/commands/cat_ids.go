@@ -1,10 +1,10 @@
 package commands
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"

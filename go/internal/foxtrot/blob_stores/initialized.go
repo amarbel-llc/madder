@@ -1,8 +1,8 @@
 package blob_stores
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 )
 
 type BlobStoreInitialized struct {

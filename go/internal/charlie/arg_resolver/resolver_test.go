@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 )
 
 // TestFormatShadowWarning_HintIsActionable pins #231: the

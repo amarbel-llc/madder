@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"code.linenisgreat.com/hyphence/go/hyphence"
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/0/ids"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 )
 

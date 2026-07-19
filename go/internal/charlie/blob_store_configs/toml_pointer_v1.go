@@ -3,8 +3,8 @@ package blob_store_configs
 import (
 	"path/filepath"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/directory_layout"
+	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
+	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

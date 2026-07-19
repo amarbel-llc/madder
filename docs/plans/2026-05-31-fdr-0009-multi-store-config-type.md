@@ -292,8 +292,8 @@ package blob_store_configs
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 )
 
 func mustId(t *testing.T, s string) blob_store_id.Id {
@@ -403,7 +403,7 @@ Create `go/internal/charlie/blob_store_configs/toml_multi_v0.go`:
 package blob_store_configs
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
@@ -789,10 +789,10 @@ package blob_stores
 import (
 	"testing"
 
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 )
 
 // Helper: a BlobStoreInitialized whose Config carries a given digest
@@ -877,10 +877,10 @@ Create `go/internal/foxtrot/blob_stores/multi_factory.go`:
 package blob_stores
 
 import (
-	"github.com/amarbel-llc/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
+	"code.linenisgreat.com/madder/go/internal/bravo/markl"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
@@ -1091,7 +1091,7 @@ package blob_stores
 import (
 	"testing"
 
-	_ "github.com/amarbel-llc/madder/go/internal/charlie/markl_registrations"
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 )
 
 func TestBuildMultiStores_Nested(t *testing.T) {
@@ -1416,12 +1416,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/amarbel-llc/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/madder/go/internal/charlie/tap"
-	"github.com/amarbel-llc/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/madder/go/internal/futility"
-	"github.com/amarbel-llc/madder/go/internal/golf/command_components"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
+	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
+	"code.linenisgreat.com/madder/go/internal/charlie/tap"
+	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/futility"
+	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
