@@ -4,9 +4,9 @@ go 1.26
 
 require (
 	code.linenisgreat.com/hyphence/go v0.3.0
+	code.linenisgreat.com/piggy/go v0.0.0-20260719231529-e5adf0d2047c
 	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/crap/go-crap/v2 v2.2.2
-	github.com/amarbel-llc/piggy/go v0.0.0-20260706021717-a08ad5ae28b3
 	github.com/amarbel-llc/purse-first/libs/dewey v0.3.2
 	github.com/amarbel-llc/tap/go v0.1.8
 	github.com/amarbel-llc/tommy v0.3.4-0.20260608131104-42624689df9b

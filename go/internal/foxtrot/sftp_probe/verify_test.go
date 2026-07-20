@@ -13,7 +13,7 @@ import (
 	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 )
 
 // candidateNoneNoneSha256 is the simplest candidate: no compression,

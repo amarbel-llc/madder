@@ -60,7 +60,7 @@ let
     # passthru bridges dewey for consumers that need it — madder's
     # dewey dep stays on its organic gomod2nix pin (dewey tags are
     # public), so no bridge entry is added here.
-    "github.com/amarbel-llc/piggy/go" = {
+    "code.linenisgreat.com/piggy/go" = {
       src = piggy.packages.${system}.go-pkgs;
     };
   };

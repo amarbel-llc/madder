@@ -346,6 +346,10 @@
           "igloo"
         ],
         "jcardsim": "jcardsim",
+        "langlang": [
+          "hyphence",
+          "langlang"
+        ],
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
@@ -359,10 +363,10 @@
         ]
       },
       "locked": {
-        "lastModified": 1784310101,
-        "narHash": "sha256-a1xShpJtAvG6uCI0SyRVvYNo5mWvfSujjsU4YqqHJfs=",
+        "lastModified": 1784502929,
+        "narHash": "sha256-sgYn7d9zejgsTsIft4adQmhLZkJC71fwMYWI9NFPJ7c=",
         "type": "tarball",
-        "url": "https://code.linenisgreat.com/piggy/archive/c1ee59913fbac5f51679a5acbb5f277441c97bc3.tar.gz"
+        "url": "https://code.linenisgreat.com/piggy/archive/e5adf0d2047c14bb1f4383fe6b939861b12f36e3.tar.gz"
       },
       "original": {
         "type": "tarball",

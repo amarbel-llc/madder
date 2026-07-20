@@ -10,7 +10,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 )
 
 // TestEncodeWithDigestRoundTrip: encoding a config through

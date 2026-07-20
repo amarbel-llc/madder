@@ -30,10 +30,10 @@ import (
 	// pre-cutover core registered directly. The SSH signing formats stay
 	// stubs here — connecting a signer is a consumer-side call (see
 	// agent.RegisterSSHEd25519Format).
-	_ "github.com/amarbel-llc/piggy/go/pkgs/age"
-	_ "github.com/amarbel-llc/piggy/go/pkgs/agent"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
-	_ "github.com/amarbel-llc/piggy/go/pkgs/markl_registrations"
+	_ "code.linenisgreat.com/piggy/go/pkgs/age"
+	_ "code.linenisgreat.com/piggy/go/pkgs/agent"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
+	_ "code.linenisgreat.com/piggy/go/pkgs/markl_registrations"
 )
 
 // PurposeIdAlias names a purposeId-shaped string that

@@ -9,7 +9,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 )
 
 // legacyCompressionTypes is the fixed set of compression strings

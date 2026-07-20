@@ -3,7 +3,7 @@ package blob_store_configs
 import (
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
 )

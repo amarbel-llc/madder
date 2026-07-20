@@ -9,7 +9,7 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
 	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 )
 
 // TestDiscardBlobStore_HashMatchesDirectDigester pins the discard store's

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
-	"github.com/amarbel-llc/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 )
 
 // AllPurposes is the canonical, ordered list of madder's purposes.

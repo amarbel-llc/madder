@@ -8,7 +8,7 @@ package domain_interfaces
 // forcing dual imports on every consumer.
 
 import (
-	"github.com/amarbel-llc/piggy/go/pkgs/domain_interfaces"
+	"code.linenisgreat.com/piggy/go/pkgs/domain_interfaces"
 	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 

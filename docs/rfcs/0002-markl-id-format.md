@@ -19,7 +19,7 @@ This RFC pins the wire format the Go reference implementation already
 produces and consumes. No on-disk bytes change. The reference
 implementation lives in
 [`amarbel-llc/piggy`](https://github.com/amarbel-llc/piggy)'s
-`go/` module (`github.com/amarbel-llc/piggy/go`; moved from madder's
+`go/` module (`code.linenisgreat.com/piggy/go`; moved from madder's
 `go/internal/bravo/markl/` under the piggy#183 ownership inversion),
 alongside piggy's Rust `piggy-markl` crate. A normative spec plus
 portable test vectors are the precondition for cross-language

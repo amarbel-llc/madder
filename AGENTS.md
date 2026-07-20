@@ -65,7 +65,7 @@ Renaming them in madder desyncs the wire format. Tracked separately in
   stores. The `dodder-*` purposes themselves are registered by dodder
   ([#255](https://github.com/amarbel-llc/madder/issues/255)); their
   string constants live upstream in piggy's `go/` module
-  (`github.com/amarbel-llc/piggy/go/pkgs/markl` — the markl core
+  (`code.linenisgreat.com/piggy/go/pkgs/markl` — the markl core
   moved there under piggy#183; madder's `go/internal/bravo/markl/` and
   `go/internal/alfa/blech32/` were deleted in the cutover).
 - `go/internal/bravo/directory_layout/util.go` —
