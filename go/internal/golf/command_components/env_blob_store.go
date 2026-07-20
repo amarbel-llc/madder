@@ -9,8 +9,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/juliett/inventory_log"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/config_cli"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/config_cli"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/debug"
 )
 
 // inventoryLogFlagsReader is the minimal surface `command_components`

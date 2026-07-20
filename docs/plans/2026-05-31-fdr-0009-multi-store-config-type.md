@@ -404,8 +404,8 @@ package blob_store_configs
 
 import (
 	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
@@ -881,8 +881,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/alfa/blob_store_id"
 	"code.linenisgreat.com/madder/go/internal/bravo/markl"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // resolveMultiRef looks a reference up in the map by its bare key and
@@ -1422,8 +1422,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 func init() {

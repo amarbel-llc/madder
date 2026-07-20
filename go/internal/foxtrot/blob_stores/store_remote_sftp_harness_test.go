@@ -16,7 +16,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // The benchmarks in this file target the specific knobs the SFTP-perf

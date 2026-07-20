@@ -2,7 +2,7 @@ package directory_layout
 
 import (
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // v3System is the XDG-system (`//name`) blob-store layout (madder#230). It

@@ -4,8 +4,8 @@ import (
 	"os"
 
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/xdg"
 )
 
 // TODO separate read-only from write

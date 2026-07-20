@@ -12,7 +12,7 @@ decision-makers: Sasha F
 > machinery (`errors.Context`, `Cancel`, `runRetry`,
 > `ContextContinueOrPanic`) lives:
 >
-> → [amarbel-llc/purse-first — `libs/dewey/docs/decisions/0001-typed-panics-as-failure-channel.md`](https://github.com/amarbel-llc/purse-first/blob/master/libs/dewey/docs/decisions/0001-typed-panics-as-failure-channel.md)
+> → [amarbel-llc/purse-first — `libs/dewey/docs/decisions/0001-typed-panics-as-failure-channel.md`](https://code.linenisgreat.com/purse-first/blob/master/libs/dewey/docs/decisions/0001-typed-panics-as-failure-channel.md)
 >
 > The relocated version is broadened from this repo's `BlobStore`
 > framing to dewey's general panic-as-channel pattern, with

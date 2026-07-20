@@ -21,7 +21,7 @@ registered instance. No commands ported in Phase 1.
 
 **Tech Stack:**
 - Go 1.23+ (matching madder)
-- `github.com/amarbel-llc/purse-first/libs/dewey/...` for shared
+- `code.linenisgreat.com/purse-first/libs/dewey/...` for shared
   primitives (`charlie/flags`, `bravo/errors`, `charlie/ui`,
   `charlie/values`, `0/interfaces`, etc.)
 - Nix flake for builds (modeled on madder's `flake.nix`)
@@ -62,18 +62,18 @@ Throughout the port, dodder-specific imports become dewey or stdlib:
 
 | dodder import | new-repo substitution |
 | --- | --- |
-| `code.linenisgreat.com/dodder/go/lib/0/collections_slice` | `github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice` |
-| `code.linenisgreat.com/dodder/go/lib/alfa/flags` | `github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags` |
-| `code.linenisgreat.com/dodder/go/lib/alfa/ui` | `github.com/amarbel-llc/purse-first/libs/dewey/charlie/ui` |
-| `code.linenisgreat.com/dodder/go/lib/alfa/quiter` | `github.com/amarbel-llc/purse-first/libs/dewey/alfa/quiter` (verify exists; otherwise drop usage) |
-| `code.linenisgreat.com/dodder/go/lib/charlie/config_cli` | `github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli` |
+| `code.linenisgreat.com/dodder/go/lib/0/collections_slice` | `code.linenisgreat.com/purse-first/libs/dewey/bravo/collections_slice` |
+| `code.linenisgreat.com/dodder/go/lib/alfa/flags` | `code.linenisgreat.com/purse-first/libs/dewey/charlie/flags` |
+| `code.linenisgreat.com/dodder/go/lib/alfa/ui` | `code.linenisgreat.com/purse-first/libs/dewey/charlie/ui` |
+| `code.linenisgreat.com/dodder/go/lib/alfa/quiter` | `code.linenisgreat.com/purse-first/libs/dewey/alfa/quiter` (verify exists; otherwise drop usage) |
+| `code.linenisgreat.com/dodder/go/lib/charlie/config_cli` | `code.linenisgreat.com/purse-first/libs/dewey/foxtrot/config_cli` |
 | `code.linenisgreat.com/dodder/go/lib/bravo/cli` | drop the `CLICompleter` alias for Phase 1 (not needed) |
-| `github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces` | unchanged |
-| `github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors` | unchanged |
+| `code.linenisgreat.com/purse-first/libs/dewey/0/interfaces` | unchanged |
+| `code.linenisgreat.com/purse-first/libs/dewey/bravo/errors` | unchanged |
 | `code.linenisgreat.com/madder/go/pkgs/env_local` | **drop** — use `any` for the second `Completer` arg per the design doc |
 
 If a substituted import doesn't exist or has drifted, run
-`go doc github.com/amarbel-llc/purse-first/libs/dewey/...` (or
+`go doc code.linenisgreat.com/purse-first/libs/dewey/...` (or
 `hamster.doc`) to find the right path before asking for help.
 
 ---
@@ -404,7 +404,7 @@ package command
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/values"
 )
 
 func TestArg_FieldsPreserved(t *testing.T) {
@@ -466,7 +466,7 @@ import substitution from the table:
 ```go
 package command
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+import "code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 
 type (
 	Arg struct {
@@ -544,7 +544,7 @@ package command
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/collections_slice"
 )
 
 func TestCommandLineInput_LastArg(t *testing.T) {
@@ -594,7 +594,7 @@ package command
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/collections_slice"
 )
 
 // TODO complete merging Args, consumed and FlagsOrArgs for use by Run/Complete
@@ -676,8 +676,8 @@ package command
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/flags"
 )
 
 func newTestRequest(args ...string) Request {
@@ -736,10 +736,10 @@ package command
 import (
 	"slices"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/collections_slice"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/flags"
 )
 
 type Request struct {
@@ -949,8 +949,8 @@ package command
 import (
 	"fmt"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/foxtrot/config_cli"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/foxtrot/config_cli"
 )
 
 type Config interface {
@@ -1073,7 +1073,7 @@ package command
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 type capturingCmd struct {
@@ -1246,8 +1246,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 func extendNameIfNecessary(name string) string {
@@ -1275,7 +1275,7 @@ func handleMainErrors(
 
 **Note:** if `errors.IsBadRequest` doesn't exist on dewey, drop the
 exit-code distinction and just `return 1` for any error. Verify with
-`hamster.doc github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors`.
+`hamster.doc code.linenisgreat.com/purse-first/libs/dewey/bravo/errors`.
 
 **Step 4: Run to verify pass**
 
@@ -1366,7 +1366,7 @@ design doc):
 ```go
 package command
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+import "code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 
 type SupportsCompletion interface {
 	SupportsCompletion()
@@ -1561,9 +1561,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/flags"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/flags"
 )
 
 // testStdoutHook lets tests intercept the complete subcommand's

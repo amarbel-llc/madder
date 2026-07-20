@@ -18,7 +18,7 @@ promotion-criteria: |
 
 Madder's blob stores today encode bytes through a fixed pair of
 positional slots — a `compression-type` enum sourced from
-`github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type`
+`code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type`
 and an `encryption` field — both burned into every store config.
 Adding a new transform (zstd dictionaries, future encryption
 variants, content-addressed re-coding, signing) means coordinating
@@ -186,7 +186,7 @@ flows through the plugin abstraction; the legacy
 that resolves to the same plugin references.
 
 The result is that **madder drops its import of
-`github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type`
+`code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type`
 entirely in v0**. The dewey package may stay alive for its
 other consumers; madder simply doesn't depend on it for any
 code path, new or legacy.
@@ -314,7 +314,7 @@ reference.
   the `cg capture --zstd-dict` / `madder train-zstd-dict` user-
   facing surfaces on top of this architecture, replacing the
   superseded FDR 0003 user-surface design.
-- `github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type` —
+- `code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type` —
   the dewey package this architecture displaces. Stays available
   to dewey's own consumers; madder stops depending on it for new
   V4 stores.

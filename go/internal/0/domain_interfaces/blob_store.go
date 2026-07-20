@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 type (

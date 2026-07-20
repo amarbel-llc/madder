@@ -310,7 +310,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 type SampleResult struct {
@@ -1406,8 +1406,8 @@ package commands
 import (
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/values"
 )
 
 func init() {

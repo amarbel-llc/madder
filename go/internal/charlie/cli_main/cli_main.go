@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"code.linenisgreat.com/madder/go/internal/futility"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
 
 // Run invokes utility.RunCLI with os.Args, writes any error to stderr

@@ -7,7 +7,7 @@ import (
 
 	"code.linenisgreat.com/hyphence/go/hyphence"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // DigestPurpose is the markl purpose stamped on the @ line of every

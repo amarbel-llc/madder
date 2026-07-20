@@ -19,10 +19,10 @@ import (
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/transport"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/protocol"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/server"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/transport"
 )
 
 // URI scheme served by this MCP server.

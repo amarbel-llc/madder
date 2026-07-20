@@ -16,10 +16,10 @@ import (
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"code.linenisgreat.com/madder/go/internal/juliett/inventory_log"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/script_value"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/script_value"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/values"
 )
 
 func init() {

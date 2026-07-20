@@ -14,7 +14,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/charlie/blob_store_configs"
 	delta_blob_store_configs "code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // writeStoreConfig writes a minimal V3 hash-bucketed config to

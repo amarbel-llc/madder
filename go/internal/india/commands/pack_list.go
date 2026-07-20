@@ -7,7 +7,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/values"
 )
 
 func init() {

@@ -1,8 +1,8 @@
 package futility
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/cli"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/cli"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 type SupportsCompletion interface {

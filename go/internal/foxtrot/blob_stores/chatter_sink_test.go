@@ -13,7 +13,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/charlie/fd"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // envDirWithErrSink doubles as an env that carries an env_ui-style err

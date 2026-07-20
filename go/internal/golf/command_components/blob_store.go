@@ -7,7 +7,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"code.linenisgreat.com/madder/go/internal/futility"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 type BlobStore struct{}

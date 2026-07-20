@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // TestWireDefault_EnvDisableReturnsNop pins the disable contract:

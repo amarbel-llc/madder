@@ -18,7 +18,7 @@ import (
 	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // multiModeStub is a BlobStore double for Multi's mode-dispatch tests.

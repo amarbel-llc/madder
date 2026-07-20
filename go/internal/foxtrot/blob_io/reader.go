@@ -7,10 +7,10 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pivy"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/files"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ohio"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/pivy"
 )
 
 type blobReader struct {

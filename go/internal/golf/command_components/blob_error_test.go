@@ -9,9 +9,9 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/delta/env_ui"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/debug"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // TestPrintBlobErrors_HeaderRoutesToEnvErrSink pins the

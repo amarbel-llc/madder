@@ -12,8 +12,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_store_env"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/debug"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // TestPrintCopyProgress_RoutesToEnvErrSink pins the blob_transfers half

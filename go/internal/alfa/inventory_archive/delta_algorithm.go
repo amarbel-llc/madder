@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // DeltaAlgorithm computes and applies binary deltas between blobs.

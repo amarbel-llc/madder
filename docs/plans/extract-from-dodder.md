@@ -6,7 +6,7 @@ Madder is a content-addressable blob storage CLI + MCP server currently embedded
 in dodder (`code.linenisgreat.com/dodder/go`). We're extracting it into its own
 repo (`github.com/amarbel-llc/madder`) and switching from dodder's `go/lib/`
 general-purpose libraries to purse-first's `dewey` library
-(`github.com/amarbel-llc/purse-first/libs/dewey`, on `brave-baobab` branch).
+(`code.linenisgreat.com/purse-first/libs/dewey`, on `brave-baobab` branch).
 
 ## New Repo Layout
 
@@ -41,12 +41,12 @@ madder/
 
 ## Import Rewrite Rules (applied in order)
 
-1. `code.linenisgreat.com/dodder/go/lib/` -> `github.com/amarbel-llc/purse-first/libs/dewey/`
-2. `code.linenisgreat.com/dodder/go/internal/golf/command` -> `github.com/amarbel-llc/purse-first/libs/dewey/golf/command`
+1. `code.linenisgreat.com/dodder/go/lib/` -> `code.linenisgreat.com/purse-first/libs/dewey/`
+2. `code.linenisgreat.com/dodder/go/internal/golf/command` -> `code.linenisgreat.com/purse-first/libs/dewey/golf/command`
 3. `code.linenisgreat.com/dodder/go/internal/golf/man` -> `code.linenisgreat.com/madder/go/internal/golf/man`
 4. `code.linenisgreat.com/dodder/go/internal/` -> `code.linenisgreat.com/madder/go/internal/`
 
-go-mcp imports (`github.com/amarbel-llc/purse-first/libs/go-mcp/*`) stay unchanged.
+go-mcp imports (`code.linenisgreat.com/purse-first/libs/go-mcp/*`) stay unchanged.
 
 ## Steps
 

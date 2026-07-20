@@ -4,7 +4,7 @@ package mmap_blob
 
 import (
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Verify recomputes the digest of the mmap'd bytes through the recorded

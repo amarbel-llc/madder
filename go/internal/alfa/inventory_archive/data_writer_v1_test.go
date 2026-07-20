@@ -11,9 +11,9 @@ import (
 	"testing"
 
 	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/age"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pivy"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/age"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/pivy"
 )
 
 func TestV1RoundTripFullEntriesOnly(t *testing.T) {

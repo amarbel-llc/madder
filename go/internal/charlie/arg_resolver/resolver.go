@@ -37,7 +37,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // Mode is a bitmask declaring which argument shapes a command accepts.

@@ -5,10 +5,10 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/env_local"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/pool"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/pool"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
 
 type BlobError struct {

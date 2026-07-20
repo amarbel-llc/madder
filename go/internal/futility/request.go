@@ -3,12 +3,12 @@ package futility
 import (
 	"slices"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_slice"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/collections_value"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/quiter"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/collections_slice"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/collections_value"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/flags"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/quiter"
 )
 
 // TODO refactor this to have a generic config field and for the commands_madder

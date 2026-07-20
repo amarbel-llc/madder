@@ -3,7 +3,7 @@ package env_ui
 import (
 	"sync/atomic"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
 
 type ProgressWriter struct {

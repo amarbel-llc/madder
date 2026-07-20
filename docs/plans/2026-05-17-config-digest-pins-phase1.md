@@ -236,7 +236,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 // DigestPurpose is the markl purpose stamped on the @ line of every
@@ -510,7 +510,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/bravo/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 // DecodeAndVerify decodes a blob_store-config from r and, if its
@@ -993,8 +993,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 func init() {

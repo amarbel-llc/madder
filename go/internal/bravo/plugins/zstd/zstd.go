@@ -6,8 +6,8 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 	"github.com/DataDog/zstd"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 const Reference = "madder-codec-zstd-v1@zstd"

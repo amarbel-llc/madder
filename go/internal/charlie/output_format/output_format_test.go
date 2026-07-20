@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/files"
 )
 
 func TestResolveFor(t *testing.T) {

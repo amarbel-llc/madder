@@ -3,7 +3,7 @@ package blob_io
 import (
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/files"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/files"
 )
 
 // TemporaryFS is the temp-fs handle MoveOptions embeds. Aliased

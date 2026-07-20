@@ -332,7 +332,7 @@ Create `go/internal/foxtrot/blob_stores/multi_builder.go`:
 package blob_stores
 
 import (
-    "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+    "code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 type MultiBuilder struct {
@@ -982,8 +982,8 @@ import (
     "sync/atomic"
 
     "code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
-    "github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-    "github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+    "code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+    "code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 type teeBlobReader struct {

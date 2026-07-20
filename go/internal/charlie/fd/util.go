@@ -3,7 +3,7 @@ package fd
 import (
 	"fmt"
 
-	lib_fd "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/fd"
+	lib_fd "code.linenisgreat.com/purse-first/libs/dewey/pkgs/fd"
 )
 
 func Base(p string) string { return lib_fd.Base(p) }

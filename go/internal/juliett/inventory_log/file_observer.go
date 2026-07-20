@@ -11,7 +11,7 @@ import (
 	"code.linenisgreat.com/hyphence/go/hyphence"
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/0/ids"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 // bodyTypeNDJSON is the on-disk hyphence `! type-string` for inventory-log

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/server"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/protocol"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/server"
 )
 
 func TestAppRegisterMCPTools(t *testing.T) {

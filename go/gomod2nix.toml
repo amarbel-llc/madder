@@ -2,13 +2,23 @@ schema = 3
 
 [mod]
   [mod.'code.linenisgreat.com/hyphence/go']
-    version = 'v0.3.0'
-    hash = 'sha256-O6G/2ZXT7JfOrKZISKoxpGTThHG/vQh5JQIfL/ImGoE='
+    version = 'v0.3.1-0.20260720154720-ea7f1e0933f9'
+    hash = 'sha256-HMeJOBTmoABNHhQho2KUazvLAhDvdWCba8ZvMtKiEv8='
     goVersion = '1.26'
 
   [mod.'code.linenisgreat.com/piggy/go']
-    version = 'v0.0.0-20260719231529-e5adf0d2047c'
-    hash = 'sha256-yGDxPSG24fmICY0FjT3yJilXaCmDPhkt7jtrN7sBQto='
+    version = 'v0.0.0-20260720155209-77cfdea0031e'
+    hash = 'sha256-HGekZfv1QS5BGlIlU+eJpTDQBd+7HqXNFJZWV/cpo7c='
+    goVersion = '1.26'
+
+  [mod.'code.linenisgreat.com/purse-first/libs/dewey']
+    version = 'v0.5.0'
+    hash = 'sha256-WaAb5xVdkek2jtlcD8y+99VuZyAoCVzezyIrs5X9Mbg='
+    goVersion = '1.26'
+
+  [mod.'code.linenisgreat.com/tommy']
+    version = 'v0.5.0'
+    hash = 'sha256-Stc6rRy+e/nVDkH7Ykww3NxBR/KeAy+UXDt13peknDg='
     goVersion = '1.26'
 
   [mod.'filippo.io/age']
@@ -32,18 +42,13 @@ schema = 3
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/purse-first/libs/dewey']
-    version = 'v0.3.2'
-    hash = 'sha256-qCPYqLkjtbqAaCX3nPxP4cGTTjBbub6iIWiOJG8ejWk='
+    version = 'v0.1.8'
+    hash = 'sha256-dNrByOns78mIRKUK9003JKK0p3L3UmYeZjRYt3J/huM='
     goVersion = '1.26'
 
   [mod.'github.com/amarbel-llc/tap/go']
     version = 'v0.1.8'
     hash = 'sha256-ZvId+dizMgnVOXBkg/SdZiK4kRwvula9oB/E4pX9oC8='
-    goVersion = '1.26'
-
-  [mod.'github.com/amarbel-llc/tommy']
-    version = 'v0.3.4-0.20260608131104-42624689df9b'
-    hash = 'sha256-aqm33fq/WLAeNW52pcdMwp56BxNMMnTA25wkmzDGpUY='
     goVersion = '1.26'
 
   [mod.'github.com/atotto/clipboard']

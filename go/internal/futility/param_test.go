@@ -3,7 +3,7 @@ package futility
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/values"
 )
 
 func TestFlagImplementsParam(t *testing.T) {

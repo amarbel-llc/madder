@@ -1,6 +1,6 @@
 package env_dir
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/debug"
+import "code.linenisgreat.com/purse-first/libs/dewey/pkgs/debug"
 
 // EnvVarNames bundles the env var names env_dir reads from and writes to.
 // Consumers supply their own bundle via Config.EnvVarNames; env_dir does

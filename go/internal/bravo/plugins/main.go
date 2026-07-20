@@ -8,7 +8,7 @@ package plugins
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 // Factory constructs a plugin instance. v0 plugins are non-parametric;

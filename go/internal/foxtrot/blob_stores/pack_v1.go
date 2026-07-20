@@ -17,9 +17,9 @@ import (
 	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
 	_ "code.linenisgreat.com/madder/go/internal/bravo/plugins/builtins"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ui"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
 
 // sliceBlobSet implements inventory_archive.BlobSet backed by a slice.

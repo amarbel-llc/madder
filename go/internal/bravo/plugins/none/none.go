@@ -4,8 +4,8 @@ package none
 
 import (
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/ohio"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ohio"
 )
 
 const Reference = "madder-codec-none-v1@none"

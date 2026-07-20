@@ -3,13 +3,13 @@ module code.linenisgreat.com/madder/go
 go 1.26
 
 require (
-	code.linenisgreat.com/hyphence/go v0.3.0
-	code.linenisgreat.com/piggy/go v0.0.0-20260719231529-e5adf0d2047c
+	code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9
+	code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e
+	code.linenisgreat.com/purse-first/libs/dewey v0.5.0
+	code.linenisgreat.com/tommy v0.5.0
 	github.com/DataDog/zstd v1.5.7
 	github.com/amarbel-llc/crap/go-crap/v2 v2.2.2
-	github.com/amarbel-llc/purse-first/libs/dewey v0.3.2
 	github.com/amarbel-llc/tap/go v0.1.8
-	github.com/amarbel-llc/tommy v0.3.4-0.20260608131104-42624689df9b
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.16
@@ -31,6 +31,7 @@ require (
 require (
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
+	github.com/amarbel-llc/purse-first/libs/dewey v0.1.8 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.10 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.23 // indirect
@@ -82,10 +83,10 @@ require (
 )
 
 tool (
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/actx
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/defererr
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/paramobj
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/repool
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/seqerror
-	github.com/amarbel-llc/purse-first/libs/dewey/cmd/testui
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/actx
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/defererr
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/paramobj
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/repool
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/seqerror
+	code.linenisgreat.com/purse-first/libs/dewey/cmd/testui
 )

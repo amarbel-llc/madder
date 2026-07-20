@@ -9,7 +9,7 @@ package domain_interfaces
 
 import (
 	"code.linenisgreat.com/piggy/go/pkgs/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 type (

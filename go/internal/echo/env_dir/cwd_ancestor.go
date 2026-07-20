@@ -3,8 +3,8 @@ package env_dir
 import (
 	"path/filepath"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/xdg"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/xdg"
 )
 
 // resolveCwdAncestorOrError walks up depth literal parent directories from

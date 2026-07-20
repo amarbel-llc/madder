@@ -3,7 +3,7 @@ package futility
 import (
 	"io/fs"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/protocol"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/protocol"
 )
 
 // EnvVar declares an environment variable that an app or command reads,

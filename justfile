@@ -139,7 +139,7 @@ verify-go-analyzer name:
   bin="{{justfile_directory()}}/.tmp/analyzers/{{name}}"
   mkdir -p "$(dirname "$bin")"
   cd go
-  go build -o "$bin" github.com/amarbel-llc/purse-first/libs/dewey/cmd/{{name}}
+  go build -o "$bin" code.linenisgreat.com/purse-first/libs/dewey/cmd/{{name}}
   go vet -tags test -vettool="$bin" ./...
 
 [group("post-build")]
@@ -436,7 +436,7 @@ update-go-mod:
 # Update dewey to a version (e.g. just update-dewey v0.0.3).
 [group("maintenance")]
 update-dewey version:
-  cd go && go get github.com/amarbel-llc/purse-first/libs/dewey@{{version}} && go mod tidy
+  cd go && go get code.linenisgreat.com/purse-first/libs/dewey@{{version}} && go mod tidy
   just build-gomod2nix
 
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
@@ -557,8 +557,8 @@ debug-incubate-dewey-pkg subpath dest:
   set -euo pipefail
   cd {{justfile_directory()}}
   mod_cache=$(cd go && go env GOMODCACHE)
-  ver=$(cd go && go list -m -f '{{{{.Version}}}}' github.com/amarbel-llc/purse-first/libs/dewey)
-  src="$mod_cache/github.com/amarbel-llc/purse-first/libs/dewey@${ver}/{{subpath}}"
+  ver=$(cd go && go list -m -f '{{{{.Version}}}}' code.linenisgreat.com/purse-first/libs/dewey)
+  src="$mod_cache/code.linenisgreat.com/purse-first/libs/dewey@${ver}/{{subpath}}"
   dst="go/internal/{{dest}}"
   if [ ! -d "$src" ]; then
     echo "source not found: $src" >&2

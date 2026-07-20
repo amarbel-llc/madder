@@ -5,7 +5,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/0/ids"
 	charlie_bsc "code.linenisgreat.com/madder/go/internal/charlie/blob_store_configs"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config]{

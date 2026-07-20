@@ -1,7 +1,7 @@
 package inventory_archive
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 type BaseSelectorParams struct {

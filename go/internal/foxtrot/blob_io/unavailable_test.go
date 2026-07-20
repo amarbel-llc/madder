@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	deweyerrors "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+	deweyerrors "code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
 func TestIsBlobStoreUnavailable_Nil(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/0/xdg_location_type"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/tridex"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/tridex"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
 	"golang.org/x/term"

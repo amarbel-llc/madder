@@ -2,7 +2,7 @@ package xdg_location_type
 
 //go:generate dagnabit export
 
-import "github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
+import "code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 
 type (
 	Type interface {

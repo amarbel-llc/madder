@@ -5,8 +5,8 @@ import (
 	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/values"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/values"
 )
 
 // TomlLocalHashBucketedV2 is the V2 configuration for the local hash-bucketed blob store.

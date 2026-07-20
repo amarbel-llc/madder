@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/errors"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
 )
 

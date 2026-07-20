@@ -2,7 +2,7 @@ package commands
 
 import (
 	"code.linenisgreat.com/madder/go/internal/futility"
-	"github.com/amarbel-llc/purse-first/libs/dewey/pkgs/flags"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/flags"
 )
 
 var utility = futility.NewUtility("madder", "content-addressed blob stores")

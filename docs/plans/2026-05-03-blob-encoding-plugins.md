@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use eng:subagent-driven-development to implement this plan task-by-task.
 
-**Goal:** Replace `github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type` with a madder-owned plugin registry. Pure under-the-hood refactor; no on-disk format change, no CLI surface change, no test behavior change. End state: madder no longer imports `dewey/delta/compression_type`.
+**Goal:** Replace `code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type` with a madder-owned plugin registry. Pure under-the-hood refactor; no on-disk format change, no CLI surface change, no test behavior change. End state: madder no longer imports `dewey/delta/compression_type`.
 
 **Architecture:** A `Plugin` (= `interfaces.IOWrapper` from `dewey/0/interfaces`) is a stream-to-stream transform. Madder owns four built-in plugins (`none`, `gzip`, `zlib`, `zstd`) at `go/internal/bravo/plugins/`, each in its own subpackage so the package leaf-name convention from FDR 0004 (`madder-codec-zstd-v1@zstd`) holds. A registry resolves `<type-tag>@<builtin-plugin-id>` → factory; a legacy translator maps the on-disk strings (`"zstd"`, `"gzip"`, ...) to plugin references. Existing TOML store configs stay byte-identical on disk; the in-memory representation goes through the new registry instead of the dewey enum.
 
@@ -57,7 +57,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 func TestRegistry_RegisterAndResolve(t *testing.T) {
@@ -124,7 +124,7 @@ package plugins
 //go:generate dagnabit export
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 // Factory constructs a plugin instance. v0 plugins are non-parametric;
@@ -161,8 +161,8 @@ package plugins
 import (
 	"sync"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 // registry is the in-process plugin index. The package-level Default
@@ -326,8 +326,8 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/charlie/ohio"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/charlie/ohio"
 )
 
 const Reference = "madder-codec-none-v1@none"
@@ -467,7 +467,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 const Reference = "madder-codec-gzip-v1@gzip"
@@ -572,7 +572,7 @@ import (
 
 	"github.com/DataDog/zstd"
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 
 const Reference = "madder-codec-zstd-v1@zstd"
@@ -718,7 +718,7 @@ Create `go/internal/bravo/plugins/legacy.go`:
 package plugins
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 // ErrUnknownLegacyCompression is returned by LegacyCompressionRef when
@@ -803,7 +803,7 @@ Replace the `compressionToByteMap` and `byteToCompressionMap` plus the helpers `
 // (in types.go — replace existing maps and helper signatures)
 import (
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 var compressionRefToByteMap = map[string]byte{

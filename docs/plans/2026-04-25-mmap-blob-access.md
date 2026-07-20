@@ -108,7 +108,7 @@ package env_dir
 import (
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestHasIdentityWrappers_Default(t *testing.T) {
@@ -205,7 +205,7 @@ import (
 	"io"
 	"os"  // <-- add
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/0/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/0/interfaces"
 )
 ```
 
@@ -274,7 +274,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestMmapSource_LocalFileIdentityWrappers(t *testing.T) {
@@ -611,7 +611,7 @@ import (
 	"sync"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 	"golang.org/x/sys/unix"
 )
 
@@ -728,7 +728,7 @@ import (
 	"testing"
 
 	"code.linenisgreat.com/madder/go/internal/echo/env_dir"
-	"github.com/amarbel-llc/purse-first/libs/dewey/delta/compression_type"
+	"code.linenisgreat.com/purse-first/libs/dewey/delta/compression_type"
 )
 
 func TestMakeMmapBlob_LocalFileIdentity(t *testing.T) {
@@ -980,7 +980,7 @@ Replace the stub in `mmap_unix.go` (delete the stub `Verify`) and create `verify
 package mmap_blob
 
 import (
-	"github.com/amarbel-llc/purse-first/libs/dewey/bravo/errors"
+	"code.linenisgreat.com/purse-first/libs/dewey/bravo/errors"
 )
 
 // Verify recomputes the digest of the mmap'd bytes and compares against

@@ -38,7 +38,7 @@ let
       src = tap.packages.${system}.go-pkgs;
       subPath = "go";
     };
-    "github.com/amarbel-llc/tommy" = {
+    "code.linenisgreat.com/tommy" = {
       src = tommy.packages.${system}.go-pkgs;
     };
     # crap's go-pkgs is full-repo-filtered (its repo is polyglot:
