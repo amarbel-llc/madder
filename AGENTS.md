@@ -31,7 +31,7 @@ should be coordinated.
 ## History: madder was extracted from dodder
 
 Madder was extracted in April 2026 from a larger project called **dodder**
-(`github.com/amarbel-llc/dodder`). Dodder is an immutable cryptographic
+(`code.linenisgreat.com/dodder`). Dodder is an immutable cryptographic
 object graph inspired by Git, Nix, and Zettelkasten. Madder is the blob
 store layer that dodder is built on; it was pulled into its own repo so it
 can be built, tested, and released on its own cadence. Dodder is still
@@ -57,13 +57,13 @@ always, that is wrong. The remaining references fall into these buckets:
 
 Protocol identifiers that are written into files and read by dodder itself.
 Renaming them in madder desyncs the wire format. Tracked separately in
-[#16](https://github.com/amarbel-llc/madder/issues/16).
+[#16](https://code.linenisgreat.com/madder/issues/16).
 
 - `go/internal/charlie/markl_registrations/main.go` — registers the
   legacy purpose-id aliases (`dodder-repo-private_key-v1`,
   `zit-repo-private_key-v1`) needed to read pre-rename on-disk blob
   stores. The `dodder-*` purposes themselves are registered by dodder
-  ([#255](https://github.com/amarbel-llc/madder/issues/255)); their
+  ([#255](https://code.linenisgreat.com/madder/issues/255)); their
   string constants live upstream in piggy's `go/` module
   (`code.linenisgreat.com/piggy/go/pkgs/markl` — the markl core
   moved there under piggy#183; madder's `go/internal/bravo/markl/` and
@@ -96,13 +96,13 @@ domain description.
   future pack-blobs strategy from the era when madder ran inside dodder.
   These are design speculation, not current behavior. Triaged alongside the
   broader TODO sweep in
-  [#19](https://github.com/amarbel-llc/madder/issues/19).
+  [#19](https://code.linenisgreat.com/madder/issues/19).
 
 ### Already migrated
 
 - XDG utility name and env vars — `XDGUtilityNameDodder`, `DIR_DODDER`,
   `BIN_DODDER`, `DODDER_XDG_UTILITY_OVERRIDE` were renamed or dropped under
-  [#42](https://github.com/amarbel-llc/madder/issues/42) (commit
+  [#42](https://code.linenisgreat.com/madder/issues/42) (commit
   `677007a`). Runtime now resolves under `$XDG_*_HOME/madder/`. Test
   `go/internal/echo/env_dir/env_var_names_test.go` pins the current names.
 

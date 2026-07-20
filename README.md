@@ -12,9 +12,9 @@ Madder ships one Go module (`code.linenisgreat.com/madder/go`) that
 builds the `madder` CLI plus the sibling binaries `madder-cache` and
 `madder-mcp`, and `mad`, a short alias for `madder` itself (mirroring
 dodder's `der`). It was extracted from
-[dodder](https://github.com/amarbel-llc/dodder) in April 2026 and is
+[dodder](https://code.linenisgreat.com/dodder) in April 2026 and is
 consumed as a library by both dodder and
-[cutting-garden](https://github.com/amarbel-llc/cutting-garden) via the
+[cutting-garden](https://code.linenisgreat.com/cutting-garden) via the
 public `go/pkgs/` surface.
 
 ## Philosophy
@@ -74,7 +74,7 @@ belongs in a layer above madder.
   digest (see Config integrity). See `blob-store(7)`.
 - **hyphence** — the `---`-fenced text format madder uses for
   `blob_store-config` files and the inventory log, now consumed as a
-  library from [amarbel-llc/hyphence](https://github.com/amarbel-llc/hyphence).
+  library from [amarbel-llc/hyphence](https://code.linenisgreat.com/hyphence).
   See `hyphence(7)`.
 
 ## Install & build
@@ -209,7 +209,7 @@ expected config digest at resolve time. See FDR-0008 and `blob-store(7)`.
 - **madder-mcp** — `madder-mcp serve` runs an MCP server over stdio,
   exposing madder operations as tools.
 The `hyphence` format CLI (`validate`/`format`/`meta`/`body`) moved to its
-own repo, [amarbel-llc/hyphence](https://github.com/amarbel-llc/hyphence),
+own repo, [amarbel-llc/hyphence](https://code.linenisgreat.com/hyphence),
 and is no longer built by madder (madder#253).
 
 ## Library use
