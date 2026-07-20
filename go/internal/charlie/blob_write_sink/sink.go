@@ -15,7 +15,7 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/charlie/tap_diagnostics"
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
+	tap "code.linenisgreat.com/tap/go/pkgs/writer"
 )
 
 // Sink abstracts write's output stream so Run can stay format-agnostic.

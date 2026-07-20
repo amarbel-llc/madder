@@ -4,7 +4,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/charlie/tap_diagnostics"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
-	tap "github.com/amarbel-llc/tap/go/pkgs/writer"
+	tap "code.linenisgreat.com/tap/go/pkgs/writer"
 )
 
 // PackOptions controls the behavior of the Pack operation.

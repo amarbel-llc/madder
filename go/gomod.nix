@@ -34,7 +34,7 @@ let
   # polyglot), so consumers still slice with `subPath = "go"`;
   # tommy's module is at its repo root.
   goFlakeInputs = {
-    "github.com/amarbel-llc/tap/go" = {
+    "code.linenisgreat.com/tap/go" = {
       src = tap.packages.${system}.go-pkgs;
       subPath = "go";
     };
@@ -46,7 +46,7 @@ let
     # the go-crap/ subtree and consumers slice with subPath. The module
     # declared path gained a /v2 suffix at the v2.0.0 release; the source
     # subtree is still go-crap/.
-    "github.com/amarbel-llc/crap/go-crap/v2" = {
+    "code.linenisgreat.com/crap/go-crap/v2" = {
       src = crap.packages.${system}.go-pkgs;
       subPath = "go-crap";
     };
