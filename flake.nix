@@ -120,6 +120,7 @@
     bats.inputs.conformist.follows = "conformist";
     hyphence.inputs.langlang.inputs.tap.inputs.crane.follows = "tap/crane";
     hyphence.inputs.langlang.inputs.tap.inputs.rust-overlay.follows = "tap/rust-overlay";
+    hyphence.inputs.langlang.inputs.tap.follows = "tap";
     # piggy's own langlang pin (piggy#183's markl-id framework pulls in the
     # same langlang subtree hyphence does) is bit-identical to hyphence's —
     # doppelgang lint flagged the duplicate node; collapse onto hyphence's
