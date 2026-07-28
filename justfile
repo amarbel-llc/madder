@@ -13,6 +13,8 @@ build: build-nix build-go build-gomod2nix
 
 # Build all binaries (mad, madder, madder-cache, madder-mcp) + man pages via
 # nix. The full release build; `build-go` is the faster compile-only check.
+#
+# build all binaries and man pages via nix
 [group("build")]
 build-nix:
   nix build --show-trace
@@ -33,6 +35,8 @@ build-go:
 # pass uses madder's config and does NOT walk up to a stray ancestor
 # ~/eng/conformist.toml (which enables rustfmt/prettier/… absent from PATH).
 # This is the env the retired dagnabitWrapped shim used to bake.
+#
+# regenerate facades and show which dewey imports landed in them
 [group("debug")]
 debug-check-facade-imports:
   nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
@@ -59,6 +63,8 @@ debug-check-facade-imports:
 # pull deps (e.g. dave/jennifer) that madder doesn't import, so `go mod
 # tidy` prunes them from go.sum and an in-module build fails. Keep the
 # devshell tommy in sync with go.mod's tommy via `nix flake update tommy`.
+#
+# regenerate tommy codegen for the blob_store_configs package
 [group("codemod")]
 codemod-tommy:
   find {{justfile_directory()}}/go/internal/charlie/blob_store_configs \
@@ -76,12 +82,16 @@ codemod-tommy:
 
 # Wipe Go's build cache. Useful when bisecting a stale-build mystery
 # or recovering from a corrupted cache entry.
+#
+# wipe Go's build cache
 [group("maintenance")]
 clean-go-cache:
   cd go && go clean -cache
 
 # Wipe Go's module cache (~/go/pkg/mod). Forces re-download of every
 # module on the next build. Heavier than clean-go-cache.
+#
+# wipe Go's module cache
 [group("maintenance")]
 clean-go-modcache:
   cd go && go clean -modcache
@@ -91,6 +101,8 @@ clean-go: clean-go-cache clean-go-modcache
 
 # Remove the nix-build symlink. Forces the next `nix build` to
 # refresh the symlink even if its store path is reachable from cache.
+#
+# remove the nix-build result symlink
 [group("maintenance")]
 clean-nix-result:
   rm -f {{justfile_directory()}}/result
@@ -116,6 +128,8 @@ run-go-test *flags:
 # Run Go benchmarks. Usage: just run-bench ./internal/foxtrot/blob_stores
 # Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
 # in flags for real timing. -run=^$ suppresses test functions.
+#
+# run Go benchmarks
 [group("post-build")]
 run-bench pkg="./..." *flags="-benchtime=1x":
   cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
@@ -123,6 +137,8 @@ run-bench pkg="./..." *flags="-benchtime=1x":
 # Run `go vet` across the module with the test build tag, which gates
 # several internal test-only symbols. Without -tags test, vet reports
 # false positives on test-tagged source files.
+#
+# run go vet across the module with the test build tag
 [group("post-build")]
 run-go-vet *flags:
   cd go && go vet -tags test {{flags}} ./...
@@ -132,6 +148,8 @@ run-go-vet *flags:
 # `go vet -vettool`. Strict: any analyzer finding fails the recipe.
 # The analyzer cmds are pinned via go.mod `tool` directives so
 # `go mod tidy` does not drop their transitive deps.
+#
+# build a dewey go/analysis analyzer and run it via go vet -vettool
 [group("post-build")]
 verify-go-analyzer name:
   #!/usr/bin/env bash
@@ -149,6 +167,8 @@ verify-go-analyzers: (verify-go-analyzer "seqerror") (verify-go-analyzer "repool
 # verification triple, but scoped to ./internal/<subpath>/... so we don't
 # wait for the whole module when iterating on one package.
 # Usage: just run-internal-pkg futility
+#
+# build, vet, and test a single internal subpackage tree
 [group("post-build")]
 run-internal-pkg subpath:
   cd go && go build ./internal/{{subpath}}/...
@@ -157,6 +177,8 @@ run-internal-pkg subpath:
 
 # Run Go unit tests under the race detector. Invoked by the default
 # `test` target; kept as a standalone recipe for flag-passing use cases.
+#
+# run Go unit tests under the race detector
 [group("post-build")]
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
@@ -166,6 +188,8 @@ test-go-race *flags:
 # and a textfmt profile to .tmp/go-cover.out (the legacy interface).
 # View the full HTML report with
 # `cd go && go tool cover -html=../.tmp/go-cover.out`.
+#
+# run Go unit tests with coverage collection
 [group("post-build")]
 run-go-cover *flags:
   #!/usr/bin/env bash
@@ -192,6 +216,8 @@ run-go-cover *flags:
 # namespace where the bind succeeds — same rationale as test-bats-net-cap.
 # For fast local iteration against result/bin, use `run-bats-targets` /
 # `run-bats-tags` in the devshell instead.
+#
+# run bats integration tests via the nix-sandbox lane
 [group("post-build")]
 test-bats:
   nix build .#bats-default --no-link --print-build-logs
@@ -207,6 +233,8 @@ test-bats:
 # which is everything the SFTP/WebDAV harnesses need — no sandcastle
 # `--allow-local-binding` / `--allow-unix-sockets` escape hatch
 # required. See clown ADR-0007 for the empirical sandbox survey.
+#
+# run net_cap-tagged bats tests via the nix-sandbox lane
 [group("post-build")]
 test-bats-net-cap:
   nix build .#bats-net_cap --no-link --print-build-logs
@@ -218,6 +246,8 @@ test-bats-net-cap:
 # bats suite against `madder-race`'s `$out/bin/madder`. net_cap-tagged
 # scenarios are filtered out — the SFTP harness those tests need is
 # a devshell-only derivation not exposed to nix-driven bats lanes.
+#
+# run bats integration tests against race-instrumented binaries
 [group("post-build")]
 run-bats-race:
   nix build .#bats-race --print-build-logs --no-link
@@ -234,6 +264,8 @@ run-bats-race:
 #
 # net_cap-tagged scenarios are filtered out by the derivation — they
 # need loopback binding the nix sandbox doesn't grant.
+#
+# run bats integration tests against a coverage-instrumented binary
 [group("post-build")]
 run-bats-cover:
   #!/usr/bin/env bash
@@ -258,6 +290,8 @@ run-bats-cover:
 # having produced fragments under .tmp/cover-data/{unit,bats}/. Use this
 # to see the full coverage picture across both lanes — anything still
 # uncovered after both passes is a real gap.
+#
+# merge unit-test and bats coverage into a combined profile
 [group("post-build")]
 run-cover-merged: run-go-cover run-bats-cover
   #!/usr/bin/env bash
@@ -277,6 +311,8 @@ run-cover-merged: run-go-cover run-bats-cover
 # merged %, and bats-delta (how much bats adds beyond unit). Sorted
 # ascending by merged % so the worst-covered packages surface first.
 # Depends on run-cover-merged so all three profiles exist.
+#
+# print a per-package coverage rollup with delta columns
 [group("post-build")]
 run-cover-summary: run-cover-merged
   #!/usr/bin/env bash
@@ -329,6 +365,8 @@ run-bats-targets *targets: build
 # sandbox against the same `$out/bin/madder` `.#madder` produces, so
 # dev-loop and release share one cache. `nix flake show` lists every
 # available bats lane.
+#
+# run bats tests filtered by file_tag
 [group("post-build")]
 run-bats-tags *tags:
   nix build --print-build-logs --no-link .#bats-{{tags}}
@@ -347,6 +385,8 @@ codemod: codemod-fmt codemod-tommy codemod-flake
 # eng-convention linters' repair actions. Uses the Nix-generated config
 # ($MADDER_CONFORMIST_CONFIG, from ./conformist.nix + presets.eng) passed to the
 # bare conformist via --config-file. The read-only counterpart is `lint-fmt`.
+#
+# format and repair all source files via conformist
 [group("codemod")]
 codemod-fmt:
   nix develop {{justfile_directory()}} --command sh -c 'conformist --config-file "$MADDER_CONFORMIST_CONFIG"'
@@ -364,6 +404,8 @@ lint: lint-flake lint-fmt lint-tommy lint-worktree
 # Lint flake.lock for reducible input duplication (madder#214,
 # doppelgang FDR-0002). Exits 1 on findings, so CI surfaces drift. The
 # write-mode counterpart is `codemod-flake`.
+#
+# lint flake.lock for reducible input duplication
 [group("pre-build")]
 lint-flake:
   nix develop {{justfile_directory()}} --command sh -c 'doppelgang lint --flake .'
@@ -374,6 +416,8 @@ lint-flake:
 # only byte-identical follows opportunities; multi-version inputs stay
 # report-only and still exit nonzero (choosing a rev changes behavior — resolve
 # those by hand). Needs nix on PATH. The read-only counterpart is `lint-flake`.
+#
+# repair reducible flake-input duplication
 [group("codemod")]
 codemod-flake:
   nix develop {{justfile_directory()}} --command sh -c 'doppelgang lint --fix --flake .'
@@ -383,6 +427,8 @@ codemod-flake:
 # per the Nix-generated config ($MADDER_CONFORMIST_CONFIG, from ./conformist.nix
 # + presets.eng) passed to the bare conformist via --config-file. `just
 # codemod-fmt` is the write mode.
+#
+# check formatting and eng conventions via conformist
 [group("pre-build")]
 lint-fmt:
   nix develop {{justfile_directory()}} --command sh -c 'conformist check --config-file "$MADDER_CONFORMIST_CONFIG"'
@@ -404,6 +450,8 @@ lint-fmt:
 # write-mode counterpart is `codemod-tommy`. NB the devshell tommy must match
 # the version that produced the committed files; `codemod-tommy` restamps to
 # the current devshell tommy.
+#
+# fail if the committed *_tommy.go codegen has drifted
 [group("pre-build")]
 lint-tommy:
   nix develop {{justfile_directory()}} --command bash -c 'set -euo pipefail; cd {{justfile_directory()}}/go/internal/charlie/blob_store_configs; rc=0; for f in $(grep -lF "//go:generate tommy generate" *.go); do GOFILE="$f" tommy generate --check || rc=1; done; exit "$rc"'
@@ -417,6 +465,8 @@ lint-tommy:
 # agents-md repair (`nix fmt` won't reach it) is `codemod-fmt`-adjacent; run
 # `conformist --config-file "$MADDER_CONFORMIST_IMPURE_CONFIG" --tree-root .`
 # by hand for its autofix.
+#
+# run the impure eng-convention checks against the working tree
 [group("pre-build")]
 lint-worktree:
   nix develop {{justfile_directory()}} --command sh -c 'conformist check --config-file "$MADDER_CONFORMIST_IMPURE_CONFIG" --tree-root .'
@@ -441,6 +491,8 @@ update-dewey version:
 
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
 # the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
+#
+# tag a Go module release
 [group("maintenance")]
 tag version message:
   #!/usr/bin/env bash
@@ -463,6 +515,8 @@ tag version message:
 # reads it directly, and the binary picks it up via -ldflags injection
 # (see go/internal/0/buildinfo). No-op if already at the target.
 # Usage: just bump-version 0.0.2
+#
+# rewrite MADDER_VERSION in version.env to the given semver
 [group("maintenance")]
 bump-version new_version:
   #!/usr/bin/env bash
@@ -487,6 +541,8 @@ bump-version new_version:
 # recipe boundaries was unreliable — the inner recipe saw a malformed
 # argument and `git tag -s` would fail in a way that didn't surface
 # until much later (see madder release-v0.3.0 incident).
+#
+# cut a release: bump version.env, commit, push, then sign and push the tag
 [group("maintenance")]
 release version:
   #!/usr/bin/env bash
@@ -532,6 +588,8 @@ build-gomod2nix:
 
 # Print the version subcommand output from the nix-built binaries.
 # Used to verify -ldflags injection (see go/internal/0/buildinfo).
+#
+# print the version output from the nix-built binaries
 [group("debug")]
 debug-version:
   #!/usr/bin/env bash
@@ -551,6 +609,8 @@ debug-color-demo:
 # Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,
 # copies recursively, and chmods writable. Destination must not exist.
 # Usage: just debug-incubate-dewey-pkg golf/command futility
+#
+# copy a subpackage from the cached dewey module into go/internal/
 [group("debug")]
 debug-incubate-dewey-pkg subpath dest:
   #!/usr/bin/env bash
@@ -583,6 +643,8 @@ debug-incubate-dewey-pkg subpath dest:
 #     code.linenisgreat.com/madder/go/internal/futility \
 #     command futility \
 #     'go/internal/golf/command/*' 'go/internal/futility/*'
+#
+# rewrite a Go import path and its package identifier across the module
 [group("debug")]
 debug-rename-go-import old_path new_path old_ident new_ident *skips:
   #!/usr/bin/env bash
@@ -604,6 +666,8 @@ debug-rename-go-import old_path new_path old_ident new_ident *skips:
 # directory tree. Also rewrites `package <old>_test` for external test
 # files. Does not touch import statements — rename consumers separately.
 # Usage: just debug-rename-go-package go/internal/futility command futility
+#
+# rewrite `package <old>` to `package <new>` across a directory tree
 [group("debug")]
 debug-rename-go-package dir old new:
   #!/usr/bin/env bash
@@ -637,6 +701,8 @@ debug-gen_man page="madder.1":
 # .madder-workspace/.dodder-workspace. Because this recipe's tmp workdir
 # lives under the repo's .tmp/, an uncapped walk would reach the repo root
 # and potentially the host's $HOME. Every variant sets the ceiling.
+#
+# run `madder init` variants in an isolated tmp HOME (repro for #21)
 [group("debug")]
 debug-init-repro storeid="default":
   #!/usr/bin/env bash
@@ -697,6 +763,8 @@ debug-init-repro storeid="default":
 # only if its purpose permits it (auth/sig keys parse but are not
 # encryption recipients). Same ceiling/tmp-home safety as
 # debug-init-repro. Usage: just debug-init-encryption '<markl-id>' [storeid]
+#
+# check whether an -encryption markl-id parses and validates
 [group("debug")]
 debug-init-encryption value storeid="enc":
   #!/usr/bin/env bash
@@ -721,6 +789,8 @@ debug-init-encryption value storeid="enc":
 # `.madder/` should surface both ancestor `.madder/` stores with
 # disambiguating dot prefixes. Builds a fresh fixture under tmp so it
 # does not touch the host's $HOME or any real stores.
+#
+# reproduce issue #145: multi-ancestor store listing from a leaf
 [group("debug")]
 debug-issue-145-multi-ancestor-repro:
   #!/usr/bin/env bash
@@ -766,6 +836,8 @@ debug-issue-145-multi-ancestor-repro:
 # tap-dancer YAMLish diagnostic block. Drives `madder write`
 # (blob_write_sink) and `madder fsck` (blob_verify_sink) in -format tap
 # mode against an isolated tmp home, so a real TTY is not required.
+#
+# assert the TAP emitters produce no legacy `# Output` directives
 [group("debug")]
 debug-tap-output:
   #!/usr/bin/env bash
@@ -819,6 +891,8 @@ debug-tap-output:
 # madder://blobs/<test-digest>. Each response is pretty-printed so the
 # pagination and resource_link round-trips can be eyeballed. Requires
 # `result/` to be populated (run `just build` first if it isn't).
+#
+# smoke-test the madder MCP server's resources over stdio
 [group("debug")]
 debug-mcp-resources:
   #!/usr/bin/env bash
@@ -920,6 +994,8 @@ debug-mcp-resources:
 # (GET/HEAD/PUT /blobs/<digest>) against the worktree's .default store —
 # the integration smoke test for the circus admin daemon (FDR-0007).
 # Requires `just build` first to populate result/.
+#
+# smoke-test `madder serve`'s unix-socket HTTP blob API
 [group("debug")]
 debug-serve-blob-api:
   #!/usr/bin/env bash
