@@ -73,8 +73,8 @@ The encoding converts binary data from 8-bit to 5-bit groups, maps each through
 the alphabet, and appends a 6-character BCH checksum. The checksum detects all
 single-character substitutions and adjacent transpositions.
 
-The entire string must be uniformly cased (all upper or all lower). The
-90-character length limit from BIP173 is not enforced.
+The entire string is lower-case only, per piggy RFC 0011. The 90-character
+length limit from BIP173 is not enforced.
 
 # FORMAT IDS
 
@@ -93,6 +93,8 @@ The entire string must be uniformly cased (all upper or all lower). The
   age_x25519_sec           32     age X25519 secret key
   pivy_ecdh_p256_pub       33     PIV ECDH P-256 public key
   ssh_ecdsa_nistp256_pub   33     SSH-suitable ECDSA P-256 public key (SEC1)
+  ssh_ed25519_pub          32     SSH-suitable Ed25519 public key
+  ssh_ecdsa_nistp384_pub   49     SSH-suitable ECDSA P-384 public key (SEC1)
   nonce                    32     Random nonce
 
 The **\*_ssh** formats carry a bare public-key payload (32 or 33 bytes); the
@@ -110,8 +112,8 @@ opaquely if it isn't registered. Purpose-full markl IDs are the canonical
 spelling for pinned/locked references ecosystem-wide, e.g. `md@blake2b256-...`
 (a type pinned to its definition) or `one/uno@blake2b256-...` (an object
 pinned to a version), alongside registered-purpose uses like
-`piggy-piv_auth-v1@ssh_...`. See RFC 0002 §2.1, §2.2, and §6 for the
-normative grammar and the embedding-grammar quoting split (a purpose
+`piggy-piv_auth-v1@ssh_...`. See piggy RFC 0011 for the normative grammar and
+the embedding-grammar quoting split (a purpose
 containing runes an embedding grammar reserves is quoted on the purpose slot
 only, e.g. `"my thing"@blake2b256-...` — the digest slot is never quoted).
 
@@ -145,13 +147,13 @@ Common registered purposes:
     a PAPI document's canonicalized (JCS) bytes. Format: ecdsa_p256_sig.
     Jointly owned with amarbel-llc/papi; produced by `piggy papi sign`.
 
-See RFC 0002 (docs/rfcs/0002-markl-id-format.md) for the normative wire-format
-spec and the cross-language stable purpose registry. The Go reference
-implementation registers additional dodder/madder-internal purposes that are
-out of scope for the RFC.
+See piggy RFC 0011 for the normative wire-format spec and the cross-language
+stable purpose registry. The Go reference implementation registers additional
+dodder/madder-internal purposes that are out of scope for the RFC.
+`docs/rfcs/0002-markl-id-format.md` in this repo is a superseded stub.
 
 # SEE ALSO
 
 **dodder**(1), **doddish**(7), **blob-store**(7)
 
-RFC 0002: Markl ID Format (docs/rfcs/0002-markl-id-format.md)
+piggy RFC 0011: Markl ID Format (code.linenisgreat.com/linenisgreat/piggy docs/rfcs/0011-markl-id-format.md)

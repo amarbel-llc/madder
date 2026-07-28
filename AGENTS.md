@@ -82,7 +82,11 @@ domain description.
   objects", "dodder repositories", and the `dodder-*` markl-id scheme.
   Dodder is the canonical owner of these concepts. (The `hyphence.md`
   man page is now a redirect stub; the format moved to
-  `amarbel-llc/hyphence` — see madder#253.)
+  `amarbel-llc/hyphence` — see madder#253. The `markl-id.md` man page
+  is maintained in madder as a local reference but the normative
+  wire-format spec is **piggy RFC 0011** at
+  `code.linenisgreat.com/linenisgreat/piggy`; `docs/rfcs/0002-markl-id-format.md`
+  is now a superseded stub — see madder#274.)
 - Subpackage AGENTS.md files and `futility` comments refer to "dodder" or
   "dodder-style commands" because the text hasn't been re-homed; these are
   stale prose, not active couplings.
