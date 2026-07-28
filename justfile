@@ -19,7 +19,7 @@ build: build-nix build-go build-gomod2nix
 build-nix:
   nix build --show-trace
 
-# Compile-only Go build (no nix, no man pages) — the fast inner-loop check.
+# compile-only Go build (no nix, no man pages) — the fast inner-loop check
 [group("build")]
 build-go:
   cd go && go build ./...
@@ -120,7 +120,9 @@ clean: clean-go clean-nix-result
 [group("post-build")]
 test: verify-go-analyzers test-go-race test-bats test-bats-net-cap
 
-# Run Go unit tests only. Usage: just run-go-test ./internal/foo
+# Usage: just run-go-test ./internal/foo
+#
+# run Go unit tests only
 [group("post-build")]
 run-go-test *flags:
   cd go && go test -tags test {{flags}} ./...
@@ -353,7 +355,9 @@ run-cover-summary: run-cover-merged
     | sort -t $'\t' -k4 -n \
     | awk -F $'\t' '{ printf "%-72s %6.1f%% %6.1f%% %7.1f%% %+9.1f\n", $1, $2, $3, $4, $3-$2 }'
 
-# Run specific bats test files. Usage: just run-bats-targets foo.bats bar.bats
+# Usage: just run-bats-targets foo.bats bar.bats
+#
+# run specific bats test files
 [group("post-build")]
 run-bats-targets *targets: build
   MADDER_BIN={{justfile_directory()}}/result/bin/madder \
@@ -478,12 +482,12 @@ lint-worktree:
 #  |_|  |_|\__,_|_|_| |_|\__|
 #
 
-# Tidy go.mod/go.sum (`go mod tidy`) — prune unused deps, add missing ones.
+# tidy go.mod/go.sum (`go mod tidy`) — prune unused deps, add missing ones
 [group("maintenance")]
 update-go-mod:
   cd go && go mod tidy
 
-# Update dewey to a version (e.g. just update-dewey v0.0.3).
+# update dewey to a version (e.g. just update-dewey v0.0.3)
 [group("maintenance")]
 update-dewey version:
   cd go && go get code.linenisgreat.com/purse-first/libs/dewey@{{version}} && go mod tidy
@@ -581,7 +585,7 @@ release version:
   git push origin "$tag"
   gum log --level info "Pushed $tag"
 
-# Regenerate gomod2nix.toml from go.mod/go.sum (the nix build's dep lockfile).
+# regenerate gomod2nix.toml from go.mod/go.sum (the nix build's dep lockfile)
 [group("maintenance")]
 build-gomod2nix:
   cd go && gomod2nix
@@ -599,7 +603,7 @@ debug-version:
   echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
   echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
 
-# Display ANSI 256-color palette with lipgloss styling to pick colors for UI.
+# display the ANSI 256-color palette with lipgloss styling to pick colors for UI
 [group("debug")]
 debug-color-demo:
   cd {{justfile_directory()}}/go && go run {{justfile_directory()}}/.tmp/color-demo.go
@@ -682,7 +686,9 @@ debug-rename-go-package dir old new:
     -e 's/^package {{old}}_test$/package {{new}}_test/'
   echo "renamed package {{old}} -> {{new}} in {{dir}}"
 
-# Regenerate man pages into a tmp dir and print one by name. Usage: just debug-gen_man madder.1
+# Usage: just debug-gen_man madder.1
+#
+# regenerate man pages into a tmp dir and print one by name
 [group("debug")]
 debug-gen_man page="madder.1":
   #!/usr/bin/env bash
