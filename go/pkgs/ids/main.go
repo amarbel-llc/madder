@@ -35,6 +35,7 @@ const (
 	TypeTomlBlobStoreConfigV1                       = internal.TypeTomlBlobStoreConfigV1
 	TypeTomlBlobStoreConfigV2                       = internal.TypeTomlBlobStoreConfigV2
 	TypeTomlBlobStoreConfigV3                       = internal.TypeTomlBlobStoreConfigV3
+	TypeTomlBlobStoreConfigV4                       = internal.TypeTomlBlobStoreConfigV4
 	TypeTomlBlobStoreConfigVCurrent                 = internal.TypeTomlBlobStoreConfigVCurrent
 	TypeTomlBlobStoreConfigWebdavV0                 = internal.TypeTomlBlobStoreConfigWebdavV0
 )

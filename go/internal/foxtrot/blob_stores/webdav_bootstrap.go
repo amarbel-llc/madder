@@ -103,7 +103,7 @@ func BootstrapWebdavRemoteConfig(
 	}
 
 	var encoded bytes.Buffer
-	if _, err = blob_store_configs.Coder.EncodeTo(typedConfig, &encoded); err != nil {
+	if _, err = blob_store_configs.EncodeWithDigest(typedConfig, &encoded); err != nil {
 		return errors.Wrapf(err, "failed to encode remote config")
 	}
 

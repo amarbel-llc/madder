@@ -1028,7 +1028,7 @@ func WriteRemoteConfigS3(
 	}
 
 	var buf bytes.Buffer
-	if _, err := blob_store_configs.Coder.EncodeTo(typedConfig, &buf); err != nil {
+	if _, err := blob_store_configs.EncodeWithDigest(typedConfig, &buf); err != nil {
 		return deweyerrors.Wrapf(err, "encode remote blob store config")
 	}
 

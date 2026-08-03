@@ -402,8 +402,14 @@ identity, distinct from its config digest.
 - Every blob store **MUST** carry a uuidv7 instance identity, rendered as
   a markl id (`uuidv7-<blech32 payload>` — the 16 uuidv7 bytes
   blech32-encoded), stored inside its `blob_store-config`.
-- The uuid **MUST** be minted once, at store init, and is **immutable**
-  thereafter.
+- The uuid **MUST** be minted once, at store **creation**, and is
+  **immutable** thereafter. Minting happens inside `EncodeWithDigest` — the
+  single sanctioned config-write funnel (FDR-0008) — for any config that
+  carries a uuid field but has not yet been minted. Every creation path
+  (local `init`, `config-gen`, and the remote-store bootstraps) therefore
+  mints uniformly, with no per-call-site hook to forget; a re-encode of an
+  already-minted config preserves its uuid, and reads decode without ever
+  reaching this write path.
 - The uuid **MUST NOT** be lazy-minted. Minting a uuid into an existing
   config on first read would rewrite the config bytes and thereby
   invalidate every digest pin taken against the pre-mint config (see

@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"code.linenisgreat.com/hyphence/go/hyphence"
+	"code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
@@ -34,6 +35,28 @@ func EncodeWithDigest(
 	typedConfig *TypedConfig,
 	w io.Writer,
 ) (n int64, err error) {
+	// FDR-0010: EncodeWithDigest is the sole sanctioned config write path, so
+	// it is the single funnel where a store's uuidv7 instance identity is
+	// minted. Mint only for a config that carries an instance-id field
+	// (mintable) and has not been minted yet (empty id) — i.e. a store being
+	// created. A re-encode of an already-minted config preserves its id
+	// (non-empty → skipped), and legacy configs are not mintable, so neither
+	// re-mints. Because the id lives in the config BODY, the digest computed
+	// below inherits its entropy and becomes instance-unique. Reads decode;
+	// they never reach this write path, so nothing is ever lazy-minted.
+	if mintable, ok := typedConfig.Blob.(ConfigInstanceIdMintable); ok {
+		if len(mintable.GetInstanceId().GetBytes()) == 0 {
+			var instanceId markl.Id
+
+			if instanceId, err = markl_registrations.MintInstanceId(); err != nil {
+				err = errors.Wrap(err)
+				return n, err
+			}
+
+			mintable.SetInstanceId(instanceId)
+		}
+	}
+
 	var bodyBuf bytes.Buffer
 	bodyWriter := bufio.NewWriter(&bodyBuf)
 	if _, err = Coder.Blob.EncodeTo(typedConfig, bodyWriter); err != nil {

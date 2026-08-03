@@ -2,6 +2,7 @@ package blob_store_configs
 
 import (
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
@@ -120,4 +121,22 @@ func (blobStoreConfig TomlV3) GetDefaultHashTypeId() string {
 
 func (blobStoreConfig *TomlV3) setBasePath(value string) {
 	blobStoreConfig.BasePath = value
+}
+
+// Upgrade migrates a V3 config to V4 (which adds the FDR-0010 instance id).
+// It does NOT mint an id: upgrade runs on read, and lazy-minting is
+// forbidden (FDR-0010), so the upgraded V4 carries an empty InstanceId
+// until the store is copy-migrated. Fields are copied verbatim.
+func (blobStoreConfig TomlV3) Upgrade() (Config, ids.TypeStruct) {
+	upgraded := &TomlV4{
+		HashBuckets:       blobStoreConfig.HashBuckets,
+		BasePath:          blobStoreConfig.BasePath,
+		HashTypeId:        blobStoreConfig.HashTypeId,
+		Encryption:        blobStoreConfig.Encryption,
+		CompressionType:   blobStoreConfig.CompressionType,
+		VerifyOnCollision: blobStoreConfig.VerifyOnCollision,
+		SingleHash:        blobStoreConfig.SingleHash,
+	}
+
+	return upgraded, ids.GetOrPanic(ids.TypeTomlBlobStoreConfigV4).TypeStruct
 }

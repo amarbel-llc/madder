@@ -985,7 +985,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
 			Blob: cand.StoreConfig,
 		}
-		if _, err := delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
+		if _, err := delta_blob_store_configs.EncodeWithDigest(typedConfig, f); err != nil {
 			_ = f.Close()
 			return errors.Wrapf(err, "encode to %q", configPath)
 		}
@@ -1019,7 +1019,7 @@ func (cmd SftpAnalyzeAndSuggestConfigs) runBootstrap(
 	if err != nil {
 		return errors.Wrapf(err, "create %q", tmpPath)
 	}
-	if _, err := delta_blob_store_configs.Coder.EncodeTo(typedConfig, f); err != nil {
+	if _, err := delta_blob_store_configs.EncodeWithDigest(typedConfig, f); err != nil {
 		_ = f.Close()
 		_ = sftpClient.Remove(tmpPath)
 		return errors.Wrapf(err, "encode to %q", tmpPath)

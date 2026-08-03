@@ -8,6 +8,8 @@ type (
 	Config                      = internal.Config
 	ConfigCompressionType       = internal.ConfigCompressionType
 	ConfigHashType              = internal.ConfigHashType
+	ConfigInstanceId            = internal.ConfigInstanceId
+	ConfigInstanceIdMintable    = internal.ConfigInstanceIdMintable
 	ConfigInventoryArchive      = internal.ConfigInventoryArchive
 	ConfigInventoryArchiveDelta = internal.ConfigInventoryArchiveDelta
 	ConfigLocalHashBucketed     = internal.ConfigLocalHashBucketed
@@ -45,6 +47,7 @@ type (
 	TomlSFTPViaSSHConfigV0      = internal.TomlSFTPViaSSHConfigV0
 	TomlUriV0                   = internal.TomlUriV0
 	TomlV3                      = internal.TomlV3
+	TomlV4                      = internal.TomlV4
 	TomlWebDAVV0                = internal.TomlWebDAVV0
 	TypedConfig                 = internal.TypedConfig
 	TypedMutableConfig          = internal.TypedMutableConfig
@@ -93,6 +96,7 @@ var (
 	DecodeTomlSFTPViaSSHConfigV0  = internal.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlUriV0               = internal.DecodeTomlUriV0
 	DecodeTomlV3                  = internal.DecodeTomlV3
+	DecodeTomlV4                  = internal.DecodeTomlV4
 	DecodeTomlWebDAVV0            = internal.DecodeTomlWebDAVV0
 	Default                       = internal.Default
 	DefaultHashBuckets            = internal.DefaultHashBuckets

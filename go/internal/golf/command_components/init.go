@@ -80,6 +80,8 @@ func (cmd Init) InitBlobStore(
 
 	// Per ADR 0005 / #65, blob_store-config is immutable per store
 	// identity: write read-only via the atomic tmp+chmod+rename helper.
+	// The uuidv7 instance identity (FDR-0010) is minted inside
+	// EncodeWithDigest — the single config write funnel — not here.
 	if err := files.WriteImmutable(
 		path.GetConfig(),
 		func(w io.Writer) error {

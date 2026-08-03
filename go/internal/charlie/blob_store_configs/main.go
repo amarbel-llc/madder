@@ -45,6 +45,23 @@ type (
 		interfaces.CommandComponentWriter
 	}
 
+	// ConfigInstanceId is implemented by config versions that carry a
+	// uuidv7 instance identity (FDR-0010). Empty markl.Id means none
+	// (legacy config, or one upgraded in memory from an older version).
+	ConfigInstanceId interface {
+		GetInstanceId() markl.Id
+	}
+
+	// ConfigInstanceIdMintable is implemented by config versions whose
+	// instance identity can be minted at store creation. InitBlobStore
+	// mints a fresh uuidv7 via SetInstanceId before the config is
+	// digest-stamped and written; never called on read (FDR-0010's
+	// no-lazy-mint rule).
+	ConfigInstanceIdMintable interface {
+		ConfigInstanceId
+		SetInstanceId(markl.Id)
+	}
+
 	ConfigHashType interface {
 		SupportsMultiHash() bool
 		GetDefaultHashTypeId() string

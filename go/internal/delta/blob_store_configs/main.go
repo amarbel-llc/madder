@@ -16,6 +16,8 @@ type (
 	Config                      = charlie_bsc.Config
 	ConfigUpgradeable           = charlie_bsc.ConfigUpgradeable
 	ConfigMutable               = charlie_bsc.ConfigMutable
+	ConfigInstanceId            = charlie_bsc.ConfigInstanceId
+	ConfigInstanceIdMintable    = charlie_bsc.ConfigInstanceIdMintable
 	ConfigHashType              = charlie_bsc.ConfigHashType
 	ConfigCompressionType       = charlie_bsc.ConfigCompressionType
 	ConfigLocalMutable          = charlie_bsc.ConfigLocalMutable
@@ -41,6 +43,7 @@ type (
 	TomlLocalHashBucketedV1     = charlie_bsc.TomlLocalHashBucketedV1
 	TomlLocalHashBucketedV2     = charlie_bsc.TomlLocalHashBucketedV2
 	TomlV3                      = charlie_bsc.TomlV3
+	TomlV4                      = charlie_bsc.TomlV4
 	TomlSFTPV0                  = charlie_bsc.TomlSFTPV0
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
 	TomlWebDAVV0                = charlie_bsc.TomlWebDAVV0
@@ -78,6 +81,7 @@ var (
 	DecodeTomlLocalHashBucketedV1 = charlie_bsc.DecodeTomlLocalHashBucketedV1
 	DecodeTomlLocalHashBucketedV2 = charlie_bsc.DecodeTomlLocalHashBucketedV2
 	DecodeTomlV3                  = charlie_bsc.DecodeTomlV3
+	DecodeTomlV4                  = charlie_bsc.DecodeTomlV4
 	DecodeTomlSFTPV0              = charlie_bsc.DecodeTomlSFTPV0
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
 	DecodeTomlWebDAVV0            = charlie_bsc.DecodeTomlWebDAVV0
@@ -105,6 +109,11 @@ var (
 	_ ConfigLocalHashBucketed     = TomlV3{}
 	_ ConfigLocalMutable          = &TomlV3{}
 	_ ConfigMutable               = &TomlV3{}
+	_ ConfigUpgradeable           = TomlV3{}
+	_ ConfigLocalHashBucketed     = TomlV4{}
+	_ ConfigLocalMutable          = &TomlV4{}
+	_ ConfigMutable               = &TomlV4{}
+	_ ConfigInstanceIdMintable    = &TomlV4{}
 	_ ConfigPointer               = TomlPointerV0{}
 	_ ConfigMutable               = &TomlPointerV0{}
 	_ ConfigPointer               = TomlPointerV1{}
@@ -131,7 +140,7 @@ var (
 	_ ConfigMutable               = &TomlS3V0{}
 )
 
-type DefaultType = TomlV3
+type DefaultType = TomlV4
 
 func Default() *TypedMutableConfig {
 	return &TypedMutableConfig{
@@ -163,6 +172,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigV2
 	case *TomlV3, TomlV3:
 		typeId = ids.TypeTomlBlobStoreConfigV3
+	case *TomlV4, TomlV4:
+		typeId = ids.TypeTomlBlobStoreConfigV4
 	case *TomlSFTPV0:
 		typeId = ids.TypeTomlBlobStoreConfigSftpExplicitV0
 	case *TomlSFTPViaSSHConfigV0, TomlSFTPViaSSHConfigV0:
