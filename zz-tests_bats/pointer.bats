@@ -5,11 +5,11 @@ setup() {
 
 # bats file_tags=pointer
 
-# init-pointer defaults to TomlPointerV1: a single-field config carrying
-# only the absolute base-path of the target store. The resolver derives
+# init-pointer defaults to TomlPointerV2: the base-path field plus a uuid
+# instance identity minted at creation (FDR-0010). The resolver derives
 # the config-path inside GetPath(); reads and writes routed through the
 # pointer must materialize blobs at the target store's on-disk paths.
-function init_pointer_default_is_v1 { # @test
+function init_pointer_default_is_v2 { # @test
   init_store .target
 
   # The leading '.' in the blob-store-id is the location-type prefix
@@ -24,13 +24,14 @@ function init_pointer_default_is_v1 { # @test
   local ptr_config=".madder/local/share/blob_stores/ptr/blob_store-config"
   [[ -f $ptr_config ]] || fail "expected pointer config at $ptr_config"
 
-  # Wire-format pin: the v1 type-id must appear in the hyphence header,
-  # the v1 field (base-path) must be present, and the v0-only fields
-  # (id, config-path) must NOT.
+  # Wire-format pin: the v2 type-id must appear in the hyphence header,
+  # the base-path field must be present, the v2 instance-id (uuidv7) must
+  # be minted (FDR-0010), and the v0-only fields (id, config-path) must NOT.
   run cat "$ptr_config"
   assert_success
-  assert_output --partial '! toml-blob_store_config-pointer-v1'
+  assert_output --partial '! toml-blob_store_config-pointer-v2'
   assert_output --partial 'base-path = '
+  assert_output --partial 'instance-id = "uuidv7-'
   refute_output --partial 'config-path'
   # 'id = ...' would be the v0 field; assert no such line exists.
   refute_line --regexp '^id = '
