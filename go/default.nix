@@ -506,6 +506,46 @@ let
         runHook postInstall
       '';
     };
+
+  # store-import-smoke (madder#278 regression guard): build the fixture
+  # cmd/madder-test-store-import-smoke — which imports ONLY the public
+  # pkgs/blob_store_env, deliberately NOT markl_registrations — and RUN it
+  # as the check. The fixture exits nonzero if importing the store package
+  # failed to activate the markl registrations transitively (i.e. the funnel
+  # blank-import in internal/charlie/blob_store_configs regressed), so
+  # `nix build .#store-import-smoke` IS the guard. A self-contained
+  # build-and-run smoke (madder#278's ask) — no bats/env plumbing needed
+  # because the fixture's exit code is the assertion.
+  store-import-smoke = pkgs.buildGoApplication {
+    pname = "madder-store-import-smoke";
+    version = "0.0.0";
+    inherit goFlakeInputs;
+    src = goPkgsTest;
+    pwd = goPkgsTest;
+    modules = ./gomod2nix.toml;
+    go = pkgs-master.go_1_26;
+    GOTOOLCHAIN = "local";
+    subPackages = [ "cmd/madder-test-store-import-smoke" ];
+
+    buildPhase = ''
+      runHook preBuild
+      go build -o "$TMPDIR/store-import-smoke" ./cmd/madder-test-store-import-smoke
+      runHook postBuild
+    '';
+
+    doCheck = true;
+    checkPhase = ''
+      runHook preCheck
+      "$TMPDIR/store-import-smoke"
+      runHook postCheck
+    '';
+
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out"
+      runHook postInstall
+    '';
+  };
 in
 {
   packages = {
@@ -516,6 +556,7 @@ in
       madder-cli-cover
       madder-clown-plugin
       madder-test-sftp-server
+      store-import-smoke
       ;
     default = madder;
   }

@@ -1,6 +1,24 @@
 package blob_store_configs
 
 import (
+	// madder#278: activate madder's markl format/purpose registrations at
+	// the store-config funnel. Every store-facing public package
+	// (pkgs/blob_store_env, blob_stores, blob_io, madder_env,
+	// inventory_archive, blob_store_configs) reaches THIS package when it
+	// resolves an encryption format (… → delta/blob_store_configs → here),
+	// so this single blank import makes an external in-process consumer of
+	// those packages activate the age/pivy format swaps transitively — no
+	// separate `_ pkgs/markl_registrations` blank import needed, closing the
+	// invisible runtime `unknown format id: "age_x25519_sec"` footgun.
+	//
+	// Deliberate trade-off (madder#278, option A): this makes importing this
+	// package non-pure and links piggy's age/pivy deps for every store
+	// consumer, even a plaintext-only one — accepted to eliminate the
+	// footgun at the single funnel. Safe under Go's init-once semantics even
+	// if a consumer ALSO blank-imports pkgs/markl_registrations. No import
+	// cycle: markl_registrations imports only piggy, never blob_store_configs.
+	_ "code.linenisgreat.com/madder/go/internal/charlie/markl_registrations"
+
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"

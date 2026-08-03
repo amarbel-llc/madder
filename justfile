@@ -118,7 +118,7 @@ clean: clean-go clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-bats test-bats-net-cap test-grammar-vectors
+test: verify-go-analyzers test-go-race test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
 
 # Usage: just run-go-test ./internal/foo
 #
@@ -233,6 +233,14 @@ test-bats:
 [group("post-build")]
 test-grammar-vectors:
   nix build .#grammar-vectors-test --no-link --print-build-logs
+
+# madder#278 regression guard: build the store-import-smoke fixture (imports
+# ONLY pkgs/blob_store_env, not markl_registrations) and RUN it — a nonzero
+# exit means importing the public store package stopped activating the markl
+# registrations transitively. The nix build's checkPhase IS the assertion.
+# run the markl-registration-activation (madder#278) smoke via the nix lane
+test-store-import-smoke:
+  nix build .#store-import-smoke --no-link --print-build-logs
 
 # Run net_cap-tagged bats tests (SFTP + WebDAV harnesses, future
 # loopback-binding harnesses) via the nix-sandbox lane. The lane bundles
