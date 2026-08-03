@@ -54,6 +54,13 @@
   # non-flake callers degrade to organic gomod2nix.toml resolution.
   goFlakeInputs ? { },
   man7Src ? null,
+  # langlang (the PEG tool, flake-input-go_mod-bridged) + grammarPeg (the
+  # scoped_id.peg staged beside piggy's marklid.peg) for the FDR-0010
+  # grammar-vectors gate. Both null for non-flake callers, so a bare
+  # `import ./go/default.nix` never forces the gate or its ${grammarPeg}
+  # interpolation.
+  langlang ? null,
+  grammarPeg ? null,
   # Test-only inputs consumed by the bats installCheckPhase shared
   # between `madder` and `madder-race`. Defaulted to null so direct
   # `import ./go/default.nix` callers without a flake context still
@@ -451,6 +458,54 @@ let
     go = pkgs-master.go_1_26;
     GOTOOLCHAIN = "local";
   };
+
+  # grammar-vectors-test (FDR-0010): the langlang -input cross-check of the
+  # scoped_id vector corpus' `grammar` dimension against scoped_id.peg —
+  # the structural counterpart to vectors_test.go's Id.Set (parser) half.
+  # Runs only TestScopedIdGrammarVectors with the langlang binary on PATH
+  # and LANGLANG_BIN/SCOPED_ID_GRAMMAR_PEG set, so the test's env-gated skip
+  # doesn't fire. Mirrors hyphence's grammar-vectors-test. Kept a package
+  # (not a check): langlang is a less-vetted external input, same posture
+  # as the sibling test-server fixtures. Only built when langlang is
+  # supplied; asserts a clear message if grammarPeg is missing alongside it.
+  grammar-vectors-test =
+    assert (langlang == null) || (grammarPeg != null);
+    pkgs.buildGoApplication {
+      pname = "madder-grammar-vectors-test";
+      version = "0.0.0";
+      inherit goFlakeInputs;
+      src = goPkgsTest;
+      pwd = goPkgsTest;
+      modules = ./gomod2nix.toml;
+      go = pkgs-master.go_1_26;
+      GOTOOLCHAIN = "local";
+      subPackages = [ "internal/alfa/scoped_id" ];
+
+      nativeBuildInputs = pkgs-master.lib.optionals (langlang != null) [
+        langlang.packages.${system}.default
+      ];
+
+      buildPhase = ''
+        runHook preBuild
+        go build ./internal/alfa/scoped_id/...
+        runHook postBuild
+      '';
+
+      doCheck = true;
+      checkPhase = ''
+        runHook preCheck
+        export LANGLANG_BIN=langlang
+        export SCOPED_ID_GRAMMAR_PEG=${grammarPeg}
+        go test -tags test -run TestScopedIdGrammarVectors -v ./internal/alfa/scoped_id/...
+        runHook postCheck
+      '';
+
+      installPhase = ''
+        runHook preInstall
+        mkdir -p "$out"
+        runHook postInstall
+      '';
+    };
 in
 {
   packages = {
@@ -464,7 +519,12 @@ in
       ;
     default = madder;
   }
-  // batsLaneOutputs;
+  // batsLaneOutputs
+  # grammar-vectors-test is only defined meaningfully when langlang is
+  # supplied — a bare `import ./go/default.nix` (langlang defaults null)
+  # never forces it, so the unconditional `${grammarPeg}` interpolation in
+  # its checkPhase is never evaluated for non-flake callers.
+  // pkgs-master.lib.optionalAttrs (langlang != null) { inherit grammar-vectors-test; };
 
   devShells.default = pkgs-master.mkShell {
     packages = [

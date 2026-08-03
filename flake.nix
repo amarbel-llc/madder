@@ -422,6 +422,18 @@
           package = conformist.packages.${system}.default;
         };
 
+        # grammarStaged: scoped_id.peg + piggy's marklid.peg co-located in
+        # one dir so langlang resolves scoped_id.peg's relative
+        # `@import ... from "./marklid.peg"` at grammar-vectors time
+        # (FDR-0010). Mirrors hyphence's grammarStaged; piggy publishes
+        # marklid.peg via its `.#marklid-grammar` export output, not an
+        # internal path.
+        grammarStaged = pkgs.runCommandLocal "scoped-id-grammar-staged" { } ''
+          mkdir -p "$out"
+          cp ${./go/internal/alfa/scoped_id/scoped_id.peg} "$out/scoped_id.peg"
+          cp ${piggy.packages.${system}.marklid-grammar} "$out/marklid.peg"
+        '';
+
         result = import ./go/default.nix {
           nixpkgs = igloo;
           inherit
@@ -431,6 +443,7 @@
             purse-first
             doppelgang
             conformist
+            langlang
             system
             ;
           # Pivot self-consumption onto the published artifact: every
@@ -464,6 +477,9 @@
           # $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
           conformistImpureConfig = conformistImpureEval.config.build.configFile;
           man7Src = ./docs/man.7;
+          # FDR-0010 grammar-vectors gate: the langlang binary (bridged
+          # input) + scoped_id.peg staged beside piggy's marklid.peg.
+          grammarPeg = "${grammarStaged}/scoped_id.peg";
           # Test-only inputs for the bats lanes' installCheckPhase.
           # Kept out of the build-time `src` closure so test-only
           # changes don't trigger a full Go rebuild. `version.env`
