@@ -117,22 +117,21 @@
     # against madder's inputs so flake.lock keeps one node each (doppelgang
     # dedup); mirrors hyphence's langlang block, and hyphence/piggy now
     # follow THIS node (below) rather than carrying their own.
+    # tap and conformist collapse WHOLE onto madder's (their pins match
+    # langlang's — doppelgang confirms one archive each), so no deep
+    # sub-follows: langlang only uses tap (tap-dancer) and conformist for
+    # its own devShell/format, which madder never evaluates. This differs
+    # from hyphence's block, which sub-follows because its tap/conformist
+    # versions skew from langlang's and cannot collapse.
     langlang = {
       url = "https://code.linenisgreat.com/langlang/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
-      inputs.tap.inputs.bats.follows = "bats";
-      inputs.tap.inputs.purse-first.follows = "purse-first";
-      inputs.tap.inputs.gomod2nix.follows = "purse-first/gomod2nix";
-      inputs.tap.inputs.treefmt-nix.follows = "igloo/treefmt-nix";
+      inputs.tap.follows = "tap";
+      inputs.conformist.follows = "conformist";
     };
-    langlang.inputs.conformist.inputs.igloo.inputs.bun2nix.follows = "igloo/bun2nix";
-    langlang.inputs.conformist.inputs.igloo.inputs.flake-parts.follows = "igloo/flake-parts";
-    langlang.inputs.conformist.inputs.igloo.inputs.systems.follows = "igloo/systems";
-    langlang.inputs.conformist.inputs.igloo.inputs.treefmt-nix.follows = "igloo/treefmt-nix";
-    langlang.inputs.conformist.follows = "conformist";
 
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {

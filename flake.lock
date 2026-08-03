@@ -99,21 +99,6 @@
         "type": "github"
       }
     },
-    "crane_2": {
-      "locked": {
-        "lastModified": 1785284101,
-        "narHash": "sha256-ghcXEpYEM4a7pbEkoqbn8c0ptJJqgGzuFiG3T6W5g4I=",
-        "owner": "ipetkov",
-        "repo": "crane",
-        "rev": "756d6d07c3818ea95d1e2cdac63fa7d02fe3e61b",
-        "type": "github"
-      },
-      "original": {
-        "owner": "ipetkov",
-        "repo": "crane",
-        "type": "github"
-      }
-    },
     "crap": {
       "inputs": {
         "bats": [
@@ -309,7 +294,9 @@
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
-        "tap": "tap",
+        "tap": [
+          "tap"
+        ],
         "utils": [
           "utils"
         ]
@@ -453,34 +440,12 @@
         "nixpkgs-master": "nixpkgs-master",
         "piggy": "piggy",
         "purse-first": "purse-first",
-        "tap": "tap_2",
+        "tap": "tap",
         "tommy": "tommy",
         "utils": "utils"
       }
     },
     "rust-overlay": {
-      "inputs": {
-        "nixpkgs": [
-          "langlang",
-          "tap",
-          "igloo"
-        ]
-      },
-      "locked": {
-        "lastModified": 1785388444,
-        "narHash": "sha256-6gtZiMMyfgr1CHA5g6fXoIYkTngQWMm1wtp3gNtuqJU=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "c5b112f74bdbf91c5afd2d3779d12989818c9e8c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "rust-overlay_2": {
       "inputs": {
         "nixpkgs": [
           "tap",
@@ -527,58 +492,15 @@
           "gomod2nix"
         ],
         "igloo": [
-          "langlang",
           "igloo"
         ],
         "nixpkgs-master": [
-          "langlang",
           "nixpkgs-master"
         ],
         "purse-first": [
           "purse-first"
         ],
         "rust-overlay": "rust-overlay",
-        "treefmt-nix": [
-          "igloo",
-          "treefmt-nix"
-        ],
-        "utils": [
-          "langlang",
-          "utils"
-        ]
-      },
-      "locked": {
-        "lastModified": 1785437131,
-        "narHash": "sha256-mkw1FxVj+cvJ0zuVWmBt0swlS34YLo/wc5rC+IMCSU8=",
-        "rev": "c82af9cb0180c7ed46cfb7031a0a680d3730bcb7",
-        "type": "tarball",
-        "url": "https://code.linenisgreat.com/tap/archive/c82af9cb0180c7ed46cfb7031a0a680d3730bcb7.tar.gz"
-      },
-      "original": {
-        "type": "tarball",
-        "url": "https://code.linenisgreat.com/tap/archive/master.tar.gz"
-      }
-    },
-    "tap_2": {
-      "inputs": {
-        "bats": [
-          "bats"
-        ],
-        "crane": "crane_2",
-        "gomod2nix": [
-          "purse-first",
-          "gomod2nix"
-        ],
-        "igloo": [
-          "igloo"
-        ],
-        "nixpkgs-master": [
-          "nixpkgs-master"
-        ],
-        "purse-first": [
-          "purse-first"
-        ],
-        "rust-overlay": "rust-overlay_2",
         "treefmt-nix": [
           "igloo",
           "treefmt-nix"
