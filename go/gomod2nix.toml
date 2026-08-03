@@ -12,6 +12,11 @@ schema = 3
     hash = 'sha256-HMeJOBTmoABNHhQho2KUazvLAhDvdWCba8ZvMtKiEv8='
     goVersion = '1.26'
 
+[mod.'code.linenisgreat.com/langlang/go']
+    version = 'v0.0.0-20260803132232-ce3cdb6787e8'
+    hash = 'sha256-S24bNQRBkIocI8ioxPs3Gfyg+uaIpNK4MaOAG0PtnpY='
+    goVersion = '1.26.1'
+
 [mod.'code.linenisgreat.com/piggy/go']
     version = 'v0.0.0-20260720155209-77cfdea0031e'
     hash = 'sha256-HGekZfv1QS5BGlIlU+eJpTDQBd+7HqXNFJZWV/cpo7c='
@@ -220,6 +225,11 @@ schema = 3
     version = 'v2.5.0'
     hash = 'sha256-Men4JLhiuEtAx8ZSzId5ciRWhud68o3k/B48ppwyxkM='
     goVersion = '1.18'
+
+[mod.'github.com/dave/jennifer']
+    version = 'v1.7.1'
+    hash = 'sha256-tKr4x0m+Nup2X9UyxIK+5ZXzrb1vyfPzc9hD2xh6H6g='
+    goVersion = '1.20'
 
 [mod.'github.com/dsnet/compress']
     version = 'v0.0.0-20171208185109-cc9eb1d7ad76'

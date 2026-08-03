@@ -25,6 +25,7 @@
   crap,
   hyphence,
   piggy,
+  langlang,
   system,
 }:
 let
@@ -62,6 +63,17 @@ let
     # public), so no bridge entry is added here.
     "code.linenisgreat.com/piggy/go" = {
       src = piggy.packages.${system}.go-pkgs;
+    };
+    # langlang: the PEG tool behind the scoped_id grammar-vectors gate
+    # (FDR-0010). A clarete/langlang fork whose Go module was renamed into
+    # the fleet namespace (code.linenisgreat.com/langlang/go) so it bridges
+    # exactly like piggy/tommy — same host, same pattern, no replace. Its
+    # producer half (go-pkgs, name="langlang", src scoped to go/, no
+    # subPath) was added langlang-side for this bridge. Consumed as a go.mod
+    # `tool` (…/cmd/langlang); the grammar-vectors nix gate runs the
+    # `.#default` binary from the same flake input.
+    "code.linenisgreat.com/langlang/go" = {
+      src = langlang.packages.${system}.go-pkgs;
     };
   };
 in

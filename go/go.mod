@@ -1,6 +1,6 @@
 module code.linenisgreat.com/madder/go
 
-go 1.26
+go 1.26.1
 
 require (
 	code.linenisgreat.com/crap/go-crap/v2 v2.3.0
@@ -29,6 +29,7 @@ require (
 )
 
 require (
+	code.linenisgreat.com/langlang/go v0.0.0-20260803132232-ce3cdb6787e8 // indirect
 	filippo.io/age v1.3.1 // indirect
 	filippo.io/hpke v0.4.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -58,6 +59,7 @@ require (
 	github.com/clipperhouse/displaywidth v0.9.0 // indirect
 	github.com/clipperhouse/stringish v0.1.1 // indirect
 	github.com/clipperhouse/uax29/v2 v2.5.0 // indirect
+	github.com/dave/jennifer v1.7.1 // indirect
 	github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
@@ -82,6 +84,7 @@ require (
 )
 
 tool (
+	code.linenisgreat.com/langlang/go/cmd/langlang
 	code.linenisgreat.com/purse-first/libs/dewey/cmd/actx
 	code.linenisgreat.com/purse-first/libs/dewey/cmd/defererr
 	code.linenisgreat.com/purse-first/libs/dewey/cmd/paramobj

@@ -4,6 +4,8 @@ code.linenisgreat.com/crap/go-crap/v2 v2.3.0 h1:SD++RNZKIUsTpCwoosnLWjnowzWwvxB9
 code.linenisgreat.com/crap/go-crap/v2 v2.3.0/go.mod h1:1vN9uhpZQvV52Xkp+OLCkH76DuCOsqH51e9dmwYwsUM=
 code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9 h1:iVfOsxFwmib/hwvWMjoHGKbmbTHOfM8yWlUv7vminDA=
 code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9/go.mod h1:/c5ScMJSIbliSfj3R9IfVYql9PSMtFwNSgN8wvJQQc4=
+code.linenisgreat.com/langlang/go v0.0.0-20260803132232-ce3cdb6787e8 h1:mFM685kZsoHa9RWSSU5cOGEzCA7TaR3X/5QywiYh0zw=
+code.linenisgreat.com/langlang/go v0.0.0-20260803132232-ce3cdb6787e8/go.mod h1:LM6sA+QsFBP0cqXglMVzAmBEx0IQtLg6vRg3yCfKOUk=
 code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e h1:afcPD4YiDv2EjF2V8o5IqOk9+MToUdF3RNU8tzoZGdw=
 code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e/go.mod h1:SvQcD+AKbeY0YJUYUrTRUyDYtV3JGFZLzcZXJSsyAUk=
 code.linenisgreat.com/purse-first/libs/dewey v0.5.0 h1:+sd1CsNmJqPOv0K8D/qHdN62vLngYMUohHE0h52uJZU=
@@ -104,6 +106,8 @@ github.com/clipperhouse/uax29/v2 v2.5.0 h1:x7T0T4eTHDONxFJsL94uKNKPHrclyFI0lm7+w
 github.com/clipperhouse/uax29/v2 v2.5.0/go.mod h1:Wn1g7MK6OoeDT0vL+Q0SQLDz/KpfsVRgg6W7ihQeh4g=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
+github.com/dave/jennifer v1.7.1 h1:B4jJJDHelWcDhlRQxWeo0Npa/pYKBLrirAQoTN45txo=
+github.com/dave/jennifer v1.7.1/go.mod h1:nXbxhEmQfOZhWml3D1cDK5M1FLnMSozpbFN/m3RmGZc=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dsnet/compress v0.0.0-20171208185109-cc9eb1d7ad76 h1:eX+pdPPlD279OWgdx7f6KqIRSONuK7egk+jDx7OM3Ac=

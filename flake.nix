@@ -108,6 +108,32 @@
       inputs.conformist.follows = "conformist";
     };
 
+    # langlang: the PEG tool behind the scoped_id grammar-vectors gate
+    # (FDR-0010). A clarete/langlang fork whose Go module was renamed into
+    # the fleet namespace (code.linenisgreat.com/langlang/go) so it bridges
+    # like piggy/tommy. packages.default (the binary) runs the gate;
+    # packages.go-pkgs is the flake-input-go_mod producer half consumed via
+    # go/gomod.nix. Its devShell/tap/conformist toolchain is followed
+    # against madder's inputs so flake.lock keeps one node each (doppelgang
+    # dedup); mirrors hyphence's langlang block, and hyphence/piggy now
+    # follow THIS node (below) rather than carrying their own.
+    langlang = {
+      url = "https://code.linenisgreat.com/langlang/archive/master.tar.gz";
+      inputs.igloo.follows = "igloo";
+      inputs.nixpkgs-master.follows = "nixpkgs-master";
+      inputs.utils.follows = "utils";
+      inputs.bats.follows = "bats";
+      inputs.tap.inputs.bats.follows = "bats";
+      inputs.tap.inputs.purse-first.follows = "purse-first";
+      inputs.tap.inputs.gomod2nix.follows = "purse-first/gomod2nix";
+      inputs.tap.inputs.treefmt-nix.follows = "igloo/treefmt-nix";
+    };
+    langlang.inputs.conformist.inputs.igloo.inputs.bun2nix.follows = "igloo/bun2nix";
+    langlang.inputs.conformist.inputs.igloo.inputs.flake-parts.follows = "igloo/flake-parts";
+    langlang.inputs.conformist.inputs.igloo.inputs.systems.follows = "igloo/systems";
+    langlang.inputs.conformist.inputs.igloo.inputs.treefmt-nix.follows = "igloo/treefmt-nix";
+    langlang.inputs.conformist.follows = "conformist";
+
     # Provides `lint`; flake.lock dedup gate (madder#214).
     doppelgang = {
       url = "https://code.linenisgreat.com/doppelgang/archive/master.tar.gz";
@@ -118,13 +144,13 @@
     doppelgang.inputs.conformist.follows = "conformist";
     tommy.inputs.conformist.follows = "conformist";
     bats.inputs.conformist.follows = "conformist";
-    hyphence.inputs.langlang.inputs.tap.follows = "tap";
+    hyphence.inputs.langlang.follows = "langlang";
     hyphence.inputs.piggy.follows = "piggy";
     # piggy's own langlang pin (piggy#183's markl-id framework pulls in the
     # same langlang subtree hyphence does) is bit-identical to hyphence's —
     # doppelgang lint flagged the duplicate node; collapse onto hyphence's
     # copy rather than deep-following piggy's separately (madder#<piggy-leg>).
-    piggy.inputs.langlang.follows = "hyphence/langlang";
+    piggy.inputs.langlang.follows = "langlang";
   };
 
   outputs =
@@ -140,6 +166,7 @@
       crap,
       hyphence,
       piggy,
+      langlang,
       doppelgang,
       conformist,
       ...
@@ -174,6 +201,7 @@
             crap
             hyphence
             piggy
+            langlang
             ;
           # Scope the producer at go/ so downstream consumers reference
           # go-pkgs directly with no subPath. Madder's repo root has
