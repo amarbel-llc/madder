@@ -23,6 +23,39 @@ func MakeBlobImporter(
 	}
 }
 
+// CopyAllBlobs copies every blob from src into dst, content-addressably and
+// idempotently: a blob already present in dst is counted as Ignored, not
+// re-copied. It aborts on the first source-list error or hard copy failure
+// and returns it; the returned Counts are valid in either case. This is the
+// non-interactive copy used by the init-from --from-store copy-migration
+// (FDR-0010) — sync(1) drives the importer directly for its live viewport
+// reporting rather than through this helper.
+func CopyAllBlobs(
+	envBlobStore command_components.BlobStoreEnv,
+	src blob_stores.BlobStoreInitialized,
+	dst blob_stores.BlobStoreInitialized,
+) (counts Counts, err error) {
+	blobImporter := MakeBlobImporter(
+		envBlobStore,
+		src,
+		blob_stores.BlobStoreMap{dst.Path.GetId().String(): dst},
+	)
+
+	for blobId, errIter := range src.AllBlobs() {
+		if errIter != nil {
+			err = errors.Wrap(errIter)
+			return blobImporter.Counts, err
+		}
+
+		if err = blobImporter.ImportBlobIfNecessary(blobId); err != nil {
+			err = errors.Wrap(err)
+			return blobImporter.Counts, err
+		}
+	}
+
+	return blobImporter.Counts, err
+}
+
 type BlobImporter struct {
 	EnvBlobStore           command_components.BlobStoreEnv
 	CopierDelegate         interfaces.FuncIter[blob_stores.CopyResult]

@@ -361,6 +361,16 @@ a redeploy never fails on the immutable-config write. Without a digest pin,
 **madder init** and **madder init-from** accept **--if-not-exists** for the
 same idempotent-by-existence behaviour (no digest verification).
 
+**madder init-from --from-store** *source-blob-store-id* *new-blob-store-id*
+copy-migrates a store (FDR-0010): it reads the source store's config, upgrades
+it to the current version, and creates the new store with a **freshly minted
+uuid instance identity** — so the new store is a distinct instance (with its
+own config digest) and the source store is left byte-untouched. Add **--sync**
+to also copy the source store's blobs into the new store. The new store id must
+not be digest-pinned in this mode, since its digest is minted at creation. This
+is the sanctioned way to move a store onto a new config version without an
+in-place rewrite (which would silently invalidate existing digest pins).
+
 # SEE ALSO
 
 **madder**(1), **blob-store-multi**(7), **markl-id**(7)
