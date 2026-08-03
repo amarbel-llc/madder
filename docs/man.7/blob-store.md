@@ -100,9 +100,9 @@ tree bucketed by digest prefix (similar to Git's object storage). Created with
 ## Inventory Archive
 
 Packs multiple blobs into indexed archive files for efficient storage and O(1)
-lookups via a fan-out table. Supports optional delta compression. Three format
-versions exist (v0, v1, v2); use **madder init-inventory-archive** for the
-current version.
+lookups via a fan-out table. Supports optional delta compression. Four format
+versions exist (v0, v1, v2, v3); use **madder init-inventory-archive** for the
+current version (v3, which carries a uuid instance identity per FDR-0010).
 
 Archive management commands: **madder pack** consolidates loose blobs into
 archives, **madder pack-list** lists archive files, and **madder pack-cat-ids**
@@ -136,13 +136,13 @@ init-webdav**:
     already exist on the server; **init-webdav** issues a single MKCOL
     against the URL itself and a PUT for the remote config file.
 
-Auth in v0:
+Auth modes:
 
 - **anonymous** (default; **-url** only).
 - **basic** (**-url ... -user U -password P**).
 - **bearer** and **TLS client certificate** modes land in a follow-up.
 
-**-discover** is not supported in v0 — only the fresh-bootstrap path is
+**-discover** is not yet supported — only the fresh-bootstrap path is
 available. To adopt an existing remote layout, copy the existing
 **blob_store-config** into place before invoking **init-webdav** (or wait
 for the **-discover** follow-up).
@@ -179,10 +179,11 @@ not hold blobs itself but redirects reads and writes to the target store.
 Two on-disk wire formats exist:
 
 **madder init-pointer -base-path PATH** *blob-store-id*
-:   Current path-only format (**!toml-blob_store_config-pointer-v1**).
-    Carries a single absolute **base-path** field; the config file location
-    is derived as **&lt;base-path&gt;/blob_store-config**. Use this for new
-    pointer stores.
+:   Current path format (**!toml-blob_store_config-pointer-v2**).
+    Carries an absolute **base-path** field plus a uuid **instance-id**
+    (minted at creation per FDR-0010); the config file location is derived
+    as **&lt;base-path&gt;/blob_store-config**. Use this for new pointer
+    stores.
 
 **madder init-pointer-v0 -id ID -base-path PATH -config-path PATH** *blob-store-id*
 :   Legacy three-field format (**!toml-blob_store_config-pointer-v0**).
@@ -196,7 +197,7 @@ Two on-disk wire formats exist:
 
 ## Multi
 
-Composes other stores into one. A multi config (**!toml-blob_store_config-multi-v0**)
+Composes other stores into one. A multi config (**!toml-blob_store_config-multi-v1**)
 either **mirror**s writes across a set of stores or **write_through**s
 to a single write store with read fallback (and optional read-fill
 cache tee). Created with **madder init-multi**:

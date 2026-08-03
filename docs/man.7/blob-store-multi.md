@@ -19,7 +19,7 @@ already-initialised **BlobStore** values and presents them as a single
 
 Multi is consumed as a Go library by callers (notably **dodder**, where
 it backs FDR-0015's multi-store read fallback). It is **also** a
-persistent config-file blob-store type: the **!toml-blob_store_config-multi-v0**
+persistent config-file blob-store type: the **!toml-blob_store_config-multi-v1**
 wire format, authored by **madder init-multi**, resolves a Multi from a
 blob-store-id at load time so every command composes through it
 transparently. That config-type wrapper is specified in **FDR-0009**
@@ -266,7 +266,7 @@ write-through mode.
 # CONFIG TYPE
 
 A multi blob store can be persisted as a **blob_store-config** with the
-type tag **!toml-blob_store_config-multi-v0**. Author one with **madder
+type tag **!toml-blob_store_config-multi-v1**. Author one with **madder
 init-multi**, which assembles the config from typed flags — flags
 first, the new store's blob-store-id last:
 
@@ -283,22 +283,24 @@ blob-store-ids (*name*@*hash*-*digest*), and — for write_through — a
 **write-store**, **read-stores**, **mirror-stores**, **read-fill**. A
 mirror config:
 
-    !toml-blob_store_config-multi-v0
+    !toml-blob_store_config-multi-v1
     @ blake2b256-…
 
     mode = "mirror"
     mirror-stores = [".ssd@blake2b256-…", ".nvme@blake2b256-…"]
+    instance-id = "uuidv7-…"
 
 A write_through config (**read-fill** defaults to **true** when the key
 is absent):
 
-    !toml-blob_store_config-multi-v0
+    !toml-blob_store_config-multi-v1
     @ blake2b256-…
 
     mode = "write_through"
     write-store = ".default@blake2b256-…"
     read-stores = [".archive@blake2b256-…"]
     read-fill = true
+    instance-id = "uuidv7-…"
 
 References MUST be digest-bearing: the digest pins the referenced
 config's content (FDR-0008 Phase 2), which makes the reference graph a
