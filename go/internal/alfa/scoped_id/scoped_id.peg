@@ -1,0 +1,131 @@
+// scoped_id.peg — formal grammar for the madder scoped-id text form:
+// the blob-store name (scope prefix + dot-depth) plus the optional
+// `@<markl-id>` digest pin (FDR-0008 Phase 2 / FDR-0010). Companion to
+// go/internal/alfa/scoped_id/main.go's Id.Set decoder and to FDR-0010
+// (docs/features/0010-scoped-id-resolution.md).
+//
+// Notation: Ford PEG, authored langlang-compatible, matching piggy's
+// marklid.peg and hyphence's hyphence-content.peg conventions (// comments
+// only, explicit spacing, no automatic space insertion). Validate with
+// BOTH `-disable-builtins -disable-spaces` (the hyphence#7 dialect-gap
+// finding: -disable-builtins alone leaves the whitespace-injector pass on,
+// which auto-inserts Spacing between sequence items this grammar never
+// asked for).
+//
+// Whitespace: a scoped-id has NO whitespace anywhere. Every NameRune and
+// digest primitive excludes it, and no rule calls a Spacing production.
+//
+// SCOPE (grammar vs decoder): this file is STRUCTURAL only — scope shape,
+// name charset, and the two-slot digest form. It does NOT and per PEG
+// cannot encode: the blech32 checksum (a BCH computation), payload length,
+// or markl format/purpose registration. Those stay Id.Set's job — a
+// grammar-valid string can still be decoder-rejected (an unregistered
+// `@uuidv7-…` format, an abbreviated digest, a bad-checksum payload). That
+// two-dimension split is pinned by testdata/scoped_id_vectors.txt, whose
+// `grammar` column this file governs and whose `parser` column Id.Set
+// governs, exactly the piggy RFC 0011 §4.1 grammar-vs-decoder precedent.
+//
+// ---- imported from piggy (single source of truth) --------------------
+//
+// Per the 2026-07-22 grammar-composition ruling (one home per grammar
+// unit, composed upstream→downstream via langlang @import), the markl-id
+// PRIMITIVES are imported from piggy's marklid.peg (piggy owns the markl-id
+// format, RFC 0011), not redefined here. langlang resolves @import RELATIVE
+// to the importing file, so marklid.peg must be staged beside this file at
+// validation time — the grammar-vectors nix gate stages it from piggy's
+// `.#marklid-grammar` flake output, the same way hyphence-content.peg
+// stages it.
+//
+//   Format, DataChar   the digest-slot primitives (piggy#237). DataChar is
+//                      the blech32 alphabet; Format is the format-id rune
+//                      class.
+//   PurposeBare        the bare purpose production (piggy RFC 0011 §2.1).
+//   String             the doddish quoting rules (piggy#236), for a quoted
+//                      purpose.
+@import Format, DataChar, PurposeBare, String from "./marklid.peg"
+
+// ---- entry point -----------------------------------------------------
+//
+// A scoped-id is a scoped NAME optionally followed by a `@<markl-id>` pin,
+// then end of input. Id.Set splits on the FIRST `@`: everything left is the
+// name, everything right is parsed as a markl-id. NameRune excludes `@`, so
+// the first `@` is unambiguously the name/pin boundary.
+ScopedId   <- ScopedName Pin? EOF
+
+// ---- the scoped name (scope prefix + dot-depth + name) ---------------
+//
+// Ordered choice mirrors Id.Set's prefix dispatch. CwdName and the slash
+// forms are tried before the prefix-rune forms, which are tried before the
+// bare UserName, because a leading `.`, `/`, `%`, `~`, or `_` selects a
+// non-user scope (Id.Set: SetPrefix), while any other leading NameRune is
+// the bare XDG-user scope. UnknownName ('_' …) precedes UserName so a
+// LEADING `_` reads as the Unknown-scope prefix (Id.Set's SetPrefix('_')),
+// even though `_` is itself a NameRune interior to a name (e.g. widget_1).
+ScopedName <- CwdName
+            / SystemName
+            / CacheName
+            / AliasName
+            / UnknownName
+            / UserName
+
+// `.name` depth 0, `..name` depth 1, … (Id.Set stores dots-1 as cwdDepth).
+// At least one dot AND a name: an all-dots string ('.', '...') has no name
+// and is rejected (Id.Set: "all dots, no name").
+CwdName    <- '.'+ Name
+
+// FDR-0019 system scope. `//name` forces the system scope; `/name` is the
+// remote-first spelling; a bare `/` is the legacy nameless system selector.
+// `//` alone (no name) is rejected. The `//` alternative is first so it is
+// not shadowed by the single-slash form.
+SystemName <- '//' Name
+            / '/' Name
+            / '/'
+
+// `%name` XDG cache, `~name` the parse-only XDG-user alias, `_name` the
+// Unknown scope.
+CacheName   <- '%' Name
+AliasName   <- '~' Name
+UnknownName <- '_' Name
+
+// Bare (no prefix) is the XDG-user scope.
+UserName   <- Name
+
+// The name charset (Id.Set: validateName) — [a-zA-Z0-9_-]. Excludes `@`,
+// so the pin boundary is unambiguous; excludes `.`/`/`/`%`/`~`, so a
+// scope prefix is never mistaken for name interior.
+Name       <- NameRune+
+NameRune   <- [a-zA-Z0-9_-]
+
+// ---- the digest pin (`@<markl-id>`) ----------------------------------
+//
+// The pin is a full markl-id: an optional purpose slot joined by `@` to a
+// digest slot. The PIN CURRENCY is the bare `@<digest>` (no purpose); the
+// purpose-ful form is grammatical (Id.Set accepts it, splitting on the
+// first `@` and letting markl's quote-aware scan find the purpose-join
+// `@`) but is not the currency. A purpose containing `@` is spelled quoted
+// (`"a@b"@fmt-…`); the join is then the SECOND `@`.
+Pin        <- '@' MarklId
+MarklId    <- (Purpose '@')? DigestSlot
+Purpose    <- PurposeBare / String
+
+// The digest slot is composed from piggy's exported Format/DataChar
+// primitives as `Format '-' DataChar+` — CHARSET-STRICT but LENGTH-
+// AGNOSTIC, so it admits both a full digest and an ABBREVIATED one (a legal
+// prefix, e.g. `blake2b256-9ft3x`); length and checksum stay Id.Set's
+// concern. This is exactly the composition piggy documents on its exported
+// DataChar (and that trellis/hyphence use); piggy deliberately does not
+// export the composed shape, so each consumer owns its length policy. The
+// trailing `!NameRune` rejects junk after the data run (`blake2b256-9bt3` —
+// `b` is outside the blech32 alphabet — fails here rather than leaving a
+// dangling NameRune).
+DigestSlot <- Format '-' DataChar+ !NameRune
+
+EOF        <- !.
+
+// ---- conformance vectors ---------------------------------------------
+//
+// Not duplicated here — the shared corpus at
+// go/internal/alfa/scoped_id/testdata/scoped_id_vectors.txt pins every
+// vector's `grammar` outcome (this file, via the langlang grammar-vectors
+// gate) alongside its `parser` outcome (Id.Set, via vectors_test.go). A
+// third copy here would drift silently.

@@ -1,0 +1,88 @@
+# scoped_id grammar vectors — FDR-0010 (scoped-id resolution + uuid identity)
+#
+# One vector per non-comment, non-blank line. Fields are `|`-delimited and
+# edge-trimmed. The corpus is consumed by TWO harnesses, so every vector
+# pins BOTH dimensions independently:
+#
+#   grammar  — outcome under scoped_id.peg via langlang (STRUCTURAL only:
+#              charset + shape; checksum/length/registration are NOT the
+#              grammar's job, matching piggy RFC 0011 §4.1's grammar-vs-
+#              decoder split). accept | reject.
+#   parser   — outcome under scoped_id.Id.Set (the Go decoder: enforces the
+#              markl-id checksum, blech32 length, and format/purpose
+#              registration). accept | reject.
+#
+# A vector where grammar=accept but parser=reject is the interesting
+# "structurally well-formed, semantically refused" class (hyphence's
+# "parses here, REJECTED at validation" precedent): an unregistered
+# @uuid-format placeholder, an abbreviated digest (a legal prefix the
+# decoder resolves by length/checksum), a bad-checksum digest.
+#
+# Fields (columns after `parser` are only meaningful when parser=accept;
+# leave them empty otherwise):
+#
+#   input | grammar | parser | scope | depth | name | remote | pin
+#
+#   input    the scoped-id text. The literal token <empty> means "".
+#   scope    user | cwd | system | cache | unknown
+#   depth    cwd dot-depth (dots-1); 0 for non-cwd.
+#   name     the parsed name (id) component.
+#   remote   true only for the single-slash `/name` remote-first spelling.
+#   pin      y when a digest pin is present (HasDigest), else n.
+#
+# DIGEST reused below (a valid blake2b256 markl-id):
+#   blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd
+#
+# Non-"default" names throughout (widgets/gadgets/sprockets), per FDR-0010's
+# conformance requirement.
+
+# ---- accept: bare scopes (grammar + parser agree) --------------------
+widgets                                                                 | accept | accept | user    | 0 | widgets   | false | n
+~widgets                                                                | accept | accept | user    | 0 | widgets   | false | n
+.widgets                                                                | accept | accept | cwd     | 0 | widgets   | false | n
+..widgets                                                               | accept | accept | cwd     | 1 | widgets   | false | n
+...gadgets                                                              | accept | accept | cwd     | 2 | gadgets   | false | n
+//widgets                                                               | accept | accept | system  | 0 | widgets   | false | n
+/widgets                                                                | accept | accept | system  | 0 | widgets   | true  | n
+%gadgets                                                                | accept | accept | cache   | 0 | gadgets   | false | n
+_sprockets                                                              | accept | accept | unknown | 0 | sprockets | false | n
+widget-1_A                                                              | accept | accept | user    | 0 | widget-1_A| false | n
+
+# ---- accept: digest pins (the pin currency, name@blake2b256-...) ------
+widgets@blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd     | accept | accept | user   | 0 | widgets | false | y
+.widgets@blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd    | accept | accept | cwd    | 0 | widgets | false | y
+//widgets@blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd   | accept | accept | system | 0 | widgets | false | y
+# A purpose-ful markl-id pin (purpose@format-data): grammatical and, for a
+# registered purpose, decoder-valid — but NOT the pin currency (currency
+# stays the bare name@digest). Set splits on the FIRST @ (name|markl-id);
+# the purpose-join @ is the SECOND, located by markl's quote-aware scan.
+widgets@madder-blob_store-config-digest-v1@blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd | accept | accept | user | 0 | widgets | false | y
+
+# ---- grammar-only: structurally valid, decoder refuses --------------
+# @uuidv7-<payload>: a uuid-FORMAT markl-id. Grammatically a Format '-'
+# Data digest slot (Format is generic), so the grammar accepts it. The
+# decoder refuses it here because uuidv7 is not yet a registered madder
+# markl format and the payload carries no valid blech32 checksum. Once
+# FDR-0010's uuidv7 format registration lands (madder's own registration
+# site) and a real payload is used, such a value decodes — but it is NOT
+# the pin CURRENCY regardless (currency stays name@digest).
+widgets@uuidv7-qpzry9x8gf2tvdw0s3jn54khce                                | accept | reject |         |   |         |       |
+# An ABBREVIATED digest (a legal prefix of a full blake2b256 id): the
+# grammar admits any DataChar+ run (piggy exports DataChar precisely so
+# downstreams can accept abbreviations); the decoder refuses a prefix
+# because the 6-char blech32 checksum cannot validate on a truncation.
+# Abbreviation is a decoder/CLI-resolution concern, not grammar.
+widgets@blake2b256-9ft3m74l                                              | accept | reject |         |   |         |       |
+# Bad blech32 alphabet char ('b' is outside the blech32 set): still a
+# structural Format '-' DataChar-ish slot? No — 'b' is not a DataChar, so
+# the digest slot's DataChar+ run cannot consume it; grammar rejects too.
+widgets@blake2b256-9bt3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5v | reject | reject |         |   |         |       |
+
+# ---- reject: structurally malformed (grammar + parser agree) --------
+<empty>                                                                 | reject | reject |         |   |         |       |
+.                                                                       | reject | reject |         |   |         |       |
+...                                                                     | reject | reject |         |   |         |       |
+//                                                                      | reject | reject |         |   |         |       |
+wid gets                                                                | reject | reject |         |   |         |       |
+widg#ets                                                                | reject | reject |         |   |         |       |
+@blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd   | reject | reject |         |   |         |       |
