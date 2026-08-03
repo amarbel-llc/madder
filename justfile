@@ -118,7 +118,7 @@ clean: clean-go clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-bats test-bats-net-cap
+test: verify-go-analyzers test-go-race test-bats test-bats-net-cap test-grammar-vectors
 
 # Usage: just run-go-test ./internal/foo
 #
@@ -223,6 +223,16 @@ run-go-cover *flags:
 [group("post-build")]
 test-bats:
   nix build .#bats-default --no-link --print-build-logs
+
+# Cross-check the scoped_id grammar (scoped_id.peg) against the vector
+# corpus' `grammar` dimension via langlang -input (FDR-0010) — the
+# structural counterpart to vectors_test.go's Id.Set parser half. Runs in
+# the nix lane (langlang is a flake-input-go_mod-bridged hard dep); mirrors
+# hyphence's test-grammar-vectors.
+# run the scoped_id grammar-vectors gate via the nix lane
+[group("post-build")]
+test-grammar-vectors:
+  nix build .#grammar-vectors-test --no-link --print-build-logs
 
 # Run net_cap-tagged bats tests (SFTP + WebDAV harnesses, future
 # loopback-binding harnesses) via the nix-sandbox lane. The lane bundles
