@@ -418,7 +418,15 @@ identity, distinct from its config digest.
   the piggy#183 ownership inversion). uuidv7 is madder's first
   self-defined format, so madder gains a format-registration call against
   piggy's registry mechanism. Naming the site is in scope for this FDR;
-  wiring the registration is not (this FDR is docs + skeleton). Because a
+  wiring the registration is not (this FDR is docs + skeleton). Registering
+  the format is necessary but **not sufficient**: per **madder#278**, a
+  markl registration only takes effect where `markl_registrations` is
+  actually *imported*, so an external in-process consumer resolving a
+  `uuidv7-…` id would hit the same invisible runtime footgun
+  (`unknown format id`) that #278 documents for the age/pivy formats,
+  unless the uuidv7 registration rides whatever activation path #278
+  settles on — folding registrations into the store-package imports, or a
+  fail-fast guard. The implementer inherits that constraint. Because a
   `uuidv7-<payload>` value is an ordinary markl-id `format-data` (the
   format-id slot is generic), the scoped-id grammar admits it with **no
   change** — see `scoped_id.peg`'s `DigestSlot`.
@@ -706,9 +714,12 @@ Bare `#N` denotes a madder issue; `dodder#N` a dodder issue
 - **Instance identity (uuid):** the uuidv7 markl format is registered at
   madder's own site `go/internal/charlie/markl_registrations` — madder's
   first self-defined format, extending the madder#255 formats-live-in-piggy
-  policy. Migration precedent: dodder's `migrate-repo-layout`
-  (`code.linenisgreat.com/dodder`, dodder#363 — pure copy, source
-  untouched). Composes with FDR-0008 (config digests become
+  policy. That registration must be *activated* (imported) where consumers
+  resolve ids, per **madder#278** (registrations are not pulled in
+  transitively by the store packages — an in-process consumer hits a
+  runtime `unknown format id` otherwise). Migration precedent: dodder's
+  `migrate-repo-layout` (`code.linenisgreat.com/dodder`, dodder#363 — pure
+  copy, source untouched). Composes with FDR-0008 (config digests become
   instance-unique) and FDR-0009 (`multi` members become instance pins).
 - **langlang as a hard dependency:** the `grammar-vectors` gate requires
   langlang (the PEG tool), injected via `flake-input-go_mod` rather than a
