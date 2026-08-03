@@ -468,10 +468,11 @@ named so the slot is anticipated.)
 ### Mismatch diagnosis (normative; composes with the Error Contract)
 
 When a `name@digest` reference resolves (through the one resolver) to a
-store whose **current** config digest differs from the pinned digest, the
-resolver **MUST** turn the one ambiguous "digest mismatch" into one of two
-precise diagnoses by comparing the resolved store's uuid against the
-**pinned instance's** uuid:
+store whose **current** config digest differs from the pinned digest, and
+the **pinned config is recoverable** (so the pinned instance's uuid is in
+hand — see the well-definedness note below), the resolver **MUST** turn
+the one ambiguous "digest mismatch" into one of two precise diagnoses by
+comparing the resolved store's uuid against the pinned instance's uuid:
 
 - **same uuid** → *same instance, config evolved*. The reference still
   points at the right store; only its config moved on. The resolver
@@ -480,6 +481,10 @@ precise diagnoses by comparing the resolved store's uuid against the
   **different** physical store than the one pinned. This **MUST** be a
   hard error — it is the identity-layer form of the dodder#359 class,
   and silently proceeding is exactly the bug FDR-0010 exists to kill.
+
+Where the pinned config is **not** recoverable, the resolver has no uuid
+to compare against, so it **MUST** still fail fast on the plain digest
+mismatch — a hard error, no uuid diagnosis, but never a silent proceed.
 
 Example error text (different-uuid, hard error):
 
@@ -501,21 +506,25 @@ the comparison is only well-defined when the resolver can obtain that
 uuid, via one of:
 
 1. a **uuid-bearing reference** — a documented *superset* of the digest
-   currency (`name@digest` stays the default; instance-critical sites may
-   also record the target uuid). This is the robust option and the one
-   this FDR recommends for receipts and `multi` members.
-2. a **recoverable pinned config** — e.g. a `multi` config's members are
+   currency (`name@digest` stays the default; instance-critical sites also
+   record the target uuid). Robust, but it changes the currency decision.
+2. a **recoverable pinned config** — a `multi` config's members are
    present at resolve time, so a member's uuid is readable directly
    (FDR-0009). Where the pinned config is in hand, no reference change is
-   needed.
-3. **inventory history** — if madder can enumerate which uuid ever
-   produced the pinned digest, it can attribute the mismatch. This
-   presumes a digest→uuid record that does not exist today.
+   needed and the currency is untouched.
+3. **inventory history** — a digest→uuid record letting madder attribute
+   which uuid produced the pinned digest. No such record exists today.
 
-The dodder-side RFC that composes over this substrate should decide which
-of these its references rely on; the madder recommendation is (1) for
-newly-persisted instance-critical references and (2) wherever the pinned
-config is already present.
+The dodder-side revision (RFC-0007, `code.linenisgreat.com/dodder`)
+selects **(2) as primary**, keeping the digest-only currency: uuid
+mismatch-diagnosis applies wherever the pinned config is recoverable
+(`multi` members), and **degrades to the plain fail-fast digest-mismatch
+hard error** — no uuid comparison, still no silent proceed — where it is
+not. **(1)** is recorded as a documented-but-not-adopted alternative: it
+would change the currency, so it is a revisit-at-implementation item if
+the degraded case proves common (persisted receipts are the candidate).
+**(3)** is unjustified new machinery for now. This FDR aligns to that
+choice so the two documents do not disagree on the currency.
 
 ### Terminology: name vs id
 
