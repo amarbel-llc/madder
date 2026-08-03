@@ -22,6 +22,12 @@ var (
 // as AllPurposes).
 var AllAliases = internal.AllAliases
 
+// AllFormats is the canonical list of markl FORMATS madder itself defines
+// and registers (FDR-0010). Today just uuidv7 (blob-store instance
+// identity) — madder's first self-defined format; every other format
+// lives upstream in piggy.
+var AllFormats = internal.AllFormats
+
 // AllPurposes is the canonical, ordered list of purposes madder
 // registers. Order is deterministic but consumers must not depend on
 // it — registration is order-independent under markl's lazy Related
@@ -29,8 +35,18 @@ var AllAliases = internal.AllAliases
 //
 // TODO(#108) codegen this slice from the per-purpose vars so adding
 // a new Purpose*Opts entry doesn't require a manual append.
+var AllPurposes = internal.AllPurposes
+
+// FormatUuidv7 is the bare (non-hash) markl format for the uuidv7 instance
+// id — just an id and a fixed 16-byte size. Registered in the package init
+// via AllFormats.
+var FormatUuidv7 = internal.FormatUuidv7
+
+// MintInstanceId mints a fresh UUIDv7 instance identity as a markl.Id of
+// format uuidv7. It is called ONCE when a blob store is created and never on
+// read (FDR-0010's no-lazy-mint rule). Uses the wall clock + crypto/rand.
 var (
-	AllPurposes                        = internal.AllPurposes
+	MintInstanceId                     = internal.MintInstanceId
 	PurposeBlobStoreConfigDigestV1Opts = internal.PurposeBlobStoreConfigDigestV1Opts
 	PurposeMadderPrivateKeyV0Opts      = internal.PurposeMadderPrivateKeyV0Opts
 	PurposeMadderPrivateKeyV1Opts      = internal.PurposeMadderPrivateKeyV1Opts
@@ -49,3 +65,12 @@ var (
 // (existing IDs still validate), so start narrow and amend if a
 // software signer appears.
 var PurposePapiDocSigV1Opts = internal.PurposePapiDocSigV1Opts
+
+// FormatIdUuidv7 is madder's own markl format for a blob store's instance
+// identity (FDR-0010): a UUIDv7 (RFC 9562) carried as a 16-byte markl-id
+// payload, rendered `uuidv7-<blech32>`. This is madder's FIRST self-defined
+// markl format — every other format lives upstream in piggy (madder#255) —
+// so it is registered here at madder's own site (AllFormats, see main.go's
+// init). It activates for external in-process consumers via the store-config
+// funnel per madder#278.
+const FormatIdUuidv7 = internal.FormatIdUuidv7

@@ -2,12 +2,16 @@
 // purpose-id-alias registrations for the markl framework. Each
 // registration is exposed as a named exported var so consumers can
 // introspect madder's canonical vocabulary or use entries as
-// templates. The aggregate slices AllPurposes and AllAliases are the
-// data that init() iterates to install everything in markl's registry.
+// templates. The aggregate slices AllPurposes, AllAliases, and
+// AllFormats are the data that init() iterates to install everything in
+// markl's registry.
 //
-// Ownership (madder#255): format registrations and the piggy-*
-// purposes live upstream in piggy's go module (piggy#183); the
-// blank import below activates them. The dodder-* purposes are
+// Ownership (madder#255): the piggy-* purposes and MOST formats live
+// upstream in piggy's go module (piggy#183); the blank import below
+// activates them. The ONE exception is `uuidv7` (FDR-0010): madder's
+// first self-defined markl format — blob-store instance identity — and
+// the repo that DEFINES a format owns its registration, so it is
+// registered here (AllFormats / FormatUuidv7 in uuidv7.go). The dodder-* purposes are
 // registered by dodder itself. This package registers only madder-*
 // purposes, papi-doc-sig-v1 (until papi has a registration site), and
 // the legacy purpose-id aliases madder needs to read its own
@@ -156,7 +160,23 @@ var AllAliases = []PurposeIdAlias{
 	AliasDodderRepoPrivateKeyV1,
 }
 
+// AllFormats is the canonical list of markl FORMATS madder itself defines
+// and registers (FDR-0010). Today just uuidv7 (blob-store instance
+// identity) — madder's first self-defined format; every other format
+// lives upstream in piggy.
+var AllFormats = []markl.Format{
+	FormatUuidv7,
+}
+
 func init() {
+	// Formats first: a purpose may reference a format id, so the format
+	// must exist before RegisterPurpose runs. (madder's own uuidv7 format
+	// is referenced by no purpose today, but the ordering is the safe
+	// default.)
+	for _, format := range AllFormats {
+		markl.RegisterFormat(format)
+	}
+
 	for _, opts := range AllPurposes {
 		markl.RegisterPurpose(opts)
 	}
