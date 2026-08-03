@@ -9,10 +9,14 @@ promotion-criteria: |
   `zz-tests_bats/resolution_conformance.bats`) pass with every
   EXPECTED-FAIL marker removed, and the divergent functions named in
   the Divergence Inventory are either deleted or reduced to thin
-  callers of the one resolver. Promote to `accepted` once at least one
-  downstream (the dodder FDR-0019 revision) resolves repo ids through
-  the same single-resolver contract and the implicit-merge read paths
-  (`makeAncestorOverrideStores`, `blobFromRemainingStores`) are removed.
+  callers of the one resolver, and the `grammar-vectors` gate is green
+  with langlang wired as a hard dependency (flake-input-go_mod). Promote
+  to `accepted` once at least one downstream (the dodder FDR-0019
+  revision) resolves repo ids through the same single-resolver contract,
+  the implicit-merge read paths (`makeAncestorOverrideStores`,
+  `blobFromRemainingStores`) are removed, and the instance-identity layer
+  has shipped — every blob store carrying a minted uuidv7, the
+  copy-migration command, and the normative mismatch-diagnosis.
 ---
 
 # Scoped-ID Resolution
@@ -126,8 +130,11 @@ madder.
 
 **In scope for this FDR:** the normative id→location function, the init
 exception, the resolve-time error contract, the retirement of implicit
-union-merge, and the legacy-layout error behaviour — all as they govern
-**madder** blob-store resolution.
+union-merge, the legacy-layout error behaviour, and — since identity is
+inseparable from resolution here — the blob-store **instance identity**
+(the uuidv7), its copy-migration, and the mismatch-diagnosis that
+composes with the error contract; all as they govern **madder**
+blob-store resolution.
 
 **Out of scope** (owned by the parallel revision of dodder's FDR-0019):
 repo auto-id discovery rules, the `repos/<name>/` nesting *policy*, and
@@ -374,6 +381,159 @@ legacy error names that recovery. Until then the legacy error remains
 the glob-time manual form, and this FDR's per-id resolve-time legacy
 error is a promotion-blocking convergence item, not a shipped behaviour.
 
+## Instance Identity: the uuid
+
+The resolver above answers *where* a scoped id points. This section
+answers *which instance* is there. A config digest alone is **not**
+identity: two blob stores configured identically produce byte-identical
+configs and therefore identical digests, so a digest cannot distinguish
+"the store I pinned" from "a different store that happens to be
+configured the same." That gap is the identity half of the dodder#359
+class — a `name@digest` reference can resolve to the wrong physical store
+and a digest match would not notice. (The same problem exists on the
+dodder side, where one yubikey-backed pubkey can legitimately back
+several repos.)
+
+Every blob store therefore carries a **uuid** (uuidv7) instance
+identity, distinct from its config digest.
+
+### The uuid field
+
+- Every blob store **MUST** carry a uuidv7 instance identity, rendered as
+  a markl id (`uuidv7-<blech32 payload>` — the 16 uuidv7 bytes
+  blech32-encoded), stored inside its `blob_store-config`.
+- The uuid **MUST** be minted once, at store init, and is **immutable**
+  thereafter.
+- The uuid **MUST NOT** be lazy-minted. Minting a uuid into an existing
+  config on first read would rewrite the config bytes and thereby
+  invalidate every digest pin taken against the pre-mint config (see
+  *Digest entropy*) — a destructive side effect disguised as a read.
+  Existing stores acquire a uuid only through the explicit migration
+  below.
+- The `uuidv7` markl **format** is registered at **madder's own**
+  registration site (`go/internal/charlie/markl_registrations`): the repo
+  that *defines* a format owns its registration. This is a deliberate
+  extension of current policy — that site registers only *purposes* and
+  aliases today, and *formats* have lived upstream in piggy (madder#255,
+  the piggy#183 ownership inversion). uuidv7 is madder's first
+  self-defined format, so madder gains a format-registration call against
+  piggy's registry mechanism. Naming the site is in scope for this FDR;
+  wiring the registration is not (this FDR is docs + skeleton). Because a
+  `uuidv7-<payload>` value is an ordinary markl-id `format-data` (the
+  format-id slot is generic), the scoped-id grammar admits it with **no
+  change** — see `scoped_id.peg`'s `DigestSlot`.
+
+### Migration: hard cut and copy (never in-place mint)
+
+The uuid-bearing config version is a **hard cut**, not an
+additive-compatible bump, and existing stores migrate by **copy**, never
+in place. The migration command **MUST**:
+
+1. Create a **new** store with the new config flavor, minting its uuid at
+   creation.
+2. Populate the new store with the old store's objects.
+3. Leave the **old** store untouched; the user deletes it when satisfied.
+
+Precedent: dodder's `migrate-repo-layout`
+(`code.linenisgreat.com/dodder`, issue #363) — a pure copy in which the
+source is never modified. Consequences, stated normatively:
+
+- Existing digest pins stay **coherent against the old store**: the old
+  config is byte-unchanged, so its digest and every pin to it still
+  resolve.
+- Migration **re-points** references at the new store as part of the
+  copy.
+- **Sequencing:** dodder repos adopt the same copy-migration pattern
+  **after** madder proves it here.
+
+This **replaces** an earlier in-place-mint framing (shaped like
+`config-pin_digest`'s rewrite): an in-place mint changes the config bytes
+and so silently invalidates existing pins — exactly what the "never
+lazy-mint" rule forbids. Copy-migration is the only sanctioned path.
+
+### Digest entropy: FDR-0008 pins become instance pins
+
+Because the uuid lives **inside** the config, the FDR-0008 Phase-1 config
+digest — computed over the config body bytes — now covers the uuid.
+Configs that were byte-identical (same store type, same options) no
+longer are: each carries a distinct uuid, hence a distinct digest.
+
+Therefore FDR-0008 digest pinning becomes true **instance** pinning with
+**zero wire-format change**. A `name@digest` that matched two stores
+before now matches exactly one, because the digest carries the instance's
+entropy. The pin currency is unchanged: still `name@digest`. (A v2 that
+pins `digest + signature` via a piggy/PAPI identity is out of scope here,
+named so the slot is anticipated.)
+
+### Mismatch diagnosis (normative; composes with the Error Contract)
+
+When a `name@digest` reference resolves (through the one resolver) to a
+store whose **current** config digest differs from the pinned digest, the
+resolver **MUST** turn the one ambiguous "digest mismatch" into one of two
+precise diagnoses by comparing the resolved store's uuid against the
+**pinned instance's** uuid:
+
+- **same uuid** → *same instance, config evolved*. The reference still
+  points at the right store; only its config moved on. The resolver
+  **SHOULD** warn and treat it as a re-pin candidate, not a hard failure.
+- **different uuid** → *wrong instance*. The name now resolves to a
+  **different** physical store than the one pinned. This **MUST** be a
+  hard error — it is the identity-layer form of the dodder#359 class,
+  and silently proceeding is exactly the bug FDR-0010 exists to kill.
+
+Example error text (different-uuid, hard error):
+
+    error: blob-store pin "cache@blake2b256-2k4p9r3m…" resolved to the
+            wrong instance
+      name:     cache  (XDG user)
+      pinned:   digest blake2b256-2k4p9r3m…  instance uuidv7-7q3w5h2x…
+      resolved: digest blake2b256-9ft3m74l…  instance uuidv7-1a2b3c4d…
+      cause:    the store now named "cache" is a DIFFERENT instance than
+                the one pinned (uuid differs), not an evolved config
+      action:   restore the pinned instance, or re-mint the reference
+                against the intended store
+
+**⚠ Concrete problem flagged** (per the design-review invitation, not a
+relitigation): the diagnosis needs the **pinned instance's uuid**, but
+the pin currency is a bare `name@digest`, which carries **no uuid**, and a
+digest is not locally invertible to a uuid without the pinned config. So
+the comparison is only well-defined when the resolver can obtain that
+uuid, via one of:
+
+1. a **uuid-bearing reference** — a documented *superset* of the digest
+   currency (`name@digest` stays the default; instance-critical sites may
+   also record the target uuid). This is the robust option and the one
+   this FDR recommends for receipts and `multi` members.
+2. a **recoverable pinned config** — e.g. a `multi` config's members are
+   present at resolve time, so a member's uuid is readable directly
+   (FDR-0009). Where the pinned config is in hand, no reference change is
+   needed.
+3. **inventory history** — if madder can enumerate which uuid ever
+   produced the pinned digest, it can attribute the mismatch. This
+   presumes a digest→uuid record that does not exist today.
+
+The dodder-side RFC that composes over this substrate should decide which
+of these its references rely on; the madder recommendation is (1) for
+newly-persisted instance-critical references and (2) wherever the pinned
+config is already present.
+
+### Terminology: name vs id
+
+- The scoped human handle is the **name** — the blob-store name; the
+  scope prefix (`.`/`//`/`%`/`~`/`_`) and dot-depth are part of the *name*
+  grammar, not the id.
+- The **uuid** is the **id** — the immutable instance identity.
+- The digest is neither: it is a *config-version* fingerprint that,
+  post-uuid, is instance-unique.
+- The CLI **MAY** accept a shortest-distinct-prefix **digest
+  abbreviation** in a `name@digest` reference (dodder's zettel-id
+  abbreviation precedent). Abbreviation is a decoder/CLI-resolution
+  concern, not grammar: `scoped_id.peg`'s `DigestSlot` already admits any
+  `DataChar+` prefix (charset-strict, length-agnostic — piggy exports
+  `DataChar` for exactly this), and the decoder resolves the prefix by
+  length/checksum. The vector corpus pins an abbreviated digest as
+  grammar-accept / parser-reject.
+
 ## Divergence Inventory
 
 Where today's implementation diverges from the spec above. Each entry
@@ -456,15 +616,27 @@ spec and implementation drift silently (dodder#359 is a `default` bug).
   `zz-tests_bats/resolution_conformance.bats`. Drives `madder init`,
   `madder info-repo <id> config-path` (the id→physical-location probe),
   `madder list`, and read/write with non-`default` names.
+- **grammar** — `go/internal/alfa/scoped_id/scoped_id.peg` with the
+  two-dimension corpus `go/internal/alfa/scoped_id/testdata/scoped_id_vectors.txt`.
+  Each vector pins BOTH a `grammar` outcome (structure, under langlang)
+  and a `parser` outcome (checksum/length/registration, under `Id.Set`).
+  The parser half (`vectors_test.go`) runs today and is green; the
+  grammar half runs as the `grammar-vectors` nix gate once langlang is
+  wired as a hard dependency (flake-input-go_mod). This suite is
+  all-green conformance — it has **no** EXPECTED-FAIL — because the
+  grammar is sound; the vectors exist to keep grammar and decoder from
+  drifting (e.g. an abbreviated or `uuidv7`-format pin is
+  grammar-accept / parser-reject, and both harnesses must agree on that).
 
-Tests that **fail against today's implementation are intentional** —
-they document a divergence. Each is marked EXPECTED-FAIL (Go: `t.Skip`
-with a divergence annotation; bats: `skip` with the same) naming the
-inventory entry it pins. Promotion to `experimental` requires removing
-every EXPECTED-FAIL marker and having the suite pass. The suite's PASS
-anchors (operate deepest-first; overflow error shape; scope-from-prefix)
-establish that the spec's chosen semantics already hold on the operate
-path and that the grammar is not the defect.
+The two *resolution* suites (Go + bats) contain tests that **fail against
+today's implementation** on purpose — they document a divergence. Each is
+marked EXPECTED-FAIL (Go: `t.Skip` with a divergence annotation; bats:
+`skip` with the same) naming the inventory entry it pins. Promotion to
+`experimental` requires removing every EXPECTED-FAIL marker and having
+those suites pass. Their PASS anchors (operate deepest-first; overflow
+error shape; scope-from-prefix) establish that the spec's chosen
+semantics already hold on the operate path and that the grammar is not
+the defect.
 
 ## Rollout Sketch (non-normative)
 
@@ -516,9 +688,23 @@ Bare `#N` denotes a madder issue; `dodder#N` a dodder issue
   `resolveCwdAncestorOrError` / `ResolveNthAncestorMatch` document the
   literal-vs-store-aware split as intentional. This FDR is the decision
   to stop maintaining two semantics.
-- **Grammar reference (unchanged by this FDR):**
-  `docs/man.7/blob-store.md`, `go/internal/alfa/scoped_id/main.go`,
-  `go/internal/0/xdg_location_type`.
+- **Grammar:** `go/internal/alfa/scoped_id/scoped_id.peg` (Ford/langlang
+  PEG, colocated with the parser, `@import`ing piggy's `marklid.peg`
+  primitives per the one-home-per-grammar-unit ruling), the two-dimension
+  corpus `.../testdata/scoped_id_vectors.txt`, and `vectors_test.go` (the
+  parser half). Reference: `docs/man.7/blob-store.md`,
+  `go/internal/alfa/scoped_id/main.go`, `go/internal/0/xdg_location_type`.
+- **Instance identity (uuid):** the uuidv7 markl format is registered at
+  madder's own site `go/internal/charlie/markl_registrations` — madder's
+  first self-defined format, extending the madder#255 formats-live-in-piggy
+  policy. Migration precedent: dodder's `migrate-repo-layout`
+  (`code.linenisgreat.com/dodder`, dodder#363 — pure copy, source
+  untouched). Composes with FDR-0008 (config digests become
+  instance-unique) and FDR-0009 (`multi` members become instance pins).
+- **langlang as a hard dependency:** the `grammar-vectors` gate requires
+  langlang (the PEG tool), injected via `flake-input-go_mod` rather than a
+  PATH-lookup + skip. Filed for hyphence (the grammar-vectors precedent)
+  as `code.linenisgreat.com/hyphence` issue #13.
 - **Walk-up / dot-depth lineage:** #153 (multi-dot `..name` init
   walk-up, parked), #145 (CWD-ancestor discovery walk-up), dodder#281
   (store-aware operate walk-up).
