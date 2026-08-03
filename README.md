@@ -256,6 +256,9 @@ madder behavior:
 - *Shipped in madder* — 0004 blob-encoding plugins, 0008 config digest
   pins, 0009 multi-store config type (primitive shipped; config wrapper
   in progress).
+- *Proposed (normative, not yet implemented)* — 0010 scoped-id
+  resolution (one-resolver redesign; retires the coexisting resolution
+  engines).
 - *Design exploration only* — 0002 remote inventory-archive packing,
   0005 plugin-id build orchestration.
 - *Superseded* — 0003 zstd dictionary hints (folded into 0004).
