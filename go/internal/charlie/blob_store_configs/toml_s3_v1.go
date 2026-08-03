@@ -1,12 +1,12 @@
 package blob_store_configs
 
 import (
-	"code.linenisgreat.com/madder/go/internal/0/ids"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
-type TomlS3V0 struct {
+type TomlS3V1 struct {
 	Endpoint           string `toml:"endpoint,omitempty"`
 	Region             string `toml:"region,omitempty"`
 	Bucket             string `toml:"bucket"`
@@ -16,13 +16,18 @@ type TomlS3V0 struct {
 	SessionToken       string `toml:"session-token,omitempty"`
 	UsePathStyle       bool   `toml:"use-path-style,omitempty"`
 	InsecureSkipVerify bool   `toml:"insecure-skip-tls-verify,omitempty"`
+
+	// InstanceId is the store's uuidv7 instance identity (FDR-0010),
+	// minted once at creation inside EncodeWithDigest. Empty for a legacy
+	// config or one upgraded in memory from V0.
+	InstanceId markl.Id `toml:"instance-id,omitempty"`
 }
 
-func (*TomlS3V0) GetBlobStoreType() string {
+func (*TomlS3V1) GetBlobStoreType() string {
 	return "s3"
 }
 
-func (blobStoreConfig *TomlS3V0) SetFlagDefinitions(
+func (blobStoreConfig *TomlS3V1) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.StringVar(
@@ -90,60 +95,46 @@ func (blobStoreConfig *TomlS3V0) SetFlagDefinitions(
 	)
 }
 
-func (blobStoreConfig *TomlS3V0) GetEndpoint() string {
+func (blobStoreConfig *TomlS3V1) GetEndpoint() string {
 	return blobStoreConfig.Endpoint
 }
 
-func (blobStoreConfig *TomlS3V0) GetRegion() string {
+func (blobStoreConfig *TomlS3V1) GetRegion() string {
 	return blobStoreConfig.Region
 }
 
-func (blobStoreConfig *TomlS3V0) GetBucket() string {
+func (blobStoreConfig *TomlS3V1) GetBucket() string {
 	return blobStoreConfig.Bucket
 }
 
-func (blobStoreConfig *TomlS3V0) GetPrefix() string {
+func (blobStoreConfig *TomlS3V1) GetPrefix() string {
 	return blobStoreConfig.Prefix
 }
 
-func (blobStoreConfig *TomlS3V0) GetAccessKeyId() string {
+func (blobStoreConfig *TomlS3V1) GetAccessKeyId() string {
 	return blobStoreConfig.AccessKeyId
 }
 
-func (blobStoreConfig *TomlS3V0) GetSecretAccessKey() string {
+func (blobStoreConfig *TomlS3V1) GetSecretAccessKey() string {
 	return blobStoreConfig.SecretAccessKey
 }
 
-func (blobStoreConfig *TomlS3V0) GetSessionToken() string {
+func (blobStoreConfig *TomlS3V1) GetSessionToken() string {
 	return blobStoreConfig.SessionToken
 }
 
-func (blobStoreConfig *TomlS3V0) GetUsePathStyle() bool {
+func (blobStoreConfig *TomlS3V1) GetUsePathStyle() bool {
 	return blobStoreConfig.UsePathStyle
 }
 
-func (blobStoreConfig *TomlS3V0) GetInsecureSkipVerify() bool {
+func (blobStoreConfig *TomlS3V1) GetInsecureSkipVerify() bool {
 	return blobStoreConfig.InsecureSkipVerify
 }
 
-// Upgrade migrates a V0 s3 config to V1 (adds the FDR-0010 instance id).
-// It does NOT mint — upgrade runs on read, and lazy-minting is forbidden —
-// so the upgraded V1 carries an empty InstanceId until the store is
-// copy-migrated.
-func (blobStoreConfig *TomlS3V0) Upgrade() (Config, ids.TypeStruct) {
-	upgraded := &TomlS3V1{
-		Endpoint:           blobStoreConfig.Endpoint,
-		Region:             blobStoreConfig.Region,
-		Bucket:             blobStoreConfig.Bucket,
-		Prefix:             blobStoreConfig.Prefix,
-		AccessKeyId:        blobStoreConfig.AccessKeyId,
-		SecretAccessKey:    blobStoreConfig.SecretAccessKey,
-		SessionToken:       blobStoreConfig.SessionToken,
-		UsePathStyle:       blobStoreConfig.UsePathStyle,
-		InsecureSkipVerify: blobStoreConfig.InsecureSkipVerify,
-	}
+func (blobStoreConfig *TomlS3V1) GetInstanceId() markl.Id {
+	return blobStoreConfig.InstanceId
+}
 
-	return upgraded, ids.GetOrPanic(
-		ids.TypeTomlBlobStoreConfigS3V1,
-	).TypeStruct
+func (blobStoreConfig *TomlS3V1) SetInstanceId(instanceId markl.Id) {
+	blobStoreConfig.InstanceId = instanceId
 }

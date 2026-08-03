@@ -1,12 +1,12 @@
 package blob_store_configs
 
 import (
-	"code.linenisgreat.com/madder/go/internal/0/ids"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
-type TomlWebDAVV0 struct {
+type TomlWebDAVV1 struct {
 	URL                   string `toml:"url"`
 	User                  string `toml:"user,omitempty"`
 	Password              string `toml:"password,omitempty"`
@@ -16,13 +16,18 @@ type TomlWebDAVV0 struct {
 	TLSCAPath             string `toml:"tls-ca-path,omitempty"`
 	TLSServerName         string `toml:"tls-server-name,omitempty"`
 	TLSInsecureSkipVerify bool   `toml:"tls-insecure-skip-verify,omitempty"`
+
+	// InstanceId is the store's uuidv7 instance identity (FDR-0010),
+	// minted once at creation inside EncodeWithDigest. Empty for a legacy
+	// config or one upgraded in memory from V0.
+	InstanceId markl.Id `toml:"instance-id,omitempty"`
 }
 
-func (*TomlWebDAVV0) GetBlobStoreType() string {
+func (*TomlWebDAVV1) GetBlobStoreType() string {
 	return "webdav"
 }
 
-func (blobStoreConfig *TomlWebDAVV0) SetFlagDefinitions(
+func (blobStoreConfig *TomlWebDAVV1) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.StringVar(
@@ -89,60 +94,46 @@ func (blobStoreConfig *TomlWebDAVV0) SetFlagDefinitions(
 	)
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetURL() string {
+func (blobStoreConfig *TomlWebDAVV1) GetURL() string {
 	return blobStoreConfig.URL
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetUser() string {
+func (blobStoreConfig *TomlWebDAVV1) GetUser() string {
 	return blobStoreConfig.User
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetPassword() string {
+func (blobStoreConfig *TomlWebDAVV1) GetPassword() string {
 	return blobStoreConfig.Password
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetBearerToken() string {
+func (blobStoreConfig *TomlWebDAVV1) GetBearerToken() string {
 	return blobStoreConfig.BearerToken
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetTLSClientCertPath() string {
+func (blobStoreConfig *TomlWebDAVV1) GetTLSClientCertPath() string {
 	return blobStoreConfig.TLSClientCertPath
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetTLSClientKeyPath() string {
+func (blobStoreConfig *TomlWebDAVV1) GetTLSClientKeyPath() string {
 	return blobStoreConfig.TLSClientKeyPath
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetTLSCAPath() string {
+func (blobStoreConfig *TomlWebDAVV1) GetTLSCAPath() string {
 	return blobStoreConfig.TLSCAPath
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetTLSServerName() string {
+func (blobStoreConfig *TomlWebDAVV1) GetTLSServerName() string {
 	return blobStoreConfig.TLSServerName
 }
 
-func (blobStoreConfig *TomlWebDAVV0) GetTLSInsecureSkipVerify() bool {
+func (blobStoreConfig *TomlWebDAVV1) GetTLSInsecureSkipVerify() bool {
 	return blobStoreConfig.TLSInsecureSkipVerify
 }
 
-// Upgrade migrates a V0 webdav config to V1 (adds the FDR-0010 instance
-// id). It does NOT mint — upgrade runs on read, and lazy-minting is
-// forbidden — so the upgraded V1 carries an empty InstanceId until the
-// store is copy-migrated.
-func (blobStoreConfig *TomlWebDAVV0) Upgrade() (Config, ids.TypeStruct) {
-	upgraded := &TomlWebDAVV1{
-		URL:                   blobStoreConfig.URL,
-		User:                  blobStoreConfig.User,
-		Password:              blobStoreConfig.Password,
-		BearerToken:           blobStoreConfig.BearerToken,
-		TLSClientCertPath:     blobStoreConfig.TLSClientCertPath,
-		TLSClientKeyPath:      blobStoreConfig.TLSClientKeyPath,
-		TLSCAPath:             blobStoreConfig.TLSCAPath,
-		TLSServerName:         blobStoreConfig.TLSServerName,
-		TLSInsecureSkipVerify: blobStoreConfig.TLSInsecureSkipVerify,
-	}
+func (blobStoreConfig *TomlWebDAVV1) GetInstanceId() markl.Id {
+	return blobStoreConfig.InstanceId
+}
 
-	return upgraded, ids.GetOrPanic(
-		ids.TypeTomlBlobStoreConfigWebdavV1,
-	).TypeStruct
+func (blobStoreConfig *TomlWebDAVV1) SetInstanceId(instanceId markl.Id) {
+	blobStoreConfig.InstanceId = instanceId
 }

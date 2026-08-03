@@ -25,17 +25,24 @@ const (
 	TypeTomlBlobStoreConfigInventoryArchiveV0       = internal.TypeTomlBlobStoreConfigInventoryArchiveV0
 	TypeTomlBlobStoreConfigInventoryArchiveV1       = internal.TypeTomlBlobStoreConfigInventoryArchiveV1
 	TypeTomlBlobStoreConfigInventoryArchiveV2       = internal.TypeTomlBlobStoreConfigInventoryArchiveV2
+	TypeTomlBlobStoreConfigInventoryArchiveV3       = internal.TypeTomlBlobStoreConfigInventoryArchiveV3
 	TypeTomlBlobStoreConfigInventoryArchiveVCurrent = internal.TypeTomlBlobStoreConfigInventoryArchiveVCurrent
 	TypeTomlBlobStoreConfigMultiV0                  = internal.TypeTomlBlobStoreConfigMultiV0
+	TypeTomlBlobStoreConfigMultiV1                  = internal.TypeTomlBlobStoreConfigMultiV1
 	TypeTomlBlobStoreConfigPointerV0                = internal.TypeTomlBlobStoreConfigPointerV0
 	TypeTomlBlobStoreConfigPointerV1                = internal.TypeTomlBlobStoreConfigPointerV1
+	TypeTomlBlobStoreConfigPointerV2                = internal.TypeTomlBlobStoreConfigPointerV2
 	TypeTomlBlobStoreConfigS3V0                     = internal.TypeTomlBlobStoreConfigS3V0
+	TypeTomlBlobStoreConfigS3V1                     = internal.TypeTomlBlobStoreConfigS3V1
 	TypeTomlBlobStoreConfigSftpExplicitV0           = internal.TypeTomlBlobStoreConfigSftpExplicitV0
+	TypeTomlBlobStoreConfigSftpExplicitV1           = internal.TypeTomlBlobStoreConfigSftpExplicitV1
 	TypeTomlBlobStoreConfigSftpViaSSHConfigV0       = internal.TypeTomlBlobStoreConfigSftpViaSSHConfigV0
+	TypeTomlBlobStoreConfigSftpViaSSHConfigV1       = internal.TypeTomlBlobStoreConfigSftpViaSSHConfigV1
 	TypeTomlBlobStoreConfigV1                       = internal.TypeTomlBlobStoreConfigV1
 	TypeTomlBlobStoreConfigV2                       = internal.TypeTomlBlobStoreConfigV2
 	TypeTomlBlobStoreConfigV3                       = internal.TypeTomlBlobStoreConfigV3
 	TypeTomlBlobStoreConfigV4                       = internal.TypeTomlBlobStoreConfigV4
 	TypeTomlBlobStoreConfigVCurrent                 = internal.TypeTomlBlobStoreConfigVCurrent
 	TypeTomlBlobStoreConfigWebdavV0                 = internal.TypeTomlBlobStoreConfigWebdavV0
+	TypeTomlBlobStoreConfigWebdavV1                 = internal.TypeTomlBlobStoreConfigWebdavV1
 )

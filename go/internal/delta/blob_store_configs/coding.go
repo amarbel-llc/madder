@@ -134,6 +134,28 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigSftpExplicitV1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlSFTPV1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlSFTPV1(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlSFTPV1); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigWebdavV0: hyphence.CoderTommy[
 				Config,
 				*Config,
@@ -151,6 +173,28 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 						return nil, err
 					}
 					if v, ok := cfg.(*TomlWebDAVV0); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
+			ids.TypeTomlBlobStoreConfigWebdavV1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlWebDAVV1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlWebDAVV1(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlWebDAVV1); ok {
 						*doc.Data() = *v
 					}
 					return doc.Encode()
@@ -178,6 +222,28 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigS3V1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlS3V1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlS3V1(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlS3V1); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0: hyphence.CoderTommy[
 				Config,
 				*Config,
@@ -195,6 +261,28 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 						return nil, err
 					}
 					if v, ok := cfg.(*TomlSFTPViaSSHConfigV0); ok {
+						*doc.Data() = *v
+					}
+					return doc.Encode()
+				},
+			},
+			ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlSFTPViaSSHConfigV1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlSFTPViaSSHConfigV1(nil)
+					if err != nil {
+						return nil, err
+					}
+					if v, ok := cfg.(*TomlSFTPViaSSHConfigV1); ok {
 						*doc.Data() = *v
 					}
 					return doc.Encode()
@@ -250,6 +338,31 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigPointerV2: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlPointerV2(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlPointerV2(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlPointerV2:
+						*doc.Data() = *v
+					case TomlPointerV2:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigMultiV0: hyphence.CoderTommy[
 				Config,
 				*Config,
@@ -274,6 +387,35 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					case *TomlMultiV0:
 						*doc.Data() = *v
 					case TomlMultiV0:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
+			ids.TypeTomlBlobStoreConfigMultiV1: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				// FDR-0009: the generated DecodeTomlMultiV1 calls
+				// TomlMultiV1.Validate() internally, so a hand-edited config
+				// with a bare (non-digest-bearing) reference fails to decode
+				// here — no extra Validate() call is needed.
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlMultiV1(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlMultiV1(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlMultiV1:
+						*doc.Data() = *v
+					case TomlMultiV1:
 						*doc.Data() = v
 					}
 					return doc.Encode()
@@ -349,6 +491,31 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					case *TomlInventoryArchiveV2:
 						*doc.Data() = *v
 					case TomlInventoryArchiveV2:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
+			ids.TypeTomlBlobStoreConfigInventoryArchiveV3: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlInventoryArchiveV3(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlInventoryArchiveV3(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlInventoryArchiveV3:
+						*doc.Data() = *v
+					case TomlInventoryArchiveV3:
 						*doc.Data() = v
 					}
 					return doc.Encode()

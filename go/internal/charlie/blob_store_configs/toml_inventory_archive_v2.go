@@ -2,6 +2,7 @@ package blob_store_configs
 
 import (
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/0/ids"
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	"code.linenisgreat.com/madder/go/internal/bravo/plugins"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
@@ -162,4 +163,22 @@ func (config TomlInventoryArchiveV2) GetSelectorMaxBlobSize() uint64 {
 
 func (config TomlInventoryArchiveV2) GetMaxPackSize() uint64 {
 	return config.MaxPackSize
+}
+
+// Upgrade migrates a V2 inventory-archive config to V3 (adds the FDR-0010
+// instance id). It does NOT mint — upgrade runs on read, and lazy-minting
+// is forbidden — so the upgraded V3 carries an empty InstanceId until the
+// store is copy-migrated.
+func (config TomlInventoryArchiveV2) Upgrade() (Config, ids.TypeStruct) {
+	upgraded := &TomlInventoryArchiveV3{
+		HashTypeId:      config.HashTypeId,
+		CompressionType: config.CompressionType,
+		Encryption:      config.Encryption,
+		Delta:           config.Delta,
+		MaxPackSize:     config.MaxPackSize,
+	}
+
+	return upgraded, ids.GetOrPanic(
+		ids.TypeTomlBlobStoreConfigInventoryArchiveV3,
+	).TypeStruct
 }

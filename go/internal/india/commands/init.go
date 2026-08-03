@@ -50,15 +50,16 @@ func init() {
 		"init-pointer",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigPointerV1,
+				ids.TypeTomlBlobStoreConfigPointerV2,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlPointerV1{},
+			blobStoreConfig: &blob_store_configs.TomlPointerV2{},
 			desc: futility.Description{
 				Short: "initialize a pointer blob store",
 				Long: "Create a blob store that delegates to another store by " +
 					"reference. The pointer store does not hold blobs itself " +
 					"but redirects reads and writes to the target store. The " +
-					"v1 config carries only an absolute base-path; the config " +
+					"v2 config carries an absolute base-path plus a uuid " +
+					"instance identity; the config " +
 					"file location is derived as <base-path>/blob_store-config.",
 			},
 		},
@@ -84,9 +85,9 @@ func init() {
 		"init-sftp-explicit",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigSftpExplicitV0,
+				ids.TypeTomlBlobStoreConfigSftpExplicitV1,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlSFTPV0{},
+			blobStoreConfig: &blob_store_configs.TomlSFTPV1{},
 			desc: futility.Description{
 				Short: "initialize an SFTP blob store with explicit credentials",
 				Long: "Create a blob store backed by an SFTP remote, using " +
@@ -101,9 +102,9 @@ func init() {
 		"init-sftp-ssh_config",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV0,
+				ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV1,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlSFTPViaSSHConfigV0{},
+			blobStoreConfig: &blob_store_configs.TomlSFTPViaSSHConfigV1{},
 			desc: futility.Description{
 				Short: "initialize an SFTP blob store via ssh_config",
 				Long: "Create a blob store backed by an SFTP remote, resolving " +
@@ -118,9 +119,9 @@ func init() {
 		"init-webdav",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigWebdavV0,
+				ids.TypeTomlBlobStoreConfigWebdavV1,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlWebDAVV0{},
+			blobStoreConfig: &blob_store_configs.TomlWebDAVV1{},
 			desc: futility.Description{
 				Short: "initialize a WebDAV blob store",
 				Long: "Create a blob store backed by a WebDAV server (Nextcloud, " +
@@ -138,9 +139,9 @@ func init() {
 		"init-s3",
 		&Init{
 			tipe: ids.GetOrPanic(
-				ids.TypeTomlBlobStoreConfigS3V0,
+				ids.TypeTomlBlobStoreConfigS3V1,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlS3V0{},
+			blobStoreConfig: &blob_store_configs.TomlS3V1{},
 			desc: futility.Description{
 				Short: "initialize an S3 / S3-compatible blob store",
 				Long: "Create a blob store backed by an S3 bucket (AWS S3, " +
@@ -159,7 +160,7 @@ func init() {
 			tipe: ids.GetOrPanic(
 				ids.TypeTomlBlobStoreConfigInventoryArchiveVCurrent,
 			).TypeStruct,
-			blobStoreConfig: &blob_store_configs.TomlInventoryArchiveV2{
+			blobStoreConfig: &blob_store_configs.TomlInventoryArchiveV3{
 				Delta: blob_store_configs.DeltaConfig{
 					Enabled:     false,
 					Algorithm:   "bsdiff",

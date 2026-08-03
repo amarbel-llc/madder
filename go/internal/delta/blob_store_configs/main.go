@@ -45,16 +45,23 @@ type (
 	TomlV3                      = charlie_bsc.TomlV3
 	TomlV4                      = charlie_bsc.TomlV4
 	TomlSFTPV0                  = charlie_bsc.TomlSFTPV0
+	TomlSFTPV1                  = charlie_bsc.TomlSFTPV1
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
+	TomlSFTPViaSSHConfigV1      = charlie_bsc.TomlSFTPViaSSHConfigV1
 	TomlWebDAVV0                = charlie_bsc.TomlWebDAVV0
+	TomlWebDAVV1                = charlie_bsc.TomlWebDAVV1
 	TomlS3V0                    = charlie_bsc.TomlS3V0
+	TomlS3V1                    = charlie_bsc.TomlS3V1
 	TomlPointerV0               = charlie_bsc.TomlPointerV0
 	TomlPointerV1               = charlie_bsc.TomlPointerV1
+	TomlPointerV2               = charlie_bsc.TomlPointerV2
 	TomlMultiV0                 = charlie_bsc.TomlMultiV0
+	TomlMultiV1                 = charlie_bsc.TomlMultiV1
 	TomlUriV0                   = charlie_bsc.TomlUriV0
 	TomlInventoryArchiveV0      = charlie_bsc.TomlInventoryArchiveV0
 	TomlInventoryArchiveV1      = charlie_bsc.TomlInventoryArchiveV1
 	TomlInventoryArchiveV2      = charlie_bsc.TomlInventoryArchiveV2
+	TomlInventoryArchiveV3      = charlie_bsc.TomlInventoryArchiveV3
 	TypedConfig                 = hyphence.TypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, Config]
 	TypedMutableConfig          = hyphence.TypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id, *markl.Id, ConfigMutable]
 )
@@ -83,16 +90,23 @@ var (
 	DecodeTomlV3                  = charlie_bsc.DecodeTomlV3
 	DecodeTomlV4                  = charlie_bsc.DecodeTomlV4
 	DecodeTomlSFTPV0              = charlie_bsc.DecodeTomlSFTPV0
+	DecodeTomlSFTPV1              = charlie_bsc.DecodeTomlSFTPV1
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
+	DecodeTomlSFTPViaSSHConfigV1  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV1
 	DecodeTomlWebDAVV0            = charlie_bsc.DecodeTomlWebDAVV0
+	DecodeTomlWebDAVV1            = charlie_bsc.DecodeTomlWebDAVV1
 	DecodeTomlS3V0                = charlie_bsc.DecodeTomlS3V0
+	DecodeTomlS3V1                = charlie_bsc.DecodeTomlS3V1
 	DecodeTomlPointerV0           = charlie_bsc.DecodeTomlPointerV0
 	DecodeTomlPointerV1           = charlie_bsc.DecodeTomlPointerV1
+	DecodeTomlPointerV2           = charlie_bsc.DecodeTomlPointerV2
 	DecodeTomlMultiV0             = charlie_bsc.DecodeTomlMultiV0
+	DecodeTomlMultiV1             = charlie_bsc.DecodeTomlMultiV1
 	DecodeTomlUriV0               = charlie_bsc.DecodeTomlUriV0
 	DecodeTomlInventoryArchiveV0  = charlie_bsc.DecodeTomlInventoryArchiveV0
 	DecodeTomlInventoryArchiveV1  = charlie_bsc.DecodeTomlInventoryArchiveV1
 	DecodeTomlInventoryArchiveV2  = charlie_bsc.DecodeTomlInventoryArchiveV2
+	DecodeTomlInventoryArchiveV3  = charlie_bsc.DecodeTomlInventoryArchiveV3
 )
 
 // Interface satisfaction checks
@@ -138,6 +152,40 @@ var (
 	_ ConfigMutable               = &TomlWebDAVV0{}
 	_ ConfigS3                    = &TomlS3V0{}
 	_ ConfigMutable               = &TomlS3V0{}
+
+	// FDR-0010 uuid-bearing versions: each new-version config satisfies the
+	// same interfaces as its predecessor plus ConfigInstanceIdMintable, and
+	// each predecessor gains an Upgrade() (ConfigUpgradeable).
+	_ ConfigUpgradeable           = &TomlSFTPV0{}
+	_ ConfigSFTPRemotePath        = &TomlSFTPV1{}
+	_ ConfigMutable               = &TomlSFTPV1{}
+	_ ConfigInstanceIdMintable    = &TomlSFTPV1{}
+	_ ConfigUpgradeable           = TomlSFTPViaSSHConfigV0{}
+	_ ConfigSFTPRemotePath        = TomlSFTPViaSSHConfigV1{}
+	_ ConfigMutable               = &TomlSFTPViaSSHConfigV1{}
+	_ ConfigInstanceIdMintable    = &TomlSFTPViaSSHConfigV1{}
+	_ ConfigUpgradeable           = &TomlWebDAVV0{}
+	_ ConfigWebDAV                = &TomlWebDAVV1{}
+	_ ConfigMutable               = &TomlWebDAVV1{}
+	_ ConfigInstanceIdMintable    = &TomlWebDAVV1{}
+	_ ConfigUpgradeable           = &TomlS3V0{}
+	_ ConfigS3                    = &TomlS3V1{}
+	_ ConfigMutable               = &TomlS3V1{}
+	_ ConfigInstanceIdMintable    = &TomlS3V1{}
+	_ ConfigUpgradeable           = TomlPointerV1{}
+	_ ConfigPointer               = TomlPointerV2{}
+	_ ConfigMutable               = &TomlPointerV2{}
+	_ ConfigInstanceIdMintable    = &TomlPointerV2{}
+	_ ConfigUpgradeable           = TomlMultiV0{}
+	_ ConfigMulti                 = TomlMultiV1{}
+	_ ConfigMutable               = &TomlMultiV1{}
+	_ ConfigInstanceIdMintable    = &TomlMultiV1{}
+	_ ConfigUpgradeable           = TomlInventoryArchiveV2{}
+	_ ConfigInventoryArchiveDelta = TomlInventoryArchiveV3{}
+	_ ConfigMutable               = &TomlInventoryArchiveV3{}
+	_ SignatureConfigImmutable    = TomlInventoryArchiveV3{}
+	_ SelectorConfigImmutable     = TomlInventoryArchiveV3{}
+	_ ConfigInstanceIdMintable    = &TomlInventoryArchiveV3{}
 )
 
 type DefaultType = TomlV4
@@ -194,6 +242,20 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV1
 	case *TomlInventoryArchiveV2, TomlInventoryArchiveV2:
 		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV2
+	case *TomlSFTPV1:
+		typeId = ids.TypeTomlBlobStoreConfigSftpExplicitV1
+	case *TomlSFTPViaSSHConfigV1, TomlSFTPViaSSHConfigV1:
+		typeId = ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV1
+	case *TomlWebDAVV1:
+		typeId = ids.TypeTomlBlobStoreConfigWebdavV1
+	case *TomlS3V1:
+		typeId = ids.TypeTomlBlobStoreConfigS3V1
+	case *TomlPointerV2, TomlPointerV2:
+		typeId = ids.TypeTomlBlobStoreConfigPointerV2
+	case *TomlMultiV1, TomlMultiV1:
+		typeId = ids.TypeTomlBlobStoreConfigMultiV1
+	case *TomlInventoryArchiveV3, TomlInventoryArchiveV3:
+		typeId = ids.TypeTomlBlobStoreConfigInventoryArchiveV3
 	default:
 		panic(fmt.Sprintf(
 			"no wire type-id known for blob store config of type %T",

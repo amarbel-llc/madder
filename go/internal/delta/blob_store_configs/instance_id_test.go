@@ -95,3 +95,56 @@ func TestInstanceIdMakesConfigDigestUnique(t *testing.T) {
 		t.Fatal("re-encoding an already-minted config must be deterministic (no re-mint)")
 	}
 }
+
+// TestEncodeWithDigestMintsEveryCurrentType is the horizontal-sweep guard
+// (FDR-0010): every current-version store config — not just the local one —
+// carries an instance-id field and is minted by the EncodeWithDigest funnel.
+// If a future bump adds a new store type without the mint interface, or a
+// VCurrent-style alias is not advanced, the corresponding row fails.
+func TestEncodeWithDigestMintsEveryCurrentType(t *testing.T) {
+	cases := []struct {
+		name   string
+		typeId string
+		blob   Config
+	}{
+		{"local", ids.TypeTomlBlobStoreConfigV4, &TomlV4{
+			HashBuckets: DefaultHashBuckets, HashTypeId: HashTypeDefault,
+			CompressionType: "zstd",
+		}},
+		{"sftp", ids.TypeTomlBlobStoreConfigSftpExplicitV1, &TomlSFTPV1{}},
+		{"sftp-ssh", ids.TypeTomlBlobStoreConfigSftpViaSSHConfigV1, &TomlSFTPViaSSHConfigV1{}},
+		{"webdav", ids.TypeTomlBlobStoreConfigWebdavV1, &TomlWebDAVV1{}},
+		{"s3", ids.TypeTomlBlobStoreConfigS3V1, &TomlS3V1{Bucket: "b"}},
+		{"pointer", ids.TypeTomlBlobStoreConfigPointerV2, &TomlPointerV2{}},
+		{"multi", ids.TypeTomlBlobStoreConfigMultiV1, &TomlMultiV1{Mode: "mirror"}},
+		{"inventory", ids.TypeTomlBlobStoreConfigInventoryArchiveV3, &TomlInventoryArchiveV3{}},
+	}
+
+	wantPrefix := markl_registrations.FormatIdUuidv7 + "-"
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &TypedConfig{
+				Type: ids.GetOrPanic(tc.typeId).TypeStruct,
+				Blob: tc.blob,
+			}
+
+			mintable, ok := cfg.Blob.(ConfigInstanceIdMintable)
+			if !ok {
+				t.Fatalf("current %s config %T is not instance-id mintable", tc.name, cfg.Blob)
+			}
+
+			var buf bytes.Buffer
+			if _, err := EncodeWithDigest(cfg, &buf); err != nil {
+				t.Fatal(err)
+			}
+
+			if got := mintable.GetInstanceId().StringWithFormat(); !strings.HasPrefix(
+				got,
+				wantPrefix,
+			) {
+				t.Fatalf("%s: instance-id %q lacks %q prefix", tc.name, got, wantPrefix)
+			}
+		})
+	}
+}

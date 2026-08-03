@@ -1,12 +1,12 @@
 package blob_store_configs
 
 import (
-	"code.linenisgreat.com/madder/go/internal/0/ids"
+	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
 //go:generate tommy generate
-type TomlSFTPV0 struct {
+type TomlSFTPV1 struct {
 	// TODO replace the below with a url scheme
 	Host           string `toml:"host"`
 	Port           int    `toml:"port,omitempty"`
@@ -15,13 +15,18 @@ type TomlSFTPV0 struct {
 	PrivateKeyPath string `toml:"private-key-path,omitempty"`
 	RemotePath     string `toml:"remote-path"`
 	KnownHostsFile string `toml:"known-hosts-file,omitempty"`
+
+	// InstanceId is the store's uuidv7 instance identity (FDR-0010),
+	// minted once at creation inside EncodeWithDigest. Empty for a legacy
+	// config or one upgraded in memory from V0.
+	InstanceId markl.Id `toml:"instance-id,omitempty"`
 }
 
-func (*TomlSFTPV0) GetBlobStoreType() string {
+func (*TomlSFTPV1) GetBlobStoreType() string {
 	return "sftp"
 }
 
-func (blobStoreConfig *TomlSFTPV0) SetFlagDefinitions(
+func (blobStoreConfig *TomlSFTPV1) SetFlagDefinitions(
 	flagSet interfaces.CLIFlagDefinitions,
 ) {
 	flagSet.StringVar(
@@ -74,53 +79,41 @@ func (blobStoreConfig *TomlSFTPV0) SetFlagDefinitions(
 	)
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetHost() string {
+func (blobStoreConfig *TomlSFTPV1) GetHost() string {
 	return blobStoreConfig.Host
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetPort() int {
+func (blobStoreConfig *TomlSFTPV1) GetPort() int {
 	if blobStoreConfig.Port == 0 {
 		return 22
 	}
 	return blobStoreConfig.Port
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetUser() string {
+func (blobStoreConfig *TomlSFTPV1) GetUser() string {
 	return blobStoreConfig.User
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetPassword() string {
+func (blobStoreConfig *TomlSFTPV1) GetPassword() string {
 	return blobStoreConfig.Password
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetPrivateKeyPath() string {
+func (blobStoreConfig *TomlSFTPV1) GetPrivateKeyPath() string {
 	return blobStoreConfig.PrivateKeyPath
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetRemotePath() string {
+func (blobStoreConfig *TomlSFTPV1) GetRemotePath() string {
 	return blobStoreConfig.RemotePath
 }
 
-func (blobStoreConfig *TomlSFTPV0) GetKnownHostsFile() string {
+func (blobStoreConfig *TomlSFTPV1) GetKnownHostsFile() string {
 	return blobStoreConfig.KnownHostsFile
 }
 
-// Upgrade migrates a V0 sftp config to V1 (adds the FDR-0010 instance
-// id). It does NOT mint — upgrade runs on read, and lazy-minting is
-// forbidden — so the upgraded V1 carries an empty InstanceId until the
-// store is copy-migrated.
-func (blobStoreConfig *TomlSFTPV0) Upgrade() (Config, ids.TypeStruct) {
-	upgraded := &TomlSFTPV1{
-		Host:           blobStoreConfig.Host,
-		Port:           blobStoreConfig.Port,
-		User:           blobStoreConfig.User,
-		Password:       blobStoreConfig.Password,
-		PrivateKeyPath: blobStoreConfig.PrivateKeyPath,
-		RemotePath:     blobStoreConfig.RemotePath,
-		KnownHostsFile: blobStoreConfig.KnownHostsFile,
-	}
+func (blobStoreConfig *TomlSFTPV1) GetInstanceId() markl.Id {
+	return blobStoreConfig.InstanceId
+}
 
-	return upgraded, ids.GetOrPanic(
-		ids.TypeTomlBlobStoreConfigSftpExplicitV1,
-	).TypeStruct
+func (blobStoreConfig *TomlSFTPV1) SetInstanceId(instanceId markl.Id) {
+	blobStoreConfig.InstanceId = instanceId
 }

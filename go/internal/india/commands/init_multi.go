@@ -95,7 +95,7 @@ func (cmd *InitMulti) Run(req futility.Request) {
 
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
-	cfg := &blob_store_configs.TomlMultiV0{Mode: cmd.mode}
+	cfg := &blob_store_configs.TomlMultiV1{Mode: cmd.mode}
 
 	resolve := func(ref string) scoped_id.Id {
 		// Resolve a bare name to its leaf's current digest; pass a
@@ -150,7 +150,7 @@ func (cmd *InitMulti) Run(req futility.Request) {
 		envBlobStore,
 		blobStoreId,
 		&blob_store_configs.TypedConfig{
-			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV0).TypeStruct,
+			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigMultiV1).TypeStruct,
 			Blob: cfg,
 		},
 	)
