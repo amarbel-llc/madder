@@ -139,7 +139,26 @@ func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []scoped_id.Id) {
 	ids := make([]string, len(blobStoreIds))
 
 	for i, id := range blobStoreIds {
-		ids[i] = id.String()
+		key := id.String()
+		ids[i] = key
+
+		// An explicitly-ordered store that failed to build fails hard —
+		// the caller named it. This mirrors GetBlobStore's keyed-lookup
+		// contract; only *discovered* stores degrade silently until
+		// addressed. (A name absent from the map keeps its existing
+		// silently-skipped behaviour in GetBlobStoresSorted; that is not
+		// a build failure.)
+		if bs, ok := env.blobStores[key]; ok && bs.BuildErr != nil {
+			errors.ContextCancelWithBadRequestError(
+				env,
+				errors.Wrapf(
+					bs.BuildErr,
+					"blob store %q failed to build during discovery",
+					key,
+				),
+			)
+			return
+		}
 	}
 
 	env.orderedBlobStoreIds = ids
@@ -147,10 +166,19 @@ func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []scoped_id.Id) {
 }
 
 func (env BlobStoreEnv) GetDefaultBlobStore() blob_stores.BlobStoreInitialized {
-	if len(env.blobStores) == 0 {
+	// defaultBlobStoreIdString is "" when discovery found no store, or
+	// found only stores that failed to build (setupStores skips those when
+	// picking the default). Either way there is no usable default; per
+	// this method's contract that is a panic (GetDefaultBlobStoreId is the
+	// soft-failure peer). Without the "" guard, env.blobStores[""] would
+	// return a zero-value entry with a nil backend and no BuildErr, and
+	// the caller would hit an opaque nil-dispatch panic instead.
+	if len(env.blobStores) == 0 || env.defaultBlobStoreIdString == "" {
 		panic(
 			errors.Errorf(
-				"calling GetDefaultBlobStore without any initialized blob stores: %#v",
+				"calling GetDefaultBlobStore with no usable default "+
+					"(no stores initialized, or all discovered stores "+
+					"failed to build): %#v",
 				env.BlobStore,
 			),
 		)
