@@ -17,6 +17,11 @@ for one release.
 
 - Text marshaling/unmarshaling support (wire-format via `Canonical`)
 - Location-based prefixing for ID strings
+- `ResolveFrom(configCwdDepth)`: rebase a CWD-scoped id parsed from a
+  config into the process-cwd frame by adding the config's own walk-up
+  depth — FDR-0010 config-location-relative resolution. Cwd-only;
+  fixed-scope (user/system/cache) ids are returned unchanged; the digest
+  is preserved.
 
 ## ID Format
 

@@ -26,3 +26,19 @@ Factory and management layer for content-addressable blob storage backends.
 - Pointer-based blob store references for indirection
 - Multi-store management with XDG override support
 - Copy verification and state tracking
+
+## Resolution & degradation notes
+
+- A `multi` store's CWD-scoped member refs (`.name`, `..name`) resolve
+  relative to the multi **config's own** discovered cwd-depth, not the
+  process cwd (`resolveMultiRef` offsets via `scoped_id.Id.ResolveFrom`).
+  So an ancestor multi discovered at `..notes` resolves its `.local`
+  member to `..local`. See FDR-0010 "Config-relative resolution".
+- A store discovered during `MakeBlobStores` that fails to **build** is
+  skipped with a diagnostic and its error stashed on
+  `BlobStoreInitialized.BuildErr` (backend left nil), instead of aborting
+  the whole map — one broken/foreign ancestor store can't kill an
+  unrelated repo's construction. The error surfaces as a hard failure
+  only when the store is explicitly addressed
+  (`blob_store_env.GetBlobStore` / `SetBlobStoreOrder`). Decode/discovery
+  failures (legacy configs) still hard-abort.
