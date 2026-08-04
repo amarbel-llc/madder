@@ -141,22 +141,44 @@ func makeMultiStore(
 // buildMultiStores materializes every ConfigMulti in blobStores in
 // dependency order. Each iteration builds any multi whose references
 // are all resolved; it loops until an iteration makes no progress.
-// Because digest-bearing references form a Merkle DAG, a no-progress
-// iteration with unbuilt multis remaining means a dangling reference
-// (cycles are unrepresentable). The aggregated deferral errors name
-// the offending references.
+//
+// Failures degrade rather than abort (the SECONDARY half of the
+// FDR-0010-adjacent fix): a multi that hits a hard error (digest
+// mismatch, bad mode, or a dangling reference) is settled with its error
+// stashed on the map entry (BuildErr) and building continues for the
+// rest, so one broken or foreign discovered multi can't kill an
+// unrelated repo's construction. A no-progress pass with multis still
+// deferred means their references are unresolvable — dangling, or
+// dependent on a multi that failed above; each is settled with its
+// deferral reason. The returned error is the aggregate of every failure
+// (nil when all built); callers that discover the whole map log it and
+// rely on the per-entry BuildErr surfacing at address time, while a
+// direct caller can still observe that a specific set failed.
 func buildMultiStores(
 	ctx interfaces.ActiveContext,
 	blobStores BlobStoreMap,
 ) error {
+	var failures []error
+
+	settleFailed := func(key string, err error) {
+		blobStore := blobStores[key]
+		blobStore.BlobStore = nil
+		blobStore.BuildErr = err
+		blobStores[key] = blobStore
+		failures = append(failures, err)
+	}
+
 	for {
 		progressed := false
-		var deferred []error
+		deferred := map[string]error{}
 
 		for key := range blobStores {
 			blobStore := blobStores[key]
 			if blobStore.BlobStore != nil {
 				continue
+			}
+			if blobStore.BuildErr != nil {
+				continue // already settled as failed this construction
 			}
 			config, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti)
 			if !isMulti {
@@ -172,11 +194,14 @@ func buildMultiStores(
 			built, err := makeMultiStore(ctx, config, configDepth, blobStores)
 			if err != nil {
 				if errors.Is(err, ErrMultiRefNotReady{}) {
-					deferred = append(deferred, errors.Wrapf(err,
-						"multi %q", key))
+					deferred[key] = errors.Wrapf(err, "multi %q", key)
 					continue
 				}
-				return errors.Wrapf(err, "multi %q", key)
+				// Hard error for a discovered multi: settle it as failed
+				// and keep building the rest.
+				settleFailed(key, errors.Wrapf(err, "multi %q", key))
+				progressed = true
+				continue
 			}
 
 			blobStore.BlobStore = built
@@ -185,20 +210,24 @@ func buildMultiStores(
 		}
 
 		if len(deferred) == 0 {
-			return nil // all multis built
+			break // every multi either built or settled as failed
 		}
 		if !progressed {
-			// No multi advanced this pass and some remain unbuilt.
-			// Non-multi leaves are always built before this runs (the
-			// pass-1/2 construction in MakeBlobStores cancels — and
-			// thus panics — on any leaf-build failure), and
-			// digest-bearing references make cycles unrepresentable.
-			// So the only remaining cause is a dangling reference (a
-			// ref to a name not present in the map, transitively). The
-			// aggregated deferral errors name the offenders.
-			return errors.Join(deferred...)
+			// No multi advanced and some remain deferred: their references
+			// are unresolvable (dangling, or dependent on a multi that
+			// failed above). Settle each with its deferral reason rather
+			// than aborting the whole map.
+			for key, err := range deferred {
+				settleFailed(key, err)
+			}
+			break
 		}
 	}
+
+	if len(failures) == 0 {
+		return nil
+	}
+	return errors.Join(failures...)
 }
 
 // ErrMultiRefNotReady signals that a referenced store exists in the

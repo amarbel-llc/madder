@@ -207,8 +207,12 @@ func MakeBlobStores(
 			blobStore.ConfigNamed,
 			blobStores,
 		); err != nil {
-			ctx.Cancel(err)
-			return blobStores
+			// Discovered store: skip with a stashed error rather than
+			// aborting the whole map (a broken or foreign ancestor store
+			// must not kill an unrelated repo's construction). The error
+			// surfaces only when the store is explicitly addressed.
+			blobStore.BlobStore = nil
+			blobStore.BuildErr = err
 		}
 
 		blobStores[blobStoreIdString] = blobStore
@@ -219,6 +223,9 @@ func MakeBlobStores(
 
 		if blobStore.BlobStore != nil {
 			continue
+		}
+		if blobStore.BuildErr != nil {
+			continue // already settled as failed in pass 1
 		}
 		if _, isMulti := blobStore.Config.Blob.(blob_store_configs.ConfigMulti); isMulti {
 			continue
@@ -231,19 +238,47 @@ func MakeBlobStores(
 			blobStore.ConfigNamed,
 			blobStores,
 		); err != nil {
-			ctx.Cancel(err)
-			return blobStores
+			blobStore.BlobStore = nil
+			blobStore.BuildErr = err
 		}
 
 		blobStores[blobStoreIdString] = blobStore
 	}
 
-	if err := buildMultiStores(ctx, blobStores); err != nil {
-		ctx.Cancel(err)
-		return blobStores
-	}
+	// buildMultiStores degrades the same way: a multi that cannot build
+	// (dangling ref, digest mismatch, unbuildable member) is stashed with
+	// its BuildErr rather than aborting. The returned aggregate is only a
+	// signal that some multi failed; the per-multi errors live on their
+	// entries and are reported below.
+	_ = buildMultiStores(ctx, blobStores)
+
+	reportSkippedStores(envDir, blobStores)
 
 	return blobStores
+}
+
+// reportSkippedStores emits one diagnostic per discovered store that
+// failed to build. These stores were skipped (not aborted) so a broken or
+// foreign ancestor store can't kill an unrelated repo's construction; the
+// stashed BuildErr surfaces as a hard error only when the store is
+// explicitly addressed (blob_store_env.GetBlobStore).
+func reportSkippedStores(envDir env_dir.Env, blobStores BlobStoreMap) {
+	base := storeChatterPrinter(envDir)
+
+	for _, blobStore := range blobStores {
+		if blobStore.BuildErr == nil {
+			continue
+		}
+
+		ui.MakePrefixPrinter(
+			base,
+			fmt.Sprintf("# (blob_store: %s) ", blobStore.Path.GetId()),
+		).Printf(
+			"discovered store skipped (failed to build): %s; "+
+				"addressing it will surface this error",
+			blobStore.BuildErr,
+		)
+	}
 }
 
 func MakeRemoteBlobStore(

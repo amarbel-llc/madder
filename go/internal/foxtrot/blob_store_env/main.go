@@ -116,7 +116,19 @@ func (env *BlobStoreEnv) setupStores() {
 	}
 
 	sort.Strings(keys)
-	env.defaultBlobStoreIdString = keys[0]
+
+	// The default is the alphabetically-first store that actually built.
+	// A discovered store that failed to build (BuildErr set, BlobStore
+	// nil) is skipped so a broken ancestor store sorting first cannot
+	// become the default and panic on use. If nothing built, the default
+	// stays unset; GetBlobStore surfaces the per-store BuildErr when such
+	// a store is explicitly addressed.
+	for _, key := range keys {
+		if env.blobStores[key].BlobStore != nil {
+			env.defaultBlobStoreIdString = key
+			return
+		}
+	}
 }
 
 func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []scoped_id.Id) {
@@ -202,6 +214,22 @@ func (env BlobStoreEnv) GetBlobStore(
 			available,
 		)
 
+		return blob_stores.BlobStoreInitialized{}
+	}
+
+	// A discovered store that failed to build is present in the map but
+	// unusable. Addressing it explicitly is the point at which its stashed
+	// error becomes a hard failure (MakeBlobStores only skipped it with a
+	// diagnostic so an unrelated repo's construction could proceed).
+	if blobStore.BuildErr != nil {
+		errors.ContextCancelWithBadRequestError(
+			env,
+			errors.Wrapf(
+				blobStore.BuildErr,
+				"blob store %q failed to build during discovery",
+				key,
+			),
+		)
 		return blob_stores.BlobStoreInitialized{}
 	}
 
@@ -315,6 +343,13 @@ func tryOpenInStore(
 	store blob_stores.BlobStoreInitialized,
 	id domain_interfaces.MarklId,
 ) (reader domain_interfaces.BlobReader, ok bool, err error) {
+	// A discovered store that failed to build has a nil backend; it can't
+	// serve any blob, so skip it (calling through the nil interface would
+	// otherwise panic into the recover below).
+	if store.BlobStore == nil {
+		return nil, false, nil
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			ok = false
@@ -337,6 +372,10 @@ func storeHasBlob(
 	store blob_stores.BlobStoreInitialized,
 	id domain_interfaces.MarklId,
 ) (has bool) {
+	if store.BlobStore == nil {
+		return false
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			has = false

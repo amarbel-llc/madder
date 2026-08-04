@@ -230,4 +230,51 @@ func TestBuildMultiStores_DanglingRef(t *testing.T) {
 	if err := buildMultiStores(testCtx(t), stores); err == nil {
 		t.Fatal("expected dangling-ref error, got nil")
 	}
+
+	// The failure degrades: the orphan is settled with its error stashed
+	// on the entry (surfaced at address time), not left half-built.
+	if stores["orphan"].BuildErr == nil {
+		t.Error("orphan multi should carry a stashed BuildErr")
+	}
+	if stores["orphan"].BlobStore != nil {
+		t.Error("orphan multi should not have a built BlobStore")
+	}
+}
+
+// TestBuildMultiStores_DegradesInsteadOfAborting pins the SECONDARY fix:
+// one unbuildable discovered multi (a dangling ref) must NOT abort the
+// construction of an unrelated, buildable multi. The good multi builds;
+// the bad one is skipped with its error stashed; the aggregate return is
+// non-nil so a direct caller can still see something failed.
+func TestBuildMultiStores_DegradesInsteadOfAborting(t *testing.T) {
+	ssd := builtLeafForTest(t, "ssd", 0x01)
+
+	good := multiLeafForTest(t, "good", &blob_store_configs.TomlMultiV0{
+		Mode:         "mirror",
+		MirrorStores: []scoped_id.Id{digestRef(ssd)},
+	})
+	bad := multiLeafForTest(t, "bad", &blob_store_configs.TomlMultiV0{
+		Mode:         "mirror",
+		MirrorStores: []scoped_id.Id{scoped_id.Make("ghost").WithDigest(digestSeeded(t, 0x09))},
+	})
+
+	stores := MakeBlobStoreMap(ssd, good, bad)
+
+	err := buildMultiStores(testCtx(t), stores)
+	if err == nil {
+		t.Fatal("expected an aggregate error for the failed multi, got nil")
+	}
+
+	if stores["good"].BlobStore == nil {
+		t.Error("the buildable multi was aborted by the unrelated failure")
+	}
+	if stores["good"].BuildErr != nil {
+		t.Errorf("the buildable multi should have no BuildErr, got %v", stores["good"].BuildErr)
+	}
+	if stores["bad"].BuildErr == nil {
+		t.Error("the unbuildable multi should carry a stashed BuildErr")
+	}
+	if stores["bad"].BlobStore != nil {
+		t.Error("the unbuildable multi should not have a built BlobStore")
+	}
 }
