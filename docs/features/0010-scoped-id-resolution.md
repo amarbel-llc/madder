@@ -224,6 +224,38 @@ Because ambiguity is structurally excluded, every resolution outcome is
 either *one location* or *a fail-fast error*. There is no third,
 "merged" outcome (see Implicit Union-Merge Is Retired).
 
+### Config-relative resolution (references inside a config)
+
+A scoped id does not always arrive from the command line. It can be a
+**reference stored inside a config** — most notably a `multi` config's
+digest-pinned member ids (FDR-0009 / FDR-0008 Phase 2). For such a
+reference the resolver's `cwd` argument **MUST** be the directory where
+**that config lives**, not the process cwd. An id inside a config means
+what it meant *where the config lives*: the resolver conceptually `cd`s
+to the config's directory before resolving the config's CWD-scoped refs.
+
+Concretely, for a CWD-scoped reference (`.name`, `..name`, …) the
+resolver adds the **config's own walk-up depth** to the reference's
+dot-depth before the walk. A `.local` member inside a `notes` multi
+config discovered at `..notes` (one ancestor up) resolves to `..local`
+(that same ancestor's `local` store), **not** `.local` (the process
+cwd's own `local` store). References in a fixed scope (XDG user, system,
+cache) are scope-absolute and unaffected — they name the same store
+regardless of where the referencing config lives.
+
+This is the single-resolver invariant applied to nested references: the
+same physical store is selected whether the id is typed at the process
+cwd or embedded in a config discovered N ancestors up, because both go
+through the one resolver with the *correct* `cwd`. Its absence was a live
+instance of the resolution-plurality class: implicit union-merge
+discovery (below) resolved an ancestor multi's `.member` against the
+process cwd, silently binding the wrong physical store. That went
+unnoticed while identically-configured local stores shared a config
+digest; the FDR's instance uuid (below) made each digest unique, so the
+digest-pin assertion correctly fired ("wrong instance") and exposed the
+mis-resolution — the dodder#196 / dodder#359 mechanism, caught by the
+identity layer doing its job (see *Mismatch diagnosis*).
+
 ## The Init Exception
 
 Init is **not a second resolver.** It is the one resolver plus a single
@@ -697,6 +729,17 @@ Bare `#N` denotes a madder issue; `dodder#N` a dodder issue
 - **Related dodder bugs the one-resolver contract closes:** dodder#283
   (nested same-named repo), dodder#341 (fresh env can't discover a
   pointer store), dodder#196 (clone split-brains lookups).
+- **Config-relative member resolution (madder side):** the multi
+  build path (`blob_stores.resolveMultiRef`) rebases a multi's
+  CWD-scoped member refs through the multi config's own discovered depth
+  (`scoped_id.Id.ResolveFrom`), so an ancestor multi's `.member` resolves
+  to the ancestor's store — the *Config-relative resolution* rule above.
+  Relates to **madder#283** (reference re-pointing: a migrated store's
+  references must repoint at the new instance) and **madder#280** (M3
+  mismatch diagnosis): this bug is madder#280's mechanism firing
+  *correctly* — the instance-uuid digest-pin catching a member ref bound
+  to the wrong physical store, which is exactly the wrong-instance
+  diagnosis the *Mismatch diagnosis* section specifies.
 - **Cross-repo:** the dodder-side policy (repo auto-id discovery,
   `repos/<name>/` nesting, `/name` remote-first) is specified in the
   parallel revision of dodder's **FDR-0019**, which composes over this
