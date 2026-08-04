@@ -109,26 +109,27 @@ func (env *BlobStoreEnv) setupStores() {
 		env.BlobStore,
 	)
 
-	keys := slices.Collect(maps.Keys(env.blobStores))
+	env.defaultBlobStoreIdString = selectDefaultBlobStoreId(env.blobStores)
+}
 
-	if len(keys) == 0 {
-		return
-	}
-
+// selectDefaultBlobStoreId returns the alphabetically-first store whose
+// backend actually built, or "" when the map is empty or every store
+// failed to build. A discovered store that failed to build (BuildErr set,
+// BlobStore nil) is skipped so a broken store sorting first cannot become
+// the default and panic on use; when nothing built the default stays
+// unset and GetBlobStore surfaces the per-store BuildErr on explicit
+// address.
+func selectDefaultBlobStoreId(blobStores blob_stores.BlobStoreMap) string {
+	keys := slices.Collect(maps.Keys(blobStores))
 	sort.Strings(keys)
 
-	// The default is the alphabetically-first store that actually built.
-	// A discovered store that failed to build (BuildErr set, BlobStore
-	// nil) is skipped so a broken ancestor store sorting first cannot
-	// become the default and panic on use. If nothing built, the default
-	// stays unset; GetBlobStore surfaces the per-store BuildErr when such
-	// a store is explicitly addressed.
 	for _, key := range keys {
-		if env.blobStores[key].BlobStore != nil {
-			env.defaultBlobStoreIdString = key
-			return
+		if blobStores[key].BlobStore != nil {
+			return key
 		}
 	}
+
+	return ""
 }
 
 func (env *BlobStoreEnv) SetBlobStoreOrder(blobStoreIds []scoped_id.Id) {
