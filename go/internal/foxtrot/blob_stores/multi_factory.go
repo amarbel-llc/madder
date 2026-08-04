@@ -15,15 +15,28 @@ import (
 // digest-bearing by decode-time Validate() (Task 2/3), so this does
 // not re-parse or re-check the format.
 //
+// configDepth is the discovered cwd-depth of the multi config that owns
+// this reference (0 for a multi at the process cwd or in a fixed XDG
+// scope). Cwd-scoped refs are rebased through that depth so they resolve
+// relative to the config's own location, not the process cwd (FDR-0010
+// config-location-relative resolution; see scoped_id.Id.ResolveFrom).
+// Without this, an ancestor multi discovered at `..default-notes` would
+// resolve its `.default-local` member against the process cwd's own
+// `.default-local` — a different instance with a different digest — and
+// the digest-pin assertion below would fire on a correct config.
+//
 // Returns ErrMultiRefNotReady when the named store exists but has not
 // been built yet (BlobStore == nil) — the construction loop uses this
 // to defer. Returns a hard error for a dangling ref (name not in the
 // map), a legacy/undigested target, or a digest mismatch.
 func resolveMultiRef(
 	refId scoped_id.Id,
+	configDepth uint,
 	blobStores BlobStoreMap,
 ) (BlobStoreInitialized, error) {
-	resolved, ok := blobStores[refId.String()]
+	lookupId := refId.ResolveFrom(configDepth)
+
+	resolved, ok := blobStores[lookupId.String()]
 	if !ok {
 		return BlobStoreInitialized{}, errors.BadRequestf(
 			"multi store references %q which is not present in any "+
@@ -56,9 +69,15 @@ func resolveMultiRef(
 // makeMultiStore builds a Multi from a ConfigMulti and a populated
 // store map. Every reference must already be built; resolveMultiRef
 // surfaces ErrMultiRefNotReady otherwise so the caller can defer.
+//
+// configDepth is the discovered cwd-depth of this multi's own config; it
+// is passed through to resolveMultiRef so cwd-scoped member refs resolve
+// relative to the config's location rather than the process cwd (see
+// resolveMultiRef).
 func makeMultiStore(
 	ctx interfaces.ActiveContext,
 	config blob_store_configs.ConfigMulti,
+	configDepth uint,
 	blobStores BlobStoreMap,
 ) (store domain_interfaces.BlobStore, err error) {
 	builder := NewMulti(ctx)
@@ -73,7 +92,7 @@ func makeMultiStore(
 		}
 		mirrors := make([]BlobStoreInitialized, 0, len(refs))
 		for _, refId := range refs {
-			resolved, e := resolveMultiRef(refId, blobStores)
+			resolved, e := resolveMultiRef(refId, configDepth, blobStores)
 			if e != nil {
 				return store, e
 			}
@@ -88,7 +107,7 @@ func makeMultiStore(
 				"multi write_through mode requires a write-store",
 			)
 		}
-		writeStore, e := resolveMultiRef(writeId, blobStores)
+		writeStore, e := resolveMultiRef(writeId, configDepth, blobStores)
 		if e != nil {
 			return store, e
 		}
@@ -96,7 +115,7 @@ func makeMultiStore(
 
 		reads := make([]BlobStoreInitialized, 0, len(config.GetReadStores()))
 		for _, refId := range config.GetReadStores() {
-			resolved, e := resolveMultiRef(refId, blobStores)
+			resolved, e := resolveMultiRef(refId, configDepth, blobStores)
 			if e != nil {
 				return store, e
 			}
@@ -144,7 +163,13 @@ func buildMultiStores(
 				continue
 			}
 
-			built, err := makeMultiStore(ctx, config, blobStores)
+			// The multi's own discovered cwd-depth (tagged during the
+			// ancestor walk-up in makeAncestorOverrideStores) is the frame
+			// its cwd-scoped member refs resolve against. 0 for a multi at
+			// the process cwd or in a fixed XDG scope.
+			configDepth := blobStore.Path.GetId().GetCwdDepth()
+
+			built, err := makeMultiStore(ctx, config, configDepth, blobStores)
 			if err != nil {
 				if errors.Is(err, ErrMultiRefNotReady{}) {
 					deferred = append(deferred, errors.Wrapf(err,

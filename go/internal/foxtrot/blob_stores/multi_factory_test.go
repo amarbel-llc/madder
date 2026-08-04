@@ -90,7 +90,7 @@ func TestMakeMultiStore_WriteThrough(t *testing.T) {
 		ReadFill: &readFill,
 	}
 
-	store, err := makeMultiStore(testCtx(t), cfg, stores)
+	store, err := makeMultiStore(testCtx(t), cfg, 0, stores)
 	if err != nil {
 		t.Fatalf("makeMultiStore: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestMakeMultiStore_DigestMismatchRefuses(t *testing.T) {
 		},
 	}
 
-	if _, err := makeMultiStore(testCtx(t), cfg, stores); err == nil {
+	if _, err := makeMultiStore(testCtx(t), cfg, 0, stores); err == nil {
 		t.Fatal("expected digest-mismatch error, got nil")
 	}
 }

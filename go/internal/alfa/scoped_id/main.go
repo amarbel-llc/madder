@@ -306,6 +306,34 @@ func (id Id) GetCwdDepth() uint {
 	return id.cwdDepth
 }
 
+// ResolveFrom re-expresses id — a reference parsed from a config file —
+// in the coordinate frame of the process cwd, given that the config
+// itself lives configCwdDepth cwd-levels up from the process cwd (i.e.
+// the config's own scoped id has that cwdDepth). It adds configCwdDepth
+// to a Cwd id's own depth and returns the rebased copy.
+//
+// This is FDR-0010's config-location-relative resolution: a scoped id
+// inside a config means what it meant WHERE THE CONFIG LIVES — as if the
+// resolver `cd`'d to the config's directory before resolving the id. A
+// `.name` reference inside a config discovered at `..` (depth 1) names
+// "the `name` store beside THIS config", which from the process cwd is
+// `..name` (depth 1), not `.name` (depth 0, the process cwd's own store).
+//
+// Only Cwd-scoped ids are rebased. XDG user/system/cache ids are
+// scope-absolute — they name the same store regardless of where the
+// referencing config lives — and are returned unchanged. A zero
+// configCwdDepth is the identity for every id (a config at the process
+// cwd resolves its refs exactly as written), so this is safe to call
+// unconditionally. The digest suffix, if any, is preserved.
+func (id Id) ResolveFrom(configCwdDepth uint) Id {
+	if id.location != xdg_location_type.Cwd {
+		return id
+	}
+
+	id.cwdDepth += configCwdDepth
+	return id
+}
+
 func (id Id) GetDigest() markl.Id {
 	return id.digest
 }

@@ -490,6 +490,7 @@ func MakeBlobStore(
 		return makeMultiStore(
 			envDir.GetActiveContext(),
 			config,
+			configNamed.Path.GetId().GetCwdDepth(),
 			blobStores,
 		)
 

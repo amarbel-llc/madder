@@ -62,6 +62,78 @@ func TestConformance_ScopeIsDeterminedByPrefix(t *testing.T) {
 	}
 }
 
+// TestConformance_ResolveFrom_ConfigLocationRelative pins FDR-0010's
+// config-location-relative resolution ("The Normative Resolver": an id
+// inside a config means what it meant WHERE THE CONFIG LIVES). A
+// reference parsed from a config discovered `configDepth` CWD-levels up
+// resolves as if the resolver `cd`'d to that config's directory first:
+// only CWD-scoped ids are rebased (by adding configDepth to their own
+// dot-depth); user/system/cache ids are scope-absolute and unchanged.
+// This is the primitive that makes an ancestor multi's `.member` resolve
+// to the ancestor's store, not the process cwd's — the mechanism whose
+// absence was the cross-scope multi-resolution bug (dodder#196/#359
+// class).
+func TestConformance_ResolveFrom_ConfigLocationRelative(t *testing.T) {
+	cases := []struct {
+		spelling    string
+		configDepth uint
+		want        string // String() after rebasing
+	}{
+		// CWD scope IS rebased: the config's depth adds to the ref's.
+		{".widgets", 0, ".widgets"},    // config at cwd: identity
+		{".widgets", 1, "..widgets"},   // config one ancestor up
+		{".widgets", 2, "...widgets"},  // config two ancestors up
+		{"..widgets", 1, "...widgets"}, // a `..` ref one level up
+		{"...gadgets", 0, "...gadgets"},
+
+		// Fixed scopes are scope-absolute: never rebased, whatever the
+		// config's depth.
+		{"widgets", 2, "widgets"},     // XDG user
+		{"~widgets", 2, "widgets"},    // XDG user (parse-only alias)
+		{"//widgets", 2, "//widgets"}, // XDG system (forced)
+		{"/widgets", 2, "/widgets"},   // XDG system (remote-first)
+		{"%gadgets", 2, "%gadgets"},   // XDG cache
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.spelling, func(t *testing.T) {
+			var id Id
+			if err := id.Set(tc.spelling); err != nil {
+				t.Fatalf("Set(%q): %v", tc.spelling, err)
+			}
+			got := id.ResolveFrom(tc.configDepth).String()
+			if got != tc.want {
+				t.Errorf("ResolveFrom(%d): got %q, want %q",
+					tc.configDepth, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestConformance_ResolveFrom_PreservesDigest pins that rebasing a
+// digest-pinned CWD reference (the form a multi config stores for its
+// members) carries the pin through unchanged — the rebased id addresses a
+// different physical store but still asserts the SAME pinned instance.
+func TestConformance_ResolveFrom_PreservesDigest(t *testing.T) {
+	const digest = "blake2b256-9ft3m74l5t2ppwjrvfg3wp380jqj2zfrm6zevxqx34sdethvey0s5vm9gd"
+
+	var id Id
+	if err := id.Set(".widgets@" + digest); err != nil {
+		t.Fatalf("Set: %v", err)
+	}
+
+	rebased := id.ResolveFrom(1)
+	if !rebased.HasDigest() {
+		t.Fatal("digest dropped by ResolveFrom")
+	}
+	if got, want := rebased.Canonical(), ".widgets@"+digest; got != want {
+		t.Errorf("Canonical after rebase: got %q, want %q", got, want)
+	}
+	if got := rebased.String(); got != "..widgets" {
+		t.Errorf("String after rebase: got %q, want %q", got, "..widgets")
+	}
+}
+
 // TestConformance_CrossScopeIdsAreDistinct pins that the same bare name
 // under three different prefixes parses to three distinct ids naming
 // three distinct scopes — the resolver never conflates them, so a bare
