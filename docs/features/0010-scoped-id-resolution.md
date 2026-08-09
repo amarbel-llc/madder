@@ -709,6 +709,81 @@ the defect.
 6. Flip each EXPECTED-FAIL in the conformance suite to a passing
    assertion as its divergence closes.
 
+## Registry v1 (advisory host-wide index)
+
+Origin: **dodder RFC-0007**, addendum *"registry v1 scoped —
+spinclass-pattern index + list surfaces"* (2026-08-04, ruled by Sasha).
+That addendum is the authoritative design; this section records what
+landed on the madder side and pins the on-disk conventions the dodder
+twin (genesis registration + `dodder repos-list`) must match.
+
+**Advisory only — never a resolver.** The index feeds *listing*
+exclusively (`madder list -all`); no resolution path consults it. That
+separation is deliberate: resolution correctness belongs to the
+one-resolver contract above (this FDR), and a mandatory index check would
+re-introduce exactly the ambient-lookup ambiguity the contract removes.
+The index makes divergence *visible* (two same-named stores with
+different pins sit side by side in one table) without making it
+load-bearing.
+
+**Registration at creation.** Every store-creation funnel
+(`InitBlobStore`, `EnsureBlobStoreVerbatim` — i.e. `init`, `init-*`,
+`init-from`, and any dodder-genesis store authored through madder's
+library funnel) registers the store in a per-host index after the
+config is written. Registration is **best-effort**: a failure warns on
+stderr and never fails the init. All scopes register uniformly; the
+cwd-scoped stores are the ones this buys global visibility for.
+
+**On-disk conventions** (the contract for the dodder twin):
+
+- **Directory:** `$XDG_STATE_HOME/madder/index/`. Read directly from
+  the environment — *no* env_dir scope machinery, *no* walk-up, *no*
+  ceiling — so the index cannot inherit the ambiguity this FDR resolves,
+  and a sandbox that redirects `XDG_STATE_HOME` is isolated by
+  construction. (dodder's twin uses `$XDG_STATE_HOME/dodder/index/`.)
+- **Key (entry filename):** `hex(sha256(filepath.Clean(store-base-dir))[:8])`
+  — 16 lowercase hex chars, **no extension**. `store-base-dir` is the
+  directory containing the store's `blob_store-config`
+  (`BlobStorePath.GetBase()` = `filepath.Dir(GetConfig())`).
+- **Entry:** a **symlink** whose target is the absolute path to that
+  store's `blob_store-config`.
+- **Write:** TOCTOU-safe — `os.Symlink` to a unique `.tmp-<pid>-<nano>`
+  name in the index dir, then `os.Rename` over the final key. Lifted
+  from spinclass `internal/session/session.go`'s `writeIndexSymlink`.
+- **Stale:** a **dangling** symlink (target `blob_store-config` gone —
+  store deleted or moved) is *classified*, not an error. It lists as
+  stale.
+
+**`madder list -all`.** Unions the registered entries (host-wide) with
+the current scope's discovered stores, deduped by key (and cleaned
+config path). Columns: **NAME** (scoped spelling — exact for live
+stores; best-effort inferred from the path for registered-only entries,
+since host-wide no marker distinguishes every cwd root — LOCATION
+carries the exact path regardless), **PIN** (config digest,
+shortest-distinct-prefix abbreviated), **ID** (uuidv7 instance id,
+abbreviated), **TYPE** (`local`/`multi`/`pointer`/`sftp`/`webdav`/`s3`/
+`archive`), **LOCATION** (`~`-relative store dir). Dangling entries are
+marked `(stale)`. Rendered as a charmbracelet/lipgloss table on a TTY;
+`-format=tap|ndjson|json` give scriptable forms (ndjson/json emit a JSON
+**array**, not an id-keyed object, because names collide host-wide).
+Without `-all`, the current-scope view is unchanged.
+
+**Staleness / GC.** `madder registry-gc [-retention <dur>]` prunes
+dangling entries older than `-retention` (default 30 days, measured from
+the symlink's own mtime = registration time; a grace window against a
+transiently-unavailable store). Live entries are never touched;
+`-retention=0` is a no-op. **No tombstones in v1** — a deleted store
+needs no post-mortem record (unlike a spinclass session), so a pruned
+entry leaves nothing behind.
+
+**Package boundary.** The index primitive lives at
+`go/internal/bravo/registry` and is deliberately madder-agnostic
+(stdlib only — paths, symlinks, a utility-name segment; it does *not*
+decode `blob_store-config`, that interpretation lives in the `list`
+command). It is a cheap candidate for extraction into `dewey` once
+dodder's twin lands, but that cross-repo extraction is **not** done
+here — the boundary is kept clean so the extraction stays cheap.
+
 ## More Information
 
 Issue references: madder issues live on the Forgejo at

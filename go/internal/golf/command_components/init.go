@@ -6,12 +6,30 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/alfa/scoped_id"
 	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
+	"code.linenisgreat.com/madder/go/internal/bravo/registry"
 	"code.linenisgreat.com/madder/go/internal/charlie/files"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
+
+// registerBestEffort records a just-created (or idempotently-confirmed) blob
+// store in the per-host registry index, so `madder list -all` can see it
+// host-wide regardless of the XDG scope or cwd that created it (dodder
+// RFC-0007, "registry v1 scoped"). Best-effort by contract: a failure warns on
+// stderr and never fails the init. Advisory only — the index feeds listing,
+// never resolution (FDR-0010).
+func registerBestEffort(path directory_layout.BlobStorePath) {
+	if err := registry.Register(path.GetBase(), path.GetConfig()); err != nil {
+		ui.Err().Printf(
+			"warning: blob store registry registration failed for %s: %v",
+			path.GetId(),
+			err,
+		)
+	}
+}
 
 type Init struct{}
 
@@ -93,6 +111,8 @@ func (cmd Init) InitBlobStore(
 		return path
 	}
 
+	registerBestEffort(path)
+
 	return path
 }
 
@@ -141,7 +161,13 @@ func (cmd Init) EnsureBlobStoreVerbatim(
 				existing.BlobDigest,
 				intendedDigest,
 			))
+			return path
 		}
+
+		// Idempotent match: the store already exists with the intended config.
+		// Re-register (harmless replace) so a store created before the registry
+		// existed — or in another checkout — gains host-wide visibility.
+		registerBestEffort(path)
 
 		return path
 	} else if !errors.IsNotExist(err) {
@@ -174,6 +200,8 @@ func (cmd Init) EnsureBlobStoreVerbatim(
 		envBlobStore.Cancel(err)
 		return path
 	}
+
+	registerBestEffort(path)
 
 	return path
 }

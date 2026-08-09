@@ -159,8 +159,9 @@ generated `madder(1)` man page — run `man madder`, or regenerate with
 
 | Command | Description |
 |---------|-------------|
-| `list` | list configured blob stores |
+| `list` | list configured blob stores (`-all` lists every store registered host-wide, with stale entries marked) |
 | `info-repo` | display blob store configuration |
+| `registry-gc` | prune stale (dangling) entries from the per-host blob store registry index |
 | `sync` | synchronize blobs between stores |
 | `fsck` | verify blob store integrity |
 | `config-pin_digest` | mint or refresh the `@` digest line on `blob_store-config` files |

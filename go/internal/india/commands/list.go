@@ -25,6 +25,7 @@ type List struct {
 
 	Format output_format.Format
 	Tree   bool
+	All    bool
 }
 
 var (
@@ -64,6 +65,11 @@ func (cmd *List) SetFlagDefinitions(
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 	flagSet.BoolVar(&cmd.Tree, "tree", false,
 		"render the multi-store reference graph (forces text output)")
+	flagSet.BoolVar(&cmd.All, "all", false,
+		"list every blob store registered host-wide (from the per-host "+
+			"registry index at $XDG_STATE_HOME/madder/index), unioned with "+
+			"the current scope's discovered stores; dangling entries (store "+
+			"deleted or moved) are marked stale")
 }
 
 type listRecord struct {
@@ -87,6 +93,14 @@ type listRecordRef struct {
 func (cmd List) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 	blobStores := envBlobStore.GetBlobStores()
+
+	// -all switches to the host-wide registry view (NAME/PIN/ID/TYPE/LOCATION,
+	// stale marking) — a different column set from the current-scope list, so
+	// it has its own assembly + renderers. See list_all.go.
+	if cmd.All {
+		cmd.runAll(envBlobStore, blobStores)
+		return
+	}
 
 	// -tree is a human-facing text rendering of the multi-store graph;
 	// it forces text output regardless of -format or whether stdout is
