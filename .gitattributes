@@ -1,0 +1,28 @@
+# conformist-git(7) MERGE DRIVERS: regenerate-on-conflict merge for
+# generated files. The merge.<name>.driver side is registered per-machine
+# in eng home-manager git config; these lines are the per-repo half.
+flake.lock merge=conformist-flake-lock
+*_tommy.go merge=conformist-codegen-header
+go/pkgs/arg_resolver/main.go merge=conformist-codegen-header
+go/pkgs/blob_io/main.go merge=conformist-codegen-header
+go/pkgs/blob_store_configs/main.go merge=conformist-codegen-header
+go/pkgs/blob_store_env/main.go merge=conformist-codegen-header
+go/pkgs/blob_stores/main.go merge=conformist-codegen-header
+go/pkgs/directory_layout/main.go merge=conformist-codegen-header
+go/pkgs/domain_interfaces/main.go merge=conformist-codegen-header
+go/pkgs/env_dir/main.go merge=conformist-codegen-header
+go/pkgs/env_local/main.go merge=conformist-codegen-header
+go/pkgs/env_ui/main.go merge=conformist-codegen-header
+go/pkgs/fd/main.go merge=conformist-codegen-header
+go/pkgs/ids/main.go merge=conformist-codegen-header
+go/pkgs/inventory_archive/main.go merge=conformist-codegen-header
+go/pkgs/inventory_log/main.go merge=conformist-codegen-header
+go/pkgs/madder_env/main.go merge=conformist-codegen-header
+go/pkgs/markl_io/main.go merge=conformist-codegen-header
+go/pkgs/markl_registrations/main.go merge=conformist-codegen-header
+go/pkgs/mmap_blob/main.go merge=conformist-codegen-header
+go/pkgs/output_format/main.go merge=conformist-codegen-header
+go/pkgs/plugins/main.go merge=conformist-codegen-header
+go/pkgs/scoped_id/main.go merge=conformist-codegen-header
+go/pkgs/tap_diagnostics/main.go merge=conformist-codegen-header
+go/pkgs/xdg_location_type/main.go merge=conformist-codegen-header

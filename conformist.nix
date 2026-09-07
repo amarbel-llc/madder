@@ -88,4 +88,114 @@
     "result-*"
     ".tmp/**"
   ];
+
+  # conformist-git(7) MERGE DRIVERS. presets.eng binds flake.lock by default;
+  # a definition here REPLACES that default, so flake.lock is restated. The
+  # rest are this repo's generated sources, named explicitly (never a glob
+  # that could also match a hand-written sibling) so only files a generator
+  # owns go through the stamp-resolving driver. The merge.<name>.driver
+  # registration is the per-machine half, in eng home/git.nix.
+  linters.git-merge-drivers.entries = [
+    {
+      pattern = "flake.lock";
+      driver = "conformist-flake-lock";
+      when-file = "flake.nix";
+    }
+    {
+      pattern = "*_tommy.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/arg_resolver/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/blob_io/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/blob_store_configs/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/blob_store_env/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/blob_stores/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/directory_layout/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/domain_interfaces/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/env_dir/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/env_local/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/env_ui/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/fd/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/ids/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/inventory_archive/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/inventory_log/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/madder_env/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/markl_io/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/markl_registrations/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/mmap_blob/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/output_format/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/plugins/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/scoped_id/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/tap_diagnostics/main.go";
+      driver = "conformist-codegen-header";
+    }
+    {
+      pattern = "go/pkgs/xdg_location_type/main.go";
+      driver = "conformist-codegen-header";
+    }
+  ];
 }
