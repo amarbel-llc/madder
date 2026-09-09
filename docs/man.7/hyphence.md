@@ -9,8 +9,7 @@ title: HYPHENCE(7) Madder \| Miscellaneous
 
 # NAME
 
-hyphence - text-based metadata + body serialization format (moved to the
-hyphence repository)
+hyphence - text-based metadata + body serialization format (moved to hyphence)
 
 # DESCRIPTION
 

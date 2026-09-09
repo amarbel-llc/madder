@@ -64,7 +64,7 @@ type SftpAnalyzeAndSuggestConfigs struct {
 
 func (cmd SftpAnalyzeAndSuggestConfigs) GetDescription() futility.Description {
 	return futility.Description{
-		Short: "analyze a legacy SFTP blob store and suggest blob_store-config candidates",
+		Short: "analyze a legacy SFTP blob store and suggest config candidates",
 		Long: "Read-only probe of a legacy SFTP remote without a " +
 			"blob_store-config file. Samples blobs, generates candidate " +
 			"configs, sample-verifies them through the existing reader " +

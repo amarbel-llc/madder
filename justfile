@@ -715,6 +715,37 @@ debug-gen_man page="madder.1":
   cd go && go run ./cmd/madder-gen_man "$out"
   cat "$out/share/man/man1/{{page}}"
 
+# Sweep every built man page (sections 1 and 7 under result/share/man) with
+# lexgrog and report each NAME line as whatis would extract it. spinclass
+# renders these NAME lines into a system-prompt index; the fleet rule is one
+# non-empty description line <= 72 characters. Exits non-zero when any page
+# fails to parse or its description is over the limit. Run after build-nix.
+#
+# check built man pages' NAME descriptions parse and fit the 72-char limit
+[group("debug")]
+debug-man-name-lines limit="72":
+  #!/usr/bin/env bash
+  set -euo pipefail
+  rc=0
+  for page in result/share/man/man1/* result/share/man/man7/*; do
+    if ! line=$(lexgrog "$page" 2>&1); then
+      printf 'FAIL %s: %s\n' "$page" "$line"
+      rc=1
+      continue
+    fi
+    # lexgrog prints `path: "name - description"`
+    desc=${line#* - }
+    desc=${desc%\"}
+    len=${#desc}
+    status=ok
+    if [ -z "$desc" ] || [ "$len" -gt {{limit}} ]; then
+      status=OVER
+      rc=1
+    fi
+    printf '%-4s %3d %s\n' "$status" "$len" "$line"
+  done
+  exit "$rc"
+
 # Repro for #21: try `madder init` with and without the flags bats uses.
 # Runs in an isolated tmp HOME/workdir under a ceiling that prevents madder
 # from walking into any real config. All variants keep MADDER_CEILING_DIRECTORIES
