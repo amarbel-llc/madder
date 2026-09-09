@@ -717,11 +717,15 @@ debug-gen_man page="madder.1":
 
 # Sweep every built man page (sections 1 and 7 under result/share/man) with
 # lexgrog and report each NAME line as whatis would extract it. spinclass
-# renders these NAME lines into a system-prompt index; the fleet rule is one
-# non-empty description line <= 72 characters. Exits non-zero when any page
-# fails to parse or its description is over the limit. Run after build-nix.
+# renders these NAME lines into a system-prompt index by reading only the
+# FIRST physical roff line of the NAME body; the fleet rule (doppelgang
+# lint-man) is one physical, non-empty description line <= 72 characters.
+# lexgrog joins wrapped lines, so the recipe also zcats each page and counts
+# the physical lines between `.SH NAME` and the next `.SH`. Exits non-zero
+# when any page fails to parse, wraps NAME, or is over the limit. Run after
+# build-nix.
 #
-# check built man pages' NAME descriptions parse and fit the 72-char limit
+# check built man pages' NAME lines are one physical line <= 72 chars
 [group("debug")]
 debug-man-name-lines limit="72":
   #!/usr/bin/env bash
@@ -737,12 +741,21 @@ debug-man-name-lines limit="72":
     desc=${line#* - }
     desc=${desc%\"}
     len=${#desc}
+    # physical roff lines in the NAME body (comments and blank lines dropped)
+    lines=$(zcat "$page" | awk '
+      /^\.SH NAME/ { inname = 1; next }
+      /^\.SH/ { inname = 0 }
+      inname && !/^\.\\"/ && !/^[[:space:]]*$/ { n++ }
+      END { print n + 0 }')
     status=ok
     if [ -z "$desc" ] || [ "$len" -gt {{limit}} ]; then
       status=OVER
       rc=1
+    elif [ "$lines" -ne 1 ]; then
+      status=WRAP
+      rc=1
     fi
-    printf '%-4s %3d %s\n' "$status" "$len" "$line"
+    printf '%-4s %3d %dL %s\n' "$status" "$len" "$lines" "$line"
   done
   exit "$rc"
 

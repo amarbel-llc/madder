@@ -251,7 +251,10 @@ let
       mkdir -p $out/share/man/man7
       for f in ${man7Src}/*.md; do
         name="$(basename "$f" .md)"
-        pandoc -s -t man "$f" -o "$out/share/man/man7/$name.7"
+        # --wrap=none: pandoc's default 72-column re-wrap can split the
+        # NAME line across two roff lines, and spinclass's system-prompt
+        # index reads only the first physical line of it.
+        pandoc -s -t man --wrap=none "$f" -o "$out/share/man/man7/$name.7"
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';

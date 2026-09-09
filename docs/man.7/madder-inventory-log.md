@@ -7,7 +7,7 @@ title: MADDER-INVENTORY-LOG(7) Madder \| Miscellaneous
 
 # NAME
 
-madder-inventory-log - per-blob audit log: wiring patterns for Go importers
+madder-inventory-log - per-blob audit log wiring for Go importers
 
 # SYNOPSIS
 
