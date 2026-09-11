@@ -289,7 +289,13 @@ let
       # by default in buildGoApplication.
       checkPhase = ''
         runHook preCheck
-        go test -tags test -p $NIX_BUILD_CORES ./...
+        go test -tags test -ldflags ${
+          pkgs-master.lib.escapeShellArg (
+            pkgs-master.lib.concatStringsSep " " (
+              pkgs-master.lib.mapAttrsToList (sym: val: "-X ${sym}=${val}") fixtureTestLdflagsX
+            )
+          )
+        } -p $NIX_BUILD_CORES ./...
         runHook postCheck
       '';
     };
@@ -316,10 +322,9 @@ let
   # built under `-tags test`, as `go test -tags test ./...` compiles every
   # package with the tag (the `test`-gated helpers are shared across
   # packages); packages the tag doesn't touch are shared with `madder` (CA).
-  # Self-consumes goPkgsTest like every other build. testEnv hands the
-  # test-server fixtures' TestMains prebuilt binaries (a per-package run has
-  # no `go` to build them), and arms the env-gated scoped_id grammar-vectors
-  # test (FDR-0010) when langlang is supplied.
+  # Self-consumes goPkgsTest like every other build. testEnv arms the
+  # env-gated scoped_id grammar-vectors test (FDR-0010) when langlang is
+  # supplied.
   madderGodynTests = pkgs.buildGodynModule {
     pname = "madder";
     inherit version goFlakeInputs;
@@ -328,14 +333,23 @@ let
     cc = pkgs.stdenv.cc;
     tags = [ "test" ];
     tests = true;
-    testEnv = {
-      MADDER_TEST_SFTP_SERVER = "${madder-test-sftp-server}/bin/madder-test-sftp-server";
-      MADDER_TEST_WEBDAV_SERVER = "${madder-test-webdav-server}/bin/madder-test-webdav-server";
-    }
-    // pkgs-master.lib.optionalAttrs (langlang != null) {
+    testLdflagsX = fixtureTestLdflagsX;
+    testEnv = pkgs-master.lib.optionalAttrs (langlang != null) {
       LANGLANG_BIN = "${langlang.packages.${system}.default}/bin/langlang";
       SCOPED_ID_GRAMMAR_PEG = grammarPeg;
     };
+  };
+
+  # Burned into the test-server fixtures' test binaries by both test lanes
+  # (godyn testLdflagsX, bga `go test -ldflags`): their TestMain would
+  # otherwise `go build` the binary, and a nix test run has no `go`. Full
+  # import paths, since a package main's test variant compiles as
+  # -p <importpath> (godyn(7)).
+  fixtureTestLdflagsX = {
+    "code.linenisgreat.com/madder/go/cmd/madder-test-sftp-server.prebuiltBinary" =
+      "${madder-test-sftp-server}/bin/madder-test-sftp-server";
+    "code.linenisgreat.com/madder/go/cmd/madder-test-webdav-server.prebuiltBinary" =
+      "${madder-test-webdav-server}/bin/madder-test-webdav-server";
   };
 
   # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)

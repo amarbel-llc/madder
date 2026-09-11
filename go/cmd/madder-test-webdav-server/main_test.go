@@ -20,10 +20,14 @@ import (
 // goroutines blocked forever in cmd.Wait().
 var binaryPath string
 
+// prebuiltBinary is burned in with -X by the nix test lanes, which have no
+// `go` to build the binary with; unset (e.g. a devshell `go test`), TestMain
+// builds one.
+var prebuiltBinary string
+
 func TestMain(m *testing.M) {
-	// A prebuilt binary wins: the nix godyn test lane has no `go` on PATH.
-	if prebuilt := os.Getenv("MADDER_TEST_WEBDAV_SERVER"); prebuilt != "" {
-		binaryPath = prebuilt
+	if prebuiltBinary != "" {
+		binaryPath = prebuiltBinary
 		os.Exit(m.Run())
 	}
 
