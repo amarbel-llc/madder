@@ -96,16 +96,14 @@ let
   # that embed it pass it in both `nativeArgs` and `bgaArgs`.
   #
   # godyn needs `cc` because github.com/DataDog/zstd is cgo-only (without it
-  # the derived graph is CGO_ENABLED=0 and that package has no files). The
-  # godyn result carries no `pname` attr, which bats' batsLane reads as its
-  # naming anchor, so it is surfaced via passthru.
+  # the derived graph is CGO_ENABLED=0 and that package has no files).
   buildMadderGo =
     {
       bgaArgs ? { },
       nativeArgs ? { },
       ...
     }@args:
-    (pkgs.buildGoAuto (
+    pkgs.buildGoAuto (
       builtins.removeAttrs args [
         "bgaArgs"
         "nativeArgs"
@@ -126,12 +124,7 @@ let
         }
         // bgaArgs;
       }
-    )).overrideAttrs
-      (old: {
-        passthru = old.passthru // {
-          inherit (args) pname;
-        };
-      });
+    );
 
   # dagnabitBin is the upstream dagnabit (facade generator + drift check). Put
   # on the devShell PATH bare: the facade-format config is now threaded by the
@@ -323,9 +316,10 @@ let
   # built under `-tags test`, as `go test -tags test ./...` compiles every
   # package with the tag (the `test`-gated helpers are shared across
   # packages); packages the tag doesn't touch are shared with `madder` (CA).
-  # Self-consumes goPkgsTest like every other build. testEnv arms the
-  # env-gated scoped_id grammar-vectors test (FDR-0010) when langlang is
-  # supplied.
+  # Self-consumes goPkgsTest like every other build. testEnv hands the
+  # test-server fixtures' TestMains prebuilt binaries (a per-package run has
+  # no `go` to build them), and arms the env-gated scoped_id grammar-vectors
+  # test (FDR-0010) when langlang is supplied.
   madderGodynTests = pkgs.buildGodynModule {
     pname = "madder";
     inherit version goFlakeInputs;
@@ -334,7 +328,11 @@ let
     cc = pkgs.stdenv.cc;
     tags = [ "test" ];
     tests = true;
-    testEnv = pkgs-master.lib.optionalAttrs (langlang != null) {
+    testEnv = {
+      MADDER_TEST_SFTP_SERVER = "${madder-test-sftp-server}/bin/madder-test-sftp-server";
+      MADDER_TEST_WEBDAV_SERVER = "${madder-test-webdav-server}/bin/madder-test-webdav-server";
+    }
+    // pkgs-master.lib.optionalAttrs (langlang != null) {
       LANGLANG_BIN = "${langlang.packages.${system}.default}/bin/langlang";
       SCOPED_ID_GRAMMAR_PEG = grammarPeg;
     };
@@ -538,8 +536,8 @@ let
   # as the sibling test-server fixtures. Only built when langlang is
   # supplied; asserts a clear message if grammarPeg is missing alongside it.
   #
-  # Stays on buildGoApplication as the gate: madderGodynTests carries the same
-  # test (via testEnv), but that lane does not build green yet.
+  # Stays on buildGoApplication so the gate covers every system:
+  # madderGodynTests runs the same test (via testEnv) on x86_64-linux only.
   grammar-vectors-test =
     assert (langlang == null) || (grammarPeg != null);
     pkgs.buildGoApplication {

@@ -118,7 +118,7 @@ clean: clean-go clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-go-nix test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
+test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
 
 # Usage: just run-go-test ./internal/foo
 #
@@ -188,12 +188,28 @@ test-go-race *flags:
 # Run the Go unit suite (`go test -tags test ./...`) in the nix sandbox via
 # the buildGoApplication backend's checkPhase. The default `madder` build is
 # godyn on x86_64-linux and runs no tests, so this keeps the sandboxed suite
-# in the merge gate until the godyn test lane (.#madder-godyn-tests) is green.
+# in the merge gate on every system; `test-go-godyn` is the per-package lane.
 #
 # run the Go unit suite in the nix sandbox (buildGoApplication backend)
 [group("post-build")]
 test-go-nix:
   nix build .#madder.passthru.bga --no-link --print-build-logs
+
+# Run the Go unit suite as godyn's per-package test lane (`-tags test`, one
+# cached run per package; only changed cones re-run). The output exists only
+# on x86_64-linux, where godyn builds (godyn(7) LIMITATIONS), so elsewhere this
+# is a no-op and `test-go-nix` carries the gate.
+#
+# run the Go unit suite via godyn's per-package test lane (x86_64-linux)
+[group("post-build")]
+test-go-godyn:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname -sm)" != "Linux x86_64" ]; then
+    echo "test-go-godyn: skipped (godyn test lane is x86_64-linux only)"
+    exit 0
+  fi
+  nix build .#madder-godyn-tests --no-link --print-build-logs
 
 # Run Go unit tests with coverage collection. Writes covdata fragments
 # to .tmp/cover-data/unit/ (mergeable with the bats lane via run-cover-merged)

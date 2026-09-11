@@ -21,6 +21,12 @@ import (
 var binaryPath string
 
 func TestMain(m *testing.M) {
+	// A prebuilt binary wins: the nix godyn test lane has no `go` on PATH.
+	if prebuilt := os.Getenv("MADDER_TEST_WEBDAV_SERVER"); prebuilt != "" {
+		binaryPath = prebuilt
+		os.Exit(m.Run())
+	}
+
 	tmpDir, err := os.MkdirTemp("", "madder-test-webdav-server-build-*")
 	if err != nil {
 		panic(err)
