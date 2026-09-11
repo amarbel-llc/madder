@@ -188,7 +188,7 @@
       system:
       let
         # Needed for the mkGoPkgs producer call in go/gomod.nix.
-        # buildGoApplication / mkGoEnv consumers live in go/default.nix.
+        # buildGoAuto / mkGoEnv consumers live in go/default.nix.
         pkgs = import igloo { inherit system; };
 
         gomod = import ./go/gomod.nix {
@@ -446,7 +446,7 @@
             system
             ;
           # Pivot self-consumption onto the published artifact: every
-          # buildGoApplication in go/default.nix uses this as `src`,
+          # Go build in go/default.nix uses this as `src`,
           # so the same closure downstream consumers receive via
           # go-pkgs-test is what madder builds itself from. Contract
           # test for the producer-side split — if the filter ever

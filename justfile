@@ -118,7 +118,7 @@ clean: clean-go clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
+test: verify-go-analyzers test-go-race test-go-nix test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
 
 # Usage: just run-go-test ./internal/foo
 #
@@ -184,6 +184,16 @@ run-internal-pkg subpath:
 [group("post-build")]
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
+
+# Run the Go unit suite (`go test -tags test ./...`) in the nix sandbox via
+# the buildGoApplication backend's checkPhase. The default `madder` build is
+# godyn on x86_64-linux and runs no tests, so this keeps the sandboxed suite
+# in the merge gate until the godyn test lane (.#madder-godyn-tests) is green.
+#
+# run the Go unit suite in the nix sandbox (buildGoApplication backend)
+[group("post-build")]
+test-go-nix:
+  nix build .#madder.passthru.bga --no-link --print-build-logs
 
 # Run Go unit tests with coverage collection. Writes covdata fragments
 # to .tmp/cover-data/unit/ (mergeable with the bats lane via run-cover-merged)

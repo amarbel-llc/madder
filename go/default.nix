@@ -43,7 +43,7 @@
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
-  # buildGoApplication self-consumes this as `src`/`pwd` so madder
+  # Go build self-consumes this as `src` so madder
   # builds itself from the same artifact downstream consumers see —
   # contract test for the go-pkgs / go-pkgs-test split (#212).
   # Defaulted to ./. so non-flake callers (`import ./go/default.nix`
@@ -82,6 +82,56 @@ let
   # compose the overlay twice.
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
+
+  # godyn (per-package build, graph derived at eval time — igloo FDR 0007/0008)
+  # where its build is validated: x86_64-linux (godyn(7) LIMITATIONS, igloo#33).
+  # buildGoApplication elsewhere. Both backends stay reachable on every Go build
+  # as passthru.native / passthru.bga.
+  godynSystem = system == "x86_64-linux";
+
+  # Shared shape of every madder Go build: self-consume goPkgsTest (#212) with
+  # the committed gomod2nix.toml pins and the goFlakeInputs bridges, no
+  # committed godyn graph. bga-only extras (pinned toolchain, pwd, custom
+  # phases) ride in `bgaArgs`; `commit` has no buildGoAuto slot, so callers
+  # that embed it pass it in both `nativeArgs` and `bgaArgs`.
+  #
+  # godyn needs `cc` because github.com/DataDog/zstd is cgo-only (without it
+  # the derived graph is CGO_ENABLED=0 and that package has no files). The
+  # godyn result carries no `pname` attr, which bats' batsLane reads as its
+  # naming anchor, so it is surfaced via passthru.
+  buildMadderGo =
+    {
+      bgaArgs ? { },
+      nativeArgs ? { },
+      ...
+    }@args:
+    (pkgs.buildGoAuto (
+      builtins.removeAttrs args [
+        "bgaArgs"
+        "nativeArgs"
+      ]
+      // {
+        src = goPkgsTest;
+        modules = ./gomod2nix.toml;
+        inherit goFlakeInputs;
+        strategy = if godynSystem then "native" else "bga";
+        nativeArgs = {
+          cc = pkgs.stdenv.cc;
+        }
+        // nativeArgs;
+        bgaArgs = {
+          pwd = goPkgsTest;
+          go = pkgs-master.go_1_26;
+          GOTOOLCHAIN = "local";
+        }
+        // bgaArgs;
+      }
+    )).overrideAttrs
+      (old: {
+        passthru = old.passthru // {
+          inherit (args) pname;
+        };
+      });
 
   # dagnabitBin is the upstream dagnabit (facade generator + drift check). Put
   # on the devShell PATH bare: the facade-format config is now threaded by the
@@ -204,11 +254,9 @@ let
   # — it lives as separate `bats-*` lanes (`batsLaneOutputs`) so
   # downstream consumers don't pay the integration-test cost on a
   # from-source rebuild. See amarbel-llc/eng#62.
-  madder = pkgs.buildGoApplication ({
+  madder = buildMadderGo {
     pname = "madder";
-    inherit version commit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
+    inherit version;
     subPackages = [
       "cmd/mad"
       "cmd/madder"
@@ -216,31 +264,42 @@ let
       "cmd/madder-gen_man"
       "cmd/madder-mcp"
     ];
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
 
-    nativeBuildInputs = [
-      purse-first.packages.${system}.dagnabit
-    ]
-    ++ pkgs-master.lib.optionals (man7Src != null) [
+    nativeBuildInputs = pkgs-master.lib.optionals (man7Src != null) [
       pkgs-master.pandoc
     ];
 
-    preBuild = ''
-      dagnabit export
-    '';
+    # godyn's go test lane is the separate `-tags test` instance
+    # (madderGodynTests below); this release build stays untagged.
+    nativeArgs = {
+      inherit commit;
+    };
 
-    # buildGoApplication's stock goCheckHook only tests subPackages, which
-    # are cmd/* directories that have no test files. Override checkPhase
-    # to test all packages with the `test` build tag (gates internal
-    # test-only symbols like ui.T / ui.TestContext). doCheck stays true
-    # by default in buildGoApplication.
-    checkPhase = ''
-      runHook preCheck
-      go test -tags test -p $NIX_BUILD_CORES ./...
-      runHook postCheck
-    '';
+    bgaArgs = {
+      inherit commit;
+
+      nativeBuildInputs = [
+        purse-first.packages.${system}.dagnabit
+      ]
+      ++ pkgs-master.lib.optionals (man7Src != null) [
+        pkgs-master.pandoc
+      ];
+
+      preBuild = ''
+        dagnabit export
+      '';
+
+      # buildGoApplication's stock goCheckHook only tests subPackages, which
+      # are cmd/* directories that have no test files. Override checkPhase
+      # to test all packages with the `test` build tag (gates internal
+      # test-only symbols like ui.T / ui.TestContext). doCheck stays true
+      # by default in buildGoApplication.
+      checkPhase = ''
+        runHook preCheck
+        go test -tags test -p $NIX_BUILD_CORES ./...
+        runHook postCheck
+      '';
+    };
 
     # madder-gen_man takes a *prefix* and writes to {prefix}/share/man/man1/
     postInstall = ''
@@ -258,7 +317,28 @@ let
         ${pkgs-master.gnused}/bin/sed -i '3a\.\" Formatting overrides\n.ss 12 0\n.na' "$out/share/man/man7/$name.7"
       done
     '';
-  });
+  };
+
+  # godyn's per-package go test lane (x86_64-linux only): a second instance
+  # built under `-tags test`, as `go test -tags test ./...` compiles every
+  # package with the tag (the `test`-gated helpers are shared across
+  # packages); packages the tag doesn't touch are shared with `madder` (CA).
+  # Self-consumes goPkgsTest like every other build. testEnv arms the
+  # env-gated scoped_id grammar-vectors test (FDR-0010) when langlang is
+  # supplied.
+  madderGodynTests = pkgs.buildGodynModule {
+    pname = "madder";
+    inherit version goFlakeInputs;
+    src = goPkgsTest;
+    modules = ./gomod2nix.toml;
+    cc = pkgs.stdenv.cc;
+    tags = [ "test" ];
+    tests = true;
+    testEnv = pkgs-master.lib.optionalAttrs (langlang != null) {
+      LANGLANG_BIN = "${langlang.packages.${system}.default}/bin/langlang";
+      SCOPED_ID_GRAMMAR_PEG = grammarPeg;
+    };
+  };
 
   # madder-clown-plugin stages a clown plugin (see clown-plugin-protocol(7)
   # / clown-json(5)) that exposes madder blobs as MCP resources at
@@ -289,8 +369,12 @@ let
   # The bats lane against this binary lives in `batsLaneOutputs` as
   # `bats-race`. There is no nix-driven race+net_cap lane today —
   # the net_cap suite needs the devshell-only sftp test harness.
+  #
+  # The race and coverage lanes below build on the buildGoApplication backend
+  # (passthru.bga): they override its phases, and godyn has no -race stdlib
+  # variant (godyn(7) LIMITATIONS).
   madder-race = pkgs.buildGoRace {
-    base = madder;
+    base = madder.passthru.bga;
     tags = [ "test" ];
   };
 
@@ -308,7 +392,7 @@ let
   # the bats suite against an instrumented binary. Mixing CLI bats
   # coverage in here would conflate two signals — the coverage profile
   # would no longer correspond to "what `go test` covered."
-  madder-cover = madder.overrideAttrs (old: {
+  madder-cover = madder.passthru.bga.overrideAttrs (old: {
     pname = "madder-cover";
     # Suppress the default checkPhase — its job (running the suite)
     # is being replaced with an installCheckPhase that emits the
@@ -339,7 +423,7 @@ let
   # real CLI. Merging them (via `just cover-merged`) gives the full
   # picture.
   madder-cli-cover = pkgs.buildGoCover {
-    base = madder;
+    base = madder.passthru.bga;
     extraNativeInstallCheckInputs = [
       pkgs-master.jq
       pkgs.parallel
@@ -419,47 +503,29 @@ let
   # accepts any password — but addressable as
   # `madder.packages.${system}.madder-test-sftp-server` for explicit
   # opt-in by test-only consumers. See amarbel-llc/madder#177.
-  madder-test-sftp-server = pkgs.buildGoApplication {
+  madder-test-sftp-server = buildMadderGo {
     pname = "madder-test-sftp-server";
     version = "0.0.0";
-    inherit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-sftp-server" ];
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
   };
 
   # Devshell-only fixture binary used by bats to materialize
   # legacy-shaped blob bytes for sftp-analyze-and-suggest-configs
   # tests. Same NOT-shipped policy as madder-test-sftp-server: the
   # binary is purely a test fixture.
-  madder-test-craft-legacy-blob = pkgs.buildGoApplication {
+  madder-test-craft-legacy-blob = buildMadderGo {
     pname = "madder-test-craft-legacy-blob";
     version = "0.0.0";
-    inherit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-craft-legacy-blob" ];
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
   };
 
   # Devshell-only test harness for WebDAV integration tests (RFC 0001).
   # Intentionally NOT included in the `packages` output — release
   # artifacts must not ship a server that accepts any auth.
-  madder-test-webdav-server = pkgs.buildGoApplication {
+  madder-test-webdav-server = buildMadderGo {
     pname = "madder-test-webdav-server";
     version = "0.0.0";
-    inherit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
     subPackages = [ "cmd/madder-test-webdav-server" ];
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
   };
 
   # grammar-vectors-test (FDR-0010): the langlang -input cross-check of the
@@ -471,6 +537,9 @@ let
   # (not a check): langlang is a less-vetted external input, same posture
   # as the sibling test-server fixtures. Only built when langlang is
   # supplied; asserts a clear message if grammarPeg is missing alongside it.
+  #
+  # Stays on buildGoApplication as the gate: madderGodynTests carries the same
+  # test (via testEnv), but that lane does not build green yet.
   grammar-vectors-test =
     assert (langlang == null) || (grammarPeg != null);
     pkgs.buildGoApplication {
@@ -519,36 +588,16 @@ let
   # `nix build .#store-import-smoke` IS the guard. A self-contained
   # build-and-run smoke (madder#278's ask) — no bats/env plumbing needed
   # because the fixture's exit code is the assertion.
-  store-import-smoke = pkgs.buildGoApplication {
-    pname = "madder-store-import-smoke";
+  madder-test-store-import-smoke = buildMadderGo {
+    pname = "madder-test-store-import-smoke";
     version = "0.0.0";
-    inherit goFlakeInputs;
-    src = goPkgsTest;
-    pwd = goPkgsTest;
-    modules = ./gomod2nix.toml;
-    go = pkgs-master.go_1_26;
-    GOTOOLCHAIN = "local";
     subPackages = [ "cmd/madder-test-store-import-smoke" ];
-
-    buildPhase = ''
-      runHook preBuild
-      go build -o "$TMPDIR/store-import-smoke" ./cmd/madder-test-store-import-smoke
-      runHook postBuild
-    '';
-
-    doCheck = true;
-    checkPhase = ''
-      runHook preCheck
-      "$TMPDIR/store-import-smoke"
-      runHook postCheck
-    '';
-
-    installPhase = ''
-      runHook preInstall
-      mkdir -p "$out"
-      runHook postInstall
-    '';
   };
+
+  store-import-smoke = pkgs.runCommandLocal "madder-store-import-smoke" { } ''
+    ${madder-test-store-import-smoke}/bin/madder-test-store-import-smoke
+    mkdir -p "$out"
+  '';
 in
 {
   packages = {
@@ -562,6 +611,9 @@ in
       store-import-smoke
       ;
     default = madder;
+  }
+  // pkgs-master.lib.optionalAttrs godynSystem {
+    madder-godyn-tests = madderGodynTests.passthru.checkAll;
   }
   // batsLaneOutputs
   # grammar-vectors-test is only defined meaningfully when langlang is
@@ -585,7 +637,7 @@ in
       dagnabitBin
       # NOTE: the madder-test-* fixture binaries (sftp/webdav servers,
       # craft-legacy-blob) are intentionally NOT listed here. Each is a
-      # buildGoApplication that compiles madder, so putting them in the
+      # Go build that compiles madder, so putting them in the
       # devshell makes `nix develop` / `direnv reload` require the whole
       # tree to compile first — a bootstrap deadlock whenever generated
       # code is stale (e.g. regenerating *_tommy.go across a tommy bump,
