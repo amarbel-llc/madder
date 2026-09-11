@@ -83,16 +83,18 @@ let
   pkgs = import nixpkgs { inherit system; };
   pkgs-master = import nixpkgs-master { inherit system; };
 
-  # godyn (per-package build, graph derived at eval time — igloo FDR 0007/0008)
-  # where its build is validated: x86_64-linux (godyn(7) LIMITATIONS, igloo#33).
-  # buildGoApplication elsewhere. Both backends stay reachable on every Go build
-  # as passthru.native / passthru.bga.
-  godynSystem = system == "x86_64-linux";
+  # Systems where igloo validates godyn's build (godyn(7) LIMITATIONS, igloo#33).
+  # buildGoAuto's default strategy is godyn ("native") on exactly these and
+  # buildGoApplication elsewhere, so madder follows as igloo extends the list.
+  # Gates key off `madder.passthru.backend`, never a system name.
+  godynSystem = builtins.elem system pkgs.godynSystems;
 
   # Shared shape of every madder Go build: self-consume goPkgsTest (#212) with
   # the committed gomod2nix.toml pins and the goFlakeInputs bridges, no
-  # committed godyn graph. bga-only extras (pinned toolchain, pwd, custom
-  # phases) ride in `bgaArgs`; `commit` has no buildGoAuto slot, so callers
+  # committed godyn graph. The backend is buildGoAuto's default (see
+  # godynSystem); both stay reachable as passthru.native / passthru.bga, and
+  # passthru.backend names the chosen one. bga-only extras (pinned toolchain,
+  # pwd, custom phases) ride in `bgaArgs`; `commit` has no buildGoAuto slot, so callers
   # that embed it pass it in both `nativeArgs` and `bgaArgs`.
   #
   # godyn needs `cc` because github.com/DataDog/zstd is cgo-only (without it
@@ -112,7 +114,6 @@ let
         src = goPkgsTest;
         modules = ./gomod2nix.toml;
         inherit goFlakeInputs;
-        strategy = if godynSystem then "native" else "bga";
         nativeArgs = {
           cc = pkgs.stdenv.cc;
         }
@@ -318,7 +319,7 @@ let
     '';
   };
 
-  # godyn's per-package go test lane (x86_64-linux only): a second instance
+  # godyn's per-package go test lane (godynSystem only): a second instance
   # built under `-tags test`, as `go test -tags test ./...` compiles every
   # package with the tag (the `test`-gated helpers are shared across
   # packages); packages the tag doesn't touch are shared with `madder` (CA).
@@ -550,8 +551,10 @@ let
   # as the sibling test-server fixtures. Only built when langlang is
   # supplied; asserts a clear message if grammarPeg is missing alongside it.
   #
-  # Stays on buildGoApplication so the gate covers every system:
-  # madderGodynTests runs the same test (via testEnv) on x86_64-linux only.
+  # Stays on buildGoApplication: it is the bga-backend half of the gate
+  # (`just test-grammar-vectors` runs it where madder.passthru.backend is
+  # "bga"); where the backend is godyn, madderGodynTests runs the same test
+  # via testEnv instead.
   grammar-vectors-test =
     assert (langlang == null) || (grammarPeg != null);
     pkgs.buildGoApplication {

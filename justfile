@@ -185,28 +185,45 @@ run-internal-pkg subpath:
 test-go-race *flags:
   cd go && go test -tags test -race {{flags}} ./...
 
+# The merge gate runs exactly ONE Go unit suite per host, chosen by the backend
+# `madder` actually builds with (`madder.passthru.backend`, igloo buildGoAuto):
+# "native" (godyn, on igloo's `godynSystems`) runs `test-go-godyn`; "bga"
+# (buildGoApplication, everywhere else) runs `test-go-nix` +
+# `test-grammar-vectors`. The non-matching leaves print a skip line. Keyed off
+# the backend, never a system name, so madder follows igloo as it validates
+# godyn on more systems. The race/cover lanes are bga-based on every host
+# (godyn has no -race stdlib variant, godyn(7) LIMITATIONS).
+
 # Run the Go unit suite (`go test -tags test ./...`) in the nix sandbox via
-# the buildGoApplication backend's checkPhase. The default `madder` build is
-# godyn on x86_64-linux and runs no tests, so this keeps the sandboxed suite
-# in the merge gate on every system; `test-go-godyn` is the per-package lane.
+# the buildGoApplication backend's checkPhase. Skipped where madder's backend
+# is godyn: `test-go-godyn` runs the same package set there.
 #
 # run the Go unit suite in the nix sandbox (buildGoApplication backend)
 [group("post-build")]
 test-go-nix:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  backend="$(nix eval --raw .#madder.passthru.backend)"
+  if [ "$backend" != "bga" ]; then
+    echo "test-go-nix: skipped (madder backend is '$backend'; test-go-godyn runs the unit suite)"
+    exit 0
+  fi
   nix build .#madder.passthru.bga --no-link --print-build-logs
 
 # Run the Go unit suite as godyn's per-package test lane (`-tags test`, one
-# cached run per package; only changed cones re-run). The output exists only
-# on x86_64-linux, where godyn builds (godyn(7) LIMITATIONS), so elsewhere this
-# is a no-op and `test-go-nix` carries the gate.
+# cached run per package; only changed cones re-run). Its scoped_id run also
+# carries the grammar-vectors test (testEnv arms LANGLANG_BIN /
+# SCOPED_ID_GRAMMAR_PEG). Runs only where madder's backend is godyn; elsewhere
+# `test-go-nix` + `test-grammar-vectors` carry the gate.
 #
-# run the Go unit suite via godyn's per-package test lane (x86_64-linux)
+# run the Go unit suite via godyn's per-package test lane (godyn backend)
 [group("post-build")]
 test-go-godyn:
   #!/usr/bin/env bash
   set -euo pipefail
-  if [ "$(uname -sm)" != "Linux x86_64" ]; then
-    echo "test-go-godyn: skipped (godyn test lane is x86_64-linux only)"
+  backend="$(nix eval --raw .#madder.passthru.backend)"
+  if [ "$backend" != "native" ]; then
+    echo "test-go-godyn: skipped (madder backend is '$backend'; test-go-nix + test-grammar-vectors run the unit suite)"
     exit 0
   fi
   nix build .#madder-godyn-tests --no-link --print-build-logs
@@ -254,10 +271,19 @@ test-bats:
 # corpus' `grammar` dimension via langlang -input (FDR-0010) — the
 # structural counterpart to vectors_test.go's Id.Set parser half. Runs in
 # the nix lane (langlang is a flake-input-go_mod-bridged hard dep); mirrors
-# hyphence's test-grammar-vectors.
+# hyphence's test-grammar-vectors. Skipped where madder's backend is godyn:
+# `test-go-godyn`'s scoped_id run executes the same test with the same inputs.
+#
 # run the scoped_id grammar-vectors gate via the nix lane
 [group("post-build")]
 test-grammar-vectors:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  backend="$(nix eval --raw .#madder.passthru.backend)"
+  if [ "$backend" != "bga" ]; then
+    echo "test-grammar-vectors: skipped (madder backend is '$backend'; test-go-godyn runs TestScopedIdGrammarVectors)"
+    exit 0
+  fi
   nix build .#grammar-vectors-test --no-link --print-build-logs
 
 # madder#278 regression guard: build the store-import-smoke fixture (imports
