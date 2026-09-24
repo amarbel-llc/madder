@@ -74,8 +74,13 @@ func (cmd Sync) GetDescription() futility.Description {
 			"described below, or -format crap for raw ndjson-crap even on " +
 			"a terminal. (-format tap is not supported by sync.) Each JSON " +
 			"record has fields \"id\", " +
-			"\"state\" (transferred, failed, list_error), \"size\" " +
-			"for transferred blobs, and \"error\" for failures. Summary and " +
+			"\"state\" (transferred, failed, list_error, bail_out), " +
+			"\"size\" " +
+			"for transferred blobs, and \"error\" for failures. Note that " +
+			"in JSON mode a blob already present in the destination is " +
+			"reported as \"transferred\" with no bytes written, not as a " +
+			"distinct state; the ndjson-crap output instead reports it as " +
+			"a skipped item with reason \"exists\". Summary and " +
 			"limit notices route to stderr in JSON mode.",
 	}
 }

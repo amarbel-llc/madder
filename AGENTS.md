@@ -8,6 +8,64 @@ mirroring dodder's `der`) that runs the same `madder` command tree
 under the shorter program name; it shares `madder`'s XDG scope and man
 pages, it just isn't the utility that generates them.
 
+## Testing lanes
+
+The nix lanes are authoritative. Every bats lane is a derivation built
+from the same `$out/bin/madder` that `.#madder` produces, so the
+dev loop and CI share one cache:
+
+- `just test-bats` — `.#bats-default` (the `!net_cap` filter)
+- `just test-bats-net-cap` — `.#bats-net_cap` (SFTP/WebDAV harnesses,
+  self-sufficient via `netCapExtraBinaries`)
+- `just run-bats-tags <tag>` — `.#bats-<tag>`, one lane per unique
+  `# bats file_tags=` directive, auto-discovered at flake-eval time
+- `just run-bats-race` / `just run-bats-cover` — race- and
+  coverage-instrumented variants
+
+There is deliberately **no devshell lane driven from the root
+justfile**. `run-bats-targets` (and its `zz-tests_bats/test-targets`
+delegate) were dropped in favor of the above.
+
+### Caveats of the nix-only arrangement
+
+`mkBatsLane` (`go/default.nix`) exposes exactly one selector: `filter`,
+forwarded verbatim to `bats --filter-tags`. That constrains the dev
+loop in ways worth knowing before you go looking for a flag that
+isn't there:
+
+- **No per-test selection.** Nothing wraps `bats --filter <regex>`. To
+  run a single `@test`, invoke bats directly in the devshell. (This was
+  never plumbed in the old local lane either — dropping it cost
+  nothing here.)
+- **Per-file selection works only through tags.** By convention each
+  `.bats` file carries its own tag, so `.#bats-<tag>` is effectively
+  per-file. An ad-hoc subset of files that do *not* share a tag is not
+  expressible.
+- **Per-test `# bats test_tags=` generate no lane.** Discovery scans
+  only `file_tags`. Since `filter` is forwarded verbatim, calling
+  `mkBatsLane { filter = "sometag"; }` directly does match them.
+- **No rerun-only-failed.** `--filter-status failed` needs prior-run
+  state on disk; a derivation starts clean every build.
+- **No ad-hoc selectors at all, structurally.** Lane outputs are
+  enumerated at flake-eval time, so `nix build` cannot take a runtime
+  selector — `.#bats-<X>` must already exist as an attribute. A
+  `nix run .#bats -- <args>` app is the shape that would fix this.
+- **Silence on success.** A passing derivation prints nothing; use
+  `nix log` for the TAP stream and `--keep-failed` to keep artifacts.
+
+These gaps are tracked in madder#288. The test-name-filter half is
+upstream-owned — `batsLane` lives in the `bats` flake input
+(`code.linenisgreat.com/bats`) and would have to accept the selector
+before `mkBatsLane` could forward it — tracked there as bats#40.
+
+`zz-tests_bats/justfile` still holds devshell recipes (`test`,
+`test-tags`, `test-net-cap`) for running bats against `$PWD`'s
+binaries. They are **not authoritative**, they bypass the nix sandbox,
+and they can fail on hosts where the bats wrapper's sandbox cannot
+initialize (observed: `failed to initialize Linux bridge`). Prefer the
+nix lanes; reach for these only when you specifically need bats' own
+flags.
+
 ## External consumer: cutting-garden
 
 `amarbel-llc/cutting-garden` is the standalone filesystem-tree

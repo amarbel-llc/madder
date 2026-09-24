@@ -29,6 +29,90 @@ function cross_hash_sync { # @test
   assert_line "cross-hash-test"
 }
 
+function cross_hash_sync_into_single_hash_dest { # @test
+
+  # CHARACTERIZATION TEST — pins today's defective behavior, not the
+  # desired behavior. Do not read these assertions as a contract.
+  #
+  # madder-sync(1) documents: "When source and destination use
+  # different hash types, blobs are rehashed (source digests are not
+  # preserved in single-hash destinations)" — promising that a
+  # single-hash destination still ACCEPTS the sync and merely loses the
+  # mapping. It does not. localHashBucketed's
+  # AddForeignBlobDigestForNativeDigest errors for a single-hash store
+  # rather than no-oping (store_local_hash_bucketed.go:293), and
+  # copy.go:129 treats that error as fatal to the copy. So every blob
+  # FAILS, and the man page's "not preserved" is really "not
+  # transferred".
+  #
+  # Worse, and the reason this is pinned rather than skipped: the
+  # command still exits 0 with zero blobs transferred. A migration
+  # script checking only the exit status sees success.
+  #
+  # The sibling cross_hash_sync covers the MULTI-hash destination,
+  # where the alias is registered and the source digest stays
+  # resolvable. This is the uncovered half.
+  #
+  # Tracked as madder#286. Expect this test to FAIL once single-hash
+  # destinations are refused up front (#284 phase 2). That is the
+  # intended fix, not a regression — rewrite these assertions then.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "single-hash-dest-test" >"$blob"
+  local source_id
+  source_id="$(write_blob_id "$blob")"
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256single
+  assert_success
+
+  # `single_hash` has no init flag — it is only set by a hand-written
+  # config or by sftp discovery of a legacy tree — so flip the config
+  # directly and re-pin its FDR-0008 digest.
+  local config=".madder/local/share/blob_stores/sha256single/blob_store-config"
+  [[ -f $config ]] || fail "expected store config at $config"
+  chmod 0644 "$config"
+  sed -i.bak '/^@ /d' "$config" && rm "$config.bak"
+  printf 'single_hash = true\n' >>"$config"
+  chmod 0444 "$config"
+
+  run_madder config-pin_digest .sha256single
+  assert_success
+
+  run grep -E '^single_hash = true$' "$config"
+  assert_success # the flip survived re-pinning
+
+  run_madder sync -format ndjson .default .sha256single
+
+  # The defect, in three parts.
+  assert_success                                      # (1) exit 0 ...
+  assert_output --partial 'Successes: 0, Failures: 1' # (2) ... with nothing transferred
+  # (3) and the per-blob record carries the single-hash rejection.
+  assert_output --partial '"state":"failed"'
+  assert_output --partial 'single-hash store does not support foreign digest mapping'
+  refute_output --partial '"state":"transferred"'
+
+  # (4) The nastiest part: the blob IS written. copy.go commits the
+  # writer before the alias step, so the rehashed sha256 blob lands and
+  # only the mapping fails — yet the record says "failed" and the
+  # summary counts zero successes. A retry cannot distinguish "never
+  # transferred" from "transferred, unmappable".
+  run_madder cat-ids .sha256single
+  assert_success
+  assert_output --partial 'sha256-'    # the rehashed blob is present ...
+  refute_output --partial "$source_id" # ... but the source digest does not resolve
+
+  # Regression guard for madder#287, fixed: enumerating a single-hash
+  # local store used to parse the store's own `blob_store-config` as a
+  # blob id, so every listing carried "blobs with errors: 2". Refuting a
+  # NONZERO count rather than the whole phrase, so this holds whether
+  # the summary line is printed with a zero or dropped entirely. This is
+  # the only coverage of that fix — if the assertions above are rewritten
+  # when #286 lands, keep this one (or rehome it).
+  refute_output --regexp 'blobs with errors: [1-9]'
+}
+
 function sync_idempotent { # @test
 
   init_store

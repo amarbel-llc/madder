@@ -37,9 +37,17 @@ var (
 	GetBlobStorePathForCustomPath = internal.GetBlobStorePathForCustomPath
 	GetDefaultBlobStore           = internal.GetDefaultBlobStore
 	GetLegacyBlobStoreConfigPaths = internal.GetLegacyBlobStoreConfigPaths
-	MakeBlobStore                 = internal.MakeBlobStore
-	MakeBlobStoreCache            = internal.MakeBlobStoreCache
-	MakeBlobStorePath             = internal.MakeBlobStorePath
+)
+
+// IsBlobStoreConfigFileName reports whether name is a blob-store config
+// filename, current or legacy. Blob enumeration uses it to skip store
+// metadata that sits in the same directory as blobs and would otherwise
+// be parsed as a hex digest. See madder#287.
+var (
+	IsBlobStoreConfigFileName = internal.IsBlobStoreConfigFileName
+	MakeBlobStore             = internal.MakeBlobStore
+	MakeBlobStoreCache        = internal.MakeBlobStoreCache
+	MakeBlobStorePath         = internal.MakeBlobStorePath
 )
 
 // MakeBlobStoreSystem builds the XDG-system (`//name`) layout (madder#230).

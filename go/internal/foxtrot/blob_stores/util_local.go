@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/files"
@@ -46,6 +47,15 @@ func localAllBlobs(
 				}
 
 				if dirEntry.IsDir() {
+					return err
+				}
+
+				// Store metadata shares the directory with blobs in the
+				// single-hash layout (`<root>/<bucket>/<rest>`), so the
+				// config file would otherwise be parsed as a digest and
+				// reported as a blob error on every enumeration. See
+				// madder#287.
+				if directory_layout.IsBlobStoreConfigFileName(dirEntry.Name()) {
 					return err
 				}
 

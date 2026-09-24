@@ -259,8 +259,10 @@ run-go-cover *flags:
 # on darwin) a devshell `bats` run's child `madder serve` is denied
 # `bind: operation not permitted`. The nix sandbox gives a clean fresh
 # namespace where the bind succeeds — same rationale as test-bats-net-cap.
-# For fast local iteration against result/bin, use `run-bats-targets` /
-# `run-bats-tags` in the devshell instead.
+# For a narrower run, `run-bats-tags <tag>` drives a single
+# `.#bats-<tag>` lane (one per `# bats file_tags=` directive). There is
+# no devshell lane: the former `run-bats-targets` was dropped in favor
+# of the nix lanes — see AGENTS.md "Testing lanes" for what that costs.
 #
 # run bats integration tests via the nix-sandbox lane
 [group("post-build")]
@@ -424,14 +426,6 @@ run-cover-summary: run-cover-merged
     | join -t $'\t' -a 1 -a 2 -e '0.0' -o '0,1.2,1.3,2.2' - "$merged_pct" \
     | sort -t $'\t' -k4 -n \
     | awk -F $'\t' '{ printf "%-72s %6.1f%% %6.1f%% %7.1f%% %+9.1f\n", $1, $2, $3, $4, $3-$2 }'
-
-# Usage: just run-bats-targets foo.bats bar.bats
-#
-# run specific bats test files
-[group("post-build")]
-run-bats-targets *targets: build
-  MADDER_BIN={{justfile_directory()}}/result/bin/madder \
-    just zz-tests_bats/test-targets {{targets}}
 
 # Run bats tests filtered by file_tag. Drives the auto-generated
 # `.#bats-${tag}` flake output (one per `# bats file_tags=` directive

@@ -16,6 +16,15 @@ const (
 	fileNameBlobStoreConfigLegacy = "dodder-blob_store-config"
 )
 
+// IsBlobStoreConfigFileName reports whether name is a blob-store config
+// filename, current or legacy. Blob enumeration uses it to skip store
+// metadata that sits in the same directory as blobs and would otherwise
+// be parsed as a hex digest. See madder#287.
+func IsBlobStoreConfigFileName(name string) bool {
+	return name == FileNameBlobStoreConfig ||
+		name == fileNameBlobStoreConfigLegacy
+}
+
 func GetBlobStoreConfigPaths(
 	ctx interfaces.ActiveContext,
 	directoryLayout BlobStore,
