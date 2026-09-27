@@ -77,11 +77,14 @@ func (cmd Sync) GetDescription() futility.Description {
 			"\"state\" (transferred, failed, list_error, bail_out), " +
 			"\"size\" " +
 			"for transferred blobs, and \"error\" for failures. Note that " +
-			"in JSON mode a blob already present in the destination is " +
-			"reported as \"transferred\" with no bytes written, not as a " +
-			"distinct state; the ndjson-crap output instead reports it as " +
-			"a skipped item with reason \"exists\". Summary and " +
-			"limit notices route to stderr in JSON mode.",
+			"neither output format gives an already-present blob a state " +
+			"of its own. In JSON mode it is reported as \"transferred\" " +
+			"with a \"size\" of -1; ndjson-crap reports it as an item in " +
+			"state \"done\" with \"bytes\" of -1, and that operation's " +
+			"operation_end still counts it under \"done\" rather than " +
+			"\"skipped\". A size of -1 is therefore the only per-record " +
+			"signal that nothing was actually copied. Summary and limit " +
+			"notices route to stderr in JSON mode.",
 	}
 }
 
@@ -130,10 +133,10 @@ func (cmd Sync) Run(req futility.Request) {
 
 // syncSink is the legacy -format ndjson/json wire sink (the crap/viewport
 // path uses crap.Reporter directly, not this interface). Already-present
-// blobs are reported via transferred with bytesWritten 0 — the legacy
-// records do not distinguish a skip from a copy (the crap path does, via
-// op.Skip). That fold is intentional and byte-identical to pre-rewrite
-// output; see streamToSink.
+// blobs are reported via transferred, carrying the -1 bytesWritten that
+// CopyBlobIfNecessary's HasBlob early return records, so these records do
+// not distinguish a skip from a copy except by that -1. Neither does the
+// crap path — see streamToSink and madder#285.
 type syncSink interface {
 	// transferred reports a blob copied from source to destinations with
 	// bytesWritten known.
@@ -403,6 +406,10 @@ func (cmd Sync) runStoreCrap(
 
 		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
 			if blob_io.IsErrBlobAlreadyExists(err) {
+				// Reached only for a writer that reports already-exists on
+				// commit, NOT for the ordinary already-present blob — that
+				// one returns a nil error and lands in op.Item below as a
+				// "done" item with bytes -1. See madder#285.
 				op.Skip(formatSyncTestPoint(blobId, 0), syncStateExists)
 			} else {
 				op.Fail(formatSyncTestPoint(blobId, lastBytesWritten), err)
@@ -623,10 +630,16 @@ func (cmd Sync) streamToSink(
 
 		if err := blobImporter.ImportBlobIfNecessary(blobId); err != nil {
 			if blob_io.IsErrBlobAlreadyExists(err) {
-				// Legacy ndjson/json: an already-present blob folds into
-				// transferred (bytesWritten 0), not a distinct skip — kept
-				// byte-identical to pre-rewrite output. The crap path
-				// distinguishes it via op.Skip.
+				// Folds into transferred rather than getting a state of its
+				// own, byte-identical to pre-rewrite output.
+				//
+				// Note this branch is NOT how the ordinary
+				// already-present blob arrives: CopyBlobIfNecessary's
+				// HasBlob early return records a state and no error, so
+				// ImportBlobIfNecessary returns nil and such a blob takes
+				// the else below — reported as transferred with a
+				// bytesWritten of -1. Only that -1 distinguishes it. See
+				// madder#285.
 				sink.transferred(blobId, lastBytesWritten)
 			} else {
 				sink.failed(blobId, lastBytesWritten, err)

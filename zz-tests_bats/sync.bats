@@ -132,6 +132,83 @@ function sync_idempotent { # @test
   assert_success
 }
 
+function sync_already_present_blob_reports_negative_size { # @test
+
+  # An already-present blob folds into a "transferred" record in the
+  # legacy ndjson stream rather than getting a state of its own, so the
+  # only thing separating a skip from a real transfer is the size: the
+  # HasBlob early return (copy.go:25-29) sets bytesWritten = -1, and
+  # blob_transfers/main.go:171 emits that result unconditionally, so
+  # the -1 reaches the record.
+  #
+  # Pinned because consumers currently have no other per-record way to
+  # tell the two apart, and because the comment at sync.go:626 claimed
+  # this folds in with size 0. Treat it as an accidental signal, not a
+  # designed contract — madder#285 tracks giving the skip its own
+  # "exists" state, and this test should be rewritten when that lands
+  # rather than preserved.
+  #
+  # The second pass also demonstrates why a cross-hash re-sync is
+  # resumable at all: HasBlob is called with the SOURCE digest, and it
+  # resolves because the first pass left a foreign-digest alias behind.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "skip-size-test" >"$blob"
+  run_madder write "$blob"
+  assert_success
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial '"size":-1' # a real copy reports real bytes
+
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  assert_output --partial '"size":-1' # nothing copied the second time
+}
+
+function sync_crap_already_present_blob_reports_done_not_skipped { # @test
+
+  # The crap path does NOT distinguish an already-present blob either,
+  # contrary to what sync.go's comments and GetDescription().Long used
+  # to claim. op.Skip (sync.go:406) is gated on IsErrBlobAlreadyExists,
+  # but the ordinary "destination already has it" case returns a nil
+  # error from ImportBlobIfNecessary — copy.go:25-29 records a state,
+  # not an error — so it takes the else branch and is reported as an
+  # ordinary item.
+  #
+  # Observed on the second pass: state "done", operation_end
+  # "skipped":0, and bytes -1. So syncStateExists is unreachable for
+  # this case on this path, and `bytes`/`size` == -1 is the ONLY signal
+  # separating a skip from a real transfer in either output format.
+  # madder#285 tracks fixing that; rewrite this test when it lands.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "crap-skip-test" >"$blob"
+  run_madder write "$blob"
+  assert_success
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync .default .sha256 # crap by default under `run`
+  assert_success
+
+  run_madder sync .default .sha256
+  assert_success
+  assert_output --partial '"state":"done"'
+  assert_output --partial '"bytes":-1'
+  assert_output --partial '"skipped":0'
+  refute_output --partial '"exists"'
+}
+
 function sync_crap_auto_detects { # @test
 
   # Default auto-format under `run` (no TTY) must emit ndjson-crap.

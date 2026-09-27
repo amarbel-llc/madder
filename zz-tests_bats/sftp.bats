@@ -335,7 +335,87 @@ function sftp_write_compresses_per_remote_config { # @test
   [[ $magic == '28b52ffd' ]] || fail "expected zstd magic at start of $on_disk; got $magic"
 }
 
-function sftp_cross_hash_sync { # @test
+# sftp_remote_root_for_local_store echoes the filesystem path of a
+# local store's directory, for use as an SFTP remote root.
+#
+# The remote root is a plain filesystem path in these tests (the test
+# SFTP server has no chroot — see lib/sftp.bash), and a local store's
+# directory is itself a well-formed blob store: `blob_store-config` at
+# the root, blobs under `<hash-type>/<bucket>/<rest>`. Pointing the
+# SFTP remote at one therefore yields a genuine foreign-hash remote
+# without hand-forging a config, since init-sftp-explicit adopts an
+# existing remote config rather than overwriting it
+# (blob_stores/discover.go:216).
+sftp_remote_root_for_local_store() {
+  echo "$PWD/.madder/local/share/blob_stores/$1"
+}
+
+function sftp_source_cross_hash_sync_into_local_dest { # @test
+  # dodder's take4 migration direction (dodder#16): a legacy sha256
+  # tree reached over SFTP, synced into a modern multi-hash blake2b256
+  # local store, which must leave the source digests resolvable
+  # afterwards through the foreign-digest alias tree.
+  #
+  # This direction had no coverage at all. The test below was named
+  # `sftp_cross_hash_sync`, but both its stores default to blake2b256,
+  # so sync.go:240 takes the `continue` and the cross-hash branch never
+  # ran — the name implied coverage that did not exist. Cross-hash plus
+  # SFTP starts here.
+  #
+  # Note that the adder lives on the DESTINATION: SFTP not implementing
+  # BlobForeignDigestAdder is irrelevant here, because copy.go:124
+  # type-asserts `dst`, which is local. That is also why this needs no
+  # -allow-rehashing — sync.go:244-246 only prompts when the
+  # destination is not an adder.
+
+  init_store # .default — blake2b256, the destination
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256src
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "sftp-cross-hash-source" >"$blob"
+
+  local source_id
+  source_id="$(write_blob_id .sha256src "$blob")"
+  [[ $source_id == sha256-* ]] ||
+    fail "expected a sha256 source id, got: $source_id"
+
+  init_sftp_test_store \
+    "$(sftp_remote_root_for_local_store sha256src)" .sftp-sha256
+
+  # Fixture check, not incidental: without it this test could silently
+  # degrade into a same-hash sync, which is exactly how the one below
+  # rotted into testing nothing.
+  run_madder info-repo .sftp-sha256 hash_type-id
+  assert_success
+  assert_line 'sha256'
+
+  run_madder sync -format ndjson .sftp-sha256 .default
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial '"state":"failed"'
+
+  # A list_error here would mean the SFTP enumerator parses the remote
+  # store's own `blob_store-config` as a blob id — the SFTP analogue of
+  # madder#287, which was fixed only for local enumeration.
+  refute_output --partial '"state":"list_error"'
+
+  # The payoff: the sha256 source digest still resolves against the
+  # blake2b256 destination, via the alias the adder wrote. This is the
+  # property dodder's migration depends on.
+  run_madder cat .default "$source_id"
+  assert_success
+  assert_line 'sftp-cross-hash-source'
+}
+
+function sftp_sync_same_hash_preserves_digest { # @test
+  # NOT a cross-hash test, despite its former name
+  # (`sftp_cross_hash_sync`): init_store and init_sftp_test_store both
+  # default to blake2b256, so no rehashing occurs and the digest must
+  # simply survive the round trip unchanged. Renamed so the name
+  # matches the behavior; real cross-hash coverage is
+  # sftp_source_cross_hash_sync_into_local_dest above.
   init_store
   init_sftp_test_store
 
