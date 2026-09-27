@@ -294,7 +294,27 @@ func (u *Utility) printCommandUsage(name string, cmd *Command) {
 	if cmd.Description.Long != "" {
 		fmt.Printf("%s\n\n", cmd.Description.Long)
 	}
-	if len(cmd.Params) > 0 {
+	// Positional args were previously omitted entirely, so a command whose
+	// only params are positional printed a bare "Options:" header with
+	// nothing under it. Same omission as the man pages — see madder#290.
+	if hasPositionalParam(cmd.Params) {
+		fmt.Println("Arguments:")
+		for _, p := range cmd.Params {
+			if !p.isPositional() {
+				continue
+			}
+			label := p.paramName()
+			if p.isVariadic() {
+				label += "..."
+			}
+			if p.paramRequired() {
+				label += " (required)"
+			}
+			fmt.Printf("  %-24s %s\n", label, p.paramDescription())
+		}
+	}
+
+	if hasNonPositionalParam(cmd.Params) {
 		fmt.Println("Options:")
 		for _, p := range cmd.Params {
 			if p.isPositional() {

@@ -130,6 +130,23 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 		typeStr := strings.ToUpper(p.jsonSchemaType())
 		fmt.Fprintf(&b, ".RI [ %s = %s ]\n", flagStr, typeStr)
 	}
+	// Positionals come last, after both flag loops, so the synopsis reads
+	// `cmd [options] <args>`. Without this a command's arguments appear
+	// nowhere in its page at all — see madder#290.
+	for _, p := range cmd.Params {
+		if !p.isPositional() {
+			continue
+		}
+		name := p.paramName()
+		if p.isVariadic() {
+			name += "..."
+		}
+		if p.paramRequired() {
+			fmt.Fprintf(&b, ".I %s\n", name)
+		} else {
+			fmt.Fprintf(&b, ".RI [ %s ]\n", name)
+		}
+	}
 
 	desc := cmd.Description.Long
 	if desc == "" {
@@ -137,6 +154,25 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 	}
 	fmt.Fprintf(&b, ".SH DESCRIPTION\n")
 	fmt.Fprintf(&b, "%s\n", desc)
+
+	if hasPositionalParam(cmd.Params) {
+		fmt.Fprintf(&b, ".SH ARGUMENTS\n")
+		for _, p := range cmd.Params {
+			if !p.isPositional() {
+				continue
+			}
+			fmt.Fprintf(&b, ".TP\n")
+			label := p.paramName()
+			if p.isVariadic() {
+				label += "..."
+			}
+			if p.paramRequired() {
+				label += " (required)"
+			}
+			fmt.Fprintf(&b, ".B %s\n", label)
+			fmt.Fprintf(&b, "%s\n", p.paramDescription())
+		}
+	}
 
 	if hasNonPositionalParam(cmd.Params) {
 		fmt.Fprintf(&b, ".SH OPTIONS\n")
@@ -203,6 +239,15 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 func hasNonPositionalParam(params []Param) bool {
 	for _, p := range params {
 		if !p.isPositional() {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPositionalParam(params []Param) bool {
+	for _, p := range params {
+		if p.isPositional() {
 			return true
 		}
 	}

@@ -667,6 +667,17 @@ debug-version:
   echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
   echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
 
+# Print a command's `--help` straight from source via `go run`, without a nix
+# build or an installed binary. The generated man pages are checkable with
+# debug-gen_man; this is the equivalent for the interactive help, which is a
+# separate renderer (futility's printCommandUsage) and can drift from it.
+# Usage: just debug-cmd-help sync
+#
+# print a command's --help from source
+[group("debug")]
+debug-cmd-help command:
+  cd {{justfile_directory()}}/go && go run ./cmd/madder {{command}} --help
+
 # display the ANSI 256-color palette with lipgloss styling to pick colors for UI
 [group("debug")]
 debug-color-demo:
