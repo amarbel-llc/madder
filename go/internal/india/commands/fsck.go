@@ -61,7 +61,12 @@ func (cmd Fsck) GetDescription() futility.Description {
 			"\"id\" (for per-blob events), \"store\", \"state\" (verified, " +
 			"missing, corrupt, read_error, bail_out), and \"error\" on " +
 			"failures. Progress ticks and summaries route to stderr in " +
-			"JSON mode.",
+			"JSON mode. Note that a store holding foreign-digest aliases " +
+			"— written by a cross-hash sync into a multi-hash store — " +
+			"verifies each aliased blob twice, once under each digest. " +
+			"Both verify correctly, since one blob's bytes have a valid " +
+			"digest under either hash, but the reported blob and byte " +
+			"totals count it twice.",
 	}
 }
 

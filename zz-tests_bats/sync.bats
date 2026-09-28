@@ -248,7 +248,10 @@ function fsck_verifies_foreign_digest_aliases_but_double_counts { # @test
   run_madder sync .default .sha256
   assert_success
 
-  run_madder fsck .sha256
+  # -format ndjson explicitly: the piped default already resolves to it
+  # (sftp_fsck_json_auto_detects covers that), but this test is about
+  # fsck's counts, so it should not also depend on format detection.
+  run_madder fsck -format ndjson .sha256
   assert_success
 
   # The alias verifies under the source hash ...
