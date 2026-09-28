@@ -303,14 +303,7 @@ func (u *Utility) printCommandUsage(name string, cmd *Command) {
 			if !p.isPositional() {
 				continue
 			}
-			label := p.paramName()
-			if p.isVariadic() {
-				label += "..."
-			}
-			if p.paramRequired() {
-				label += " (required)"
-			}
-			fmt.Printf("  %-24s %s\n", label, p.paramDescription())
+			fmt.Printf("  %-24s %s\n", positionalLabel(p), p.paramDescription())
 		}
 	}
 

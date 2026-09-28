@@ -137,10 +137,7 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 		if !p.isPositional() {
 			continue
 		}
-		name := p.paramName()
-		if p.isVariadic() {
-			name += "..."
-		}
+		name := positionalName(p)
 		if p.paramRequired() {
 			fmt.Fprintf(&b, ".I %s\n", name)
 		} else {
@@ -162,14 +159,7 @@ func (u *Utility) writeCommandManpage(dir string, registeredName string, cmd *Co
 				continue
 			}
 			fmt.Fprintf(&b, ".TP\n")
-			label := p.paramName()
-			if p.isVariadic() {
-				label += "..."
-			}
-			if p.paramRequired() {
-				label += " (required)"
-			}
-			fmt.Fprintf(&b, ".B %s\n", label)
+			fmt.Fprintf(&b, ".B %s\n", positionalLabel(p))
 			fmt.Fprintf(&b, "%s\n", p.paramDescription())
 		}
 	}
@@ -252,6 +242,28 @@ func hasPositionalParam(params []Param) bool {
 		}
 	}
 	return false
+}
+
+// positionalName renders a positional param's display name, suffixed with
+// an ellipsis for a variadic.
+func positionalName(p Param) string {
+	name := p.paramName()
+	if p.isVariadic() {
+		name += "..."
+	}
+	return name
+}
+
+// positionalLabel is positionalName plus the "(required)" marker used by
+// the prose sections (man ARGUMENTS, --help). SYNOPSIS does not use this:
+// it expresses optionality through roff bracketing instead, so it renders
+// positionalName directly.
+func positionalLabel(p Param) string {
+	label := positionalName(p)
+	if p.paramRequired() {
+		label += " (required)"
+	}
+	return label
 }
 
 // writeEnvironment renders an ENVIRONMENT section in man(7) format.
