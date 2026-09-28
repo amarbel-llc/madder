@@ -209,6 +209,58 @@ function sync_crap_already_present_blob_reports_done_not_skipped { # @test
   refute_output --partial '"exists"'
 }
 
+function fsck_verifies_foreign_digest_aliases_but_double_counts { # @test
+
+  # A cross-hash sync into a multi-hash destination leaves a
+  # foreign-digest alias — a relative symlink at the source digest's
+  # path pointing at the native blob — so a store holding one real blob
+  # enumerates two entries that both look like blobs.
+  #
+  # What fsck does with that was unverified (madder#291). Answer, in two
+  # parts:
+  #
+  # 1. It is SAFE. Both entries verify. VerifyBlob reads the bytes and
+  #    compares against the expected digest, and the same bytes hash
+  #    correctly under BOTH algorithms — a digest is a function of bytes
+  #    AND hash type, so one blob legitimately has a valid sha256 and a
+  #    valid blake2b256 id. No false corruption reports, so a green fsck
+  #    over an aliased store means what it appears to mean.
+  #
+  # 2. It DOUBLE-COUNTS. Both the blob count and the byte total include
+  #    the alias, so they roughly double for a fully-rehashed store. The
+  #    16-byte blob below is reported as 2 blobs / 32 B.
+  #
+  # Part 2 is the defect worth fixing; part 1 is why it is cosmetic
+  # rather than dangerous. Asserting the inflated numbers rather than
+  # the correct ones because they are what madder does today — rewrite
+  # this when #291 is fixed.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "fsck-alias-test" >"$blob" # 16 bytes including the newline
+  local source_id
+  source_id="$(write_blob_id "$blob")"
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync .default .sha256
+  assert_success
+
+  run_madder fsck .sha256
+  assert_success
+
+  # The alias verifies under the source hash ...
+  assert_output --partial "\"id\":\"$source_id\",\"store\":\".sha256\",\"state\":\"verified\""
+  # ... and the native blob under the destination hash.
+  assert_output --regexp '"id":"sha256-[a-z0-9]+","store":"\.sha256","state":"verified"'
+  refute_output --partial '"state":"failed"'
+
+  # One blob on disk, counted twice, and its bytes counted twice.
+  assert_output --partial 'blobs verified: 2, bytes verified: 32 B'
+}
+
 function sync_crap_auto_detects { # @test
 
   # Default auto-format under `run` (no TTY) must emit ndjson-crap.
