@@ -82,11 +82,17 @@
   # in the separate IMPURE config (presets.eng-impure, run via just
   # lint-worktree) with its own excludes — so AGENTS.md/CLAUDE.md are still seen
   # there.
+  #
+  # go/pkgs/** holds dagnabit's generated facades: they belong to the
+  # generator (which formats them with its own facade config), not to this
+  # config's formatters. The dewey-facade-export lane is whole-tree
+  # (passes-files=false), so this exclude does not stop it triggering.
   settings.excludes = [
     "*.md"
     "result"
     "result-*"
     ".tmp/**"
+    "go/pkgs/**"
   ];
 
   # conformist-git(7) MERGE DRIVERS. presets.eng binds flake.lock by default;

@@ -31,15 +31,15 @@ build-go:
 # the conformist dewey-facade-export lane owns it (repair at pre-commit;
 # the merge-gate CHECK runs via lint-worktree; purse-first#163). This debug
 # recipe inlines the export, threading $DAGNABIT_CONFORMIST_CONFIG (=the
-# generated pure config) + a git-toplevel ceiling so dagnabit's facade-format
-# pass uses madder's config and does NOT walk up to a stray ancestor
-# ~/eng/conformist.toml (which enables rustfmt/prettier/… absent from PATH).
-# This is the env the retired dagnabitWrapped shim used to bake.
+# formatters-only facade config, see dagnabit(1)) + a git-toplevel ceiling so
+# dagnabit's facade-format pass uses madder's config and does NOT walk up to a
+# stray ancestor ~/eng/conformist.toml (which enables rustfmt/prettier/… absent
+# from PATH). This is the env the retired dagnabitWrapped shim used to bake.
 #
 # regenerate facades and show which dewey imports landed in them
 [group("debug")]
 debug-check-facade-imports:
-  nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_FACADE_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
   grep purse-first go/pkgs/domain_interfaces/main.go || true
   grep purse-first go/pkgs/hyphence/main.go || true
   grep purse-first go/pkgs/markl/main.go || true

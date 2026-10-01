@@ -40,6 +40,10 @@
   # Exposed as $MADDER_CONFORMIST_IMPURE_CONFIG for `just lint-worktree`.
   # Defaulted null so non-flake callers degrade gracefully.
   conformistImpureConfig ? null,
+  # dagnabit's formatters-only facade config (lib.conformistModules.
+  # dagnabit-facade). Exposed as $MADDER_CONFORMIST_FACADE_CONFIG for ad-hoc
+  # `dagnabit export`. Defaulted null so non-flake callers degrade gracefully.
+  conformistFacadeConfig ? null,
   system,
   # Filtered Go source tree (test-superset shape) produced by
   # mkGoPkgs in go/gomod.nix and threaded through flake.nix. Every
@@ -713,12 +717,11 @@ in
     MADDER_CONFORMIST_IMPURE_CONFIG =
       if conformistImpureConfig == null then "" else "${conformistImpureConfig}";
 
-    # NB: the facade lane's conformist config is no longer plumbed via a devShell
-    # env var or a baked shim. The conformist dewey-facade-export module
-    # (purse-first#163) bakes DAGNABIT_CONFORMIST_CONFIG into its own
-    # check/repair scripts (store-pinned), so the lane is env-independent in both
-    # the pre-commit hook and the impure merge lane. lint-fmt/codemod-fmt/
-    # lint-worktree still use the MADDER_CONFORMIST_*_CONFIG vars above because
-    # those recipes self-enter the devShell via `nix develop --command`.
+    # dagnabit's formatters-only facade config, for ad-hoc `dagnabit export`
+    # (debug-check-facade-imports). The facade LANE does not read this: the
+    # conformist dewey-facade-export module (purse-first#163) bakes
+    # DAGNABIT_CONFORMIST_CONFIG into its own store-pinned check/repair scripts.
+    MADDER_CONFORMIST_FACADE_CONFIG =
+      if conformistFacadeConfig == null then "" else "${conformistFacadeConfig}";
   };
 }
