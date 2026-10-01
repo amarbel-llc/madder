@@ -130,6 +130,8 @@ func CopyBlobIfNecessary(
 				return copyResult
 			}
 		}
+
+		copyResult.DestBlobId = writerDigest
 	} else {
 		if err := markl.AssertEqual(expectedDigest, writerDigest); err != nil {
 			copyResult.setErrorAfterCopy(

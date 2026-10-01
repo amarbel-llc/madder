@@ -113,6 +113,64 @@ function cross_hash_sync_into_single_hash_dest { # @test
   refute_output --regexp 'blobs with errors: [1-9]'
 }
 
+function sync_cross_hash_reports_dest_id { # @test
+
+  # madder#285, transferred half: a rehashed blob's record carries the
+  # destination digest alongside the source one, so a migration can
+  # read the sha256<->blake2b map straight off the sync stream.
+  #
+  # dest_id is deliberately ABSENT on the already-present second pass:
+  # the skip returns before any writer exists, and resolving the alias
+  # back to its native digest is the other, unimplemented half of #285.
+  # Rewrite that refute when it lands.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "dest-id-test" >"$blob"
+  local source_id
+  source_id="$(write_blob_id "$blob")"
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  assert_output --regexp "\"id\":\"$source_id\",\"dest_id\":\"sha256-[a-z0-9]+\",\"size\":[0-9]+,\"state\":\"transferred\""
+
+  # The dest_id is a real digest in the destination: it resolves to the
+  # same bytes.
+  local dest_id
+  dest_id="$(grep -o '"dest_id":"[^"]*"' <<<"$output" | cut -d'"' -f4)"
+  run_madder cat .sha256 "$dest_id"
+  assert_success
+  assert_line 'dest-id-test'
+
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  assert_output --partial '"size":-1'
+  refute_output --partial '"dest_id"'
+}
+
+function sync_same_hash_omits_dest_id { # @test
+
+  # No rehash, so nothing to map: dest_id would only repeat id.
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "same-hash-test" >"$blob"
+  run_madder write "$blob"
+  assert_success
+
+  run_madder init -encryption none .other
+  assert_success
+
+  run_madder sync -format ndjson .default .other
+  assert_success
+  assert_output --partial '"state":"transferred"'
+  refute_output --partial '"dest_id"'
+}
+
 function sync_idempotent { # @test
 
   init_store

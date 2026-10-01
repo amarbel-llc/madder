@@ -76,7 +76,13 @@ func (cmd Sync) GetDescription() futility.Description {
 			"record has fields \"id\", " +
 			"\"state\" (transferred, failed, list_error, bail_out), " +
 			"\"size\" " +
-			"for transferred blobs, and \"error\" for failures. Note that " +
+			"for transferred blobs, and \"error\" for failures. A " +
+			"transferred blob that was rehashed also carries \"dest_id\", " +
+			"the digest the destination stored it under, so the " +
+			"source-to-destination digest map can be read straight off " +
+			"the stream. \"dest_id\" is absent for same-hash copies and, " +
+			"for now, for already-present blobs, and ndjson-crap does not " +
+			"carry it. Note that " +
 			"neither output format gives an already-present blob a state " +
 			"of its own. In JSON mode it is reported as \"transferred\" " +
 			"with a \"size\" of -1; ndjson-crap reports it as an item in " +
@@ -139,8 +145,9 @@ func (cmd Sync) Run(req futility.Request) {
 // crap path — see streamToSink and madder#285.
 type syncSink interface {
 	// transferred reports a blob copied from source to destinations with
-	// bytesWritten known.
-	transferred(id domain_interfaces.MarklId, bytesWritten int64)
+	// bytesWritten known. destId is the rehashed destination digest, nil
+	// unless the copy crossed hash types.
+	transferred(id, destId domain_interfaces.MarklId, bytesWritten int64)
 	// failed reports a transfer failure for a known id.
 	failed(id domain_interfaces.MarklId, bytesWritten int64, err error)
 	// listError reports a failure reading the source's blob list (no id).
@@ -158,10 +165,11 @@ type syncSink interface {
 }
 
 type syncRecord struct {
-	Id    string `json:"id,omitempty"`
-	Size  *int64 `json:"size,omitempty"`
-	State string `json:"state,omitempty"`
-	Error string `json:"error,omitempty"`
+	Id     string `json:"id,omitempty"`
+	DestId string `json:"dest_id,omitempty"`
+	Size   *int64 `json:"size,omitempty"`
+	State  string `json:"state,omitempty"`
+	Error  string `json:"error,omitempty"`
 }
 
 const (
@@ -182,9 +190,16 @@ func (s *syncJsonSink) emit(rec syncRecord) {
 	_ = s.enc.Encode(rec)
 }
 
-func (s *syncJsonSink) transferred(id domain_interfaces.MarklId, bytesWritten int64) {
+func (s *syncJsonSink) transferred(
+	id, destId domain_interfaces.MarklId,
+	bytesWritten int64,
+) {
 	size := bytesWritten
-	s.emit(syncRecord{Id: id.String(), Size: &size, State: syncStateTransferred})
+	rec := syncRecord{Id: id.String(), Size: &size, State: syncStateTransferred}
+	if destId != nil {
+		rec.DestId = destId.String()
+	}
+	s.emit(rec)
 }
 
 func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
@@ -598,10 +613,12 @@ func (cmd Sync) streamToSink(
 	blobImporter.UseDestinationHashType = useDestinationHashType
 
 	var lastBytesWritten int64
+	var lastDestId domain_interfaces.MarklId
 
 	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
 		bytesWritten, _ := result.GetBytesWrittenAndState()
 		lastBytesWritten = bytesWritten
+		lastDestId = result.DestBlobId
 		return nil
 	}
 
@@ -622,6 +639,7 @@ func (cmd Sync) streamToSink(
 
 	for blobId, errIter := range source.AllBlobs() {
 		lastBytesWritten = 0
+		lastDestId = nil
 
 		if errIter != nil {
 			sink.listError(errIter)
@@ -640,12 +658,12 @@ func (cmd Sync) streamToSink(
 				// the else below — reported as transferred with a
 				// bytesWritten of -1. Only that -1 distinguishes it. See
 				// madder#285.
-				sink.transferred(blobId, lastBytesWritten)
+				sink.transferred(blobId, lastDestId, lastBytesWritten)
 			} else {
 				sink.failed(blobId, lastBytesWritten, err)
 			}
 		} else {
-			sink.transferred(blobId, lastBytesWritten)
+			sink.transferred(blobId, lastDestId, lastBytesWritten)
 		}
 
 		if cmd.Limit > 0 &&
