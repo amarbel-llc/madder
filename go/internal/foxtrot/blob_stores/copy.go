@@ -25,6 +25,22 @@ func CopyBlobIfNecessary(
 	if dst.HasBlob(expectedDigest) {
 		copyResult.bytesWritten = -1
 		copyResult.state = CopyResultStateExistsLocally
+
+		// A resumed cross-hash sync lands here via the alias an earlier run
+		// left behind, before any writer exists — so the destination digest
+		// has to be read back from that alias rather than computed.
+		if resolver, ok := dst.(domain_interfaces.BlobForeignDigestResolver); ok {
+			native, isAlias, err := resolver.ResolveForeignBlobDigest(expectedDigest)
+			if err != nil {
+				copyResult.SetError(err)
+				return copyResult
+			}
+
+			if isAlias {
+				copyResult.DestBlobId = native
+			}
+		}
+
 		return copyResult
 	}
 

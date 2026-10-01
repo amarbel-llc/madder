@@ -125,4 +125,12 @@ type (
 	BlobForeignDigestAdder interface {
 		AddForeignBlobDigestForNativeDigest(foreign, native MarklId) error
 	}
+
+	// BlobForeignDigestResolver is the read half of BlobForeignDigestAdder:
+	// it maps a foreign digest back to the native digest it was registered
+	// against. ok is false, with a nil error, when foreign is not an alias —
+	// absent, or a blob stored natively under that digest.
+	BlobForeignDigestResolver interface {
+		ResolveForeignBlobDigest(foreign MarklId) (native MarklId, ok bool, err error)
+	}
 )

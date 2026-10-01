@@ -11,11 +11,11 @@ import (
 
 type CopyResult struct {
 	BlobId domain_interfaces.MarklId // may not be nil
-	// DestBlobId is the digest the destination stored the blob under, set
-	// only when CopyBlobIfNecessary rehashed it (source and destination
-	// hash types differ). nil for same-hash copies and for blobs skipped
-	// as already present — resolving those needs an alias resolver
-	// (madder#285).
+	// DestBlobId is the digest the destination holds the blob under when
+	// that differs from BlobId: computed when CopyBlobIfNecessary rehashes,
+	// or read back from the foreign-digest alias when the blob was skipped
+	// as already present. nil for same-hash copies, and for skips on stores
+	// that cannot resolve aliases (madder#285).
 	DestBlobId   domain_interfaces.MarklId
 	bytesWritten int64
 	state        copyResultState

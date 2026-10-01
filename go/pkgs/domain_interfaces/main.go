@@ -10,8 +10,16 @@ import (
 type (
 	BlobAccess             = internal.BlobAccess
 	BlobForeignDigestAdder = internal.BlobForeignDigestAdder
-	BlobIOWrapper          = internal.BlobIOWrapper
-	BlobIOWrapperGetter    = internal.BlobIOWrapperGetter
+)
+
+// BlobForeignDigestResolver is the read half of BlobForeignDigestAdder:
+// it maps a foreign digest back to the native digest it was registered
+// against. ok is false, with a nil error, when foreign is not an alias —
+// absent, or a blob stored natively under that digest.
+type (
+	BlobForeignDigestResolver = internal.BlobForeignDigestResolver
+	BlobIOWrapper             = internal.BlobIOWrapper
+	BlobIOWrapperGetter       = internal.BlobIOWrapperGetter
 )
 
 // Blobs represent persisted files, like blobs in Git. Blobs are used by

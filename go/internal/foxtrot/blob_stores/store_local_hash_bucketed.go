@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
@@ -42,9 +43,10 @@ type localHashBucketed struct {
 }
 
 var (
-	_ domain_interfaces.BlobStore              = localHashBucketed{}
-	_ BlobDeleter                              = localHashBucketed{}
-	_ domain_interfaces.BlobForeignDigestAdder = localHashBucketed{}
+	_ domain_interfaces.BlobStore                 = localHashBucketed{}
+	_ BlobDeleter                                 = localHashBucketed{}
+	_ domain_interfaces.BlobForeignDigestAdder    = localHashBucketed{}
+	_ domain_interfaces.BlobForeignDigestResolver = localHashBucketed{}
 )
 
 func makeLocalHashBucketed(
@@ -331,4 +333,98 @@ func (blobStore localHashBucketed) AddForeignBlobDigestForNativeDigest(
 	}
 
 	return err
+}
+
+// ResolveForeignBlobDigest reads back the alias AddForeignBlobDigestForNativeDigest
+// wrote: the foreign path is a relative symlink into the native hash type's
+// tree, so its target path parses back into the native digest the same way
+// AllBlobs parses blob paths. See madder#285.
+func (blobStore localHashBucketed) ResolveForeignBlobDigest(
+	foreign domain_interfaces.MarklId,
+) (native domain_interfaces.MarklId, ok bool, err error) {
+	if !blobStore.multiHash || foreign.IsNull() {
+		return native, ok, err
+	}
+
+	foreignPath := blob_io.MakeHashBucketPathFromMerkleId(
+		foreign,
+		blobStore.buckets,
+		blobStore.multiHash,
+		blobStore.basePath,
+	)
+
+	var info os.FileInfo
+
+	if info, err = os.Lstat(foreignPath); err != nil {
+		if errors.IsNotExist(err) {
+			err = nil
+		} else {
+			err = errors.Wrap(err)
+		}
+
+		return native, ok, err
+	}
+
+	if info.Mode()&os.ModeSymlink == 0 {
+		return native, ok, err
+	}
+
+	var relTarget string
+
+	if relTarget, err = os.Readlink(foreignPath); err != nil {
+		err = errors.Wrap(err)
+		return native, ok, err
+	}
+
+	// The adder always writes a relative target, but a hand-planted alias
+	// may be absolute, and Join would silently graft it under the alias's
+	// directory instead of treating it as a root.
+	nativePath := relTarget
+
+	if !filepath.IsAbs(nativePath) {
+		nativePath = filepath.Join(filepath.Dir(foreignPath), relTarget)
+	}
+
+	var relNative string
+
+	if relNative, err = filepath.Rel(blobStore.basePath, nativePath); err != nil {
+		err = errors.Wrap(err)
+		return native, ok, err
+	}
+
+	hashTypeId, _, _ := strings.Cut(relNative, string(filepath.Separator))
+
+	if hashTypeId == ".." || hashTypeId == relNative {
+		err = errors.Errorf(
+			"foreign digest alias %q points outside the store's hash-type trees: %q",
+			foreignPath,
+			relTarget,
+		)
+
+		return native, ok, err
+	}
+
+	var hashType markl.FormatHash
+
+	if hashType, err = markl.GetFormatHashOrError(hashTypeId); err != nil {
+		err = errors.Wrapf(err, "foreign digest alias %q", foreignPath)
+		return native, ok, err
+	}
+
+	id, repool := hashType.GetBlobId()
+	defer repool()
+
+	if err = markl.SetHexStringFromAbsolutePath(
+		id,
+		nativePath,
+		filepath.Join(blobStore.basePath, hashTypeId),
+	); err != nil {
+		err = errors.Wrapf(err, "foreign digest alias %q", foreignPath)
+		return native, ok, err
+	}
+
+	native, _ = markl.Clone(id) //repool:owned
+	ok = true
+
+	return native, ok, err
 }

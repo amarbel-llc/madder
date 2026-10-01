@@ -115,14 +115,15 @@ function cross_hash_sync_into_single_hash_dest { # @test
 
 function sync_cross_hash_reports_dest_id { # @test
 
-  # madder#285, transferred half: a rehashed blob's record carries the
-  # destination digest alongside the source one, so a migration can
-  # read the sha256<->blake2b map straight off the sync stream.
+  # madder#285: a rehashed blob's record carries the destination digest
+  # alongside the source one, so a migration can read the
+  # sha256<->blake2b map straight off the sync stream.
   #
-  # dest_id is deliberately ABSENT on the already-present second pass:
-  # the skip returns before any writer exists, and resolving the alias
-  # back to its native digest is the other, unimplemented half of #285.
-  # Rewrite that refute when it lands.
+  # The second pass is the resume case. The blob is skipped as already
+  # present (size -1) before any writer exists, so its dest_id has to be
+  # read back from the alias the first pass left — and must equal the one
+  # the first pass reported, or a resumed run's map would disagree with
+  # a fresh run's.
 
   init_store
 
@@ -148,8 +149,7 @@ function sync_cross_hash_reports_dest_id { # @test
 
   run_madder sync -format ndjson .default .sha256
   assert_success
-  assert_output --partial '"size":-1'
-  refute_output --partial '"dest_id"'
+  assert_output --partial "\"id\":\"$source_id\",\"dest_id\":\"$dest_id\",\"size\":-1,\"state\":\"transferred\""
 }
 
 function sync_same_hash_omits_dest_id { # @test

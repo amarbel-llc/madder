@@ -80,9 +80,12 @@ func (cmd Sync) GetDescription() futility.Description {
 			"transferred blob that was rehashed also carries \"dest_id\", " +
 			"the digest the destination stored it under, so the " +
 			"source-to-destination digest map can be read straight off " +
-			"the stream. \"dest_id\" is absent for same-hash copies and, " +
-			"for now, for already-present blobs, and ndjson-crap does not " +
-			"carry it. Note that " +
+			"the stream. An already-present blob that an earlier cross-hash " +
+			"run aliased carries \"dest_id\" too, read back from the alias, " +
+			"so a resumed run into a local store still yields the complete " +
+			"map (only local stores keep aliases). " +
+			"\"dest_id\" is absent for same-hash copies, and ndjson-crap " +
+			"does not carry it. Note that " +
 			"neither output format gives an already-present blob a state " +
 			"of its own. In JSON mode it is reported as \"transferred\" " +
 			"with a \"size\" of -1; ndjson-crap reports it as an item in " +
@@ -145,8 +148,8 @@ func (cmd Sync) Run(req futility.Request) {
 // crap path — see streamToSink and madder#285.
 type syncSink interface {
 	// transferred reports a blob copied from source to destinations with
-	// bytesWritten known. destId is the rehashed destination digest, nil
-	// unless the copy crossed hash types.
+	// bytesWritten known. destId is the destination digest when it differs
+	// from id (rehashed, or resolved from an alias on a skip), else nil.
 	transferred(id, destId domain_interfaces.MarklId, bytesWritten int64)
 	// failed reports a transfer failure for a known id.
 	failed(id domain_interfaces.MarklId, bytesWritten int64, err error)
