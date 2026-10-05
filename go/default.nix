@@ -9,6 +9,11 @@
   # `import ./go/default.nix` callers without a flake context still
   # work — the devShell just won't carry doppelgang in that mode.
   doppelgang ? null,
+  # piggy's flake packages for this system, for the piv_agent bats lane:
+  # the real Rust piggy-agent (`default`) and the fibby virtual PIV card.
+  # Defaulted to null so non-flake callers still work — they just don't
+  # get that lane.
+  piggyPackages ? null,
   # conformist (treefmt successor) — format + lint gate. The BARE binary goes
   # on the devShell PATH (not the Nix wrapper): dagnabit's facade formatter
   # runs `conformist --tree-root <outdir>`, which collides with the wrapper's
@@ -160,7 +165,7 @@ let
   # self-sufficient.
   mkBatsLane =
     {
-      filter ? "!net_cap",
+      filter ? defaultLaneFilter,
       base ? madder,
       extraBinaries ? { },
     }:
@@ -224,6 +229,26 @@ let
     };
   };
 
+  # The real piggy-agent and the fibby virtual PIV card, for
+  # zz-tests_bats/piv_agent.bats (helpers in lib/piv_agent.bash). Only
+  # attached to the piv_agent lane: building piggy is a Rust build no
+  # other lane should pay for, which is also why that tag is filtered
+  # out of the default lanes.
+  pivAgentExtraBinaries = pkgs-master.lib.optionalAttrs (piggyPackages != null) {
+    PIGGY_BIN = {
+      base = piggyPackages.default;
+      name = "piggy";
+    };
+    FIBBY_BIN = {
+      base = piggyPackages.fibby;
+      name = "fibby";
+    };
+  };
+
+  # Tags the default lanes skip: net_cap binds loopback and needs the
+  # fixture servers; piv_agent needs the piggy binaries above.
+  defaultLaneFilter = "!net_cap,!piv_agent";
+
   # madder-cli-cover's coverIntegrationCommand is a phase fragment
   # (shell embedded in buildGoCover's own installCheckPhase), not a
   # derivation, so pkgs.testers.batsLane can't be substituted directly
@@ -243,7 +268,7 @@ let
     cd stage/zz-tests_bats
     ${pkgs.bats}/bin/bats \
       --jobs $NIX_BUILD_CORES \
-      --filter-tags '!net_cap' \
+      --filter-tags '${defaultLaneFilter}' \
       *.bats
     cd "$NIX_BUILD_TOP"
   '';
@@ -498,17 +523,23 @@ let
             # Per-tag binaries overlay: the net_cap lane gets the
             # SFTP/WebDAV/craft-legacy-blob test-fixture binaries so
             # `nix build .#bats-net_cap` is self-sufficient.
-            extraBinaries = if tag == "net_cap" then netCapExtraBinaries else { };
+            extraBinaries =
+              if tag == "net_cap" then
+                netCapExtraBinaries
+              else if tag == "piv_agent" then
+                pivAgentExtraBinaries
+              else
+                { };
           })
         ) allFileTags
       )
       // {
-        bats-default = mkBatsLane { filter = "!net_cap"; };
+        bats-default = mkBatsLane { filter = defaultLaneFilter; };
         # No bats-race-net_cap: the race-instrumented binary doubles
         # build time and the SFTP/WebDAV harnesses already exercise
         # the same data paths under the non-race net_cap lane.
         bats-race = mkBatsLane {
-          filter = "!net_cap";
+          filter = defaultLaneFilter;
           base = madder-race;
         };
       };

@@ -14,7 +14,7 @@ test-tags *tags:
 [group("post-build")]
 test:
   BATS_TEST_TIMEOUT="{{bats_timeout}}" \
-    bats --jobs {{num_cpus()}} --filter-tags '!net_cap' *.bats
+    bats --jobs {{num_cpus()}} --filter-tags '!net_cap,!piv_agent' *.bats
 
 # Run net_cap-tagged tests (SFTP + WebDAV harnesses) in the devshell
 # for fast iteration. The authoritative CI path runs them via

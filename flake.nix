@@ -419,6 +419,9 @@
             langlang
             system
             ;
+          # The real piggy-agent + fibby virtual card, for the piv_agent
+          # bats lane only.
+          piggyPackages = piggy.packages.${system};
           # Pivot self-consumption onto the published artifact: every
           # Go build in go/default.nix uses this as `src`,
           # so the same closure downstream consumers receive via
