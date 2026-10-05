@@ -234,7 +234,14 @@ let
   # attached to the piv_agent lane: building piggy is a Rust build no
   # other lane should pay for, which is also why that tag is filtered
   # out of the default lanes.
+  #
+  # The SFTP fixture server rides along for pigpen_sftp.bats: a
+  # sealed-key store on a remote needs both the agent and the server.
   pivAgentExtraBinaries = pkgs-master.lib.optionalAttrs (piggyPackages != null) {
+    MADDER_TEST_SFTP_SERVER = {
+      base = madder-test-sftp-server;
+      name = "madder-test-sftp-server";
+    };
     PIGGY_BIN = {
       base = piggyPackages.default;
       name = "piggy";

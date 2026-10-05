@@ -126,7 +126,7 @@ func discoverBucketDepth(
 		for _, entry := range entries {
 			name := entry.Name()
 
-			if name == directory_layout.FileNameBlobStoreConfig {
+			if directory_layout.IsBlobStoreConfigFileName(name) {
 				continue
 			}
 
@@ -223,11 +223,122 @@ func WriteRemoteConfig(
 
 	config := configFromDiscoveredConfig(discovered)
 
-	typedConfig := &blob_store_configs.TypedConfig{
-		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
-		Blob: config,
+	if err = writeRemoteTypedConfig(
+		sftpClient,
+		configPath,
+		&blob_store_configs.TypedConfig{
+			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
+			Blob: config,
+		},
+	); err != nil {
+		return err
 	}
 
+	uiPrinter.Printf("remote blob store config written successfully")
+
+	return err
+}
+
+// WriteRemoteSealedKeyConfig creates a sealed-key store (FDR 0011) at an
+// SFTP remote root: the blob_store-key sidecar first, then the immutable
+// blob_store-config. In that order an interrupted init leaves a stray
+// sidecar and no store, which a re-run replaces; the reverse would leave a
+// store whose key is gone. Neither file holds a secret.
+//
+// Refuses a remote that already has a config: its blobs were written under
+// another key, or none.
+func WriteRemoteSealedKeyConfig(
+	sftpClient *sftp.Client,
+	remotePath string,
+	typedConfig *blob_store_configs.TypedConfig,
+	sidecar []byte,
+	uiPrinter ui.Printer,
+) (err error) {
+	configPath := path.Join(remotePath, directory_layout.FileNameBlobStoreConfig)
+	sidecarPath := path.Join(remotePath, directory_layout.FileNameBlobStoreKey)
+
+	if _, statErr := sftpClient.Stat(configPath); statErr == nil {
+		err = errors.Errorf(
+			"remote blob_store-config already present at %q; "+
+				"-pigpen needs a fresh remote",
+			configPath,
+		)
+		return err
+	}
+
+	uiPrinter.Printf("writing remote store key to %q...", sidecarPath)
+
+	if err = writeRemoteStoreKeySidecar(sftpClient, sidecarPath, sidecar); err != nil {
+		return err
+	}
+
+	uiPrinter.Printf("writing remote blob store config to %q...", configPath)
+
+	if err = writeRemoteTypedConfig(sftpClient, configPath, typedConfig); err != nil {
+		return err
+	}
+
+	uiPrinter.Printf("remote sealed-key blob store config written successfully")
+
+	return err
+}
+
+// writeRemoteStoreKeySidecar replaces the sidecar via a tmp sibling and a
+// rename. Unlike the config it stays writable, since re-sealing rewrites
+// it.
+func writeRemoteStoreKeySidecar(
+	sftpClient *sftp.Client,
+	sidecarPath string,
+	sidecar []byte,
+) (err error) {
+	tmpPath, err := files.TmpSibling(sidecarPath)
+	if err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	var file *sftp.File
+
+	if file, err = sftpClient.Create(tmpPath); err != nil {
+		err = errors.Wrapf(err, "failed to create tmp store key %q", tmpPath)
+		return err
+	}
+
+	if _, err = file.Write(sidecar); err != nil {
+		_ = file.Close()
+		_ = sftpClient.Remove(tmpPath)
+		err = errors.Wrapf(err, "failed to write store key to %q", tmpPath)
+		return err
+	}
+
+	if err = file.Close(); err != nil {
+		_ = sftpClient.Remove(tmpPath)
+		err = errors.Wrap(err)
+		return err
+	}
+
+	// SFTP's plain rename refuses an existing target. Prefer the atomic
+	// posix-rename extension; without it, fall back to remove-then-rename.
+	if err = sftpClient.PosixRename(tmpPath, sidecarPath); err != nil {
+		_ = sftpClient.Remove(sidecarPath)
+
+		if err = sftpClient.Rename(tmpPath, sidecarPath); err != nil {
+			_ = sftpClient.Remove(tmpPath)
+			err = errors.Wrapf(err, "failed to rename %q -> %q", tmpPath, sidecarPath)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// writeRemoteTypedConfig writes typedConfig as the immutable
+// blob_store-config at configPath.
+func writeRemoteTypedConfig(
+	sftpClient *sftp.Client,
+	configPath string,
+	typedConfig *blob_store_configs.TypedConfig,
+) (err error) {
 	// Per ADR 0005 / #65, the remote blob_store-config is immutable.
 	// Mirror the local helper's tmp-write + chmod 0o444 + atomic
 	// rename, but over the SFTP file API.
@@ -276,8 +387,6 @@ func WriteRemoteConfig(
 		err = errors.Wrapf(err, "failed to rename %q -> %q", tmpPath, configPath)
 		return err
 	}
-
-	uiPrinter.Printf("remote blob store config written successfully")
 
 	return err
 }

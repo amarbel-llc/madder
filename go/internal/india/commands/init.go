@@ -23,6 +23,13 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+const sftpPigpenDescription = "With -pigpen the store's key is minted by " +
+	"init and sealed to the recipients of the given pigpen (a piggy-ids " +
+	"file); it needs a fresh remote. The remote then holds only the " +
+	"public key (blob_store-config) and the sealed key (blob_store-key), " +
+	"never a secret: blobs are written without the key agent, and " +
+	"reading asks the agent once per madder process."
+
 func init() {
 	utility.AddCmd(
 		"init",
@@ -100,7 +107,8 @@ func init() {
 				Long: "Create a blob store backed by an SFTP remote, using " +
 					"explicitly provided host, port, user, and key path. " +
 					"Use -discover to detect an existing remote store's " +
-					"configuration from its directory structure.",
+					"configuration from its directory structure. " +
+					sftpPigpenDescription,
 			},
 		},
 	)
@@ -117,7 +125,8 @@ func init() {
 				Long: "Create a blob store backed by an SFTP remote, resolving " +
 					"connection parameters from ~/.ssh/config host entries. " +
 					"Use -discover to detect an existing remote store's " +
-					"configuration from its directory structure.",
+					"configuration from its directory structure. " +
+					sftpPigpenDescription,
 			},
 		},
 	)
@@ -241,8 +250,8 @@ type Init struct {
 	// ensureRemoteConfigExists.
 	encryption []markl.Id
 
-	// pigpen is the value of -pigpen, offered only for the local store
-	// type: the path of a pigpen whose recipients the new store's key is
+	// pigpen is the value of -pigpen, offered for the local and SFTP store
+	// types: the path of a pigpen whose recipients the new store's key is
 	// sealed to (FDR 0011).
 	pigpen string
 
@@ -282,7 +291,10 @@ func (cmd *Init) SetFlagDefinitions(
 			"makes re-running init idempotent (e.g. a systemd ExecStartPre)",
 	)
 
-	if _, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType); isLocal {
+	_, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
+	_, isSftpStore := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
+
+	if isLocal || isSftpStore {
 		flagDefinitions.StringVar(
 			&cmd.pigpen,
 			"pigpen",
@@ -349,8 +361,50 @@ func (cmd *Init) Run(req futility.Request) {
 	tw := tap.NewWriter(os.Stdout)
 
 	if cmd.discover {
+		if cmd.pigpen != "" {
+			errors.ContextCancelWithBadRequestf(
+				req,
+				"-pigpen cannot be combined with -discover; -discover adopts "+
+					"the existing remote, -pigpen requires a fresh store",
+			)
+			return
+		}
+
 		cmd.runDiscover(req, blobStoreId, tw)
 		return
+	}
+
+	// -pigpen: mint the store key and seal it BEFORE anything is created,
+	// locally or on a remote, so a bad or unreachable pigpen leaves no
+	// store behind.
+	var sealedKeyConfig *blob_store_configs.TypedConfig
+	var sealedKeySidecar []byte
+
+	_, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
+
+	if cmd.pigpen != "" {
+		// The blob-store properties the sealed-key config carries: the
+		// flag-populated local config, or for SFTP (whose local config is
+		// transport only, ADR 0005) the same defaults a fresh remote gets.
+		properties, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
+		if !isLocal {
+			properties = &blob_store_configs.DefaultType{
+				HashTypeId:      blob_store_configs.HashTypeDefault,
+				HashBuckets:     blob_store_configs.DefaultHashBuckets,
+				CompressionType: "zstd",
+				Encryption:      cmd.encryption,
+			}
+		}
+
+		var err error
+
+		if sealedKeyConfig, sealedKeySidecar, err = command_components.MakeSealedKeyConfig(
+			properties,
+			cmd.pigpen,
+		); err != nil {
+			errors.ContextCancelWithBadRequestError(req, err)
+			return
+		}
 	}
 
 	// SFTP-backed stores need a blob_store-config at the remote root
@@ -359,7 +413,13 @@ func (cmd *Init) Run(req futility.Request) {
 	// matching `init -encryption none` for local stores) when the
 	// remote doesn't already have one.
 	if sftpConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); ok {
-		if !cmd.ensureRemoteConfigExists(req, blobStoreId, sftpConfig) {
+		if !cmd.ensureRemoteConfigExists(
+			req,
+			blobStoreId,
+			sftpConfig,
+			sealedKeyConfig,
+			sealedKeySidecar,
+		) {
 			return
 		}
 	}
@@ -377,25 +437,6 @@ func (cmd *Init) Run(req futility.Request) {
 	// the authoritative blob-store-properties.
 	if s3Config, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigS3); ok {
 		if !cmd.ensureS3RemoteConfigExists(req, blobStoreId, s3Config) {
-			return
-		}
-	}
-
-	// -pigpen: mint the store key and seal it BEFORE anything is created,
-	// so a bad or unreachable pigpen leaves no store behind.
-	var sealedKeyConfig *blob_store_configs.TypedConfig
-	var sealedKeySidecar []byte
-
-	if cmd.pigpen != "" {
-		local := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
-
-		var err error
-
-		if sealedKeyConfig, sealedKeySidecar, err = command_components.MakeSealedKeyConfig(
-			local,
-			cmd.pigpen,
-		); err != nil {
-			errors.ContextCancelWithBadRequestError(req, err)
 			return
 		}
 	}
@@ -419,7 +460,10 @@ func (cmd *Init) Run(req futility.Request) {
 		}
 	}
 
-	if sealedKeyConfig != nil {
+	// A sealed-key SFTP store's config and sidecar are already at the remote
+	// root; only the local transport config remains, written below as for
+	// any SFTP store.
+	if sealedKeyConfig != nil && !isSftp {
 		pathConfig := cmd.InitSealedKeyBlobStore(
 			req,
 			envBlobStore,
@@ -625,6 +669,8 @@ func (cmd *Init) ensureRemoteConfigExists(
 	req futility.Request,
 	blobStoreId scoped_id.Id,
 	sftpConfig blob_store_configs.ConfigSFTPRemotePath,
+	sealedKeyConfig *blob_store_configs.TypedConfig,
+	sealedKeySidecar []byte,
 ) bool {
 	printer := ui.MakePrefixPrinter(
 		ui.Err(),
@@ -652,6 +698,18 @@ func (cmd *Init) ensureRemoteConfigExists(
 	configPath := path.Join(remotePath, directory_layout.FileNameBlobStoreConfig)
 
 	if _, statErr := sftpClient.Stat(configPath); statErr == nil {
+		// An existing remote keeps its key (or its lack of one): sealing a
+		// new key over it would orphan every blob already there.
+		if sealedKeyConfig != nil {
+			errors.ContextCancelWithBadRequestf(
+				req,
+				"remote blob store config already present at %q; "+
+					"-pigpen needs a fresh remote",
+				configPath,
+			)
+			return false
+		}
+
 		printer.Printf("remote blob store config already present at %q", configPath)
 		return true
 	} else if !os.IsNotExist(statErr) {
@@ -668,6 +726,21 @@ func (cmd *Init) ensureRemoteConfigExists(
 			errors.Wrapf(err, "failed to create remote dir %q", remotePath),
 		)
 		return false
+	}
+
+	if sealedKeyConfig != nil {
+		if err := blob_stores.WriteRemoteSealedKeyConfig(
+			sftpClient,
+			remotePath,
+			sealedKeyConfig,
+			sealedKeySidecar,
+			printer,
+		); err != nil {
+			errors.ContextCancelWithBadRequestError(req, err)
+			return false
+		}
+
+		return true
 	}
 
 	if err := blob_stores.WriteRemoteConfig(

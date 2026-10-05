@@ -257,6 +257,10 @@ func (blobStore *remoteS3) readRemoteConfig() (err error) {
 		return err
 	}
 
+	if err = blobStore.adoptSealedKey(sealedKeyUnsupportedLoader("s3")); err != nil {
+		return err
+	}
+
 	blobStore.uiPrinter.Printf(
 		"remote config: hash=%s buckets=%v multi-hash=%t",
 		blobStore.defaultHashType.GetMarklFormatId(),

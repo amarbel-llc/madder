@@ -163,6 +163,16 @@ var (
 // Used by the init-s3 command's bootstrap path.
 var WriteRemoteConfigS3 = internal.WriteRemoteConfigS3
 
+// WriteRemoteSealedKeyConfig creates a sealed-key store (FDR 0011) at an
+// SFTP remote root: the blob_store-key sidecar first, then the immutable
+// blob_store-config. In that order an interrupted init leaves a stray
+// sidecar and no store, which a re-run replaces; the reverse would leave a
+// store whose key is gone. Neither file holds a secret.
+//
+// Refuses a remote that already has a config: its blobs were written under
+// another key, or none.
+var WriteRemoteSealedKeyConfig = internal.WriteRemoteSealedKeyConfig
+
 const (
 	CopyResultStateError                    = internal.CopyResultStateError
 	CopyResultStateExistsLocally            = internal.CopyResultStateExistsLocally

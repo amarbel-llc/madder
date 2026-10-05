@@ -50,9 +50,7 @@ type Opener func(doc *pigpen.Document) ([]byte, error)
 func AgentOpener(doc *pigpen.Document) ([]byte, error) {
 	socketPath, err := agent.ResolveAuthSock()
 	if err != nil {
-		// ResolveAuthSock returns a plain error; piggy's own wrapper marks
-		// it as an agent error at its call site, so do the same here.
-		return nil, fmt.Errorf("%w: %w", agent.ErrAgent, err)
+		return nil, err
 	}
 
 	return doc.Open(agent.AgentECDHOracle{SocketPath: socketPath}, nil)

@@ -253,6 +253,10 @@ func (blobStore *remoteWebdav) readRemoteConfig() (err error) {
 		return err
 	}
 
+	if err = blobStore.adoptSealedKey(sealedKeyUnsupportedLoader("webdav")); err != nil {
+		return err
+	}
+
 	blobStore.uiPrinter.Printf(
 		"remote config: hash=%s buckets=%v multi-hash=%t",
 		blobStore.defaultHashType.GetMarklFormatId(),

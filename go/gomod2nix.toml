@@ -18,8 +18,8 @@ schema = 3
     goVersion = '1.26.1'
 
 [mod.'code.linenisgreat.com/piggy/go']
-    version = 'v0.1.24-0.20261005190018-08e4e063140c'
-    hash = 'sha256-xeNYR+lf6FJ4KVQjEhvFQvDzpZ/lzAe9PgXQrXXWC/0='
+    version = 'v0.1.24-0.20261005200428-a4e604af02b4'
+    hash = 'sha256-nob7GAsc1zwUAnEQ3h4QJgezJskjmd+8yO7Lsz3BJow='
     goVersion = '1.26'
 
 [mod.'code.linenisgreat.com/purse-first/libs/dewey']

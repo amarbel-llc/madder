@@ -6,9 +6,9 @@ promotion-criteria: |
   accepted) and landed the Go helpers, madder pins that work, and a LOCAL
   store can be initialized against a pigpen, written to without an
   agent, and read back through the real piggy-agent with one ECDH per
-  process (zz-tests_bats/pigpen_store.bats, piv_agent lane). Promote to
-  `testing` once `key-status`, `key-reseal` and the drift warning exist
-  and remote (sftp) stores are supported. Promote to `accepted` once a
+  process (zz-tests_bats/pigpen_store.bats, piv_agent lane). SFTP stores
+  followed the same day (zz-tests_bats/pigpen_sftp.bats). Promote to
+  `testing` once `key-status`, `key-reseal` and the drift warning exist. Promote to `accepted` once a
   recipient has been added to a real store by re-sealing with no blob
   rewrite, and one remote store has run on this design with no secret in
   its remote config (madder#296).
@@ -18,9 +18,12 @@ promotion-criteria: |
 
 > **Implementation status (2026-10-05).** Built: the store-key crypto, the
 > `TomlV5` config and `blob_store-key` sidecar, and `madder init -pigpen`
-> plus the read path for **local** stores. Not built yet, though
-> described below: `key-status`, `key-reseal`, the drift warning, and
-> `-pigpen` on the remote store types (sftp, webdav, s3).
+> plus the read path for **local** stores, and `-pigpen` on
+> `init-sftp-explicit` / `init-sftp-ssh_config` plus the read path for
+> **sftp** stores. Not built yet, though described below: `key-status`,
+> `key-reseal`, the drift warning, and `-pigpen` on webdav and s3. A
+> sealed-key remote config met over webdav or s3 can be written to but
+> not read.
 
 ## Problem Statement
 

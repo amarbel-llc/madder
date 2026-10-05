@@ -19,7 +19,8 @@ dev loop and CI share one cache:
   self-sufficient via `netCapExtraBinaries`)
 - `just test-bats-piv-agent` — `.#bats-piv_agent` (madder against the
   real piggy-agent over fibby, piggy's virtual PIV card, via
-  `pivAgentExtraBinaries`; a Rust build, Linux only)
+  `pivAgentExtraBinaries`, which also carries the SFTP fixture server
+  for the sealed-key-over-SFTP tests; a Rust build, Linux only)
 - `just run-bats-tags <tag>` — `.#bats-<tag>`, one lane per unique
   `# bats file_tags=` directive, auto-discovered at flake-eval time
 - `just run-bats-race` / `just run-bats-cover` — race- and

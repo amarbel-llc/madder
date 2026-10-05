@@ -8,6 +8,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
@@ -44,6 +45,10 @@ type remoteBlobStoreBase struct {
 	// initializeOnce runs.
 	blobIOWrapper domain_interfaces.BlobIOWrapper
 
+	// sealedKey is set by adoptSealedKey when the remote config is a
+	// sealed-key config (FDR 0011); nil otherwise.
+	sealedKey domain_interfaces.MarklId
+
 	// initErr is the sticky error captured by initializeOnce when
 	// initialize() fails. sync.Once does not re-run f after a panic, so
 	// the wrapped error is cached here and re-surfaced on each
@@ -74,6 +79,53 @@ func (base *remoteBlobStoreBase) makeEnvDirConfig(
 		hashFormat,
 		blob_io.MakeHashBucketPathJoinFunc(base.buckets),
 		base.blobIOWrapper.GetBlobCompression(),
-		base.blobIOWrapper.GetBlobEncryption(),
+		base.blobEncryption(),
 	)
+}
+
+// blobEncryption is the encryption id blobs are read and written with: the
+// cached sealed-key id for a sealed-key store, the remote config's own
+// otherwise.
+func (base *remoteBlobStoreBase) blobEncryption() domain_interfaces.MarklId {
+	if base.sealedKey != nil {
+		return base.sealedKey
+	}
+
+	return base.blobIOWrapper.GetBlobEncryption()
+}
+
+// adoptSealedKey is called by each transport's readRemoteConfig once
+// remoteConfig is set. For a sealed-key remote config (FDR 0011) it wires
+// in the store key, whose sealed half loadSidecar fetches from the
+// blob_store-key file at the remote root on the first blob read. For any
+// other config it does nothing.
+func (base *remoteBlobStoreBase) adoptSealedKey(
+	loadSidecar func() ([]byte, error),
+) (err error) {
+	sealedKeyConfig, ok := base.remoteConfig.(blob_store_configs.ConfigSealedKey)
+	if !ok {
+		return nil
+	}
+
+	if base.sealedKey, err = makeSealedKeyEncryption(
+		sealedKeyConfig,
+		loadSidecar,
+	); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	return nil
+}
+
+// sealedKeyUnsupportedLoader is the sidecar loader for transports that
+// cannot open a sealed-key store yet: writes still work (they need only the
+// public key), reads fail naming the reason.
+func sealedKeyUnsupportedLoader(transport string) func() ([]byte, error) {
+	return func() ([]byte, error) {
+		return nil, errors.Errorf(
+			"reading a sealed-key store over %s is not supported yet",
+			transport,
+		)
+	}
 }

@@ -270,6 +270,10 @@ func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 		return err
 	}
 
+	if err = blobStore.adoptSealedKey(blobStore.readRemoteStoreKeySidecar); err != nil {
+		return err
+	}
+
 	blobStore.uiPrinter.Printf(
 		"remote config: hash=%s buckets=%v multi-hash=%t",
 		blobStore.defaultHashType.GetMarklFormatId(),
@@ -278,6 +282,31 @@ func (blobStore *remoteSftp) readRemoteConfig() (err error) {
 	)
 
 	return err
+}
+
+// readRemoteStoreKeySidecar fetches a sealed-key store's blob_store-key
+// from the remote root, next to blob_store-config (FDR 0011).
+func (blobStore *remoteSftp) readRemoteStoreKeySidecar() (sidecar []byte, err error) {
+	sidecarPath := path.Join(
+		blobStore.config.GetRemotePath(),
+		directory_layout.FileNameBlobStoreKey,
+	)
+
+	var file *sftp.File
+
+	if file, err = blobStore.sftpClient.Open(sidecarPath); err != nil {
+		err = errors.Wrapf(err, "failed to open remote store key %q", sidecarPath)
+		return nil, err
+	}
+
+	defer file.Close() //defer:err-checked
+
+	if sidecar, err = io.ReadAll(file); err != nil {
+		err = errors.Wrapf(err, "failed to read remote store key %q", sidecarPath)
+		return nil, err
+	}
+
+	return sidecar, nil
 }
 
 func (blobStore *remoteSftp) initialize() (err error) {
@@ -547,7 +576,7 @@ func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_inte
 // as hex digests. The bug surfaced for single-hash stores where the
 // walker iterates `<root>` directly. Closes #148.
 func shouldSkipBlobWalkEntry(name string) bool {
-	return name == directory_layout.FileNameBlobStoreConfig ||
+	return directory_layout.IsBlobStoreConfigFileName(name) ||
 		strings.HasPrefix(name, "tmp_")
 }
 
