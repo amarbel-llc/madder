@@ -198,6 +198,13 @@ func WriteLocalStoreKeySidecar(path string, sidecar []byte) (err error) {
 		return errors.Wrap(err)
 	}
 
+	// The sidecar is the store's only key: make sure its bytes are on disk
+	// before the rename makes them the sidecar.
+	if err = temp.Sync(); err != nil {
+		_ = temp.Close()
+		return errors.Wrap(err)
+	}
+
 	if err = temp.Close(); err != nil {
 		return errors.Wrap(err)
 	}

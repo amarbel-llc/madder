@@ -212,6 +212,52 @@ every command; **madder list -tree** renders its graph in text mode.
 See **blob-store-multi**(7) for the full primitive and config-type
 documentation.
 
+# SEALED-KEY STORES
+
+A local, SFTP or WebDAV store created with **-pigpen** *pigpen* is a
+**sealed-key** store. Its config (**!toml-blob_store_config-v5**) holds
+only a public key; the matching secret key is never stored in the clear
+anywhere, including on a remote.
+
+**init** mints one X25519 **store key** for the store. Blobs are ordinary
+age files encrypted to its public half. The secret half is sealed to
+the recipients of *pigpen*, a piggy-ids file (recipient lines, a pigpen
+recipient set, or a pointer to a remotely hosted pigpen), and kept in a
+**blob_store-key** file next to **blob_store-config**. For a remote
+store both files live at the remote root.
+
+Writing
+:   needs only the public key: no key agent, no card.
+
+Reading
+:   opens the sealed key once per madder process, through the key agent
+    (**PIGGY_AUTH_SOCK**, then **SSH_AUTH_SOCK**, then
+    **PIVY_AUTH_SOCK**) for a PIV recipient. Every blob after that
+    decrypts in software, so a whole **fsck** is one card operation.
+    With no agent reachable, blobs are reported as unreadable, not
+    missing or corrupt.
+
+The first blob read or write in a process also re-reads *pigpen* and
+warns on stderr if its recipients are no longer the ones the key is
+sealed to. It only warns; nothing is blocked or changed.
+
+**madder key-status** *store*
+:   reports the sealed recipient set, the pigpen's current one, and what
+    was added or removed. Needs no agent.
+
+**madder key-reseal** *store*
+:   opens the sealed key through the agent and seals the same store key
+    to the pigpen's current recipients, replacing **blob_store-key**. No
+    blob is rewritten. **-pigpen** records a pigpen that has moved.
+
+Removing a recipient and re-sealing is **not revocation**: anyone who
+kept the old **blob_store-key**, or the store key, can still read every
+blob. Revoking access needs a new store and a **madder sync**.
+
+**-pigpen** cannot be combined with **-encryption** or **-discover**,
+needs a remote that has no store yet, and is not available for S3. See
+FDR-0011 for the full design.
+
 # CONFIG TAMPER DETECTION
 
 Every blob_store-config carries an `@` line in its hyphence metadata

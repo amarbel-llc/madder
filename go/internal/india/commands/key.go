@@ -253,7 +253,9 @@ func (cmd KeyReseal) GetDescription() futility.Description {
 		Long: "For a blob store created with -pigpen, open the sealed store " +
 			"key through the key agent, re-read the pigpen, seal the SAME " +
 			"store key to the pigpen's current recipients, and replace the " +
-			"blob_store-key sidecar. No blob is read or rewritten. Adding " +
+			"blob_store-key sidecar. No blob is read or rewritten. With " +
+			"-pigpen <path> it seals to that pigpen instead and records " +
+			"it as the store's pigpen, for one that has moved. Adding " +
 			"a recipient this way lets it read every existing blob. " +
 			"Removing one only stops it opening the new sidecar: anyone " +
 			"who kept the old sidecar or the store key can still read " +

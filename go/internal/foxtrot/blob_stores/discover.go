@@ -1,6 +1,7 @@
 package blob_stores
 
 import (
+	"os"
 	"path"
 	"strings"
 
@@ -263,6 +264,11 @@ func WriteRemoteSealedKeyConfig(
 				"-pigpen needs a fresh remote",
 			configPath,
 		)
+		return err
+	} else if !os.IsNotExist(statErr) {
+		// Only a definite "no config" licenses clearing the sidecar below:
+		// on any other answer there may be a store here whose key it is.
+		err = errors.Wrapf(statErr, "failed to stat remote config %q", configPath)
 		return err
 	}
 
