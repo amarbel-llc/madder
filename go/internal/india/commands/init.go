@@ -41,7 +41,14 @@ func init() {
 					"compression and hash settings. The blob-store-id selects " +
 					"the XDG scope via an optional prefix ('.', '/', '%', '_', " +
 					"or none) — see blob-store(7). Examples: 'default' (XDG " +
-					"user), '.archive' (CWD-relative), '%scratch' (XDG cache).",
+					"user), '.archive' (CWD-relative), '%scratch' (XDG cache). " +
+					"With -pigpen the store's key is minted by init and sealed " +
+					"to the recipients of the given pigpen (a piggy-ids file): " +
+					"the config then holds only the public key, blobs are " +
+					"written without the key agent, and reading asks the " +
+					"agent once per madder process to open the sealed key. " +
+					"The sealed key is kept in a blob_store-key file next to " +
+					"blob_store-config.",
 			},
 		},
 	)
@@ -234,6 +241,11 @@ type Init struct {
 	// ensureRemoteConfigExists.
 	encryption []markl.Id
 
+	// pigpen is the value of -pigpen, offered only for the local store
+	// type: the path of a pigpen whose recipients the new store's key is
+	// sealed to (FDR 0011).
+	pigpen string
+
 	command_components.EnvBlobStore
 	command_components.Init
 }
@@ -269,6 +281,19 @@ func (cmd *Init) SetFlagDefinitions(
 		"exit 0 (no-op) if the store already exists, instead of erroring; "+
 			"makes re-running init idempotent (e.g. a systemd ExecStartPre)",
 	)
+
+	if _, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType); isLocal {
+		flagDefinitions.StringVar(
+			&cmd.pigpen,
+			"pigpen",
+			"",
+			"seal the store's key to the recipients of this pigpen (a "+
+				"piggy-ids file: recipient lines, a pigpen document, or a "+
+				"pointer to a remote pigpen). Blobs are then written "+
+				"without the key agent and read through it. Cannot be "+
+				"combined with -encryption",
+		)
+	}
 
 	if _, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); isSftp {
 		flagDefinitions.BoolVar(
@@ -356,6 +381,25 @@ func (cmd *Init) Run(req futility.Request) {
 		}
 	}
 
+	// -pigpen: mint the store key and seal it BEFORE anything is created,
+	// so a bad or unreachable pigpen leaves no store behind.
+	var sealedKeyConfig *blob_store_configs.TypedConfig
+	var sealedKeySidecar []byte
+
+	if cmd.pigpen != "" {
+		local := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
+
+		var err error
+
+		if sealedKeyConfig, sealedKeySidecar, err = command_components.MakeSealedKeyConfig(
+			local,
+			cmd.pigpen,
+		); err != nil {
+			errors.ContextCancelWithBadRequestError(req, err)
+			return
+		}
+	}
+
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	// --if-not-exists: a pre-existing store is a successful no-op so a
@@ -373,6 +417,21 @@ func (cmd *Init) Run(req futility.Request) {
 			tw.Plan()
 			return
 		}
+	}
+
+	if sealedKeyConfig != nil {
+		pathConfig := cmd.InitSealedKeyBlobStore(
+			req,
+			envBlobStore,
+			blobStoreId,
+			sealedKeyConfig,
+			sealedKeySidecar,
+		)
+
+		tw.Ok(fmt.Sprintf("init %s", pathConfig.GetConfig()))
+		tw.Plan()
+
+		return
 	}
 
 	pathConfig := cmd.InitBlobStore(

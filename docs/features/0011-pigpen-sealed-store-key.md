@@ -1,20 +1,26 @@
 ---
-status: proposed
+status: experimental
 date: 2026-10-05
 promotion-criteria: |
-  Promote to `experimental` once piggy has landed the pigpen-v1 markl
-  registrations and normative vectors (piggy RFC 0009 phases 2 and 4)
-  plus the Go helpers this record depends on, madder pins that commit,
-  and a store can be initialized against a pigpen recipient document,
-  written to without an agent, and read back through an agent with one
-  ECDH per process. Promote to `accepted` once that round trip is
-  covered by a bats lane against an emulated card, a recipient has been
-  added to a real store by re-sealing with no blob rewrite, and one
-  remote (sftp) store has run on this design with no secret in its
-  remote config (madder#296).
+  Promoted to `experimental` 2026-10-05: piggy froze pigpen-v1 (RFC 0008
+  accepted) and landed the Go helpers, madder pins that work, and a LOCAL
+  store can be initialized against a pigpen, written to without an
+  agent, and read back through the real piggy-agent with one ECDH per
+  process (zz-tests_bats/pigpen_store.bats, piv_agent lane). Promote to
+  `testing` once `key-status`, `key-reseal` and the drift warning exist
+  and remote (sftp) stores are supported. Promote to `accepted` once a
+  recipient has been added to a real store by re-sealing with no blob
+  rewrite, and one remote store has run on this design with no secret in
+  its remote config (madder#296).
 ---
 
 # Pigpen-sealed store key
+
+> **Implementation status (2026-10-05).** Built: the store-key crypto, the
+> `TomlV5` config and `blob_store-key` sidecar, and `madder init -pigpen`
+> plus the read path for **local** stores. Not built yet, though
+> described below: `key-status`, `key-reseal`, the drift warning, and
+> `-pigpen` on the remote store types (sftp, webdav, s3).
 
 ## Problem Statement
 
@@ -54,7 +60,10 @@ encryption recipients of the operator's pigpen recipient document.
 
 ### On-disk shape
 
-The immutable `blob_store-config` gains public material only:
+A sealed-key store's immutable `blob_store-config` is its own config
+version, `toml-blob_store_config-v5`. It is not the default: ordinary
+stores are still written as v4, so only stores created with `-pigpen`
+need a madder new enough to know v5. It carries public material only:
 
     encryption = ["piggy-recipient-v1@age_x25519_pub-…"]
 
@@ -72,11 +81,11 @@ The sealed key lives in a mutable sidecar next to the config,
 config must not (ADR 0005 immutability, FDR 0008 digest pins):
 
     ---
-    ! madder-blob_store_key-v1
+    ! toml-blob_store_key-v1
     ---
 
     [recipients]
-    source = "<path, or pigpen pointer kind + locator>"
+    source = "<absolute path of the pigpen given to init>"
     digest = "blake2b256-…"
 
     [sealed]
@@ -84,9 +93,15 @@ config must not (ADR 0005 immutability, FDR 0008 digest pins):
     <sealed pigpen-v1 document>
     """
 
+`recipients.source` is always a path. A remotely hosted pigpen is
+reached through a pointer document at that path, which piggy resolves.
 `recipients.digest` is the digest of piggy's canonical recipient-set
 bytes at seal time. For a remote store both files live at the remote
 root; neither holds a secret.
+
+`init` writes the sidecar before the config, and refuses outright if the
+store already exists, so an existing store's sidecar is never replaced
+by a second `init`.
 
 ### Commands
 

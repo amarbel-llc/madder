@@ -40,6 +40,11 @@ type localHashBucketed struct {
 	// and forwarded into blob_io.MoveOptions on every MakeBlobWriter.
 	// Nil means no audit logging for this store's writes. See ADR 0004.
 	observer domain_interfaces.BlobWriteObserver
+
+	// sealedKey is set for a sealed-key store (FDR 0011) and replaces the
+	// config's encryption id on every read and write. Nil for every other
+	// store, including ones built directly in tests.
+	sealedKey domain_interfaces.MarklId
 }
 
 var (
@@ -84,7 +89,27 @@ func makeLocalHashBucketed(
 	// forward it to every MoveOptions built from this store.
 	store.observer = envDir.GetBlobWriteObserver()
 
+	if sealedKeyConfig, ok := config.(blob_store_configs.ConfigSealedKey); ok {
+		if store.sealedKey, err = makeSealedKeyEncryption(
+			sealedKeyConfig,
+			loadLocalStoreKeySidecar(basePath),
+		); err != nil {
+			err = errors.Wrap(err)
+			return store, err
+		}
+	}
+
 	return store, err
+}
+
+// blobEncryption is the encryption id reads and writes use: the sealed
+// key for a sealed-key store, else whatever the config declares.
+func (blobStore localHashBucketed) blobEncryption() domain_interfaces.MarklId {
+	if blobStore.sealedKey != nil {
+		return blobStore.sealedKey
+	}
+
+	return blobStore.config.GetBlobEncryption()
 }
 
 func (blobStore localHashBucketed) GetBlobStoreConfig() blob_store_configs.Config {
@@ -114,7 +139,7 @@ func (blobStore localHashBucketed) makeEnvDirConfig(
 		hashFormat,
 		blob_io.MakeHashBucketPathJoinFunc(blobStore.buckets),
 		blobStore.config.GetBlobCompression(),
-		blobStore.config.GetBlobEncryption(),
+		blobStore.blobEncryption(),
 	)
 }
 
