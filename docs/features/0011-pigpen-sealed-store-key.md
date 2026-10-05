@@ -142,7 +142,8 @@ Madder asks piggy to resolve the agent socket: `PIGGY_AUTH_SOCK`, then
 Create a remote store sealed to the recipients of a password store's
 pigpen, then push to it with no card present:
 
-    $ madder init-sftp-ssh_config -host backup -remote-path Library/superior \
+    $ madder init-sftp-explicit -host backup.example -user me \
+        -remote-path Library/superior \
         -pigpen ~/.password-store/piggy-ids .superior
     $ madder sync -format ndjson baikal .superior
 
