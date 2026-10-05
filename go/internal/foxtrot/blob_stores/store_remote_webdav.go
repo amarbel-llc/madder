@@ -253,7 +253,7 @@ func (blobStore *remoteWebdav) readRemoteConfig() (err error) {
 		return err
 	}
 
-	if err = blobStore.adoptSealedKey(sealedKeyUnsupportedLoader("webdav")); err != nil {
+	if err = blobStore.adoptSealedKey(blobStore.readRemoteStoreKeySidecar); err != nil {
 		return err
 	}
 
@@ -265,6 +265,37 @@ func (blobStore *remoteWebdav) readRemoteConfig() (err error) {
 	)
 
 	return err
+}
+
+// readRemoteStoreKeySidecar fetches a sealed-key store's blob_store-key
+// from the base URL, next to blob_store-config (FDR 0011).
+func (blobStore *remoteWebdav) readRemoteStoreKeySidecar() (sidecar []byte, err error) {
+	sidecarURL := blobStore.baseURL.String() + "/" + directory_layout.FileNameBlobStoreKey
+
+	req, err := http.NewRequestWithContext(blobStore.ctx, http.MethodGet, sidecarURL, nil)
+	if err != nil {
+		return nil, errors.Wrap(err)
+	}
+	blobStore.setAuth(req)
+
+	resp, err := blobStore.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to GET remote store key %q", sidecarURL)
+	}
+	defer resp.Body.Close() //defer:err-checked
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Errorf(
+			"unexpected status %d reading remote store key at %q",
+			resp.StatusCode, sidecarURL,
+		)
+	}
+
+	if sidecar, err = io.ReadAll(resp.Body); err != nil {
+		return nil, errors.Wrapf(err, "failed to read remote store key %q", sidecarURL)
+	}
+
+	return sidecar, nil
 }
 
 func (blobStore *remoteWebdav) GetBlobStoreDescription() string {

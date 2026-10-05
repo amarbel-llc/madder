@@ -235,9 +235,14 @@ let
   # other lane should pay for, which is also why that tag is filtered
   # out of the default lanes.
   #
-  # The SFTP fixture server rides along for pigpen_sftp.bats: a
-  # sealed-key store on a remote needs both the agent and the server.
+  # The SFTP and WebDAV fixture servers ride along for pigpen_sftp.bats
+  # and pigpen_webdav.bats: a sealed-key store on a remote needs both the
+  # agent and the server.
   pivAgentExtraBinaries = pkgs-master.lib.optionalAttrs (piggyPackages != null) {
+    MADDER_TEST_WEBDAV_SERVER = {
+      base = madder-test-webdav-server;
+      name = "madder-test-webdav-server";
+    };
     MADDER_TEST_SFTP_SERVER = {
       base = madder-test-sftp-server;
       name = "madder-test-sftp-server";

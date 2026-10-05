@@ -23,7 +23,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-const sftpPigpenDescription = "With -pigpen the store's key is minted by " +
+const remotePigpenDescription = "With -pigpen the store's key is minted by " +
 	"init and sealed to the recipients of the given pigpen (a piggy-ids " +
 	"file); it needs a fresh remote. The remote then holds only the " +
 	"public key (blob_store-config) and the sealed key (blob_store-key), " +
@@ -108,7 +108,7 @@ func init() {
 					"explicitly provided host, port, user, and key path. " +
 					"Use -discover to detect an existing remote store's " +
 					"configuration from its directory structure. " +
-					sftpPigpenDescription,
+					remotePigpenDescription,
 			},
 		},
 	)
@@ -126,7 +126,7 @@ func init() {
 					"connection parameters from ~/.ssh/config host entries. " +
 					"Use -discover to detect an existing remote store's " +
 					"configuration from its directory structure. " +
-					sftpPigpenDescription,
+					remotePigpenDescription,
 			},
 		},
 	)
@@ -146,7 +146,7 @@ func init() {
 					"credentials per v0); the remote blob_store-config governs " +
 					"hash type, buckets, compression, and encryption per ADR 0005. " +
 					"-discover is not supported in v0; only the fresh-bootstrap " +
-					"path is available.",
+					"path is available. " + remotePigpenDescription,
 			},
 		},
 	)
@@ -250,8 +250,8 @@ type Init struct {
 	// ensureRemoteConfigExists.
 	encryption []markl.Id
 
-	// pigpen is the value of -pigpen, offered for the local and SFTP store
-	// types: the path of a pigpen whose recipients the new store's key is
+	// pigpen is the value of -pigpen, offered for the local, SFTP and
+	// WebDAV store types: the path of a pigpen whose recipients the new store's key is
 	// sealed to (FDR 0011).
 	pigpen string
 
@@ -294,7 +294,9 @@ func (cmd *Init) SetFlagDefinitions(
 	_, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
 	_, isSftpStore := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
 
-	if isLocal || isSftpStore {
+	_, isWebdavStore := cmd.blobStoreConfig.(blob_store_configs.ConfigWebDAV)
+
+	if isLocal || isSftpStore || isWebdavStore {
 		flagDefinitions.StringVar(
 			&cmd.pigpen,
 			"pigpen",
@@ -380,7 +382,7 @@ func (cmd *Init) Run(req futility.Request) {
 	var sealedKeyConfig *blob_store_configs.TypedConfig
 	var sealedKeySidecar []byte
 
-	_, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
+	_, isLocalStore := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
 
 	// --if-not-exists with -pigpen: an existing store must be a no-op
 	// BEFORE the pigpen is read or the remote contacted. Otherwise a re-run
@@ -401,8 +403,9 @@ func (cmd *Init) Run(req futility.Request) {
 
 	if cmd.pigpen != "" {
 		// The blob-store properties the sealed-key config carries: the
-		// flag-populated local config, or for SFTP (whose local config is
-		// transport only, ADR 0005) the same defaults a fresh remote gets.
+		// flag-populated local config, or for a remote store (whose local
+		// config is transport only, ADR 0005) the same defaults a fresh
+		// remote gets.
 		properties, isLocal := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
 		if !isLocal {
 			properties = &blob_store_configs.DefaultType{
@@ -444,7 +447,13 @@ func (cmd *Init) Run(req futility.Request) {
 	// WebDAV-backed stores follow the same Mode-B bootstrap as SFTP:
 	// PUT a default TomlV3 to <url>/blob_store-config when missing.
 	if webdavConfig, ok := cmd.blobStoreConfig.(blob_store_configs.ConfigWebDAV); ok {
-		if !cmd.ensureWebdavRemoteConfigExists(req, blobStoreId, webdavConfig) {
+		if !cmd.ensureWebdavRemoteConfigExists(
+			req,
+			blobStoreId,
+			webdavConfig,
+			sealedKeyConfig,
+			sealedKeySidecar,
+		) {
 			return
 		}
 	}
@@ -477,10 +486,10 @@ func (cmd *Init) Run(req futility.Request) {
 		}
 	}
 
-	// A sealed-key SFTP store's config and sidecar are already at the remote
-	// root; only the local transport config remains, written below as for
-	// any SFTP store.
-	if sealedKeyConfig != nil && !isSftp {
+	// A sealed-key remote store's config and sidecar are already at the
+	// remote root; only the local transport config remains, written below
+	// as for any remote store.
+	if sealedKeyConfig != nil && isLocalStore {
 		pathConfig := cmd.InitSealedKeyBlobStore(
 			req,
 			envBlobStore,

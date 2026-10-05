@@ -61,11 +61,19 @@ type PackableArchive = internal.PackableArchive
 // Returns an error if a remote `blob_store-config` already exists at
 // `<url>/blob_store-config`; callers that want overwrite semantics
 // must DELETE first.
+var BootstrapWebdavRemoteConfig = internal.BootstrapWebdavRemoteConfig
+
+// BootstrapWebdavSealedKeyConfig creates a sealed-key store (FDR 0011) at
+// a WebDAV base URL: the blob_store-key sidecar first, then the
+// blob_store-config, so an interrupted init leaves a stray sidecar and no
+// store rather than a store whose key is gone. Neither holds a secret.
+// Like BootstrapWebdavRemoteConfig it refuses a base that already has a
+// config.
 var (
-	BootstrapWebdavRemoteConfig = internal.BootstrapWebdavRemoteConfig
-	CopyBlobIfNecessary         = internal.CopyBlobIfNecessary
-	CopyReaderToWriter          = internal.CopyReaderToWriter
-	DiscoverRemoteConfig        = internal.DiscoverRemoteConfig
+	BootstrapWebdavSealedKeyConfig = internal.BootstrapWebdavSealedKeyConfig
+	CopyBlobIfNecessary            = internal.CopyBlobIfNecessary
+	CopyReaderToWriter             = internal.CopyReaderToWriter
+	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
 )
 
 // IsErrBlobUnreadable reports whether a VerifyBlob failure says nothing

@@ -30,6 +30,43 @@ func BootstrapWebdavRemoteConfig(
 	config blob_store_configs.ConfigWebDAV,
 	discovered DiscoveredConfig,
 ) (err error) {
+	return bootstrapWebdavRemote(
+		ctx,
+		uiPrinter,
+		config,
+		&blob_store_configs.TypedConfig{
+			Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
+			Blob: configFromDiscoveredConfig(discovered),
+		},
+		nil,
+	)
+}
+
+// BootstrapWebdavSealedKeyConfig creates a sealed-key store (FDR 0011) at
+// a WebDAV base URL: the blob_store-key sidecar first, then the
+// blob_store-config, so an interrupted init leaves a stray sidecar and no
+// store rather than a store whose key is gone. Neither holds a secret.
+// Like BootstrapWebdavRemoteConfig it refuses a base that already has a
+// config.
+func BootstrapWebdavSealedKeyConfig(
+	ctx interfaces.ActiveContext,
+	uiPrinter ui.Printer,
+	config blob_store_configs.ConfigWebDAV,
+	typedConfig *blob_store_configs.TypedConfig,
+	sidecar []byte,
+) (err error) {
+	return bootstrapWebdavRemote(ctx, uiPrinter, config, typedConfig, sidecar)
+}
+
+// bootstrapWebdavRemote writes typedConfig, preceded by the store-key
+// sidecar when one is given, to a base URL that has no config yet.
+func bootstrapWebdavRemote(
+	ctx interfaces.ActiveContext,
+	uiPrinter ui.Printer,
+	config blob_store_configs.ConfigWebDAV,
+	typedConfig *blob_store_configs.TypedConfig,
+	sidecar []byte,
+) (err error) {
 	// Validate before any HTTP work so init-webdav's
 	// mutually-exclusive-auth check surfaces here too, not just at
 	// store-construction time. Without this, init succeeds locally
@@ -96,42 +133,51 @@ func BootstrapWebdavRemoteConfig(
 		)
 	}
 
-	configBlob := configFromDiscoveredConfig(discovered)
-	typedConfig := &blob_store_configs.TypedConfig{
-		Type: ids.GetOrPanic(ids.TypeTomlBlobStoreConfigVCurrent).TypeStruct,
-		Blob: configBlob,
-	}
-
 	var encoded bytes.Buffer
 	if _, err = blob_store_configs.EncodeWithDigest(typedConfig, &encoded); err != nil {
 		return errors.Wrapf(err, "failed to encode remote config")
 	}
 
+	put := func(url string, body []byte) error {
+		putReq, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPut,
+			url,
+			bytes.NewReader(body),
+		)
+		if err != nil {
+			return errors.Wrap(err)
+		}
+		applyWebdavAuth(putReq, config)
+		putReq.ContentLength = int64(len(body))
+
+		putResp, err := httpClient.Do(putReq)
+		if err != nil {
+			return errors.Wrapf(err, "PUT %q", url)
+		}
+		defer putResp.Body.Close() //defer:err-checked
+
+		if putResp.StatusCode/100 != 2 {
+			return errors.Errorf("PUT %q returned %d", url, putResp.StatusCode)
+		}
+
+		return nil
+	}
+
+	if sidecar != nil {
+		sidecarURL := baseURL + "/" + directory_layout.FileNameBlobStoreKey
+
+		uiPrinter.Printf("writing remote store key to %q...", sidecarURL)
+
+		if err = put(sidecarURL, sidecar); err != nil {
+			return err
+		}
+	}
+
 	uiPrinter.Printf("writing remote blob store config to %q...", configURL)
 
-	putReq, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPut,
-		configURL,
-		bytes.NewReader(encoded.Bytes()),
-	)
-	if err != nil {
-		return errors.Wrap(err)
-	}
-	applyWebdavAuth(putReq, config)
-	putReq.ContentLength = int64(encoded.Len())
-
-	putResp, err := httpClient.Do(putReq)
-	if err != nil {
-		return errors.Wrapf(err, "PUT %q", configURL)
-	}
-	defer putResp.Body.Close() //defer:err-checked
-
-	if putResp.StatusCode/100 != 2 {
-		return errors.Errorf(
-			"PUT %q returned %d",
-			configURL, putResp.StatusCode,
-		)
+	if err = put(configURL, encoded.Bytes()); err != nil {
+		return err
 	}
 
 	uiPrinter.Printf("remote blob store config written successfully")
