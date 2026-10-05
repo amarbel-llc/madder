@@ -126,6 +126,29 @@ function sealed_webdav_store_without_an_agent_is_unreadable { # @test
   assert_output --partial '1 blob(s) could not be read'
 }
 
+function key_reseal_replaces_the_sidecar_on_the_webdav_remote { # @test
+  init_sealed_webdav_store
+
+  local blob_id before
+  blob_id="$(write_sealed_blob "written before the webdav reseal")"
+  before="$(cat "$REMOTE_ROOT/blob_store-key")"
+
+  run_madder_no_agent key-status .sealed-webdav
+  assert_success
+  assert_output --partial 'status:      in sync'
+
+  run_madder_agent key-reseal .sealed-webdav
+  assert_success
+  assert_output --partial 're-sealed .sealed-webdav to 1 recipient ('
+
+  [[ "$(cat "$REMOTE_ROOT/blob_store-key")" != "$before" ]] ||
+    fail "the remote sidecar was not replaced"
+
+  run_madder_agent cat .sealed-webdav "$blob_id"
+  assert_success
+  assert_output --partial 'written before the webdav reseal'
+}
+
 function init_webdav_pigpen_refuses_an_existing_remote { # @test
   init_webdav_store .plain-webdav
   assert_success

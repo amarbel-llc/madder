@@ -108,6 +108,7 @@ func (base *remoteBlobStoreBase) adoptSealedKey(
 	}
 
 	if base.sealedKey, err = makeSealedKeyEncryption(
+		base.id.String(),
 		sealedKeyConfig,
 		loadSidecar,
 	); err != nil {

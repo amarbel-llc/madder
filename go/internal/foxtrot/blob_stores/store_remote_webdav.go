@@ -298,6 +298,47 @@ func (blobStore *remoteWebdav) readRemoteStoreKeySidecar() (sidecar []byte, err 
 	return sidecar, nil
 }
 
+var _ StoreKeySidecarStore = (*remoteWebdav)(nil)
+
+func (blobStore *remoteWebdav) ReadStoreKeySidecar() ([]byte, error) {
+	blobStore.initializeOnce()
+	return blobStore.readRemoteStoreKeySidecar()
+}
+
+// WriteStoreKeySidecar replaces the sidecar with a single PUT. WebDAV has
+// no portable atomic replace; a PUT that fails part-way leaves whatever the
+// server kept, so the caller should hold on to the previous sidecar until
+// this returns.
+func (blobStore *remoteWebdav) WriteStoreKeySidecar(sidecar []byte) (err error) {
+	blobStore.initializeOnce()
+
+	sidecarURL := blobStore.baseURL.String() + "/" + directory_layout.FileNameBlobStoreKey
+
+	req, err := http.NewRequestWithContext(
+		blobStore.ctx,
+		http.MethodPut,
+		sidecarURL,
+		bytes.NewReader(sidecar),
+	)
+	if err != nil {
+		return errors.Wrap(err)
+	}
+	blobStore.setAuth(req)
+	req.ContentLength = int64(len(sidecar))
+
+	resp, err := blobStore.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrapf(err, "PUT %q", sidecarURL)
+	}
+	defer resp.Body.Close() //defer:err-checked
+
+	if resp.StatusCode/100 != 2 {
+		return errors.Errorf("PUT %q returned %d", sidecarURL, resp.StatusCode)
+	}
+
+	return nil
+}
+
 func (blobStore *remoteWebdav) GetBlobStoreDescription() string {
 	return "remote webdav hash bucketed"
 }

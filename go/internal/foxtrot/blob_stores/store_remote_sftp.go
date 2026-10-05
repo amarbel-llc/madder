@@ -309,6 +309,31 @@ func (blobStore *remoteSftp) readRemoteStoreKeySidecar() (sidecar []byte, err er
 	return sidecar, nil
 }
 
+var _ StoreKeySidecarStore = (*remoteSftp)(nil)
+
+func (blobStore *remoteSftp) ReadStoreKeySidecar() ([]byte, error) {
+	if err := blobStore.tryInitialize(); err != nil {
+		return nil, err
+	}
+
+	return blobStore.readRemoteStoreKeySidecar()
+}
+
+func (blobStore *remoteSftp) WriteStoreKeySidecar(sidecar []byte) error {
+	if err := blobStore.tryInitialize(); err != nil {
+		return err
+	}
+
+	return writeRemoteStoreKeySidecar(
+		blobStore.sftpClient,
+		path.Join(
+			blobStore.config.GetRemotePath(),
+			directory_layout.FileNameBlobStoreKey,
+		),
+		sidecar,
+	)
+}
+
 func (blobStore *remoteSftp) initialize() (err error) {
 	if blobStore.sshClient, err = blobStore.sshClientInitializer(); err != nil {
 		err = errors.Wrap(err)

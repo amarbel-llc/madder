@@ -1,5 +1,5 @@
 ---
-status: experimental
+status: testing
 date: 2026-10-05
 promotion-criteria: |
   Promoted to `experimental` 2026-10-05: piggy froze pigpen-v1 (RFC 0008
@@ -8,8 +8,8 @@ promotion-criteria: |
   agent, and read back through the real piggy-agent with one ECDH per
   process (zz-tests_bats/pigpen_store.bats, piv_agent lane). SFTP stores
   and WebDAV stores followed the same day (zz-tests_bats/pigpen_sftp.bats,
-  pigpen_webdav.bats). Promote to
-  `testing` once `key-status`, `key-reseal` and the drift warning exist. Promote to `accepted` once a
+  pigpen_webdav.bats). Promoted to `testing` 2026-10-05 once
+  `key-status`, `key-reseal` and the drift warning existed. Promote to `accepted` once a
   recipient has been added to a real store by re-sealing with no blob
   rewrite, and one remote store has run on this design with no secret in
   its remote config (madder#296).
@@ -17,14 +17,11 @@ promotion-criteria: |
 
 # Pigpen-sealed store key
 
-> **Implementation status (2026-10-05).** Built: the store-key crypto, the
-> `TomlV5` config and `blob_store-key` sidecar, and `madder init -pigpen`
-> plus the read path for **local** stores, and `-pigpen` on
-> `init-sftp-explicit` / `init-sftp-ssh_config` / `init-webdav` plus the
-> read path for **sftp** and **webdav** stores. Not built yet, though
-> described below: `key-status`, `key-reseal`, the drift warning, and
-> `-pigpen` on s3. A sealed-key remote config met over s3 can be written
-> to but not read.
+> **Implementation status (2026-10-05).** Built for **local**, **sftp**
+> and **webdav** stores: `-pigpen` on `init`, `init-sftp-explicit`,
+> `init-sftp-ssh_config` and `init-webdav`, the read path, `key-status`,
+> `key-reseal`, and the drift warning. Not built: `-pigpen` on s3. A
+> sealed-key remote config met over s3 can be written to but not read.
 
 ## Problem Statement
 
@@ -121,13 +118,15 @@ by a second `init`.
 - `madder key-reseal <store>` opens the sealed document through the
   agent, re-resolves the source, seals the same store key to the current
   recipient set, and replaces the sidecar atomically. No blob is
-  touched.
+  touched. `-pigpen <source>` seals to a different pigpen and records it
+  as the store's source from then on, for a pigpen that has moved.
 
 ### Drift
 
-On every command that opens the store for reading or writing, madder
-re-resolves the recorded source and compares its canonical recipient-set
-digest with `recipients.digest`. On a mismatch it prints a warning
+The first time a madder process reads a blob from the store or writes
+one to it, madder re-resolves the recorded source and compares its
+canonical recipient-set digest with `recipients.digest`. Commands that
+only list or describe stores do not check. On a mismatch it prints a warning
 naming the store and pointing at `key-status` and `key-reseal`, then
 proceeds. It never re-seals on its own. If the source cannot be resolved
 (missing file, resolver failure, timeout) madder warns and proceeds with
@@ -157,10 +156,13 @@ A YubiKey is enrolled in the pigpen later:
     # (blob_store: .superior) recipient set has changed since the store
     # key was sealed; run `madder key-status .superior`
     $ madder key-status .superior
+    pigpen:      /home/me/.password-store/piggy-ids
     sealed to:   2 recipients (blake2b256-aaaa…)
-    source now:  3 recipients (blake2b256-bbbb…)
-    added:       piggy-recipient-v1@pivy_ecdh_p256_pub-…
+    pigpen now:  3 recipients (blake2b256-bbbb…)
+    added:       pivy_ecdh_p256_pub-…
+    status:      changed; run `madder key-reseal .superior`
     $ madder key-reseal .superior
+    re-sealed .superior to 3 recipients (blake2b256-bbbb…)
 
 ## Limitations
 
@@ -186,17 +188,21 @@ A YubiKey is enrolled in the pigpen later:
 - **Existing stores are not converted.** A store with a raw
   `age_x25519_sec` in its config keeps working. Moving it to this design
   is a new store plus a sync.
-- **Depends on unreleased piggy work.** Nothing here can be built until
-  piggy freezes the pigpen-v1 bytes. Madder will not persist the sealed
-  format before then.
+- **Re-sealing does not check you can still open the result.** Sealing
+  to a pigpen that names none of your keys locks you out of the new
+  sidecar; `key-status` shows what a reseal would change before you run
+  it.
+- **Replacing a remote sidecar is not always atomic.** SFTP uses
+  posix-rename where the server has it and otherwise refuses to replace
+  an existing sidecar; WebDAV replaces it with a single PUT.
 
 ## Tuning Levers
 
 | Lever | Current | Rationale | Change signal |
 |---|---|---|---|
 | Drift response | warn and proceed | a changed pigpen must not make a backup unreadable or block a push | a recipient removal goes unnoticed long enough to matter; then refuse writes, or add a strict flag |
-| Drift check frequency | every store open | recipient changes should be seen on the next use | resolver latency or failures become a visible cost on ordinary commands; then cache or check only on `key-status` |
-| Resolver timeout | to be set when built | pointer resolution may make a network call | timeouts on a healthy network, or hangs that stall commands |
+| Drift check frequency | first blob read or write per process | recipient changes should be seen on the next use | resolver latency or failures become a visible cost on ordinary commands; then cache or check only on `key-status` |
+| Resolver timeout | 30 seconds | pointer resolution may make a network call | timeouts on a healthy network, or hangs that stall commands |
 | Sidecar vs in-config | sidecar file | keeps the config immutable and digest-pinnable | the two files drifting apart on remotes proves worse than a mutable config |
 | Key holder | `process` only | accepted as sufficient for now | a key-holding agent or fibby-backed holder exists in piggy |
 

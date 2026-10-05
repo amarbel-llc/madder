@@ -175,6 +175,30 @@ function sync_into_a_sealed_sftp_store_needs_no_agent { # @test
   assert_output --partial 'synced into the sealed remote'
 }
 
+function key_reseal_replaces_the_sidecar_on_the_sftp_remote { # @test
+  init_sealed_sftp_store
+
+  local blob_id before
+  blob_id="$(write_sealed_blob "written before the sftp reseal")"
+  before="$(cat "$REMOTE_ROOT/blob_store-key")"
+
+  run_madder_no_agent key-status .sealed-sftp
+  assert_success
+  assert_output --partial 'status:      in sync'
+
+  run_madder_agent key-reseal .sealed-sftp
+  assert_success
+  assert_output --partial 're-sealed .sealed-sftp to 1 recipient ('
+
+  # A fresh seal of the same key: new bytes on the remote, same blobs.
+  [[ "$(cat "$REMOTE_ROOT/blob_store-key")" != "$before" ]] ||
+    fail "the remote sidecar was not replaced"
+
+  run_madder_agent cat .sealed-sftp "$blob_id"
+  assert_success
+  assert_output --partial 'written before the sftp reseal'
+}
+
 function init_sftp_pigpen_refuses_an_existing_remote { # @test
   # A plain store already lives at the remote root.
   init_sftp_store .plain-sftp

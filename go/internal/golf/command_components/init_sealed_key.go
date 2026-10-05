@@ -9,6 +9,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
 	"code.linenisgreat.com/madder/go/internal/charlie/store_key"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
@@ -137,7 +138,7 @@ func (cmd Init) InitSealedKeyBlobStore(
 		return path
 	}
 
-	if err := WriteStoreKeySidecar(
+	if err := blob_stores.WriteLocalStoreKeySidecar(
 		filepath.Join(path.GetBase(), directory_layout.FileNameBlobStoreKey),
 		sidecar,
 	); err != nil {
@@ -146,41 +147,4 @@ func (cmd Init) InitSealedKeyBlobStore(
 	}
 
 	return cmd.InitBlobStore(ctx, envBlobStore, id, typedConfig)
-}
-
-// WriteStoreKeySidecar replaces a sealed-key store's sidecar atomically:
-// a reader sees the old document or the new one, never a partial write.
-// Unlike blob_store-config the sidecar stays writable, since re-sealing
-// rewrites it.
-func WriteStoreKeySidecar(path string, sidecar []byte) (err error) {
-	temp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
-	if err != nil {
-		return errors.Wrap(err)
-	}
-
-	defer func() {
-		if err != nil {
-			_ = os.Remove(temp.Name())
-		}
-	}()
-
-	if _, err = temp.Write(sidecar); err != nil {
-		_ = temp.Close()
-		return errors.Wrap(err)
-	}
-
-	if err = temp.Chmod(0o644); err != nil {
-		_ = temp.Close()
-		return errors.Wrap(err)
-	}
-
-	if err = temp.Close(); err != nil {
-		return errors.Wrap(err)
-	}
-
-	if err = os.Rename(temp.Name(), path); err != nil {
-		return errors.Wrap(err)
-	}
-
-	return nil
 }

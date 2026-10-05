@@ -180,6 +180,162 @@ function init_pigpen_refuses_bad_input_and_creates_nothing { # @test
   [[ ! -e "$(sealed_store_dir)" ]] || fail "a store was created despite the conflict"
 }
 
+# second_recipient echoes a valid X25519 recipient the test holds no key
+# for: the public key of a throwaway sealed-key store.
+second_recipient() {
+  run_madder_agent init -pigpen "$PIGPEN" .throwaway
+  assert_success
+  local id
+  id="$(grep -o 'piggy-recipient-v1@age_x25519_pub-[a-z0-9]*' \
+    .madder/local/share/blob_stores/throwaway/blob_store-config | head -n 1)"
+  [[ -n $id ]] || fail "no public key found in the throwaway store's config"
+  echo "$id"
+}
+
+function key_status_reports_in_sync_without_the_card { # @test
+  init_sealed_store
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial "pigpen:      $PIGPEN"
+  assert_output --partial 'sealed to:   1 recipient ('
+  assert_output --partial 'pigpen now:  1 recipient ('
+  assert_output --partial 'status:      in sync'
+  refute_output --partial 'added:'
+  refute_output --partial 'removed:'
+
+  [[ "$(card_ecdh_count)" == "0" ]] || fail "key-status used the card"
+}
+
+function drift_warns_and_key_reseal_adds_a_recipient { # @test
+  init_sealed_store
+
+  local blob_id added
+  blob_id="$(write_sealed_blob "written before the reseal")"
+  added="$(second_recipient)"
+  echo "$added" >>"$PIGPEN"
+
+  # A changed pigpen warns and proceeds: the blob is still readable.
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'written before the reseal'
+  assert_output --partial 'recipient set has changed'
+  assert_output --partial 'madder key-status .sealed'
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial 'sealed to:   1 recipient ('
+  assert_output --partial 'pigpen now:  2 recipients ('
+  assert_output --partial "added:       ${added#*@}"
+  assert_output --partial 'status:      changed'
+
+  local before_reseal
+  before_reseal="$(card_ecdh_count)"
+
+  run_madder_agent key-reseal .sealed
+  assert_success
+  assert_output --partial 're-sealed .sealed to 2 recipients ('
+
+  # Re-sealing opened the old document once, and read no blob.
+  [[ "$(($(card_ecdh_count) - before_reseal))" == "1" ]] ||
+    fail "expected 1 card ECDH for the reseal"
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial 'sealed to:   2 recipients ('
+  assert_output --partial 'status:      in sync'
+
+  # Same store key: the old blob still decrypts, and the warning is gone.
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'written before the reseal'
+  refute_output --partial 'recipient set has changed'
+}
+
+function key_reseal_can_remove_the_card { # @test
+  init_sealed_store
+
+  local blob_id other
+  blob_id="$(write_sealed_blob "sealed to the card")"
+  other="$(second_recipient)"
+  echo "$other" >"$PIGPEN"
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  # Recipients are listed by key, without the purpose prefix.
+  assert_output --partial "added:       ${other#*@}"
+  assert_output --partial "removed:     ${PIV_RECIPIENT_ID#*@}"
+
+  run_madder_agent key-reseal .sealed
+  assert_success
+
+  # The card no longer opens the new sidecar. This is removal, not
+  # revocation: see FDR 0011.
+  run_madder_agent cat .sealed "$blob_id"
+  assert_failure
+  refute_output --partial 'sealed to the card'
+  assert_output --partial '1 blob(s) could not be read'
+}
+
+function key_reseal_without_an_agent_changes_nothing { # @test
+  init_sealed_store
+
+  local sidecar before
+  sidecar="$(sealed_store_dir)/blob_store-key"
+  before="$(cat "$sidecar")"
+
+  second_recipient >>"$PIGPEN"
+
+  run_madder_no_agent key-reseal .sealed
+  assert_failure
+  [[ "$(cat "$sidecar")" == "$before" ]] || fail "the sidecar was replaced"
+}
+
+function a_missing_pigpen_warns_but_does_not_block_reads { # @test
+  init_sealed_store
+
+  local blob_id
+  blob_id="$(write_sealed_blob "pigpen went away")"
+  rm "$PIGPEN"
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'pigpen went away'
+  assert_output --partial 'cannot re-read the pigpen'
+
+  run_madder_no_agent key-status .sealed
+  assert_failure
+  assert_output --partial 'sealed to:   1 recipient ('
+}
+
+function key_reseal_pigpen_flag_records_a_moved_pigpen { # @test
+  init_sealed_store
+
+  local moved="$BATS_TEST_TMPDIR/moved-piggy-ids"
+  mv "$PIGPEN" "$moved"
+
+  run_madder_agent key-reseal -pigpen "$moved" .sealed
+  assert_success
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial "pigpen:      $moved"
+  assert_output --partial 'status:      in sync'
+}
+
+function key_commands_refuse_a_store_without_a_sealed_key { # @test
+  run_madder init -encryption none .plain
+  assert_success
+
+  run_madder_agent key-status .plain
+  assert_failure
+  assert_output --partial 'is not a sealed-key store'
+
+  run_madder_agent key-reseal .plain
+  assert_failure
+  assert_output --partial 'is not a sealed-key store'
+}
+
 function init_pigpen_does_not_replace_an_existing_stores_key { # @test
   init_sealed_store
 

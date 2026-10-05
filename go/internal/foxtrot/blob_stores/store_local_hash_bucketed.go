@@ -91,6 +91,7 @@ func makeLocalHashBucketed(
 
 	if sealedKeyConfig, ok := config.(blob_store_configs.ConfigSealedKey); ok {
 		if store.sealedKey, err = makeSealedKeyEncryption(
+			id.String(),
 			sealedKeyConfig,
 			loadLocalStoreKeySidecar(basePath),
 		); err != nil {
@@ -110,6 +111,19 @@ func (blobStore localHashBucketed) blobEncryption() domain_interfaces.MarklId {
 	}
 
 	return blobStore.config.GetBlobEncryption()
+}
+
+var _ StoreKeySidecarStore = localHashBucketed{}
+
+func (blobStore localHashBucketed) ReadStoreKeySidecar() ([]byte, error) {
+	return os.ReadFile(localStoreKeySidecarPath(blobStore.basePath))
+}
+
+func (blobStore localHashBucketed) WriteStoreKeySidecar(sidecar []byte) error {
+	return WriteLocalStoreKeySidecar(
+		localStoreKeySidecarPath(blobStore.basePath),
+		sidecar,
+	)
 }
 
 func (blobStore localHashBucketed) GetBlobStoreConfig() blob_store_configs.Config {

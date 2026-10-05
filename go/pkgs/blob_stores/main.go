@@ -50,6 +50,11 @@ type PackOptions = internal.PackOptions
 // blobs into archive files.
 type PackableArchive = internal.PackableArchive
 
+// StoreKeySidecarStore is implemented by the store types that can be
+// sealed-key stores (FDR 0011): access to the mutable blob_store-key
+// sidecar next to the store's config.
+type StoreKeySidecarStore = internal.StoreKeySidecarStore
+
 // BootstrapWebdavRemoteConfig is the WebDAV analogue of WriteRemoteConfig
 // for the fresh-bootstrap path: HEAD checks that no remote config
 // exists, MKCOL ensures the base URL is a collection, and PUT writes
@@ -159,9 +164,15 @@ var ValidateS3Auth = internal.ValidateS3Auth
 
 // TODO offer options like just checking the existence of the blob, getting its
 // size, or full verification
+var VerifyBlob = internal.VerifyBlob
+
+// WriteLocalStoreKeySidecar replaces a local sealed-key store's sidecar
+// atomically: a reader sees the old document or the new one, never a
+// partial write. Unlike blob_store-config the sidecar stays writable,
+// since re-sealing rewrites it.
 var (
-	VerifyBlob        = internal.VerifyBlob
-	WriteRemoteConfig = internal.WriteRemoteConfig
+	WriteLocalStoreKeySidecar = internal.WriteLocalStoreKeySidecar
+	WriteRemoteConfig         = internal.WriteRemoteConfig
 )
 
 // WriteRemoteConfigS3 PUTs a default blob_store-config object at
