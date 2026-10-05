@@ -14,9 +14,12 @@ The nix lanes are authoritative. Every bats lane is a derivation built
 from the same `$out/bin/madder` that `.#madder` produces, so the
 dev loop and CI share one cache:
 
-- `just test-bats` — `.#bats-default` (the `!net_cap` filter)
+- `just test-bats` — `.#bats-default` (the `!net_cap,!piv_agent` filter)
 - `just test-bats-net-cap` — `.#bats-net_cap` (SFTP/WebDAV harnesses,
   self-sufficient via `netCapExtraBinaries`)
+- `just test-bats-piv-agent` — `.#bats-piv_agent` (madder against the
+  real piggy-agent over fibby, piggy's virtual PIV card, via
+  `pivAgentExtraBinaries`; a Rust build, Linux only)
 - `just run-bats-tags <tag>` — `.#bats-<tag>`, one lane per unique
   `# bats file_tags=` directive, auto-discovered at flake-eval time
 - `just run-bats-race` / `just run-bats-cover` — race- and

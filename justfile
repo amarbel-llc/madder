@@ -118,7 +118,7 @@ clean: clean-go clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-grammar-vectors test-store-import-smoke
+test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-grammar-vectors test-store-import-smoke
 
 # Usage: just run-go-test ./internal/foo
 #
@@ -312,6 +312,27 @@ test-store-import-smoke:
 [group("post-build")]
 test-bats-net-cap:
   nix build .#bats-net_cap --no-link --print-build-logs
+
+# Run piv_agent-tagged bats tests: madder against the REAL Rust
+# piggy-agent backed by fibby, piggy's virtual PIV card (see
+# `pivAgentExtraBinaries` in go/default.nix and
+# zz-tests_bats/lib/piv_agent.bash). Builds piggy and fibby from the piggy
+# flake input, a Rust build, which is why the tag has its own lane and is
+# filtered out of bats-default.
+#
+# Linux only: the darwin nix sandbox denies the AF_UNIX bind fibby needs
+# (piggy#208), and piggy's own lanes skip there for the same reason.
+#
+# run piv_agent-tagged bats tests via the nix-sandbox lane
+[group("post-build")]
+test-bats-piv-agent:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "test-bats-piv-agent: skipped (needs AF_UNIX bind in the nix sandbox; Linux only, see piggy#208)"
+    exit 0
+  fi
+  nix build .#bats-piv_agent --no-link --print-build-logs
 
 # Run bats integration tests against race-instrumented binaries.
 # Catches data races that the unit-test -race pass won't, since several

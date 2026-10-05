@@ -38,6 +38,11 @@ function piv_recipient_store_writes_without_the_card { # @test
     fail "expected encrypted bytes on disk; found cleartext at $on_disk"
   fi
 
+  # The blob is an age file. blob_io relies on this header to tell an
+  # encrypted blob from a cleartext one (madder#297).
+  run head -n 1 "$on_disk"
+  assert_output 'age-encryption.org/v1'
+
   run grep -c 'GA ECDH 9D' "$PIV_FIBBY_LOG"
   assert_output '0'
 }
@@ -76,14 +81,15 @@ function piv_recipient_store_cannot_read_through_piggy_agent { # @test
   assert_failure
   refute_output --partial 'piv-recipient-roundtrip'
 
-  # A second defect, pinned because it hides the first: the error names
-  # neither decryption nor the agent. The agent replied without error, so
-  # the unwrap failure is not an "agent error", and
-  # blob_io.newFileReaderFromReadSeeker falls back to reading the blob as
-  # if it were unencrypted. That feeds ciphertext to zstd, and the user is
-  # told the blob does not exist.
-  assert_output --partial 'failed to decompress: Unknown frame descriptor'
-  assert_output --partial 'blob(s) not found'
+  # Regression guard for madder#297: the failure must be reported as a
+  # decryption failure. It used to fall back to an unencrypted read,
+  # which fed ciphertext to zstd and told the user "failed to
+  # decompress" and "blob(s) not found". Keep this when the test above is
+  # flipped — move it to a case that still cannot decrypt.
+  assert_output --partial 'blob is encrypted but could not be decrypted'
+  assert_output --partial '1 blob(s) could not be read'
+  refute_output --partial 'failed to decompress'
+  refute_output --partial 'not found'
 
   # The ECDH reached the card and succeeded, so the agent and the card
   # are not what failed.

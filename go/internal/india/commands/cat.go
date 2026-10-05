@@ -157,7 +157,18 @@ func (cmd Cat) Run(req futility.Request) {
 
 	var blobStoreId scoped_id.Id
 	explicitStore := false
-	var missCount int
+	// A blob that exists but cannot be read (undecryptable, corrupt) is
+	// not a miss, and saying "not found" for it sends the user looking
+	// for the wrong problem (madder#297).
+	var missCount, unreadableCount int
+
+	countFailure := func(err error) {
+		if blob_io.IsErrBlobMissing(err) {
+			missCount++
+		} else {
+			unreadableCount++
+		}
+	}
 
 	for _, arg := range req.PopArgs() {
 		resolved := arg_resolver.Resolve(
@@ -170,16 +181,30 @@ func (cmd Cat) Run(req futility.Request) {
 			if err := cmd.blob(blobStore, &resolved.BlobId, blobWriter); err != nil {
 				if explicitStore {
 					ui.Err().Print(err)
-					missCount++
+					countFailure(err)
 					continue
 				}
+
+				// Every failure still falls through to the other stores
+				// (#209: an unavailable store must not block a read
+				// another store can serve). But if none of them has the
+				// blob either, and this store HELD it and could not read
+				// it, report that failure rather than a miss.
+				defaultStoreErr := err
+				heldButUnreadable := !blob_io.IsErrBlobMissing(err) &&
+					!blob_io.IsBlobStoreUnavailable(err)
 
 				if err := cmd.blobFromRemainingStores(
 					envBlobStore,
 					&resolved.BlobId,
 				); err != nil {
-					ui.Err().Print(err)
-					missCount++
+					if heldButUnreadable {
+						ui.Err().Print(defaultStoreErr)
+						unreadableCount++
+					} else {
+						ui.Err().Print(err)
+						missCount++
+					}
 				}
 			}
 
@@ -196,7 +221,24 @@ func (cmd Cat) Run(req futility.Request) {
 		}
 	}
 
-	if missCount > 0 {
+	switch {
+	case unreadableCount > 0 && missCount > 0:
+		errors.ContextCancelWithError(
+			req,
+			errors.Errorf(
+				"%d blob(s) could not be read, %d blob(s) not found",
+				unreadableCount,
+				missCount,
+			),
+		)
+
+	case unreadableCount > 0:
+		errors.ContextCancelWithError(
+			req,
+			errors.Errorf("%d blob(s) could not be read", unreadableCount),
+		)
+
+	case missCount > 0:
 		errors.ContextCancelWithError(
 			req,
 			errors.MakeErrNotFoundString(

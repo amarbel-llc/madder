@@ -2,6 +2,7 @@ package blob_io
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 
@@ -115,8 +116,35 @@ func newFileReaderFromReadSeeker(
 			return blobReader, err
 		}
 
+		decryptErr := err
+
 		if _, err = readSeeker.Seek(0, io.SeekStart); err != nil {
 			err = errors.Wrap(err)
+			return blobReader, err
+		}
+
+		// The unencrypted retry below exists for cleartext blobs in a
+		// store whose config declares encryption. A blob that IS
+		// encrypted must not take it: the retry would hand ciphertext to
+		// the decompressor and the caller would report a decompression
+		// failure or a missing blob instead of the decryption failure
+		// that actually happened (madder#297).
+		var encrypted bool
+
+		if encrypted, err = startsWithAgeHeader(readSeeker); err != nil {
+			err = errors.Wrap(err)
+			return blobReader, err
+		}
+
+		if encrypted {
+			// fmt.Errorf, not errors.Wrapf: the prefix has to be part of
+			// the message the user reads, and %w keeps the cause
+			// reachable for errors.Is / errors.As.
+			err = fmt.Errorf(
+				"blob is encrypted but could not be decrypted: %w",
+				decryptErr,
+			)
+
 			return blobReader, err
 		}
 
@@ -137,6 +165,28 @@ func newFileReaderFromReadSeeker(
 	}
 
 	return blobReader, err
+}
+
+// ageHeader opens every age file, which is what all of madder's
+// encryption wrappers write (age X25519 identities and the pivy P-256
+// recipient alike).
+var ageHeader = []byte("age-encryption.org/v1\n")
+
+// startsWithAgeHeader reports whether readSeeker's content begins with
+// the age header, leaving it positioned at the start.
+func startsWithAgeHeader(readSeeker io.ReadSeeker) (ok bool, err error) {
+	prefix := make([]byte, len(ageHeader))
+
+	n, err := io.ReadFull(readSeeker, prefix)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return false, err
+	}
+
+	if _, err = readSeeker.Seek(0, io.SeekStart); err != nil {
+		return false, err
+	}
+
+	return bytes.Equal(prefix[:n], ageHeader), nil
 }
 
 func (reader *blobReader) Seek(
