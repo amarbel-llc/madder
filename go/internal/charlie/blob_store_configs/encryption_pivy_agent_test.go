@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	piggy_agent "code.linenisgreat.com/piggy/go/pkgs/agent"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/pivy"
 	"golang.org/x/crypto/ssh"
@@ -286,7 +287,7 @@ func TestPivyRecipient_EncryptsWithoutAnAgent(t *testing.T) {
 	// Decrypting without an agent must fail as an AGENT error, so the
 	// blob reader surfaces it instead of treating it as a cleartext blob.
 	_, err = ioWrapper.WrapReader(&ciphertext)
-	if !pivy.IsErrAgent(err) {
+	if !piggy_agent.IsErrAgent(err) {
 		t.Fatalf("WrapReader with no agent: got %v, want an agent error", err)
 	}
 }

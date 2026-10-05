@@ -68,6 +68,15 @@ var (
 	DiscoverRemoteConfig        = internal.DiscoverRemoteConfig
 )
 
+// IsErrBlobUnreadable reports whether a VerifyBlob failure says nothing
+// about the blob's bytes: the key agent could not be reached or would not
+// answer, or the store itself was unavailable. Such a blob may be
+// perfectly intact, so callers must not report it as corrupt
+// (madder#298). Every other VerifyBlob failure (digest mismatch, a blob
+// that will not decrypt or decompress with a working agent) does
+// implicate the stored bytes.
+var IsErrBlobUnreadable = internal.IsErrBlobUnreadable
+
 // IsRemoteConfigAlreadyExists reports whether err signals that the
 // remote blob_store-config object already exists in the target bucket.
 var IsRemoteConfigAlreadyExists = internal.IsRemoteConfigAlreadyExists

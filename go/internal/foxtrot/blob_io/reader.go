@@ -8,10 +8,10 @@ import (
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/alfa/markl_io"
+	"code.linenisgreat.com/piggy/go/pkgs/agent"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/files"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ohio"
-	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/pivy"
 )
 
 type blobReader struct {
@@ -111,7 +111,7 @@ func newFileReaderFromReadSeeker(
 	); err != nil {
 		// Agent communication errors (card not found, PIN needed, socket
 		// error) should not be masked by falling back to unencrypted read.
-		if pivy.IsErrAgent(err) {
+		if agent.IsErrAgent(err) {
 			err = errors.Wrap(err)
 			return blobReader, err
 		}

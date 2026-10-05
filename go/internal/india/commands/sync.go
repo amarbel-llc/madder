@@ -93,7 +93,9 @@ func (cmd Sync) GetDescription() futility.Description {
 			"operation_end still counts it under \"done\" rather than " +
 			"\"skipped\". A size of -1 is therefore the only per-record " +
 			"signal that nothing was actually copied. Summary and limit " +
-			"notices route to stderr in JSON mode.",
+			"notices route to stderr in JSON mode. sync exits non-zero " +
+			"if any blob failed to transfer or any source listing entry " +
+			"could not be read, after attempting every blob.",
 	}
 }
 
@@ -405,6 +407,7 @@ func (cmd Sync) runStoreCrap(
 	blobImporter.UseDestinationHashType = useDestinationHashType
 
 	var lastBytesWritten int64
+	var listErrors int
 
 	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
 		bytesWritten, _ := result.GetBytesWrittenAndState()
@@ -419,6 +422,8 @@ func (cmd Sync) runStoreCrap(
 			// A list error mid-transfer (rare — the scan pass already
 			// succeeded) surfaces as a failed item with no id.
 			op.Fail("(unknown blob)", errIter)
+			listErrors++
+
 			continue
 		}
 
@@ -445,6 +450,12 @@ func (cmd Sync) runStoreCrap(
 	op.Finish()
 
 	if err := reporter.Err(); err != nil {
+		errors.ContextCancelWithError(req, err)
+		return
+	}
+
+	// Same exit-status rule as the legacy sink (madder#299).
+	if err := syncFailureError(blobImporter.Counts.Failed, listErrors); err != nil {
 		errors.ContextCancelWithError(req, err)
 	}
 }
@@ -617,6 +628,7 @@ func (cmd Sync) streamToSink(
 
 	var lastBytesWritten int64
 	var lastDestId domain_interfaces.MarklId
+	var listErrors int
 
 	blobImporter.CopierDelegate = func(result blob_stores.CopyResult) error {
 		bytesWritten, _ := result.GetBytesWrittenAndState()
@@ -636,7 +648,10 @@ func (cmd Sync) streamToSink(
 
 			sink.finalize()
 
-			return nil
+			// The full report is out; make the exit status agree with
+			// it, so a caller checking only the status does not read
+			// failures as success (madder#299).
+			return syncFailureError(blobImporter.Counts.Failed, listErrors)
 		},
 	)
 
@@ -646,6 +661,8 @@ func (cmd Sync) streamToSink(
 
 		if errIter != nil {
 			sink.listError(errIter)
+			listErrors++
+
 			continue
 		}
 
@@ -675,6 +692,21 @@ func (cmd Sync) streamToSink(
 			break
 		}
 	}
+}
+
+// syncFailureError returns the error that fails the command when any blob
+// failed to transfer or any source listing entry could not be read, and
+// nil otherwise.
+func syncFailureError(failed, listErrors int) error {
+	if failed == 0 && listErrors == 0 {
+		return nil
+	}
+
+	return errors.Errorf(
+		"sync: %d blob(s) failed, %d source listing error(s)",
+		failed,
+		listErrors,
+	)
 }
 
 func formatSyncTestPoint(

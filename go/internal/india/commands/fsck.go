@@ -60,7 +60,14 @@ func (cmd Fsck) GetDescription() futility.Description {
 			"force a specific encoding. Each JSON record has fields " +
 			"\"id\" (for per-blob events), \"store\", \"state\" (verified, " +
 			"missing, corrupt, read_error, bail_out), and \"error\" on " +
-			"failures. Progress ticks and summaries route to stderr in " +
+			"failures. \"corrupt\" means the stored bytes are bad: a " +
+			"digest mismatch, or a blob that will not decrypt or " +
+			"decompress. \"read_error\" means the blob could not be " +
+			"read for a reason unrelated to its bytes, such as an " +
+			"unreachable key agent or blob store, so the blob may be " +
+			"intact. fsck exits non-zero if any blob was missing, " +
+			"corrupt or unreadable, after reporting on every blob. " +
+			"Progress ticks and summaries route to stderr in " +
 			"JSON mode. Note that a store holding foreign-digest aliases " +
 			"— written by a cross-hash sync into a multi-hash store — " +
 			"verifies each aliased blob twice, once under each digest. " +
@@ -104,10 +111,13 @@ func (cmd Fsck) Run(req futility.Request) {
 		sink = blob_verify_sink.NewTAP(os.Stdout)
 	}
 
+	var totalErrors uint32
+
 	for storeId, blobStore := range blobStores {
 		sink.Notice(fmt.Sprintf("(blob_store: %s) starting fsck...", storeId))
 
 		var count atomic.Uint32
+		var verifiedCount atomic.Uint32
 		var errorCount atomic.Uint32
 		var progressWriter env_ui.ProgressWriter
 
@@ -144,12 +154,18 @@ func (cmd Fsck) Run(req futility.Request) {
 						digest,
 						io.MultiWriter(&progressWriter, io.Discard),
 					); err != nil {
-						sink.Corrupt(digest, storeId, err)
+						if blob_stores.IsErrBlobUnreadable(err) {
+							sink.Unreadable(digest, storeId, err)
+						} else {
+							sink.Corrupt(digest, storeId, err)
+						}
+
 						errorCount.Add(1)
 
 						continue
 					}
 
+					verifiedCount.Add(1)
 					sink.Verified(digest, storeId)
 				}
 			},
@@ -169,13 +185,25 @@ func (cmd Fsck) Run(req futility.Request) {
 			return
 		}
 
-		sink.Notice(fmt.Sprintf(
-			"(blob_store: %s) blobs verified: %d, bytes verified: %s",
+		sink.Notice(blob_verify_sink.StoreSummary(
 			storeId,
-			count.Load(),
+			verifiedCount.Load(),
+			errorCount.Load(),
 			progressWriter.GetWrittenHumanString(),
 		))
+
+		totalErrors += errorCount.Load()
 	}
 
 	sink.Finalize()
+
+	// The full report is out; now make the exit status agree with it, so a
+	// caller checking only the status does not read failures as success
+	// (madder#299).
+	if totalErrors > 0 {
+		errors.ContextCancelWithError(
+			req,
+			errors.Errorf("fsck: %d blob(s) failed verification", totalErrors),
+		)
+	}
 }

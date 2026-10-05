@@ -4,9 +4,22 @@ import (
 	"io"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
+	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
+	"code.linenisgreat.com/piggy/go/pkgs/agent"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
+
+// IsErrBlobUnreadable reports whether a VerifyBlob failure says nothing
+// about the blob's bytes: the key agent could not be reached or would not
+// answer, or the store itself was unavailable. Such a blob may be
+// perfectly intact, so callers must not report it as corrupt
+// (madder#298). Every other VerifyBlob failure (digest mismatch, a blob
+// that will not decrypt or decompress with a working agent) does
+// implicate the stored bytes.
+func IsErrBlobUnreadable(err error) bool {
+	return agent.IsErrAgent(err) || blob_io.IsBlobStoreUnavailable(err)
+}
 
 // TODO offer options like just checking the existence of the blob, getting its
 // size, or full verification

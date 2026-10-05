@@ -45,9 +45,10 @@ function cross_hash_sync_into_single_hash_dest { # @test
   # FAILS, and the man page's "not preserved" is really "not
   # transferred".
   #
-  # Worse, and the reason this is pinned rather than skipped: the
-  # command still exits 0 with zero blobs transferred. A migration
-  # script checking only the exit status sees success.
+  # The command used to exit 0 with zero blobs transferred; that half is
+  # fixed (madder#299) and asserted below. What remains of #286 is that
+  # the destination is not refused up front and the blob is written
+  # anyway.
   #
   # The sibling cross_hash_sync covers the MULTI-hash destination,
   # where the alias is registered and the source digest stays
@@ -85,9 +86,12 @@ function cross_hash_sync_into_single_hash_dest { # @test
 
   run_madder sync -format ndjson .default .sha256single
 
-  # The defect, in three parts.
-  assert_success                                      # (1) exit 0 ...
-  assert_output --partial 'Successes: 0, Failures: 1' # (2) ... with nothing transferred
+  # The defect. Part (1) used to be "exit 0": a migration script checking
+  # only the status saw success. madder#299 fixed that half — any failed
+  # blob now fails the command — so this asserts the fix.
+  assert_failure
+  assert_output --partial 'sync: 1 blob(s) failed'
+  assert_output --partial 'Successes: 0, Failures: 1' # (2) nothing transferred
   # (3) and the per-blob record carries the single-hash rejection.
   assert_output --partial '"state":"failed"'
   assert_output --partial 'single-hash store does not support foreign digest mapping'

@@ -4,7 +4,10 @@
 // Events:
 //   - Verified(id, store)  — blob read and hash recomputed successfully
 //   - Missing(id, store)   — blob is listed but not present
-//   - Corrupt(id, store, err) — blob present but hash mismatch or read error
+//   - Corrupt(id, store, err) — blob present but its bytes are bad (hash
+//     mismatch, will not decrypt or decompress)
+//   - Unreadable(id, store, err) — blob could not be read for a reason
+//     unrelated to its bytes (key agent or store unavailable)
 //   - ReadError(store, err)   — couldn't read the blob listing entry (no id)
 //   - Notice(msg)             — informational (store header, progress ticks,
 //     per-store summary); stderr in JSON mode
@@ -21,10 +24,37 @@ import (
 	tap "code.linenisgreat.com/tap/go/pkgs/writer"
 )
 
+// StoreSummary renders the per-store closing line shared by `madder fsck`
+// and `madder cache-fsck`. "blobs verified" counts only blobs that
+// verified; failures get their own count, shown only when there are any
+// (madder#298).
+func StoreSummary(
+	storeId string,
+	verified, failed uint32,
+	bytesVerified string,
+) string {
+	summary := fmt.Sprintf(
+		"(blob_store: %s) blobs verified: %d, bytes verified: %s",
+		storeId,
+		verified,
+		bytesVerified,
+	)
+
+	if failed > 0 {
+		summary += fmt.Sprintf(", blobs failed: %d", failed)
+	}
+
+	return summary
+}
+
 type Sink interface {
 	Verified(id domain_interfaces.MarklId, store string)
 	Missing(id domain_interfaces.MarklId, store string)
 	Corrupt(id domain_interfaces.MarklId, store string, err error)
+	// Unreadable reports a known blob that could not be read for a reason
+	// that says nothing about its bytes (key agent unreachable, store
+	// unavailable). Emitted as read_error WITH the id (madder#298).
+	Unreadable(id domain_interfaces.MarklId, store string, err error)
 	ReadError(store string, err error)
 	Notice(msg string)
 	BailOut(msg string)
@@ -64,6 +94,10 @@ func (s *tapSink) Missing(id domain_interfaces.MarklId, _ string) {
 }
 
 func (s *tapSink) Corrupt(id domain_interfaces.MarklId, _ string, err error) {
+	s.tw.NotOk(id.String(), tap_diagnostics.FromError(err))
+}
+
+func (s *tapSink) Unreadable(id domain_interfaces.MarklId, _ string, err error) {
 	s.tw.NotOk(id.String(), tap_diagnostics.FromError(err))
 }
 
@@ -120,6 +154,10 @@ func (s *jsonSink) Missing(id domain_interfaces.MarklId, store string) {
 
 func (s *jsonSink) Corrupt(id domain_interfaces.MarklId, store string, err error) {
 	s.emit(record{Id: id.String(), Store: store, State: StateCorrupt, Error: err.Error()})
+}
+
+func (s *jsonSink) Unreadable(id domain_interfaces.MarklId, store string, err error) {
+	s.emit(record{Id: id.String(), Store: store, State: StateReadError, Error: err.Error()})
 }
 
 func (s *jsonSink) ReadError(store string, err error) {

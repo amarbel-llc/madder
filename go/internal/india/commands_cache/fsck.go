@@ -74,10 +74,13 @@ func (cmd Fsck) Run(req futility.Request) {
 		sink = blob_verify_sink.NewTAP(os.Stdout)
 	}
 
+	var totalErrors uint32
+
 	for storeId, blobStore := range blobStores {
 		sink.Notice(fmt.Sprintf("(blob_store: %s) starting fsck...", storeId))
 
 		var count atomic.Uint32
+		var verifiedCount atomic.Uint32
 		var errorCount atomic.Uint32
 		var progressWriter env_ui.ProgressWriter
 
@@ -110,12 +113,18 @@ func (cmd Fsck) Run(req futility.Request) {
 						digest,
 						io.MultiWriter(&progressWriter, io.Discard),
 					); err != nil {
-						sink.Corrupt(digest, storeId, err)
+						if blob_stores.IsErrBlobUnreadable(err) {
+							sink.Unreadable(digest, storeId, err)
+						} else {
+							sink.Corrupt(digest, storeId, err)
+						}
+
 						errorCount.Add(1)
 
 						continue
 					}
 
+					verifiedCount.Add(1)
 					sink.Verified(digest, storeId)
 				}
 			},
@@ -135,13 +144,24 @@ func (cmd Fsck) Run(req futility.Request) {
 			return
 		}
 
-		sink.Notice(fmt.Sprintf(
-			"(blob_store: %s) blobs verified: %d, bytes verified: %s",
+		sink.Notice(blob_verify_sink.StoreSummary(
 			storeId,
-			count.Load(),
+			verifiedCount.Load(),
+			errorCount.Load(),
 			progressWriter.GetWrittenHumanString(),
 		))
+
+		totalErrors += errorCount.Load()
 	}
 
 	sink.Finalize()
+
+	// See madder fsck: the exit status must agree with the report
+	// (madder#299).
+	if totalErrors > 0 {
+		errors.ContextCancelWithError(
+			req,
+			errors.Errorf("cache-fsck: %d blob(s) failed verification", totalErrors),
+		)
+	}
 }
