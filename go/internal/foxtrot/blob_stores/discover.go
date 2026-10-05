@@ -266,6 +266,11 @@ func WriteRemoteSealedKeyConfig(
 		return err
 	}
 
+	// With no config there is no store, so a sidecar here is the leftover
+	// of an interrupted init and opens nothing. Clear it so the write below
+	// also works on servers without posix-rename.
+	_ = sftpClient.Remove(sidecarPath)
+
 	uiPrinter.Printf("writing remote store key to %q...", sidecarPath)
 
 	if err = writeRemoteStoreKeySidecar(sftpClient, sidecarPath, sidecar); err != nil {
@@ -317,11 +322,11 @@ func writeRemoteStoreKeySidecar(
 		return err
 	}
 
-	// SFTP's plain rename refuses an existing target. Prefer the atomic
-	// posix-rename extension; without it, fall back to remove-then-rename.
+	// SFTP's plain rename refuses an existing target, so prefer the atomic
+	// posix-rename extension. The fallback never removes an existing
+	// sidecar first: if the rename then failed, the store's only key would
+	// be gone.
 	if err = sftpClient.PosixRename(tmpPath, sidecarPath); err != nil {
-		_ = sftpClient.Remove(sidecarPath)
-
 		if err = sftpClient.Rename(tmpPath, sidecarPath); err != nil {
 			_ = sftpClient.Remove(tmpPath)
 			err = errors.Wrapf(err, "failed to rename %q -> %q", tmpPath, sidecarPath)
