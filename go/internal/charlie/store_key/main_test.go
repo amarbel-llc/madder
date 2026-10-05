@@ -302,6 +302,37 @@ func TestAgentOpener_NoSocketIsAnAgentError(t *testing.T) {
 	}
 }
 
+// The recipient-set digest ignores order and duplicates, and changes when
+// a recipient is added: the properties drift detection relies on.
+func TestRecipientSetDigest(t *testing.T) {
+	a := makeSoftwareRecipient(t).id
+	b := makeSoftwareRecipient(t).id
+	c := makeSoftwareRecipient(t).id
+
+	digest := func(ids ...markl.Id) string {
+		t.Helper()
+
+		got, err := RecipientSetDigest(ids)
+		if err != nil {
+			t.Fatalf("RecipientSetDigest: %v", err)
+		}
+
+		return got.String()
+	}
+
+	if digest(a, b) != digest(b, a, a) {
+		t.Errorf("digest depends on order or duplicates")
+	}
+
+	if digest(a, b) == digest(a, b, c) {
+		t.Errorf("digest unchanged after adding a recipient")
+	}
+
+	if digest(a, b) == digest(a) {
+		t.Errorf("digest unchanged after removing a recipient")
+	}
+}
+
 // A key sealed to nobody could never be opened, so minting refuses.
 func TestMint_RefusesNoRecipients(t *testing.T) {
 	if _, _, err := Mint(nil); err == nil {

@@ -44,6 +44,9 @@ type (
 	TomlLocalHashBucketedV2     = charlie_bsc.TomlLocalHashBucketedV2
 	TomlV3                      = charlie_bsc.TomlV3
 	TomlV4                      = charlie_bsc.TomlV4
+	TomlV5                      = charlie_bsc.TomlV5
+	KeyCustody                  = charlie_bsc.KeyCustody
+	ConfigSealedKey             = charlie_bsc.ConfigSealedKey
 	TomlSFTPV0                  = charlie_bsc.TomlSFTPV0
 	TomlSFTPV1                  = charlie_bsc.TomlSFTPV1
 	TomlSFTPViaSSHConfigV0      = charlie_bsc.TomlSFTPViaSSHConfigV0
@@ -68,6 +71,7 @@ type (
 
 // Re-export constants
 const (
+	KeyHolderProcess   = charlie_bsc.KeyHolderProcess
 	HashTypeSha256     = charlie_bsc.HashTypeSha256
 	HashTypeBlake2b256 = charlie_bsc.HashTypeBlake2b256
 	HashTypeDefault    = charlie_bsc.HashTypeDefault
@@ -89,6 +93,7 @@ var (
 	DecodeTomlLocalHashBucketedV2 = charlie_bsc.DecodeTomlLocalHashBucketedV2
 	DecodeTomlV3                  = charlie_bsc.DecodeTomlV3
 	DecodeTomlV4                  = charlie_bsc.DecodeTomlV4
+	DecodeTomlV5                  = charlie_bsc.DecodeTomlV5
 	DecodeTomlSFTPV0              = charlie_bsc.DecodeTomlSFTPV0
 	DecodeTomlSFTPV1              = charlie_bsc.DecodeTomlSFTPV1
 	DecodeTomlSFTPViaSSHConfigV0  = charlie_bsc.DecodeTomlSFTPViaSSHConfigV0
@@ -128,6 +133,11 @@ var (
 	_ ConfigLocalMutable          = &TomlV4{}
 	_ ConfigMutable               = &TomlV4{}
 	_ ConfigInstanceIdMintable    = &TomlV4{}
+	_ ConfigLocalHashBucketed     = TomlV5{}
+	_ ConfigLocalMutable          = &TomlV5{}
+	_ ConfigMutable               = &TomlV5{}
+	_ ConfigInstanceIdMintable    = &TomlV5{}
+	_ ConfigSealedKey             = TomlV5{}
 	_ ConfigPointer               = TomlPointerV0{}
 	_ ConfigMutable               = &TomlPointerV0{}
 	_ ConfigPointer               = TomlPointerV1{}
@@ -222,6 +232,8 @@ func TypeStructForConfig(config Config) ids.TypeStruct {
 		typeId = ids.TypeTomlBlobStoreConfigV3
 	case *TomlV4, TomlV4:
 		typeId = ids.TypeTomlBlobStoreConfigV4
+	case *TomlV5, TomlV5:
+		typeId = ids.TypeTomlBlobStoreConfigV5
 	case *TomlSFTPV0:
 		typeId = ids.TypeTomlBlobStoreConfigSftpExplicitV0
 	case *TomlSFTPViaSSHConfigV0, TomlSFTPViaSSHConfigV0:

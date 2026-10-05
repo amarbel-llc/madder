@@ -14,15 +14,21 @@ import (
 const (
 	FileNameBlobStoreConfig       = "blob_store-config"
 	fileNameBlobStoreConfigLegacy = "dodder-blob_store-config"
+
+	// FileNameBlobStoreKey is the sealed-key sidecar that sits next to a
+	// sealed-key store's config (FDR 0011).
+	FileNameBlobStoreKey = "blob_store-key"
 )
 
-// IsBlobStoreConfigFileName reports whether name is a blob-store config
-// filename, current or legacy. Blob enumeration uses it to skip store
-// metadata that sits in the same directory as blobs and would otherwise
-// be parsed as a hex digest. See madder#287.
+// IsBlobStoreConfigFileName reports whether name is a blob-store metadata
+// filename: the config, current or legacy, or the sealed-key sidecar.
+// Blob enumeration uses it to skip store metadata that sits in the same
+// directory as blobs and would otherwise be parsed as a hex digest. See
+// madder#287.
 func IsBlobStoreConfigFileName(name string) bool {
 	return name == FileNameBlobStoreConfig ||
-		name == fileNameBlobStoreConfigLegacy
+		name == fileNameBlobStoreConfigLegacy ||
+		name == FileNameBlobStoreKey
 }
 
 func GetBlobStoreConfigPaths(

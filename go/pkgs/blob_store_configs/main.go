@@ -22,6 +22,7 @@ type (
 	ConfigSFTPConfigExplicit    = internal.ConfigSFTPConfigExplicit
 	ConfigSFTPRemotePath        = internal.ConfigSFTPRemotePath
 	ConfigSFTPUri               = internal.ConfigSFTPUri
+	ConfigSealedKey             = internal.ConfigSealedKey
 	ConfigUpgradeable           = internal.ConfigUpgradeable
 	ConfigWebDAV                = internal.ConfigWebDAV
 	DefaultType                 = internal.DefaultType
@@ -30,10 +31,13 @@ type (
 	EncryptionKeys              = internal.EncryptionKeys
 	ErrUnsupportedHashType      = internal.ErrUnsupportedHashType
 	HashType                    = internal.HashType
+	KeyCustody                  = internal.KeyCustody
 	SelectorConfig              = internal.SelectorConfig
 	SelectorConfigImmutable     = internal.SelectorConfigImmutable
 	SignatureConfig             = internal.SignatureConfig
 	SignatureConfigImmutable    = internal.SignatureConfigImmutable
+	StoreKeyRecipients          = internal.StoreKeyRecipients
+	StoreKeySealed              = internal.StoreKeySealed
 	TomlInventoryArchiveV0      = internal.TomlInventoryArchiveV0
 	TomlInventoryArchiveV1      = internal.TomlInventoryArchiveV1
 	TomlInventoryArchiveV2      = internal.TomlInventoryArchiveV2
@@ -51,9 +55,11 @@ type (
 	TomlSFTPV1                  = internal.TomlSFTPV1
 	TomlSFTPViaSSHConfigV0      = internal.TomlSFTPViaSSHConfigV0
 	TomlSFTPViaSSHConfigV1      = internal.TomlSFTPViaSSHConfigV1
+	TomlStoreKeyV1              = internal.TomlStoreKeyV1
 	TomlUriV0                   = internal.TomlUriV0
 	TomlV3                      = internal.TomlV3
 	TomlV4                      = internal.TomlV4
+	TomlV5                      = internal.TomlV5
 	TomlWebDAVV0                = internal.TomlWebDAVV0
 	TomlWebDAVV1                = internal.TomlWebDAVV1
 	TypedConfig                 = internal.TypedConfig
@@ -88,8 +94,13 @@ var DecodeAndVerify = internal.DecodeAndVerify
 // DecodeAndVerify, mirroring hyphence.DecodeFromFile's shape: a "-"
 // path reads from stdin, any other path is opened read-only with the
 // exclusive helper and closed on return.
+var DecodeAndVerifyFromFile = internal.DecodeAndVerifyFromFile
+
+// DecodeStoreKey parses a sidecar. Anything but exactly the expected
+// header is refused: a different type line means a different format, not
+// a sidecar to be read leniently.
 var (
-	DecodeAndVerifyFromFile       = internal.DecodeAndVerifyFromFile
+	DecodeStoreKey                = internal.DecodeStoreKey
 	DecodeTomlInventoryArchiveV0  = internal.DecodeTomlInventoryArchiveV0
 	DecodeTomlInventoryArchiveV1  = internal.DecodeTomlInventoryArchiveV1
 	DecodeTomlInventoryArchiveV2  = internal.DecodeTomlInventoryArchiveV2
@@ -110,6 +121,7 @@ var (
 	DecodeTomlUriV0               = internal.DecodeTomlUriV0
 	DecodeTomlV3                  = internal.DecodeTomlV3
 	DecodeTomlV4                  = internal.DecodeTomlV4
+	DecodeTomlV5                  = internal.DecodeTomlV5
 	DecodeTomlWebDAVV0            = internal.DecodeTomlWebDAVV0
 	DecodeTomlWebDAVV1            = internal.DecodeTomlWebDAVV1
 	Default                       = internal.Default
@@ -120,6 +132,9 @@ var (
 // DigestHash is the hash family used to compute the body digest.
 // Phase 1 hard-codes blake2b256.
 var DigestHash = internal.DigestHash
+
+// EncodeStoreKey renders a sidecar as a hyphence document.
+var EncodeStoreKey = internal.EncodeStoreKey
 
 // EncodeWithDigest renders typedConfig to w with a populated BlobDigest
 // covering the body bytes. It is the only sanctioned write path for
@@ -158,4 +173,9 @@ const (
 	HashTypeBlake2b256 = internal.HashTypeBlake2b256
 	HashTypeDefault    = internal.HashTypeDefault
 	HashTypeSha256     = internal.HashTypeSha256
+	KeyHolderProcess   = internal.KeyHolderProcess
 )
+
+// TypeTomlStoreKeyV1 is the hyphence type of a sealed-key store's
+// `blob_store-key` sidecar (FDR 0011).
+const TypeTomlStoreKeyV1 = internal.TypeTomlStoreKeyV1

@@ -42,7 +42,14 @@ const (
 	TypeTomlBlobStoreConfigV2                       = internal.TypeTomlBlobStoreConfigV2
 	TypeTomlBlobStoreConfigV3                       = internal.TypeTomlBlobStoreConfigV3
 	TypeTomlBlobStoreConfigV4                       = internal.TypeTomlBlobStoreConfigV4
-	TypeTomlBlobStoreConfigVCurrent                 = internal.TypeTomlBlobStoreConfigVCurrent
-	TypeTomlBlobStoreConfigWebdavV0                 = internal.TypeTomlBlobStoreConfigWebdavV0
-	TypeTomlBlobStoreConfigWebdavV1                 = internal.TypeTomlBlobStoreConfigWebdavV1
+)
+
+// V5 is the sealed-key store config (FDR 0011). It is deliberately NOT
+// TypeTomlBlobStoreConfigVCurrent: only stores created against a pigpen
+// recipient set are written as V5.
+const (
+	TypeTomlBlobStoreConfigV5       = internal.TypeTomlBlobStoreConfigV5
+	TypeTomlBlobStoreConfigVCurrent = internal.TypeTomlBlobStoreConfigVCurrent
+	TypeTomlBlobStoreConfigWebdavV0 = internal.TypeTomlBlobStoreConfigWebdavV0
+	TypeTomlBlobStoreConfigWebdavV1 = internal.TypeTomlBlobStoreConfigWebdavV1
 )

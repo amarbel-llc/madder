@@ -62,6 +62,14 @@ type (
 		SetInstanceId(markl.Id)
 	}
 
+	// ConfigSealedKey is implemented by config versions whose store key is
+	// sealed in a pigpen document (FDR 0011). The config carries only the
+	// public key and the name of the run-time key holder.
+	ConfigSealedKey interface {
+		GetStorePublicKey() markl.Id
+		GetKeyCustodyHolder() string
+	}
+
 	ConfigHashType interface {
 		SupportsMultiHash() bool
 		GetDefaultHashTypeId() string

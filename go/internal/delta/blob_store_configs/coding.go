@@ -112,6 +112,35 @@ var Coder = hyphence.CoderToTypedBlob[ids.TypeStruct, *ids.TypeStruct, markl.Id,
 					return doc.Encode()
 				},
 			},
+			ids.TypeTomlBlobStoreConfigV5: hyphence.CoderTommy[
+				Config,
+				*Config,
+			]{
+				// FDR 0011: the generated DecodeTomlV5 calls
+				// TomlV5.Validate(), so a config naming an unknown
+				// key-custody holder, or carrying anything but a single
+				// public key, fails to decode here.
+				Decode: func(b []byte) (Config, error) {
+					doc, err := charlie_bsc.DecodeTomlV5(b)
+					if err != nil {
+						return nil, err
+					}
+					return doc.Data(), nil
+				},
+				Encode: func(cfg Config) ([]byte, error) {
+					doc, err := charlie_bsc.DecodeTomlV5(nil)
+					if err != nil {
+						return nil, err
+					}
+					switch v := cfg.(type) {
+					case *TomlV5:
+						*doc.Data() = *v
+					case TomlV5:
+						*doc.Data() = v
+					}
+					return doc.Encode()
+				},
+			},
 			ids.TypeTomlBlobStoreConfigSftpExplicitV0: hyphence.CoderTommy[
 				Config,
 				*Config,

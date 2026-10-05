@@ -114,6 +114,29 @@ func SealedRecipients(sealed []byte) ([]markl.Id, error) {
 	return doc.EncryptionRecipients(), nil
 }
 
+// RecipientSetDigest returns the blake2b256 digest of piggy's canonical
+// recipient-set bytes (RFC 0008 §2.3). Two recipient lists have the same
+// digest exactly when pigpen.SameRecipientSet says they are the same set,
+// so a store can record this at seal time and compare later to detect a
+// changed pigpen without opening anything.
+func RecipientSetDigest(recipients []markl.Id) (digest markl.Id, err error) {
+	hash, repool := markl.FormatHashBlake2b256.GetHash() //repool:owned
+	defer repool()
+
+	if _, err = hash.Write(pigpen.CanonicalRecipientSet(recipients)); err != nil {
+		return digest, fmt.Errorf("hashing recipient set: %w", err)
+	}
+
+	got, repoolGot := hash.GetMarklId() //repool:owned
+	defer repoolGot()
+
+	if err = digest.SetDigest(got); err != nil {
+		return digest, fmt.Errorf("recipient set digest: %w", err)
+	}
+
+	return digest, nil
+}
+
 func seal(secret []byte, recipients []markl.Id) ([]byte, error) {
 	if len(recipients) == 0 {
 		return nil, fmt.Errorf(

@@ -3,18 +3,22 @@ package ids
 import "fmt"
 
 const (
-	TypeTomlBlobStoreConfigSftpExplicitV0           = "!toml-blob_store_config_sftp-explicit-v0"
-	TypeTomlBlobStoreConfigSftpExplicitV1           = "!toml-blob_store_config_sftp-explicit-v1"
-	TypeTomlBlobStoreConfigSftpViaSSHConfigV0       = "!toml-blob_store_config_sftp-ssh_config-v0"
-	TypeTomlBlobStoreConfigSftpViaSSHConfigV1       = "!toml-blob_store_config_sftp-ssh_config-v1"
-	TypeTomlBlobStoreConfigWebdavV0                 = "!toml-blob_store_config_webdav-v0"
-	TypeTomlBlobStoreConfigWebdavV1                 = "!toml-blob_store_config_webdav-v1"
-	TypeTomlBlobStoreConfigS3V0                     = "!toml-blob_store_config_s3-v0"
-	TypeTomlBlobStoreConfigS3V1                     = "!toml-blob_store_config_s3-v1"
-	TypeTomlBlobStoreConfigV1                       = "!toml-blob_store_config-v1"
-	TypeTomlBlobStoreConfigV2                       = "!toml-blob_store_config-v2"
-	TypeTomlBlobStoreConfigV3                       = "!toml-blob_store_config-v3"
-	TypeTomlBlobStoreConfigV4                       = "!toml-blob_store_config-v4"
+	TypeTomlBlobStoreConfigSftpExplicitV0     = "!toml-blob_store_config_sftp-explicit-v0"
+	TypeTomlBlobStoreConfigSftpExplicitV1     = "!toml-blob_store_config_sftp-explicit-v1"
+	TypeTomlBlobStoreConfigSftpViaSSHConfigV0 = "!toml-blob_store_config_sftp-ssh_config-v0"
+	TypeTomlBlobStoreConfigSftpViaSSHConfigV1 = "!toml-blob_store_config_sftp-ssh_config-v1"
+	TypeTomlBlobStoreConfigWebdavV0           = "!toml-blob_store_config_webdav-v0"
+	TypeTomlBlobStoreConfigWebdavV1           = "!toml-blob_store_config_webdav-v1"
+	TypeTomlBlobStoreConfigS3V0               = "!toml-blob_store_config_s3-v0"
+	TypeTomlBlobStoreConfigS3V1               = "!toml-blob_store_config_s3-v1"
+	TypeTomlBlobStoreConfigV1                 = "!toml-blob_store_config-v1"
+	TypeTomlBlobStoreConfigV2                 = "!toml-blob_store_config-v2"
+	TypeTomlBlobStoreConfigV3                 = "!toml-blob_store_config-v3"
+	TypeTomlBlobStoreConfigV4                 = "!toml-blob_store_config-v4"
+	// V5 is the sealed-key store config (FDR 0011). It is deliberately NOT
+	// TypeTomlBlobStoreConfigVCurrent: only stores created against a pigpen
+	// recipient set are written as V5.
+	TypeTomlBlobStoreConfigV5                       = "!toml-blob_store_config-v5"
 	TypeTomlBlobStoreConfigPointerV0                = "!toml-blob_store_config-pointer-v0"
 	TypeTomlBlobStoreConfigPointerV1                = "!toml-blob_store_config-pointer-v1"
 	TypeTomlBlobStoreConfigPointerV2                = "!toml-blob_store_config-pointer-v2"
@@ -42,6 +46,7 @@ func init() {
 		TypeTomlBlobStoreConfigV2,
 		TypeTomlBlobStoreConfigV3,
 		TypeTomlBlobStoreConfigV4,
+		TypeTomlBlobStoreConfigV5,
 		TypeTomlBlobStoreConfigPointerV0,
 		TypeTomlBlobStoreConfigPointerV1,
 		TypeTomlBlobStoreConfigPointerV2,
