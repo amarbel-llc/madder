@@ -153,3 +153,35 @@ function piv_recipient_store_reports_undecryptable_blob { # @test
   refute_output --partial 'failed to decompress'
   refute_output --partial 'not found'
 }
+
+function piv_recipient_store_fsck_and_sync_name_the_agent_failure { # @test
+
+  # With no agent reachable, fsck and sync cannot decrypt the blob. Both
+  # must say why, and neither may call the blob missing (madder#297's
+  # concern, checked here for the two commands besides cat).
+  #
+  # Two things this deliberately does NOT assert, because they look like
+  # defects and should not be pinned as a contract:
+  # - fsck labels the blob "corrupt". It is intact; the agent is absent.
+  # - both commands exit 0 despite the failure.
+  run_madder_piv init -encryption "$PIV_RECIPIENT_ID" .piv
+  assert_success
+  run_madder_piv init -encryption none .plain
+  assert_success
+
+  piv_write_blob "piv-recipient-roundtrip" >/dev/null
+
+  run env -u PIGGY_AUTH_SOCK -u SSH_AUTH_SOCK -u PIVY_AUTH_SOCK \
+    timeout --preserve-status 20s "${MADDER_BIN:-madder}" \
+    fsck -format ndjson .piv
+  assert_output --partial 'pivy agent error: no agent socket'
+  refute_output --partial '"state":"missing"'
+  refute_output --partial '"state":"verified"'
+
+  run env -u PIGGY_AUTH_SOCK -u SSH_AUTH_SOCK -u PIVY_AUTH_SOCK \
+    timeout --preserve-status 20s "${MADDER_BIN:-madder}" \
+    sync -format ndjson .piv .plain
+  assert_output --partial '"state":"failed"'
+  assert_output --partial 'pivy agent error: no agent socket'
+  assert_output --partial 'Successes: 0, Failures: 1'
+}

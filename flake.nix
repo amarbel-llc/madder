@@ -95,8 +95,10 @@
     };
 
     # The markl-id framework home (piggy#183 ownership inversion),
-    # sourced via goFlakeInputs so a piggy bump only touches flake.lock
-    # — no go.mod / gomod2nix.toml lockstep edits. Its go-pkgs producer
+    # sourced via goFlakeInputs, so every nix lane builds against this
+    # input's piggy regardless of go.mod. The devshell `go build` /
+    # `go test` (test-go-race included) still resolve go.mod, so bump both
+    # together with `just update-piggy <rev>`. Its go-pkgs producer
     # is scoped to go/ (no subPath) and carries a passthru dewey bridge.
     piggy = {
       url = "https://code.linenisgreat.com/piggy/archive/master.tar.gz";
