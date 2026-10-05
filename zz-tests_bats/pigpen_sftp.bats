@@ -192,6 +192,29 @@ function init_sftp_pigpen_refuses_an_existing_remote { # @test
   [[ ! -e "$REMOTE_ROOT/blob_store-key" ]] || fail "a sidecar was written"
 }
 
+function init_sftp_pigpen_if_not_exists_rerun_is_a_no_op { # @test
+  init_sftp_store .sealed-sftp -pigpen "$PIGPEN" -if-not-exists
+  assert_success
+
+  local blob_id before
+  blob_id="$(write_sealed_blob "written before the re-run")"
+  before="$(cat "$REMOTE_ROOT/blob_store-key")"
+
+  # The re-run (e.g. a systemd ExecStartPre) must succeed and leave the
+  # key alone, even once the pigpen file is gone.
+  rm "$PIGPEN"
+  init_sftp_store .sealed-sftp -pigpen "$PIGPEN" -if-not-exists
+  assert_success
+  assert_output --partial 'already exists'
+
+  [[ "$(cat "$REMOTE_ROOT/blob_store-key")" == "$before" ]] ||
+    fail "the re-run replaced the sidecar"
+
+  run_madder_agent cat .sealed-sftp "$blob_id"
+  assert_success
+  assert_output --partial 'written before the re-run'
+}
+
 function init_sftp_pigpen_refuses_bad_input_and_creates_nothing { # @test
   init_sftp_store .sealed-sftp -pigpen "$BATS_TEST_TMPDIR/no-such-pigpen"
   assert_failure

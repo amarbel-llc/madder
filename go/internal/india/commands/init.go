@@ -382,6 +382,23 @@ func (cmd *Init) Run(req futility.Request) {
 
 	_, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath)
 
+	// --if-not-exists with -pigpen: an existing store must be a no-op
+	// BEFORE the pigpen is read or the remote contacted. Otherwise a re-run
+	// fails on a since-moved pigpen, or on "-pigpen needs a fresh remote"
+	// against the very remote the first run created.
+	if cmd.pigpen != "" && cmd.ifNotExists {
+		path, ok := cmd.ResolveBlobStorePath(cmd.MakeEnvBlobStore(req), blobStoreId)
+		if !ok {
+			return
+		}
+
+		if _, err := os.Stat(path.GetConfig()); err == nil {
+			tw.Ok(fmt.Sprintf("init %s (already exists)", path.GetConfig()))
+			tw.Plan()
+			return
+		}
+	}
+
 	if cmd.pigpen != "" {
 		// The blob-store properties the sealed-key config carries: the
 		// flag-populated local config, or for SFTP (whose local config is
