@@ -6,8 +6,8 @@ code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9 h1:iVfOsx
 code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9/go.mod h1:/c5ScMJSIbliSfj3R9IfVYql9PSMtFwNSgN8wvJQQc4=
 code.linenisgreat.com/langlang/go v0.0.0-20260803132232-ce3cdb6787e8 h1:mFM685kZsoHa9RWSSU5cOGEzCA7TaR3X/5QywiYh0zw=
 code.linenisgreat.com/langlang/go v0.0.0-20260803132232-ce3cdb6787e8/go.mod h1:LM6sA+QsFBP0cqXglMVzAmBEx0IQtLg6vRg3yCfKOUk=
-code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e h1:afcPD4YiDv2EjF2V8o5IqOk9+MToUdF3RNU8tzoZGdw=
-code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e/go.mod h1:SvQcD+AKbeY0YJUYUrTRUyDYtV3JGFZLzcZXJSsyAUk=
+code.linenisgreat.com/piggy/go v0.1.24-0.20261005173027-7f5509cd2936 h1:KziuAPAxUTtyhLy79RP0R+M3ovOM+xLAkh/hmfV35Og=
+code.linenisgreat.com/piggy/go v0.1.24-0.20261005173027-7f5509cd2936/go.mod h1:xu9ZTqOnsNaJbPVwrxbOq55maw7gteO+ZJrqTZewRs4=
 code.linenisgreat.com/purse-first/libs/dewey v0.5.0 h1:+sd1CsNmJqPOv0K8D/qHdN62vLngYMUohHE0h52uJZU=
 code.linenisgreat.com/purse-first/libs/dewey v0.5.0/go.mod h1:IGnHB011B9XE3LU4EvZHHyL8fA3qAeQBi1QMmDXKnYQ=
 code.linenisgreat.com/tap/go v0.2.0 h1:xtQ8Ny8Kbx5wA3+TwrJz7rrERq54HRBNQoos4bX1XEY=

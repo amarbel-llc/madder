@@ -578,6 +578,19 @@ update-dewey version:
   cd go && go get code.linenisgreat.com/purse-first/libs/dewey@{{version}} && go mod tidy
   just build-gomod2nix
 
+# Bump piggy in BOTH places it is pinned: the flake input (what every nix
+# lane builds against, via goFlakeInputs) and go.mod (what the devshell
+# `go build` / `go test`, including test-go-race, resolves). Left out of
+# step, the two toolchains test different piggy code. Pass a full commit
+# sha. Usage: just update-piggy 7f5509cd2936f9a4e28a635428b64cddae984bed
+#
+# update piggy to a commit, in flake.lock and go.mod together
+[group("maintenance")]
+update-piggy rev:
+  nix flake update piggy
+  cd go && go get code.linenisgreat.com/piggy/go@{{rev}} && go mod tidy
+  just build-gomod2nix
+
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
 # the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
 #

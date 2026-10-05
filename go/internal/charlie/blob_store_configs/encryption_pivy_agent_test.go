@@ -24,15 +24,14 @@ import (
 type ecdhReplyFraming int
 
 const (
-	// SSH_AGENT_SUCCESS (6), then the secret as an SSH string. This is the
-	// framing dewey's pivy client parses (pivy/agent.go parseECDHResponse).
+	// SSH_AGENT_SUCCESS (6), then the secret as an SSH string. The only
+	// framing dewey's pivy client understood.
 	ecdhReplySuccessThenSecret ecdhReplyFraming = iota
 
 	// SSH_AGENT_EXTENSION_RESPONSE (29), then the extension name as an SSH
-	// string, then the secret as an SSH string. This is the framing
-	// piggy-agent is reported to send (piggy session reading of
-	// crates/piggy/src/cmd/agent/session.rs; not observed on a live agent
-	// by this test).
+	// string, then the secret as an SSH string: the framing piggy's own
+	// conformance client expects from the Rust piggy-agent.
+	// zz-tests_bats/piv_agent.bats covers the real agent.
 	ecdhReplyExtensionResponseNameThenSecret
 )
 
@@ -165,7 +164,9 @@ func startFakeECDHAgent(t *testing.T, framing ecdhReplyFraming) markl.Id {
 		}
 	}()
 
-	t.Setenv("PIVY_AUTH_SOCK", socketPath)
+	// PIGGY_AUTH_SOCK is first in piggy's lookup order, ahead of
+	// SSH_AUTH_SOCK, so the test never reaches a developer's real agent.
+	t.Setenv("PIGGY_AUTH_SOCK", socketPath)
 
 	var id markl.Id
 
@@ -222,50 +223,70 @@ func roundTripThroughStoreEncryption(
 	return io.ReadAll(reader)
 }
 
-// The control: against an agent that frames its reply the way dewey's
-// client expects, a single-PIV-recipient store round-trips. This is the
-// first end-to-end exercise of that path in madder, and it shows the
-// fake agent and the request encoding are sound, so the failure in the
-// next test is attributable to the reply framing alone.
-func TestPivyRecipient_RoundTrips_SuccessThenSecretFraming(t *testing.T) {
-	id := startFakeECDHAgent(t, ecdhReplySuccessThenSecret)
-	plaintext := []byte("blob bytes for the pivy round trip")
+// A single-PIV-recipient store round-trips against an agent using either
+// reply framing. The name-first framing is the regression guard: with
+// dewey's ECDH client (piggy before 78ce2ef) it failed to decrypt,
+// because that client took the first SSH string of the reply, the
+// extension name, as the shared secret. piggy's own client, which the
+// pivy_ecdh_p256_pub wrapper now uses, accepts both.
+func TestPivyRecipient_RoundTrips(t *testing.T) {
+	for name, framing := range map[string]ecdhReplyFraming{
+		"success then secret":                  ecdhReplySuccessThenSecret,
+		"extension response, name then secret": ecdhReplyExtensionResponseNameThenSecret,
+	} {
+		t.Run(name, func(t *testing.T) {
+			id := startFakeECDHAgent(t, framing)
+			plaintext := []byte("blob bytes for the pivy round trip")
 
-	decrypted, err := roundTripThroughStoreEncryption(t, id, plaintext)
-	if err != nil {
-		t.Fatalf("decrypt: %v", err)
-	}
+			decrypted, err := roundTripThroughStoreEncryption(t, id, plaintext)
+			if err != nil {
+				t.Fatalf("decrypt: %v", err)
+			}
 
-	if !bytes.Equal(decrypted, plaintext) {
-		t.Fatalf("decrypted %q, want %q", decrypted, plaintext)
+			if !bytes.Equal(decrypted, plaintext) {
+				t.Fatalf("decrypted %q, want %q", decrypted, plaintext)
+			}
+		})
 	}
 }
 
-// CHARACTERIZATION TEST: pins a defect, not a contract.
-//
-// Against an agent that answers with SSH_AGENT_EXTENSION_RESPONSE plus
-// the extension name before the secret, the same store cannot decrypt
-// what it just encrypted. dewey's parseECDHResponse skips one byte and
-// takes the first SSH string as the shared secret; under this framing
-// that string is the 15-byte extension name, so the derived wrapping key
-// is wrong and the unwrap fails.
-//
-// If piggy-agent does frame its reply this way, every madder store
-// encrypted to a single pivy_ecdh_p256_pub recipient is unreadable
-// through it. The fix belongs in dewey's pivy client. When it lands this
-// test should FAIL: flip it to assert a successful round trip.
-func TestPivyRecipient_CannotDecrypt_ExtensionResponseFraming(t *testing.T) {
-	id := startFakeECDHAgent(t, ecdhReplyExtensionResponseNameThenSecret)
-	plaintext := []byte("blob bytes for the pivy round trip")
+// Encrypting to a PIV recipient is software-only, so building the
+// wrapper and writing must work with no agent socket configured at all.
+// Before piggy 78ce2ef the wrapper resolved the socket at construction
+// and failed here.
+func TestPivyRecipient_EncryptsWithoutAnAgent(t *testing.T) {
+	id := startFakeECDHAgent(t, ecdhReplySuccessThenSecret)
 
-	decrypted, err := roundTripThroughStoreEncryption(t, id, plaintext)
-	if err == nil {
-		t.Fatalf(
-			"decrypt succeeded (%q): dewey's ECDH client now handles the "+
-				"extension-response framing; rewrite this test as a round trip",
-			decrypted,
-		)
+	for _, name := range []string{
+		"PIGGY_AUTH_SOCK", "SSH_AUTH_SOCK", "PIVY_AUTH_SOCK",
+	} {
+		t.Setenv(name, "")
 	}
 
-	t.Logf("decrypt failed as characterized: %v", err)
+	ioWrapper, err := EncryptionKeys{id}.GetIOWrapper()
+	if err != nil {
+		t.Fatalf("GetIOWrapper with no agent socket set: %v", err)
+	}
+
+	var ciphertext bytes.Buffer
+
+	writer, err := ioWrapper.WrapWriter(&ciphertext)
+	if err != nil {
+		t.Fatalf("WrapWriter: %v", err)
+	}
+
+	if _, err = writer.Write([]byte("written with no agent")); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+
+	if err = writer.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+
+	// Decrypting without an agent must fail as an AGENT error, so the
+	// blob reader surfaces it instead of treating it as a cleartext blob.
+	_, err = ioWrapper.WrapReader(&ciphertext)
+	if !pivy.IsErrAgent(err) {
+		t.Fatalf("WrapReader with no agent: got %v, want an agent error", err)
+	}
 }

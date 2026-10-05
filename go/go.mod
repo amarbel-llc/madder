@@ -5,7 +5,7 @@ go 1.26.1
 require (
 	code.linenisgreat.com/crap/go-crap/v2 v2.3.0
 	code.linenisgreat.com/hyphence/go v0.3.1-0.20260720154720-ea7f1e0933f9
-	code.linenisgreat.com/piggy/go v0.0.0-20260720155209-77cfdea0031e
+	code.linenisgreat.com/piggy/go v0.1.24-0.20261005173027-7f5509cd2936
 	code.linenisgreat.com/purse-first/libs/dewey v0.5.0
 	code.linenisgreat.com/tap/go v0.2.0
 	code.linenisgreat.com/tommy v0.5.0

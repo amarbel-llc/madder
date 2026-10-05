@@ -19,7 +19,7 @@ piv_wait_for_socket() {
 
 # start_piv_agent spawns fibby with a seeded slot-9D P-256 key and a
 # piggy-agent serving it, then exports:
-#   PIVY_AUTH_SOCK    the agent socket (the variable madder's pivy path reads)
+#   PIGGY_AUTH_SOCK   the agent socket
 #   PIV_FIBBY_SOCK    fibby's pcsc socket, for `piggy list`
 #   PIV_FIBBY_LOG     fibby's APDU wire log
 #   PIV_RECIPIENT_ID  the slot-9D key as a pivy_ecdh_p256_pub markl id
@@ -67,7 +67,9 @@ start_piv_agent() {
   piv_wait_for_socket "$agent_sock" ||
     fail "piggy-agent socket never appeared. log: $(cat "$PIV_WORKDIR/agent.log")"
 
-  export PIVY_AUTH_SOCK="$agent_sock"
+  # First in piggy's lookup order (PIGGY_AUTH_SOCK, SSH_AUTH_SOCK,
+  # PIVY_AUTH_SOCK), so nothing ambient can shadow the test agent.
+  export PIGGY_AUTH_SOCK="$agent_sock"
 
   local listing
   listing="$(PCSCLITE_CSOCK_NAME="$PIV_FIBBY_SOCK" "$PIGGY_BIN" list --format=ndjson 2>&1)" ||
