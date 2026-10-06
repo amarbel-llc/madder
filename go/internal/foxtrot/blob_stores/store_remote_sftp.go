@@ -619,13 +619,15 @@ func (blobStore *remoteSftp) HasBlob(
 	}
 
 	blobStore.blobCacheLock.RLock()
+	_, ok = blobStore.blobCache[string(merkleId.GetBytes())]
+	complete := blobStore.blobCacheComplete
+	blobStore.blobCacheLock.RUnlock()
 
-	if _, ok = blobStore.blobCache[string(merkleId.GetBytes())]; ok {
-		blobStore.blobCacheLock.RUnlock()
+	// After PrimeBlobPresence the cache is the whole store, so a miss is
+	// an answer and needs no round trip.
+	if ok || complete {
 		return ok
 	}
-
-	blobStore.blobCacheLock.RUnlock()
 
 	remotePath := blobStore.remotePathForMerkleId(merkleId)
 
@@ -637,6 +639,35 @@ func (blobStore *remoteSftp) HasBlob(
 	}
 
 	return ok
+}
+
+var _ BlobPresencePrimer = (*remoteSftp)(nil)
+
+// PrimeBlobPresence lists the whole store once, which fills the blob
+// cache, and from then on HasBlob answers from the cache alone: one
+// listing (a few requests per bucket, several buckets at a time) instead
+// of a round trip per blob. Any listing error leaves HasBlob asking the
+// remote as before.
+//
+// A blob another writer adds after the listing reads as absent. The cost
+// is a redundant upload whose rename lands on an identical file.
+func (blobStore *remoteSftp) PrimeBlobPresence() (err error) {
+	if err = blobStore.tryInitialize(); err != nil {
+		return err
+	}
+
+	// AllBlobs caches each id as it yields it.
+	for _, errIter := range blobStore.AllBlobs() {
+		if errIter != nil {
+			return errors.Wrap(errIter)
+		}
+	}
+
+	blobStore.blobCacheLock.Lock()
+	blobStore.blobCacheComplete = true
+	blobStore.blobCacheLock.Unlock()
+
+	return nil
 }
 
 func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.MarklId] {

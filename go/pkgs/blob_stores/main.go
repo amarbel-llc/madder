@@ -11,8 +11,14 @@ type ArchiveIndex = internal.ArchiveIndex
 // BlobDeleter is implemented by blob stores that support removing individual
 // blobs by their content address. Used by Pack to delete loose blobs after
 // they have been safely written to an archive.
+type BlobDeleter = internal.BlobDeleter
+
+// BlobPresencePrimer is implemented by stores for which checking blobs one
+// at a time is expensive and listing everything once is cheap by
+// comparison. After a successful PrimeBlobPresence, HasBlob answers
+// without contacting the store.
 type (
-	BlobDeleter          = internal.BlobDeleter
+	BlobPresencePrimer   = internal.BlobPresencePrimer
 	BlobStoreInitialized = internal.BlobStoreInitialized
 	BlobStoreMap         = internal.BlobStoreMap
 	CopyResult           = internal.CopyResult

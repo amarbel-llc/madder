@@ -63,6 +63,18 @@ type remoteBlobStoreBase struct {
 
 	blobCacheLock sync.RWMutex
 	blobCache     map[string]struct{}
+
+	// blobCacheComplete is set once the whole store has been listed into
+	// blobCache, after which a cache miss means the blob is absent.
+	blobCacheComplete bool
+}
+
+// BlobPresencePrimer is implemented by stores for which checking blobs one
+// at a time is expensive and listing everything once is cheap by
+// comparison. After a successful PrimeBlobPresence, HasBlob answers
+// without contacting the store.
+type BlobPresencePrimer interface {
+	PrimeBlobPresence() error
 }
 
 // makeEnvDirConfig builds the blob_io.Config for a read or write,

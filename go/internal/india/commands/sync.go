@@ -291,6 +291,26 @@ func (cmd Sync) runStore(
 		useDestinationHashType = true
 	}
 
+	// Ask each destination that can to learn its whole contents up front,
+	// so the per-blob "already there?" check costs no round trip. On a
+	// resumed sync to a remote store that check was most of the wait. It
+	// is only an optimisation: on failure the per-blob checks still work.
+	for _, dst := range destination {
+		primer, ok := dst.GetBlobStore().(blob_stores.BlobPresencePrimer)
+		if !ok {
+			continue
+		}
+
+		if err := primer.PrimeBlobPresence(); err != nil {
+			ui.Err().Printf(
+				"# (blob_store: %s) could not list the store up front; "+
+					"checking blobs one at a time: %s",
+				dst.GetId(),
+				err,
+			)
+		}
+	}
+
 	// auto + TTY renders the live go-crap viewport natively (the
 	// in-process form of `madder sync | crap-present`); no wire bytes hit
 	// stdout in this mode. The producer is runStoreCrap driving a
