@@ -16,14 +16,17 @@ import (
 )
 
 // MakeSealedKeyConfig turns the flag-populated local config into a
-// sealed-key (TomlV5) config for a store sealed to the recipients of the
-// pigpen at pigpenPath (FDR 0011). It mints the store key and returns the
-// config to write plus the sidecar that must be written next to it.
+// sealed-key (TomlV5) config for a store sealed to the recipients of a
+// pigpen (FDR 0011). pigpenKind is one of store_key.SourceKind*; pigpen is
+// a file path, or for the papi kind an identity domain. It mints the store
+// key and returns the config to write plus the sidecar that must be
+// written next to it.
 //
 // Nothing is written here, so a bad pigpen fails before any store exists.
 func MakeSealedKeyConfig(
 	local *blob_store_configs.DefaultType,
-	pigpenPath string,
+	pigpenKind string,
+	pigpen string,
 ) (
 	typedConfig *blob_store_configs.TypedConfig,
 	sidecar []byte,
@@ -38,18 +41,18 @@ func MakeSealedKeyConfig(
 		return typedConfig, sidecar, err
 	}
 
-	// Recorded so `key-status` and `key-reseal` can find the pigpen again
-	// from any working directory.
-	var source string
+	var source store_key.Source
 
-	if source, err = filepath.Abs(pigpenPath); err != nil {
-		err = errors.Wrap(err)
+	if source, err = store_key.MakeSource(pigpenKind, pigpen); err != nil {
+		err = errors.BadRequest(err)
 		return typedConfig, sidecar, err
 	}
 
 	var recipients []markl.Id
 
-	if recipients, err = store_key.LoadRecipients(source); err != nil {
+	// Live: the key is about to be sealed to this answer, so it must be
+	// the pigpen as it is now, not a cached copy.
+	if recipients, err = source.Recipients(true); err != nil {
 		err = errors.BadRequest(err)
 		return typedConfig, sidecar, err
 	}
@@ -62,22 +65,18 @@ func MakeSealedKeyConfig(
 		return typedConfig, sidecar, err
 	}
 
-	var digest markl.Id
+	var storeKey blob_store_configs.StoreKey
 
-	if digest, err = store_key.RecipientSetDigest(recipients); err != nil {
+	if storeKey, err = blob_store_configs.MakeStoreKey(
+		source,
+		recipients,
+		sealed,
+	); err != nil {
 		err = errors.Wrap(err)
 		return typedConfig, sidecar, err
 	}
 
-	if sidecar, err = blob_store_configs.EncodeStoreKey(
-		blob_store_configs.TomlStoreKeyV1{
-			Recipients: blob_store_configs.StoreKeyRecipients{
-				Source: source,
-				Digest: digest,
-			},
-			Sealed: blob_store_configs.StoreKeySealed{Document: string(sealed)},
-		},
-	); err != nil {
+	if sidecar, err = blob_store_configs.EncodeStoreKey(storeKey); err != nil {
 		err = errors.Wrap(err)
 		return typedConfig, sidecar, err
 	}

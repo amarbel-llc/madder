@@ -77,7 +77,7 @@ function init_pigpen_writes_no_secret { # @test
   # The sidecar holds the sealed document and where its recipients came
   # from, and no secret in the clear either.
   run cat "$sidecar"
-  assert_output --partial '! toml-blob_store_key-v1'
+  assert_output --partial '! toml-blob_store_key-v2'
   assert_output --partial "$PIGPEN"
   assert_output --partial 'pigpen-v1'
   refute_output --partial 'age_x25519_sec'
@@ -192,6 +192,227 @@ second_recipient() {
   echo "$id"
 }
 
+# pigpen_document echoes the recipients of $PIGPEN as a pigpen recipient-set
+# document, which is what a pointer resolver must print. It is lifted from
+# the snapshot a path-kind store embeds in its sidecar.
+pigpen_document() {
+  local name="snapshot-$RANDOM"
+  run_madder_agent init -pigpen "$PIGPEN" ".$name"
+  assert_success
+  awk '/^pigpen = """/ { on = 1; sub(/^pigpen = """/, ""); if ($0 == "") next }
+       on && /^"""/ { exit }
+       on { print }' ".madder/local/share/blob_stores/$name/blob_store-key"
+}
+
+# install_fake_papi_resolver puts a `pigpen-resolver-papi-http` first on
+# PATH. It logs each call and prints $FAKE_PIGPEN, or fails as if offline
+# when that file is absent.
+install_fake_papi_resolver() {
+  FAKE_PIGPEN="$BATS_TEST_TMPDIR/published-pigpen"
+  RESOLVER_LOG="$BATS_TEST_TMPDIR/resolver.log"
+  : >"$RESOLVER_LOG"
+  mkdir -p "$BATS_TEST_TMPDIR/bin"
+  cat >"$BATS_TEST_TMPDIR/bin/pigpen-resolver-papi-http" <<EOF
+#! /bin/sh
+echo "\$*" >>"$RESOLVER_LOG"
+if [ ! -f "$FAKE_PIGPEN" ]; then
+  echo "pigpen: resolve https://\$2/papi/pigpen: fetch failed: offline" >&2
+  exit 1
+fi
+cat "$FAKE_PIGPEN"
+EOF
+  chmod +x "$BATS_TEST_TMPDIR/bin/pigpen-resolver-papi-http"
+  export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+resolver_call_count() {
+  wc -l <"$RESOLVER_LOG" | tr -d ' '
+}
+
+function sidecar_is_plain_text_with_heredocs { # @test
+  init_sealed_store
+
+  local sidecar
+  sidecar="$(sealed_store_dir)/blob_store-key"
+
+  run cat "$sidecar"
+  assert_output --partial '! toml-blob_store_key-v2'
+  assert_output --partial 'source_kind = "path"'
+  assert_output --partial "source = \"$PIGPEN\""
+  assert_output --partial 'pigpen = """'
+  assert_output --partial 'document = """'
+  refute_output --partial 'digest'
+
+  # The sealed document's ciphertext is base64 on disk: no raw bytes.
+  run grep -c -P '[^\x20-\x7e]' "$sidecar"
+  assert_output '0'
+}
+
+function pigpen_kind_embedded_records_no_path { # @test
+  run_madder_agent init -pigpen "$PIGPEN" -pigpen-kind embedded .sealed
+  assert_success
+
+  run cat "$(sealed_store_dir)/blob_store-key"
+  assert_output --partial 'source_kind = "embedded"'
+  refute_output --partial "$PIGPEN"
+  refute_output --partial 'source = '
+
+  local blob_id
+  blob_id="$(write_sealed_blob "sealed to an embedded pigpen")"
+
+  # The file it was copied from is no longer needed for anything.
+  rm "$PIGPEN"
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'sealed to an embedded pigpen'
+  refute_output --partial 'warning'
+
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial 'pigpen:      embedded in blob_store-key'
+  assert_output --partial 'status:      in sync'
+}
+
+function pigpen_kind_papi_resolves_once_then_uses_the_cache { # @test
+  install_fake_papi_resolver
+  pigpen_document >"$FAKE_PIGPEN"
+  [[ -s $FAKE_PIGPEN ]] || fail "could not build a pigpen document"
+
+  run_madder_agent init -pigpen example.test -pigpen-kind papi .sealed
+  assert_success
+  [[ "$(resolver_call_count)" == "1" ]] || fail "init made $(resolver_call_count) resolver calls"
+
+  run cat "$RESOLVER_LOG"
+  assert_output 'resolve example.test'
+
+  # The remote-visible sidecar names the domain and holds the pointer, and
+  # nothing about this machine.
+  run cat "$(sealed_store_dir)/blob_store-key"
+  assert_output --partial 'source_kind = "papi"'
+  assert_output --partial 'source = "example.test"'
+  assert_output --partial '! pigpen-pointer-v1'
+  assert_output --partial 'kind="papi-http"'
+  refute_output --partial "$BATS_TEST_TMPDIR"
+
+  local blob_id
+  blob_id="$(write_sealed_blob "sealed to a published pigpen")"
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'sealed to a published pigpen'
+  refute_output --partial 'warning'
+
+  # Ordinary commands compared against the cache: no further fetch.
+  [[ "$(resolver_call_count)" == "1" ]] ||
+    fail "write and cat made resolver calls: $(resolver_call_count) total"
+}
+
+function pigpen_kind_papi_drift_is_seen_after_key_status { # @test
+  install_fake_papi_resolver
+  pigpen_document >"$FAKE_PIGPEN"
+
+  run_madder_agent init -pigpen example.test -pigpen-kind papi .sealed
+  assert_success
+
+  local blob_id added
+  blob_id="$(write_sealed_blob "before the published pigpen changed")"
+  added="$(second_recipient)"
+
+  # The published pigpen gains a recipient.
+  echo "$added" >>"$PIGPEN"
+  pigpen_document >"$FAKE_PIGPEN"
+
+  # Until something fetches, the cache still says the old set: no warning,
+  # and no network.
+  local before
+  before="$(resolver_call_count)"
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  refute_output --partial 'recipient set has changed'
+  [[ "$(resolver_call_count)" == "$before" ]] || fail "cat fetched the pigpen"
+
+  # key-status fetches afresh and refreshes the cache.
+  run_madder_no_agent key-status .sealed
+  assert_success
+  assert_output --partial 'pigpen:      example.test (papi)'
+  assert_output --partial "added:       ${added#*@}"
+  assert_output --partial 'status:      changed'
+  [[ "$(resolver_call_count)" == "$((before + 1))" ]] || fail "key-status did not fetch"
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'recipient set has changed'
+  [[ "$(resolver_call_count)" == "$((before + 1))" ]] || fail "cat fetched the pigpen"
+
+  run_madder_agent key-reseal -confirm .sealed
+  assert_success
+  assert_output --partial 're-sealed .sealed to 2 recipients ('
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'before the published pigpen changed'
+  refute_output --partial 'recipient set has changed'
+}
+
+function pigpen_kind_papi_offline { # @test
+  install_fake_papi_resolver
+  pigpen_document >"$FAKE_PIGPEN"
+
+  run_madder_agent init -pigpen example.test -pigpen-kind papi .sealed
+  assert_success
+
+  local blob_id
+  blob_id="$(write_sealed_blob "read while offline")"
+
+  # Offline with a warm cache: reads are silent and make no request.
+  rm "$FAKE_PIGPEN"
+  local before
+  before="$(resolver_call_count)"
+
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'read while offline'
+  refute_output --partial 'warning'
+  [[ "$(resolver_call_count)" == "$before" ]] || fail "cat tried to fetch"
+
+  # The commands that must have a live answer fail, and say why.
+  run_madder_no_agent key-status .sealed
+  assert_failure
+  assert_output --partial 'fetch failed: offline'
+
+  run_madder_agent key-reseal .sealed
+  assert_failure
+
+  # Offline with a cold cache: a warning, and the read still works.
+  rm -rf "$XDG_CACHE_HOME/madder/pigpen"
+  run_madder_agent cat .sealed "$blob_id"
+  assert_success
+  assert_output --partial 'read while offline'
+  assert_output --partial 'cannot re-read the pigpen'
+}
+
+function key_reseal_refuses_a_changed_set_without_confirm { # @test
+  init_sealed_store
+
+  local sidecar before added
+  sidecar="$(sealed_store_dir)/blob_store-key"
+  before="$(cat "$sidecar")"
+  added="$(second_recipient)"
+  echo "$added" >>"$PIGPEN"
+
+  local ecdh_before
+  ecdh_before="$(card_ecdh_count)"
+
+  run_madder_agent key-reseal .sealed
+  assert_failure
+  assert_output --partial "added:       ${added#*@}"
+  assert_output --partial 're-run with -confirm'
+
+  [[ "$(cat "$sidecar")" == "$before" ]] || fail "the sidecar was replaced without -confirm"
+  [[ "$(card_ecdh_count)" == "$ecdh_before" ]] || fail "the refused reseal used the card"
+}
+
 function key_status_reports_in_sync_without_the_card { # @test
   init_sealed_store
 
@@ -232,7 +453,7 @@ function drift_warns_and_key_reseal_adds_a_recipient { # @test
   local before_reseal
   before_reseal="$(card_ecdh_count)"
 
-  run_madder_agent key-reseal .sealed
+  run_madder_agent key-reseal -confirm .sealed
   assert_success
   assert_output --partial 're-sealed .sealed to 2 recipients ('
 
@@ -266,7 +487,7 @@ function key_reseal_can_remove_the_card { # @test
   assert_output --partial "added:       ${other#*@}"
   assert_output --partial "removed:     ${PIV_RECIPIENT_ID#*@}"
 
-  run_madder_agent key-reseal .sealed
+  run_madder_agent key-reseal -confirm .sealed
   assert_success
 
   # The card no longer opens the new sidecar. This is removal, not
@@ -286,8 +507,10 @@ function key_reseal_without_an_agent_changes_nothing { # @test
 
   second_recipient >>"$PIGPEN"
 
-  run_madder_no_agent key-reseal .sealed
+  # -confirm, so that the only thing left to fail is the agent.
+  run_madder_no_agent key-reseal -confirm .sealed
   assert_failure
+  assert_output --partial 're-sealing the store key'
   [[ "$(cat "$sidecar")" == "$before" ]] || fail "the sidecar was replaced"
 }
 

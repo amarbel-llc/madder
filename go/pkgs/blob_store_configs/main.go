@@ -36,34 +36,41 @@ type (
 	SelectorConfigImmutable     = internal.SelectorConfigImmutable
 	SignatureConfig             = internal.SignatureConfig
 	SignatureConfigImmutable    = internal.SignatureConfigImmutable
-	StoreKeyRecipients          = internal.StoreKeyRecipients
-	StoreKeySealed              = internal.StoreKeySealed
-	TomlInventoryArchiveV0      = internal.TomlInventoryArchiveV0
-	TomlInventoryArchiveV1      = internal.TomlInventoryArchiveV1
-	TomlInventoryArchiveV2      = internal.TomlInventoryArchiveV2
-	TomlInventoryArchiveV3      = internal.TomlInventoryArchiveV3
-	TomlLocalHashBucketedV1     = internal.TomlLocalHashBucketedV1
-	TomlLocalHashBucketedV2     = internal.TomlLocalHashBucketedV2
-	TomlMultiV0                 = internal.TomlMultiV0
-	TomlMultiV1                 = internal.TomlMultiV1
-	TomlPointerV0               = internal.TomlPointerV0
-	TomlPointerV1               = internal.TomlPointerV1
-	TomlPointerV2               = internal.TomlPointerV2
-	TomlS3V0                    = internal.TomlS3V0
-	TomlS3V1                    = internal.TomlS3V1
-	TomlSFTPV0                  = internal.TomlSFTPV0
-	TomlSFTPV1                  = internal.TomlSFTPV1
-	TomlSFTPViaSSHConfigV0      = internal.TomlSFTPViaSSHConfigV0
-	TomlSFTPViaSSHConfigV1      = internal.TomlSFTPViaSSHConfigV1
-	TomlStoreKeyV1              = internal.TomlStoreKeyV1
-	TomlUriV0                   = internal.TomlUriV0
-	TomlV3                      = internal.TomlV3
-	TomlV4                      = internal.TomlV4
-	TomlV5                      = internal.TomlV5
-	TomlWebDAVV0                = internal.TomlWebDAVV0
-	TomlWebDAVV1                = internal.TomlWebDAVV1
-	TypedConfig                 = internal.TypedConfig
-	TypedMutableConfig          = internal.TypedMutableConfig
+)
+
+// StoreKey is the current sidecar; older versions decode into it. In
+// memory Sealed.Document is the sealed pigpen document itself; only
+// EncodeStoreKey and DecodeStoreKey see its on-disk base64.
+type (
+	StoreKey                = internal.StoreKey
+	StoreKeyRecipients      = internal.StoreKeyRecipients
+	StoreKeySealed          = internal.StoreKeySealed
+	TomlInventoryArchiveV0  = internal.TomlInventoryArchiveV0
+	TomlInventoryArchiveV1  = internal.TomlInventoryArchiveV1
+	TomlInventoryArchiveV2  = internal.TomlInventoryArchiveV2
+	TomlInventoryArchiveV3  = internal.TomlInventoryArchiveV3
+	TomlLocalHashBucketedV1 = internal.TomlLocalHashBucketedV1
+	TomlLocalHashBucketedV2 = internal.TomlLocalHashBucketedV2
+	TomlMultiV0             = internal.TomlMultiV0
+	TomlMultiV1             = internal.TomlMultiV1
+	TomlPointerV0           = internal.TomlPointerV0
+	TomlPointerV1           = internal.TomlPointerV1
+	TomlPointerV2           = internal.TomlPointerV2
+	TomlS3V0                = internal.TomlS3V0
+	TomlS3V1                = internal.TomlS3V1
+	TomlSFTPV0              = internal.TomlSFTPV0
+	TomlSFTPV1              = internal.TomlSFTPV1
+	TomlSFTPViaSSHConfigV0  = internal.TomlSFTPViaSSHConfigV0
+	TomlSFTPViaSSHConfigV1  = internal.TomlSFTPViaSSHConfigV1
+	TomlStoreKeyV2          = internal.TomlStoreKeyV2
+	TomlUriV0               = internal.TomlUriV0
+	TomlV3                  = internal.TomlV3
+	TomlV4                  = internal.TomlV4
+	TomlV5                  = internal.TomlV5
+	TomlWebDAVV0            = internal.TomlWebDAVV0
+	TomlWebDAVV1            = internal.TomlWebDAVV1
+	TypedConfig             = internal.TypedConfig
+	TypedMutableConfig      = internal.TypedMutableConfig
 )
 
 var (
@@ -96,9 +103,9 @@ var DecodeAndVerify = internal.DecodeAndVerify
 // exclusive helper and closed on return.
 var DecodeAndVerifyFromFile = internal.DecodeAndVerifyFromFile
 
-// DecodeStoreKey parses a sidecar. Anything but exactly the expected
-// header is refused: a different type line means a different format, not
-// a sidecar to be read leniently.
+// DecodeStoreKey parses a sidecar of either version. Anything but exactly
+// an expected header is refused: a different type line means a different
+// format, not a sidecar to be read leniently.
 var (
 	DecodeStoreKey                = internal.DecodeStoreKey
 	DecodeTomlInventoryArchiveV0  = internal.DecodeTomlInventoryArchiveV0
@@ -148,10 +155,19 @@ var EncodeStoreKey = internal.EncodeStoreKey
 // dependency on the inner coder being deterministic across two calls
 // (e.g. randomized encryption-key generation in the
 // inventory_archive variants).
+var EncodeWithDigest = internal.EncodeWithDigest
+
+// MakeStoreKey builds the sidecar for a store key sealed to recipients,
+// which were resolved from source. A path source gets a snapshot of the
+// recipients embedded, so the sidecar says who the pigpen named when the
+// key was sealed; the other kinds already carry their own document.
 var (
-	EncodeWithDigest                 = internal.EncodeWithDigest
+	MakeStoreKey                     = internal.MakeStoreKey
 	SetMultiEncryptionFlagDefinition = internal.SetMultiEncryptionFlagDefinition
 )
+
+// StoreKeySource is the pigpen source a sidecar records.
+var StoreKeySource = internal.StoreKeySource
 
 // TypeStructForConfig returns the wire type-id (TypeStruct) that the
 // hyphence Coder uses to decode/encode the given Config. Inverts the
@@ -174,8 +190,6 @@ const (
 	HashTypeDefault    = internal.HashTypeDefault
 	HashTypeSha256     = internal.HashTypeSha256
 	KeyHolderProcess   = internal.KeyHolderProcess
+	TypeTomlStoreKeyV1 = internal.TypeTomlStoreKeyV1
+	TypeTomlStoreKeyV2 = internal.TypeTomlStoreKeyV2
 )
-
-// TypeTomlStoreKeyV1 is the hyphence type of a sealed-key store's
-// `blob_store-key` sidecar (FDR 0011).
-const TypeTomlStoreKeyV1 = internal.TypeTomlStoreKeyV1

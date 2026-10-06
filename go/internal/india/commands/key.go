@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"code.linenisgreat.com/madder/go/internal/charlie/store_key"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
@@ -25,7 +24,7 @@ func init() {
 type sealedKeyStore struct {
 	id      string
 	access  blob_stores.StoreKeySidecarStore
-	sidecar blob_store_configs.TomlStoreKeyV1
+	sidecar blob_store_configs.StoreKey
 	sealed  []markl.Id
 }
 
@@ -142,9 +141,11 @@ func (cmd KeyStatus) GetDescription() futility.Description {
 			"set the store key is sealed to, re-read the pigpen it was " +
 			"sealed against, and report whether the two differ, listing " +
 			"recipients added to or removed from the pigpen since. Needs " +
-			"no key agent: nothing is opened. Exits non-zero if the pigpen " +
-			"cannot be read. Use key-reseal to seal the store key to the " +
-			"pigpen's current recipients.",
+			"no key agent: nothing is opened. A pigpen behind a pointer is " +
+			"fetched afresh, which also refreshes the copy cached on this " +
+			"machine that ordinary commands check against. Exits non-zero " +
+			"if the pigpen cannot be read. Use key-reseal to seal the " +
+			"store key to the pigpen's current recipients.",
 	}
 }
 
@@ -171,12 +172,14 @@ func (cmd KeyStatus) Run(req futility.Request) {
 		return
 	}
 
-	source := store.sidecar.Recipients.Source
+	source := blob_store_configs.StoreKeySource(store.sidecar)
 
 	fmt.Fprintf(out, "pigpen:      %s\n", source)
 	fmt.Fprintf(out, "sealed to:   %s\n", sealedDescription)
 
-	current, err := store_key.LoadRecipients(source)
+	// Live: this is the command that asks "what does the pigpen say now",
+	// and it refreshes the cache ordinary commands compare against.
+	current, err := source.Recipients(true)
 	if err != nil {
 		errors.ContextCancelWithBadRequestError(env, err)
 		return
@@ -212,8 +215,34 @@ func (cmd KeyStatus) Run(req futility.Request) {
 	}
 }
 
+const pigpenKindDescription = "-pigpen-kind says how -pigpen is read: " +
+	"'path' (the default) is a local piggy-ids file, whose path is " +
+	"recorded; 'papi' is a PAPI identity domain whose published pigpen " +
+	"is fetched by pigpen-resolver-papi-http, so nothing specific to one " +
+	"machine is recorded; 'embedded' is a file whose contents are copied " +
+	"into blob_store-key and become the store's pigpen, edited there " +
+	"from then on. A fetched pigpen is cached per machine: ordinary " +
+	"commands compare against the cache and make no network request, " +
+	"and key-status and key-reseal fetch afresh."
+
+func setPigpenKindFlagDefinition(
+	flagDefinitions interfaces.CLIFlagDefinitions,
+	pigpenKind *string,
+) {
+	flagDefinitions.StringVar(
+		pigpenKind,
+		"pigpen-kind",
+		store_key.SourceKindPath,
+		"how -pigpen is read: 'path' (a local piggy-ids file), 'papi' (a "+
+			"PAPI identity domain), or 'embedded' (a file whose contents "+
+			"are copied into the store's blob_store-key)",
+	)
+}
+
 type KeyReseal struct {
-	pigpen string
+	pigpen     string
+	pigpenKind string
+	confirm    bool
 
 	command_components.EnvBlobStore
 	command_components.BlobStore
@@ -243,7 +272,18 @@ func (cmd *KeyReseal) SetFlagDefinitions(
 		"",
 		"seal to the recipients of this pigpen instead of the one recorded "+
 			"at init, and record it as the store's pigpen from now on (for "+
-			"a pigpen that has moved)",
+			"a pigpen that has moved, or to change its kind)",
+	)
+
+	setPigpenKindFlagDefinition(flagDefinitions, &cmd.pigpenKind)
+
+	flagDefinitions.BoolVar(
+		&cmd.confirm,
+		"confirm",
+		false,
+		"seal the store key to a recipient set that differs from the one "+
+			"it is sealed to now. Without it, a changed set is listed and "+
+			"nothing is written",
 	)
 }
 
@@ -254,8 +294,14 @@ func (cmd KeyReseal) GetDescription() futility.Description {
 			"key through the key agent, re-read the pigpen, seal the SAME " +
 			"store key to the pigpen's current recipients, and replace the " +
 			"blob_store-key sidecar. No blob is read or rewritten. With " +
-			"-pigpen <path> it seals to that pigpen instead and records " +
-			"it as the store's pigpen, for one that has moved. Adding " +
+			"-pigpen <value> it seals to that pigpen instead and records " +
+			"it as the store's pigpen, for one that has moved. " +
+			pigpenKindDescription + " " +
+			"If the recipient set would change, key-reseal lists what " +
+			"would be added and removed and writes nothing unless " +
+			"-confirm is given: the pigpen is trusted only as far as " +
+			"wherever it was read from, and whoever it names gets the " +
+			"store key. Adding " +
 			"a recipient this way lets it read every existing blob. " +
 			"Removing one only stops it opening the new sidecar: anyone " +
 			"who kept the old sidecar or the store key can still read " +
@@ -279,26 +325,45 @@ func (cmd KeyReseal) Run(req futility.Request) {
 		return
 	}
 
-	source := store.sidecar.Recipients.Source
+	source := blob_store_configs.StoreKeySource(store.sidecar)
 
 	if cmd.pigpen != "" {
 		var err error
 
-		if source, err = filepath.Abs(cmd.pigpen); err != nil {
-			env.Cancel(err)
+		if source, err = store_key.MakeSource(cmd.pigpenKind, cmd.pigpen); err != nil {
+			errors.ContextCancelWithBadRequestError(env, err)
 			return
 		}
 	}
 
-	recipients, err := store_key.LoadRecipients(source)
+	// Live: the key is about to be sealed to this answer.
+	recipients, err := source.Recipients(true)
 	if err != nil {
 		errors.ContextCancelWithBadRequestError(env, err)
 		return
 	}
 
-	digest, err := store_key.RecipientSetDigest(recipients)
-	if err != nil {
-		env.Cancel(err)
+	added := recipientsMissingFrom(recipients, store.sealed)
+	removed := recipientsMissingFrom(store.sealed, recipients)
+
+	if (len(added) > 0 || len(removed) > 0) && !cmd.confirm {
+		out := env.GetUIFile()
+
+		for _, id := range added {
+			fmt.Fprintf(out, "added:       %s\n", id)
+		}
+
+		for _, id := range removed {
+			fmt.Fprintf(out, "removed:     %s\n", id)
+		}
+
+		errors.ContextCancelWithBadRequestf(
+			env,
+			"the recipient set would change; re-run with -confirm to seal "+
+				"the store key of %q to the set above. Nothing was written",
+			storeId,
+		)
+
 		return
 	}
 
@@ -312,15 +377,13 @@ func (cmd KeyReseal) Run(req futility.Request) {
 		return
 	}
 
-	sidecar, err := blob_store_configs.EncodeStoreKey(
-		blob_store_configs.TomlStoreKeyV1{
-			Recipients: blob_store_configs.StoreKeyRecipients{
-				Source: source,
-				Digest: digest,
-			},
-			Sealed: blob_store_configs.StoreKeySealed{Document: string(resealed)},
-		},
-	)
+	storeKey, err := blob_store_configs.MakeStoreKey(source, recipients, resealed)
+	if err != nil {
+		env.Cancel(err)
+		return
+	}
+
+	sidecar, err := blob_store_configs.EncodeStoreKey(storeKey)
 	if err != nil {
 		env.Cancel(err)
 		return

@@ -13,12 +13,10 @@
 package store_key
 
 import (
-	"context"
 	"crypto/ecdh"
 	"crypto/rand"
 	"fmt"
 	"io"
-	"os"
 	"sync"
 	"time"
 
@@ -28,7 +26,6 @@ import (
 	"code.linenisgreat.com/piggy/go/pkgs/agent"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
 	"code.linenisgreat.com/piggy/go/pkgs/pigpen"
-	"code.linenisgreat.com/piggy/go/pkgs/pigpen_resolve"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 )
 
@@ -119,34 +116,6 @@ func SealedRecipients(sealed []byte) ([]markl.Id, error) {
 // recipientResolveTimeout bounds loading a pigpen. A pointer document runs
 // an external resolver that may make a network call (piggy RFC 0010).
 const recipientResolveTimeout = 30 * time.Second
-
-// LoadRecipients reads the pigpen at path and returns its encryption
-// recipients. The file may take any piggy-ids form: RFC 0003 lines, a
-// pigpen recipient set, or a pointer to a remotely hosted pigpen, which
-// is resolved through its `pigpen-resolver-<kind>` binary on PATH.
-func LoadRecipients(path string) ([]markl.Id, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading pigpen: %w", err)
-	}
-
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		recipientResolveTimeout,
-	)
-	defer cancel()
-
-	recipients, err := pigpen_resolve.LoadRecipients(ctx, raw)
-	if err != nil {
-		return nil, fmt.Errorf("loading recipients from %s: %w", path, err)
-	}
-
-	if len(recipients) == 0 {
-		return nil, fmt.Errorf("pigpen %s names no encryption recipients", path)
-	}
-
-	return recipients, nil
-}
 
 // RecipientSetDigest returns the blake2b256 digest of piggy's canonical
 // recipient-set bytes (RFC 0008 §2.3). Two recipient lists have the same

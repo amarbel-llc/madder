@@ -28,7 +28,8 @@ const remotePigpenDescription = "With -pigpen the store's key is minted by " +
 	"file); it needs a fresh remote. The remote then holds only the " +
 	"public key (blob_store-config) and the sealed key (blob_store-key), " +
 	"never a secret: blobs are written without the key agent, and " +
-	"reading asks the agent once per madder process."
+	"reading asks the agent once per madder process. " +
+	pigpenKindDescription
 
 func init() {
 	utility.AddCmd(
@@ -55,7 +56,7 @@ func init() {
 					"written without the key agent, and reading asks the " +
 					"agent once per madder process to open the sealed key. " +
 					"The sealed key is kept in a blob_store-key file next to " +
-					"blob_store-config.",
+					"blob_store-config. " + pigpenKindDescription,
 			},
 		},
 	)
@@ -255,6 +256,10 @@ type Init struct {
 	// sealed to (FDR 0011).
 	pigpen string
 
+	// pigpenKind is the value of -pigpen-kind: how -pigpen is to be read
+	// (store_key.SourceKind*).
+	pigpenKind string
+
 	command_components.EnvBlobStore
 	command_components.Init
 }
@@ -307,6 +312,8 @@ func (cmd *Init) SetFlagDefinitions(
 				"without the key agent and read through it. Cannot be "+
 				"combined with -encryption",
 		)
+
+		setPigpenKindFlagDefinition(flagDefinitions, &cmd.pigpenKind)
 	}
 
 	if _, isSftp := cmd.blobStoreConfig.(blob_store_configs.ConfigSFTPRemotePath); isSftp {
@@ -420,6 +427,7 @@ func (cmd *Init) Run(req futility.Request) {
 
 		if sealedKeyConfig, sealedKeySidecar, err = command_components.MakeSealedKeyConfig(
 			properties,
+			cmd.pigpenKind,
 			cmd.pigpen,
 		); err != nil {
 			errors.ContextCancelWithBadRequestError(req, err)

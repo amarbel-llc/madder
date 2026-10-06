@@ -82,23 +82,71 @@ The sealed key lives in a mutable sidecar next to the config,
 config must not (ADR 0005 immutability, FDR 0008 digest pins):
 
     ---
-    ! toml-blob_store_key-v1
+    ! toml-blob_store_key-v2
     ---
 
     [recipients]
-    source = "<absolute path of the pigpen given to init>"
-    digest = "blake2b256-…"
+    source_kind = "papi"
+    source = "example.com"
+    pigpen = """
+    ---
+    - kind="papi-http"
+    - locator="example.com"
+    ! pigpen-pointer-v1
+    ---
+    """
 
     [sealed]
     document = """
-    <sealed pigpen-v1 document>
+    <base64 of the sealed pigpen-v1 document, wrapped>
     """
 
-`recipients.source` is always a path. A remotely hosted pigpen is
-reached through a pointer document at that path, which piggy resolves.
-`recipients.digest` is the digest of piggy's canonical recipient-set
-bytes at seal time. For a remote store both files live at the remote
-root; neither holds a secret.
+`source_kind` says where the store's recipients come from, and `pigpen`
+is a pigpen document embedded as a TOML multi-line string:
+
+| `source_kind` | `source` | `pigpen` |
+|---|---|---|
+| `path` (default) | absolute path of a local piggy-ids file, any form | a snapshot of the recipients at seal time, for the reader only |
+| `papi` | a PAPI identity domain | the pointer to that domain's published pigpen |
+| `embedded` | absent | the pigpen itself, recipient set or pointer; edited in place |
+
+With `path` the local path is visible to anyone who can read the remote.
+`papi` and `embedded` record nothing specific to one machine.
+
+There is no recorded digest. The sealed document lists the recipients it
+is sealed to in the clear, so drift is the difference between that list
+and what the source says now.
+
+The sealed document ends in raw ciphertext, which a TOML string cannot
+hold, so it is stored as base64. madder reads a sidecar back before
+writing it and refuses bytes that do not decode to exactly what it meant
+to write.
+
+`toml-blob_store_key-v1` (a path, a digest, and the sealed document
+written straight into a TOML string) is still read, as a `path` source.
+`key-reseal` rewrites it as v2.
+
+For a remote store both files live at the remote root; neither holds a
+secret.
+
+### Pointers, the resolver, and the cache
+
+A pigpen behind a pointer is fetched by an external
+`pigpen-resolver-<kind>` binary on `PATH` (piggy RFC 0010); for `papi`
+that is `pigpen-resolver-papi-http`, shipped with papi. It makes network
+requests, fails when offline, and keeps nothing between runs.
+
+madder therefore caches the last answer per machine, under
+`$XDG_CACHE_HOME/madder/pigpen/`, keyed on the pointer's bytes:
+
+| | cache warm | cache cold |
+|---|---|---|
+| blob read or write | compare against the cache; no network | resolve once and keep the answer; if that fails, warn and proceed |
+| `init`, `key-status`, `key-reseal` | resolve afresh and refresh the cache | same |
+
+So a changed published pigpen is noticed on this machine after
+`key-status` is run, not on every command. A failed resolve is never
+papered over with a stale answer where a live one was asked for.
 
 `init` writes the sidecar before the config, and refuses outright if the
 store already exists, so an existing store's sidecar is never replaced
@@ -106,27 +154,39 @@ by a second `init`.
 
 ### Commands
 
-- `madder init[-sftp-*|-webdav|-s3] -pigpen <source> <store>` mints a
-  store key, resolves `<source>` to a recipient set, seals the key to
-  it, and writes the config and sidecar. `<source>` is a path to a
+- `madder init[-sftp-explicit|-sftp-ssh_config|-webdav] -pigpen <source>
+  [-pigpen-kind path|papi|embedded] <store>` mints a store key, resolves
+  `<source>` to a recipient set, seals the key to it, and writes the
+  config and sidecar. For `path` and `embedded`, `<source>` is a
   `piggy-ids` file in any of its three forms (RFC 0003 lines, pigpen
-  recipient set, pigpen pointer). `-pigpen` and `-encryption` are
-  mutually exclusive.
+  recipient set, pigpen pointer); for `papi` it is an identity domain.
+  `-pigpen` and `-encryption` are mutually exclusive.
 - `madder key-status <store>` re-resolves the recorded source and
   reports the sealed recipient set, the current one, and whether they
   differ. Needs no agent.
 - `madder key-reseal <store>` opens the sealed document through the
   agent, re-resolves the source, seals the same store key to the current
   recipient set, and replaces the sidecar atomically. No blob is
-  touched. `-pigpen <source>` seals to a different pigpen and records it
-  as the store's source from then on, for a pigpen that has moved.
+  touched. `-pigpen <source> [-pigpen-kind …]` seals to a different
+  pigpen and records it as the store's source from then on, for a pigpen
+  that has moved or to change its kind. If the recipient set would
+  change, `key-reseal` lists what would be added and removed and writes
+  nothing unless `-confirm` is given.
+
+`-confirm` exists because whoever the pigpen names gets the store key,
+and a pigpen is only as trustworthy as where it was read from. papi's
+resolver checks a published pigpen's signature against a key list
+fetched from the same origin in the same run, with no pinned key, so a
+compromised origin or TLS path can serve a forged one. The confirm step
+puts the change in front of the operator before it takes effect. It also
+catches a pigpen that has dropped the operator's own key.
 
 ### Drift
 
 The first time a madder process reads a blob from the store or writes
-one to it, madder re-resolves the recorded source and compares its
-canonical recipient-set digest with `recipients.digest`. Commands that
-only list or describe stores do not check. On a mismatch it prints a warning
+one to it, madder reads the recorded source (from the cache, for a
+pointer) and compares its recipients with the ones the sealed document
+lists. Commands that only list or describe stores do not check. On a mismatch it prints a warning
 naming the store and pointing at `key-status` and `key-reseal`, then
 proceeds. It never re-seals on its own. If the source cannot be resolved
 (missing file, resolver failure, timeout) madder warns and proceeds with
@@ -163,6 +223,9 @@ A YubiKey is enrolled in the pigpen later:
     added:       pivy_ecdh_p256_pub-…
     status:      changed; run `madder key-reseal .superior`
     $ madder key-reseal .superior
+    added:       pivy_ecdh_p256_pub-…
+    madder: the recipient set would change; re-run with -confirm …
+    $ madder key-reseal -confirm .superior
     re-sealed .superior to 3 recipients (blake2b256-bbbb…)
 
 ## Limitations
@@ -191,8 +254,14 @@ A YubiKey is enrolled in the pigpen later:
   is a new store plus a sync.
 - **Re-sealing does not check you can still open the result.** Sealing
   to a pigpen that names none of your keys locks you out of the new
-  sidecar; `key-status` shows what a reseal would change before you run
-  it.
+  sidecar. `key-reseal` lists the change and needs `-confirm`, but does
+  not know which keys are yours.
+- **A published pigpen is not pinned.** madder trusts whatever the
+  resolver returns; see `-confirm` above. Pinning the signing key belongs
+  in papi's resolver (papi RFC-0001 section 14.2, not built).
+- **Drift in a published pigpen is seen late.** Ordinary commands compare
+  against the per-machine cache, which only `key-status` and
+  `key-reseal` refresh.
 - **Replacing a remote sidecar is not always atomic.** SFTP uses
   posix-rename where the server has it and otherwise refuses to replace
   an existing sidecar; WebDAV replaces it with a single PUT.
@@ -203,6 +272,8 @@ A YubiKey is enrolled in the pigpen later:
 |---|---|---|---|
 | Drift response | warn and proceed | a changed pigpen must not make a backup unreadable or block a push | a recipient removal goes unnoticed long enough to matter; then refuse writes, or add a strict flag |
 | Drift check frequency | first blob read or write per process | recipient changes should be seen on the next use | resolver latency or failures become a visible cost on ordinary commands; then cache or check only on `key-status` |
+| Pointer cache refresh | only on `init`, `key-status`, `key-reseal` | ordinary commands must not need the network | a changed published pigpen goes unnoticed too long; then add a time limit (piggy's Rust CLI uses one hour) |
+| Reseal confirmation | `-confirm` required when the set changes | the resolved pigpen is unauthenticated beyond its origin | papi pins the signing key; then confirmation could be limited to unpinned sources |
 | Resolver timeout | 30 seconds | pointer resolution may make a network call | timeouts on a healthy network, or hangs that stall commands |
 | Sidecar vs in-config | sidecar file | keeps the config immutable and digest-pinnable | the two files drifting apart on remotes proves worse than a mutable config |
 | Key holder | `process` only | accepted as sufficient for now | a key-holding agent or fibby-backed holder exists in piggy |

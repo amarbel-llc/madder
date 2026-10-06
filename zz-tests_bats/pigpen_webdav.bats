@@ -72,7 +72,7 @@ function init_webdav_pigpen_puts_no_secret_on_the_remote { # @test
   assert_output --partial 'holder = "process"'
 
   run cat "$sidecar"
-  assert_output --partial '! toml-blob_store_key-v1'
+  assert_output --partial '! toml-blob_store_key-v2'
   assert_output --partial 'pigpen-v1'
 
   run grep -r 'age_x25519_sec' "$REMOTE_ROOT"

@@ -237,18 +237,43 @@ Reading
     With no agent reachable, blobs are reported as unreadable, not
     missing or corrupt.
 
-The first blob read or write in a process also re-reads *pigpen* and
+**-pigpen-kind** says how *pigpen* is read and what **blob_store-key**
+records about it:
+
+**path** (the default)
+:   a local piggy-ids file. Its absolute path is recorded, and is
+    visible to anyone who can read a remote store.
+
+**papi**
+:   a PAPI identity domain. The domain's published pigpen is fetched by
+    **pigpen-resolver-papi-http**, which must be on **PATH**. Nothing
+    specific to one machine is recorded.
+
+**embedded**
+:   a file whose contents are copied into **blob_store-key** and become
+    the store's pigpen, edited there from then on.
+
+The first blob read or write in a process also checks the pigpen and
 warns on stderr if its recipients are no longer the ones the key is
-sealed to. It only warns; nothing is blocked or changed.
+sealed to. It only warns; nothing is blocked or changed. A fetched
+pigpen is cached per machine under **$XDG_CACHE_HOME/madder/pigpen/**:
+this check compares against the cache and makes no network request once
+it is warm, so a changed published pigpen is noticed after **madder
+key-status** has been run.
 
 **madder key-status** *store*
 :   reports the sealed recipient set, the pigpen's current one, and what
-    was added or removed. Needs no agent.
+    was added or removed. Fetches a published pigpen afresh and refreshes
+    the cache. Needs no agent.
 
 **madder key-reseal** *store*
 :   opens the sealed key through the agent and seals the same store key
     to the pigpen's current recipients, replacing **blob_store-key**. No
-    blob is rewritten. **-pigpen** records a pigpen that has moved.
+    blob is rewritten. If the recipient set would change it lists the
+    change and writes nothing unless **-confirm** is given: whoever the
+    pigpen names gets the store key, and a published pigpen is trusted
+    only as far as the host it was fetched from. **-pigpen** and
+    **-pigpen-kind** record a pigpen that has moved or changed kind.
 
 Removing a recipient and re-sealing is **not revocation**: anyone who
 kept the old **blob_store-key**, or the store key, can still read every

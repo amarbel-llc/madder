@@ -11,6 +11,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/charlie/store_key"
 	"code.linenisgreat.com/madder/go/internal/delta/blob_store_configs"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/pigpen"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
@@ -48,10 +49,10 @@ func makeSealedKeyEncryption(
 
 	encryption.Id = config.GetStorePublicKey()
 
-	loadSidecar := sync.OnceValues(func() (blob_store_configs.TomlStoreKeyV1, error) {
+	loadSidecar := sync.OnceValues(func() (blob_store_configs.StoreKey, error) {
 		raw, err := load()
 		if err != nil {
-			return blob_store_configs.TomlStoreKeyV1{}, err
+			return blob_store_configs.StoreKey{}, err
 		}
 
 		return blob_store_configs.DecodeStoreKey(raw)
@@ -110,7 +111,7 @@ func (wrapper *driftWarningIOWrapper) WrapWriter(w io.Writer) (io.WriteCloser, e
 // never re-seals on its own (FDR 0011 "Drift").
 func warnOnRecipientDrift(
 	storeId string,
-	loadSidecar func() (blob_store_configs.TomlStoreKeyV1, error),
+	loadSidecar func() (blob_store_configs.StoreKey, error),
 ) {
 	printer := ui.MakePrefixPrinter(ui.Err(), "# (blob_store: "+storeId+") ")
 
@@ -122,7 +123,16 @@ func warnOnRecipientDrift(
 		return
 	}
 
-	current, err := store_key.LoadRecipients(sidecar.Recipients.Source)
+	sealed, err := store_key.SealedRecipients([]byte(sidecar.Sealed.Document))
+	if err != nil {
+		printer.Printf("warning: cannot read the store key sidecar: %s", err)
+		return
+	}
+
+	// Not live: a pigpen behind a pointer is compared from this machine's
+	// cache, so ordinary commands make no network request once it is warm.
+	// `key-status` refreshes it.
+	current, err := blob_store_configs.StoreKeySource(sidecar).Recipients(false)
 	if err != nil {
 		printer.Printf(
 			"warning: cannot re-read the pigpen the store key was sealed "+
@@ -133,12 +143,7 @@ func warnOnRecipientDrift(
 		return
 	}
 
-	currentDigest, err := store_key.RecipientSetDigest(current)
-	if err != nil {
-		return
-	}
-
-	if currentDigest.String() == sidecar.Recipients.Digest.String() {
+	if pigpen.SameRecipientSet(current, sealed) {
 		return
 	}
 

@@ -81,7 +81,7 @@ function init_sftp_pigpen_puts_no_secret_on_the_remote { # @test
   assert_output --partial 'holder = "process"'
 
   run cat "$sidecar"
-  assert_output --partial '! toml-blob_store_key-v1'
+  assert_output --partial '! toml-blob_store_key-v2'
   assert_output --partial 'pigpen-v1'
 
   # madder#296: nothing under the remote root is a secret key.
