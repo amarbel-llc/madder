@@ -30,12 +30,114 @@ import (
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/ui"
 )
 
-// sftpWriterBufferSize aligns the streaming-writer's bufio buffer with
-// pkg/sftp's default MaxPacket (32 KB). With UseConcurrentWrites enabled
-// the SFTP client pipelines packet-sized writes; sizing the upstream
-// bufio to match avoids fragmenting age's 64 KB chunks into the 4 KB
-// Go default.
-const sftpWriterBufferSize = 1 << 15 // 32 KiB
+// sftpPacketSize is pkg/sftp's default MaxPacket.
+const sftpPacketSize = 1 << 15 // 32 KiB
+
+// sftpPipelineWindow is how much a blob writer or reader hands pkg/sftp
+// in one call. pkg/sftp only overlaps round trips for a Write or Read
+// LARGER than one packet: it splits the buffer into packets and keeps up
+// to maxConcurrentRequests (64) in flight. A buffer of one packet or less
+// is a single request and a wait, so 32 KiB pieces move a blob at one
+// packet per round trip whatever the link can carry (measured: 0.37 MB/s
+// over a 100 ms link). One full window is 64 packets per round trip.
+const sftpPipelineWindow = 64 * sftpPacketSize // 2 MiB
+
+var sftpWriteBufferPool = sync.Pool{
+	New: func() any {
+		return bufio.NewWriterSize(nil, sftpPipelineWindow)
+	},
+}
+
+var sftpReadBufferPool = sync.Pool{
+	New: func() any {
+		buf := make([]byte, sftpPipelineWindow)
+		return &buf
+	},
+}
+
+// sftpReadFile is the part of *sftp.File the read-ahead needs.
+type sftpReadFile interface {
+	io.Reader
+	io.ReaderAt
+	io.Seeker
+}
+
+// sftpReadAhead sits between a remote file and the decrypt/decompress
+// layers, which read in small pieces. It asks the file for one packet
+// first, so a small blob costs a single request, and for a whole pipeline
+// window at a time once the file has shown it is bigger than that.
+type sftpReadAhead struct {
+	file sftpReadFile
+
+	buf      *[]byte
+	r, w     int
+	nextFill int
+	err      error
+
+	// largestFill is the biggest single request made, for tests.
+	largestFill int
+}
+
+func newSftpReadAhead(file sftpReadFile) *sftpReadAhead {
+	return &sftpReadAhead{
+		file:     file,
+		buf:      sftpReadBufferPool.Get().(*[]byte),
+		nextFill: sftpPacketSize,
+	}
+}
+
+func (ahead *sftpReadAhead) Read(p []byte) (n int, err error) {
+	if ahead.buf == nil {
+		return 0, os.ErrClosed
+	}
+
+	if ahead.r == ahead.w {
+		if ahead.err != nil {
+			return 0, ahead.err
+		}
+
+		ahead.largestFill = max(ahead.largestFill, ahead.nextFill)
+
+		filled, err := ahead.file.Read((*ahead.buf)[:ahead.nextFill])
+		ahead.r, ahead.w, ahead.err = 0, filled, err
+
+		if filled == ahead.nextFill {
+			ahead.nextFill = len(*ahead.buf)
+		}
+
+		if filled == 0 {
+			return 0, err
+		}
+	}
+
+	n = copy(p, (*ahead.buf)[ahead.r:ahead.w])
+	ahead.r += n
+
+	return n, nil
+}
+
+// ReadAt reads from the file directly; it does not move the stream.
+func (ahead *sftpReadAhead) ReadAt(p []byte, off int64) (int, error) {
+	return ahead.file.ReadAt(p, off)
+}
+
+func (ahead *sftpReadAhead) Seek(offset int64, whence int) (int64, error) {
+	if whence == io.SeekCurrent {
+		// The file is ahead of the stream by what is buffered and unread.
+		offset -= int64(ahead.w - ahead.r)
+	}
+
+	ahead.r, ahead.w, ahead.err = 0, 0, nil
+
+	return ahead.file.Seek(offset, whence)
+}
+
+func (ahead *sftpReadAhead) release() {
+	if ahead.buf != nil {
+		sftpReadBufferPool.Put(ahead.buf)
+		ahead.buf = nil
+	}
+}
 
 // sftpKeepaliveInterval is the cadence at which initialize() sends
 // keepalive@openssh.com requests on the underlying ssh.Client so long
@@ -1114,7 +1216,8 @@ func newSftpWriter(
 ) (writer *sftpWriter, err error) {
 	writer = &sftpWriter{}
 
-	writer.wBuf = bufio.NewWriterSize(ioWriter, sftpWriterBufferSize)
+	writer.wBuf = sftpWriteBufferPool.Get().(*bufio.Writer)
+	writer.wBuf.Reset(ioWriter)
 
 	if writer.wAge, err = config.GetBlobEncryption().WrapWriter(writer.wBuf); err != nil {
 		err = errors.Wrap(err)
@@ -1162,7 +1265,17 @@ func (writer *sftpWriter) Close() (err error) {
 	}
 
 	if writer.wBuf != nil {
-		if err = writer.wBuf.Flush(); err != nil {
+		wBuf := writer.wBuf
+		writer.wBuf = nil
+
+		err = wBuf.Flush()
+
+		// Reset drops the reference to the remote file and clears any
+		// sticky write error before the buffer is reused.
+		wBuf.Reset(nil)
+		sftpWriteBufferPool.Put(wBuf)
+
+		if err != nil {
 			err = errors.Wrap(err)
 			return err
 		}
@@ -1205,6 +1318,7 @@ func (reader *sftpStreamingReader) createReader(
 // sftpReader implements streaming decompression/decryption for SFTP
 type sftpReader struct {
 	file      *sftp.File
+	source    *sftpReadAhead
 	config    blob_io.Config
 	hash      domain_interfaces.Hash
 	decrypter io.Reader
@@ -1213,14 +1327,18 @@ type sftpReader struct {
 }
 
 func (reader *sftpReader) initialize(hash domain_interfaces.Hash) (err error) {
+	reader.source = newSftpReadAhead(reader.file)
+
 	// Set up decryption
-	if reader.decrypter, err = reader.config.GetBlobEncryption().WrapReader(reader.file); err != nil {
+	if reader.decrypter, err = reader.config.GetBlobEncryption().WrapReader(reader.source); err != nil {
+		reader.source.release()
 		err = errors.Wrap(err)
 		return err
 	}
 
 	// Set up decompression
 	if reader.expander, err = reader.config.GetBlobCompression().WrapReader(reader.decrypter); err != nil {
+		reader.source.release()
 		err = errors.Wrap(err)
 		return err
 	}
@@ -1265,6 +1383,8 @@ func (reader *sftpReader) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (reader *sftpReader) Close() error {
+	defer reader.source.release()
+
 	return errors.Join(
 		reader.expander.Close(),
 		reader.file.Close(),
