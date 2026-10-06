@@ -9,6 +9,7 @@ import (
 	"code.linenisgreat.com/madder/go/internal/futility"
 	"code.linenisgreat.com/madder/go/internal/golf/command_components"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
+	"code.linenisgreat.com/piggy/go/pkgs/pigpen"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/interfaces"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/values"
@@ -204,7 +205,7 @@ func (cmd KeyStatus) Run(req futility.Request) {
 		fmt.Fprintf(out, "removed:     %s\n", id)
 	}
 
-	if len(added) == 0 && len(removed) == 0 {
+	if pigpen.SameRecipientSet(current, store.sealed) {
 		fmt.Fprintf(out, "status:      in sync\n")
 	} else {
 		fmt.Fprintf(
@@ -346,7 +347,9 @@ func (cmd KeyReseal) Run(req futility.Request) {
 	added := recipientsMissingFrom(recipients, store.sealed)
 	removed := recipientsMissingFrom(store.sealed, recipients)
 
-	if (len(added) > 0 || len(removed) > 0) && !cmd.confirm {
+	// Same test as the drift warning: piggy's set equality, not the ids'
+	// spelling.
+	if !pigpen.SameRecipientSet(recipients, store.sealed) && !cmd.confirm {
 		out := env.GetUIFile()
 
 		for _, id := range added {
