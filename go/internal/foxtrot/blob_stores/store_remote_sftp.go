@@ -830,7 +830,20 @@ func (blobStore *remoteSftp) readAliasTarget(
 var (
 	_ domain_interfaces.BlobForeignDigestAdder    = (*remoteSftp)(nil)
 	_ domain_interfaces.BlobForeignDigestResolver = (*remoteSftp)(nil)
+	_ ForeignDigestAliasSupporter                 = (*remoteSftp)(nil)
 )
+
+// SupportsForeignDigestAliases is false for a single-hash remote, which
+// has no second hash-type tree to put an alias in. Such a store behaves
+// as it did before sftp stores could record aliases at all: a cross-hash
+// sync into it asks first, then rehashes without aliasing.
+func (blobStore *remoteSftp) SupportsForeignDigestAliases() bool {
+	if err := blobStore.tryInitialize(); err != nil {
+		return false
+	}
+
+	return blobStore.multiHash
+}
 
 // AddForeignBlobDigestForNativeDigest records foreign as an alias of the
 // blob stored under native: a relative symlink at foreign's path pointing

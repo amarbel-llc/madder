@@ -37,9 +37,15 @@ type (
 // ErrMultiRefNotReady signals that a referenced store exists in the
 // map but has not been built yet. The store-map construction loop
 // treats it as "defer to the next iteration", not a hard failure.
+type ErrMultiRefNotReady = internal.ErrMultiRefNotReady
+
+// ForeignDigestAliasSupporter is implemented by a store whose ability to
+// record foreign-digest aliases depends on how it is configured, so that
+// satisfying BlobForeignDigestAdder is not by itself the answer. A store
+// that does not implement it supports aliases exactly when it is an adder.
 type (
-	ErrMultiRefNotReady = internal.ErrMultiRefNotReady
-	Multi               = internal.Multi
+	ForeignDigestAliasSupporter = internal.ForeignDigestAliasSupporter
+	Multi                       = internal.Multi
 )
 
 // MultiBuilder constructs a Multi blob store with one of two modes:
@@ -154,6 +160,10 @@ var (
 	NewMulti                = internal.NewMulti
 	NopDeletionPrecondition = internal.NopDeletionPrecondition
 )
+
+// SupportsForeignDigestAliases reports whether store can record a
+// foreign-digest alias.
+var SupportsForeignDigestAliases = internal.SupportsForeignDigestAliases
 
 // ValidateS3Auth enforces credential-state invariants the AWS SDK
 // would otherwise discover only on the first API call. Today's only

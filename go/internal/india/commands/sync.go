@@ -264,7 +264,7 @@ func (cmd Sync) runStore(
 			continue
 		}
 
-		_, isAdder := dst.GetBlobStore().(domain_interfaces.BlobForeignDigestAdder)
+		isAdder := blob_stores.SupportsForeignDigestAliases(dst.GetBlobStore())
 
 		if !isAdder && !cmd.AllowRehashing {
 			if !envBlobStore.Confirm(

@@ -9,6 +9,28 @@ import (
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
 
+// ForeignDigestAliasSupporter is implemented by a store whose ability to
+// record foreign-digest aliases depends on how it is configured, so that
+// satisfying BlobForeignDigestAdder is not by itself the answer. A store
+// that does not implement it supports aliases exactly when it is an adder.
+type ForeignDigestAliasSupporter interface {
+	SupportsForeignDigestAliases() bool
+}
+
+// SupportsForeignDigestAliases reports whether store can record a
+// foreign-digest alias.
+func SupportsForeignDigestAliases(store domain_interfaces.BlobStore) bool {
+	if _, ok := store.(domain_interfaces.BlobForeignDigestAdder); !ok {
+		return false
+	}
+
+	if supporter, ok := store.(ForeignDigestAliasSupporter); ok {
+		return supporter.SupportsForeignDigestAliases()
+	}
+
+	return true
+}
+
 func CopyBlobIfNecessary(
 	ctx errors.Context,
 	dst domain_interfaces.BlobStore,
@@ -16,6 +38,24 @@ func CopyBlobIfNecessary(
 	expectedDigest domain_interfaces.MarklId,
 	extraWriter io.Writer,
 	hashType domain_interfaces.FormatHash,
+) (copyResult CopyResult) {
+	return copyBlobIfNecessary(
+		ctx, dst, src, expectedDigest, extraWriter, hashType, true,
+	)
+}
+
+// copyBlobIfNecessary is CopyBlobIfNecessary with the alias handling
+// switchable: copying the blob an alias points at must not itself go
+// looking for aliases, or a link that points at itself, or two that point
+// at each other, would recurse without end.
+func copyBlobIfNecessary(
+	ctx errors.Context,
+	dst domain_interfaces.BlobStore,
+	src domain_interfaces.BlobStore,
+	expectedDigest domain_interfaces.MarklId,
+	extraWriter io.Writer,
+	hashType domain_interfaces.FormatHash,
+	carryAliases bool,
 ) (copyResult CopyResult) {
 	copyResult.BlobId = expectedDigest
 
@@ -61,7 +101,7 @@ func CopyBlobIfNecessary(
 	// With no rehash requested, an id the source holds only as an alias of
 	// another blob is carried across as an alias, not as a second copy of
 	// the bytes under another name.
-	if hashType == nil {
+	if hashType == nil && carryAliases {
 		if aliasResult, handled := copyForeignDigestAlias(
 			ctx,
 			dst,
@@ -152,7 +192,8 @@ func CopyBlobIfNecessary(
 		writerDigest.GetMarklFormat().GetMarklFormatId()
 
 	if crossHash {
-		if adder, ok := dst.(domain_interfaces.BlobForeignDigestAdder); ok {
+		if adder, ok := dst.(domain_interfaces.BlobForeignDigestAdder); ok &&
+			SupportsForeignDigestAliases(dst) {
 			if err := adder.AddForeignBlobDigestForNativeDigest(
 				expectedDigest,
 				writerDigest,
@@ -204,10 +245,11 @@ func copyForeignDigestAlias(
 		return copyResult, false
 	}
 
-	adder, ok := dst.(domain_interfaces.BlobForeignDigestAdder)
-	if !ok {
+	if !SupportsForeignDigestAliases(dst) {
 		return copyResult, false
 	}
+
+	adder := dst.(domain_interfaces.BlobForeignDigestAdder)
 
 	copyResult.BlobId = foreign
 
@@ -224,7 +266,9 @@ func copyForeignDigestAlias(
 	var bytesWritten int64
 
 	if !dst.HasBlob(native) {
-		nativeResult := CopyBlobIfNecessary(ctx, dst, src, native, extraWriter, nil)
+		nativeResult := copyBlobIfNecessary(
+			ctx, dst, src, native, extraWriter, nil, false,
+		)
 
 		if nativeResult.state != CopyResultStateSuccess && !nativeResult.Exists() {
 			nativeResult.BlobId = foreign
