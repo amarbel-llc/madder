@@ -591,17 +591,6 @@ update-piggy rev:
   cd go && go get code.linenisgreat.com/piggy/go@{{rev}} && go mod tidy
   just build-gomod2nix
 
-# Bump tommy in go.mod to a commit, matching the flake input's locked rev.
-# The devshell tommy CLI (flake input) stamps *_tommy.go with APIs from its
-# own commit; go.mod must resolve the same commit or `go build` fails with
-# e.g. "undefined: document.ParseStrict". Usage: just update-tommy <sha>
-#
-# update tommy to a commit in go.mod, matching flake.lock
-[group("maintenance")]
-update-tommy rev:
-  cd go && go get code.linenisgreat.com/tommy@{{rev}} && go mod tidy
-  just build-gomod2nix
-
 # Tag a Go module release. The "go/v" prefix is added for you, so pass
 # the semver without it. Usage: just tag 0.0.1 "feat: public blob store API"
 #
