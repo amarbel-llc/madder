@@ -195,7 +195,7 @@ run-go-cover:
   cp "$out_path/coverage.out" "$out"
   chmod u+w "$out"
   echo "==> Coverage written to $out"
-  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", (t > 0 ? 100*c/t : 0)}' "$out"
 
 # Run bats integration tests via the nix-sandbox lane (.#bats-default,
 # the `!net_cap` filter). Excludes net_cap-tagged tests — those run under
@@ -325,7 +325,7 @@ run-bats-cover:
   chmod u+w "$out"
 
   echo "==> Coverage written to $out (fragments at $bats_dir)"
-  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", (t > 0 ? 100*c/t : 0)}' "$out"
 
 # Merge unit-test and bats coverage into a combined textfmt profile at
 # .tmp/cover-data/merged.out. Depends on run-go-cover and run-bats-cover
@@ -350,7 +350,7 @@ run-cover-merged: run-go-cover run-bats-cover
     }' "{{justfile_directory()}}/.tmp/go-cover.out" "$cover_data/bats-coverage.out" \
     | { read -r header; echo "$header"; sort; } > "$out"
   echo "==> Merged coverage written to $out"
-  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", (t > 0 ? 100*c/t : 0)}' "$out"
 
 # Per-package coverage rollup with delta columns. Shows unit %, bats %,
 # merged %, and bats-delta (how much bats adds beyond unit). Sorted
