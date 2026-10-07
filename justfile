@@ -76,25 +76,6 @@ codemod-tommy:
 #   \____|_|\___|\__,_|_| |_|
 #
 
-# Wipe Go's build cache. Useful when bisecting a stale-build mystery
-# or recovering from a corrupted cache entry.
-#
-# wipe Go's build cache
-[group("maintenance")]
-clean-go-cache:
-  cd go && go clean -cache
-
-# Wipe Go's module cache (~/go/pkg/mod). Forces re-download of every
-# module on the next build. Heavier than clean-go-cache.
-#
-# wipe Go's module cache
-[group("maintenance")]
-clean-go-modcache:
-  cd go && go clean -modcache
-
-[group("maintenance")]
-clean-go: clean-go-cache clean-go-modcache
-
 # Remove the nix-build symlink. Forces the next `nix build` to
 # refresh the symlink even if its store path is reachable from cache.
 #
@@ -104,7 +85,7 @@ clean-nix-result:
   rm -f {{justfile_directory()}}/result
 
 [group("maintenance")]
-clean: clean-go clean-nix-result
+clean: clean-nix-result
 
 #   _____         _
 #  |_   _|__  ___| |_
@@ -198,27 +179,23 @@ test-go-godyn:
   fi
   nix build .#madder-godyn-tests --no-link --print-build-logs
 
-# Run Go unit tests with coverage collection. Writes covdata fragments
-# to .tmp/cover-data/unit/ (mergeable with the bats lane via run-cover-merged)
-# and a textfmt profile to .tmp/go-cover.out (the legacy interface).
-# View the full HTML report with
-# `cd go && go tool cover -html=../.tmp/go-cover.out`.
+# Run Go unit tests with coverage collection via the nix lane
+# (`.#madder-cover`: `go test -coverprofile` inside the buildGoApplication
+# sandbox). Copies the textfmt profile to .tmp/go-cover.out and prints the
+# total statement coverage.
 #
 # run Go unit tests with coverage collection
 [group("post-build")]
-run-go-cover *flags:
+run-go-cover:
   #!/usr/bin/env bash
   set -euo pipefail
-  unit_dir="{{justfile_directory()}}/.tmp/cover-data/unit"
+  out_path="$(nix build .#madder-cover --no-link --print-out-paths --print-build-logs)"
   out="{{justfile_directory()}}/.tmp/go-cover.out"
-  rm -rf "$unit_dir"
-  mkdir -p "$unit_dir" "$(dirname "$out")"
-  cd go
-  go test -tags test -cover -covermode=atomic {{flags}} ./... \
-    -args -test.gocoverdir="$unit_dir" >/dev/null
-  go tool covdata textfmt -i="$unit_dir" -o="$out"
-  echo "==> Coverage written to $out (fragments at $unit_dir)"
-  go tool cover -func="$out" | tail -n 1
+  mkdir -p "$(dirname "$out")"
+  cp "$out_path/coverage.out" "$out"
+  chmod u+w "$out"
+  echo "==> Coverage written to $out"
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
 
 # Run bats integration tests via the nix-sandbox lane (.#bats-default,
 # the `!net_cap` filter). Excludes net_cap-tagged tests — those run under
@@ -348,13 +325,14 @@ run-bats-cover:
   chmod u+w "$out"
 
   echo "==> Coverage written to $out (fragments at $bats_dir)"
-  (cd go && go tool cover -func="$out" | tail -n 1)
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
 
-# Merge unit-test and bats coverage into a combined profile at
+# Merge unit-test and bats coverage into a combined textfmt profile at
 # .tmp/cover-data/merged.out. Depends on run-go-cover and run-bats-cover
-# having produced fragments under .tmp/cover-data/{unit,bats}/. Use this
-# to see the full coverage picture across both lanes — anything still
-# uncovered after both passes is a real gap.
+# having produced .tmp/go-cover.out and .tmp/cover-data/bats-coverage.out.
+# Blocks are keyed by position+statement count and their counts summed
+# (the profiles are both -covermode=atomic), so anything still uncovered
+# after both passes is a real gap. Pure awk: no go toolchain.
 #
 # merge unit-test and bats coverage into a combined profile
 [group("post-build")]
@@ -362,15 +340,17 @@ run-cover-merged: run-go-cover run-bats-cover
   #!/usr/bin/env bash
   set -euo pipefail
   cover_data="{{justfile_directory()}}/.tmp/cover-data"
-  merged_dir="$cover_data/merged"
   out="$cover_data/merged.out"
-  rm -rf "$merged_dir"
-  mkdir -p "$merged_dir"
-  cd go
-  go tool covdata merge -i="$cover_data/unit,$cover_data/bats" -o="$merged_dir"
-  go tool covdata textfmt -i="$merged_dir" -o="$out"
+  awk '
+    /^mode:/ { mode = $0; next }
+    { key = $1 " " $(NF-1); count[key] += $NF }
+    END {
+      print mode
+      for (k in count) print k " " count[k]
+    }' "{{justfile_directory()}}/.tmp/go-cover.out" "$cover_data/bats-coverage.out" \
+    | { read -r header; echo "$header"; sort; } > "$out"
   echo "==> Merged coverage written to $out"
-  go tool cover -func="$out" | tail -n 1
+  awk '/^mode:/ {next} {t+=$(NF-1); if ($NF+0>0) c+=$(NF-1)} END {printf "total: %.1f%%\n", t>0 ? 100*c/t : 0}' "$out"
 
 # Per-package coverage rollup with delta columns. Shows unit %, bats %,
 # merged %, and bats-delta (how much bats adds beyond unit). Sorted
@@ -671,49 +651,16 @@ debug-version:
   echo "madder:       $({{justfile_directory()}}/result/bin/madder version)"
   echo "madder-cache: $({{justfile_directory()}}/result/bin/madder-cache version)"
 
-# Print a command's `--help` straight from source via `go run`, without a nix
-# build or an installed binary. The generated man pages are checkable with
+# Print a command's `--help` from the nix-built madder (`.#madder`), without
+# an installed binary. The generated man pages are checkable with
 # debug-gen_man; this is the equivalent for the interactive help, which is a
 # separate renderer (futility's printCommandUsage) and can drift from it.
 # Usage: just debug-cmd-help sync
 #
-# print a command's --help from source
+# print a command's --help from the nix-built binary
 [group("debug")]
 debug-cmd-help command:
-  cd {{justfile_directory()}}/go && go run ./cmd/madder {{command}} --help
-
-# display the ANSI 256-color palette with lipgloss styling to pick colors for UI
-[group("debug")]
-debug-color-demo:
-  cd {{justfile_directory()}}/go && go run {{justfile_directory()}}/.tmp/color-demo.go
-
-# Copy a subpackage from the cached dewey module into go/internal/<dest>/
-# so we can iterate on it in-tree without a purse-first release cycle.
-# Resolves the pinned dewey version from go.mod, locates it in GOMODCACHE,
-# copies recursively, and chmods writable. Destination must not exist.
-# Usage: just debug-incubate-dewey-pkg golf/command futility
-#
-# copy a subpackage from the cached dewey module into go/internal/
-[group("debug")]
-debug-incubate-dewey-pkg subpath dest:
-  #!/usr/bin/env bash
-  set -euo pipefail
-  cd {{justfile_directory()}}
-  mod_cache=$(cd go && go env GOMODCACHE)
-  ver=$(cd go && go list -m -f '{{{{.Version}}}}' code.linenisgreat.com/purse-first/libs/dewey)
-  src="$mod_cache/code.linenisgreat.com/purse-first/libs/dewey@${ver}/{{subpath}}"
-  dst="go/internal/{{dest}}"
-  if [ ! -d "$src" ]; then
-    echo "source not found: $src" >&2
-    exit 1
-  fi
-  if [ -e "$dst" ]; then
-    echo "destination already exists: $dst (remove or choose another name)" >&2
-    exit 1
-  fi
-  cp -r "$src" "$dst"
-  chmod -R u+w "$dst"
-  echo "copied $src -> $dst"
+  "$(nix build .#madder --no-link --print-out-paths)/bin/madder" {{command}} --help
 
 # Rewrite an import path and its unqualified package identifier across
 # every .go file in the module. Skips files whose path matches any of the
@@ -767,14 +714,13 @@ debug-rename-go-package dir old new:
 
 # Usage: just debug-gen_man madder.1
 #
-# regenerate man pages into a tmp dir and print one by name
+# print a generated man page by name from the nix build
 [group("debug")]
 debug-gen_man page="madder.1":
   #!/usr/bin/env bash
   set -euo pipefail
-  out=$(mktemp -d)
-  cd go && go run ./cmd/madder-gen_man "$out"
-  cat "$out/share/man/man1/{{page}}"
+  out_path="$(nix build .#madder --no-link --print-out-paths)"
+  zcat -f "$out_path"/share/man/man1/{{page}}*
 
 # Sweep every built man page (sections 1 and 7 under result/share/man) with
 # lexgrog and report each NAME line as whatis would extract it. spinclass
@@ -836,7 +782,7 @@ debug-man-name-lines limit="72":
 debug-init-repro storeid="default":
   #!/usr/bin/env bash
   set -u
-  root={{justfile_directory()}}
+  madder="$(nix build {{justfile_directory()}}#madder --no-link --print-out-paths)/bin/madder"
   run_case() {
     local label="$1"; shift
     local storeid="$1"; shift
@@ -848,7 +794,7 @@ debug-init-repro storeid="default":
     echo "    MADDER_CEILING_DIRECTORIES=${MADDER_CEILING_DIRECTORIES:-<unset>}"
     echo "    CWD=$(pwd)"
     set +e
-    (cd "$root/go" && go run ./cmd/madder init "$@" "$storeid")
+    "$madder" init "$@" "$storeid"
     local rc=$?
     set -e
     echo "  exit=$rc"
@@ -898,7 +844,7 @@ debug-init-repro storeid="default":
 debug-init-encryption value storeid="enc":
   #!/usr/bin/env bash
   set -u
-  root={{justfile_directory()}}
+  madder="$(nix build {{justfile_directory()}}#madder --no-link --print-out-paths)/bin/madder"
   home=$(mktemp -d)
   workdir=$(mktemp -d)
   cd "$workdir"
@@ -907,7 +853,7 @@ debug-init-encryption value storeid="enc":
   export MADDER_CEILING_DIRECTORIES="$workdir"
   echo "=== init -encryption {{value}} {{storeid}} ==="
   set +e
-  (cd "$root/go" && go run ./cmd/madder init -encryption "{{value}}" "{{storeid}}")
+  "$madder" init -encryption "{{value}}" "{{storeid}}"
   rc=$?
   set -e
   echo "  exit=$rc"
