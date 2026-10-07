@@ -83,7 +83,6 @@ The build entrypoint is the justfile (see `eng(7)`):
 
 ```sh
 just build      # nix build → result/bin/{mad,madder,madder-cache,madder-mcp}
-just build-go   # plain `go build` of the module
 just test       # build + vet analyzers + go tests + bats lanes (also `just`)
 ```
 

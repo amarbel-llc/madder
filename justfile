@@ -9,20 +9,16 @@ default: lint build test
 #  |____/ \__,_|_|_|\__,_|
 #
 
-build: build-nix build-go build-gomod2nix
+build: build-nix build-gomod2nix
 
 # Build all binaries (mad, madder, madder-cache, madder-mcp) + man pages via
-# nix. The full release build; `build-go` is the faster compile-only check.
+# nix (godyn on godynSystems). No bare `go build` recipe: tommy no longer
+# ships a root go.mod, so go.mod-based resolution cannot build madder.
 #
 # build all binaries and man pages via nix
 [group("build")]
 build-nix:
   nix build --show-trace
-
-# compile-only Go build (no nix, no man pages) — the fast inner-loop check
-[group("build")]
-build-go:
-  cd go && go build ./...
 
 # Regenerate facades and show what dewey imports landed in the three
 # facades that import dewey directly (domain_interfaces, hyphence,
