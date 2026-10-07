@@ -116,13 +116,6 @@ clean: clean-go clean-nix-result
 [group("post-build")]
 test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-grammar-vectors test-store-import-smoke
 
-# Usage: just run-go-test ./internal/foo
-#
-# run Go unit tests only
-[group("post-build")]
-run-go-test *flags:
-  cd go && go test -tags test {{flags}} ./...
-
 # Run Go benchmarks. Usage: just run-bench ./internal/foxtrot/blob_stores
 # Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
 # in flags for real timing. -run=^$ suppresses test functions.
@@ -132,54 +125,35 @@ run-go-test *flags:
 run-bench pkg="./..." *flags="-benchtime=1x":
   cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
 
-# Run `go vet` across the module with the test build tag, which gates
-# several internal test-only symbols. Without -tags test, vet reports
-# false positives on test-tagged source files.
+# Run a dewey go/analysis analyzer (seqerror, repool, defererr) as godyn's
+# per-package vet lane over the `-tags test` build (`.#madder-vet-<name>`).
+# Strict: any finding in a local package fails. No bare `go`: it resolves no
+# go.mod, so tommy's missing root go.mod cannot break it. The lane exists only
+# where madder's backend is godyn (igloo godynSystems).
 #
-# run go vet across the module with the test build tag
-[group("post-build")]
-run-go-vet *flags:
-  cd go && go vet -tags test {{flags}} ./...
-
-# Build a dewey go/analysis analyzer (e.g. defererr, repool, seqerror, actx,
-# testui, paramobj) from the module cache into .tmp/analyzers/, then run it via
-# `go vet -vettool`. Strict: any analyzer finding fails the recipe.
-# The analyzer cmds are pinned via go.mod `tool` directives so
-# `go mod tidy` does not drop their transitive deps.
-#
-# build a dewey go/analysis analyzer and run it via go vet -vettool
+# run a dewey analyzer via godyn's per-package vet lane
 [group("post-build")]
 verify-go-analyzer name:
   #!/usr/bin/env bash
   set -euo pipefail
-  bin="{{justfile_directory()}}/.tmp/analyzers/{{name}}"
-  mkdir -p "$(dirname "$bin")"
-  cd go
-  go build -o "$bin" code.linenisgreat.com/purse-first/libs/dewey/cmd/{{name}}
-  go vet -tags test -vettool="$bin" ./...
+  backend="$(nix eval --raw .#madder.passthru.backend)"
+  if [ "$backend" != "native" ]; then
+    echo "verify-go-analyzer {{name}}: skipped (madder backend is '$backend'; godyn vet lanes exist only on godynSystems)"
+    exit 0
+  fi
+  nix build .#madder-vet-{{name}} --no-link --print-build-logs
 
 [group("post-build")]
 verify-go-analyzers: (verify-go-analyzer "seqerror") (verify-go-analyzer "repool") (verify-go-analyzer "defererr")
 
-# Build, vet, and test a single internal subpackage tree — the standard
-# verification triple, but scoped to ./internal/<subpath>/... so we don't
-# wait for the whole module when iterating on one package.
-# Usage: just run-internal-pkg futility
-#
-# build, vet, and test a single internal subpackage tree
-[group("post-build")]
-run-internal-pkg subpath:
-  cd go && go build ./internal/{{subpath}}/...
-  cd go && go vet -tags test ./internal/{{subpath}}/...
-  cd go && go test -tags test ./internal/{{subpath}}/...
-
-# Run Go unit tests under the race detector. Invoked by the default
-# `test` target; kept as a standalone recipe for flag-passing use cases.
+# Run the Go unit tests under the race detector via the nix race build
+# (`.#madder-race`, buildGoRace over the bga backend; godyn has no -race
+# stdlib variant). Invoked by the default `test` target.
 #
 # run Go unit tests under the race detector
 [group("post-build")]
-test-go-race *flags:
-  cd go && go test -tags test -race {{flags}} ./...
+test-go-race:
+  nix build .#madder-race --no-link --print-build-logs
 
 # The merge gate runs exactly ONE Go unit suite per host, chosen by the backend
 # `madder` actually builds with (`madder.passthru.backend`, igloo buildGoAuto):

@@ -382,6 +382,24 @@ let
     };
   };
 
+  # godyn's per-package vet lane (godynSystem only), one instance per dewey
+  # go/analysis analyzer (purse-first packages seqerror/repool/defererr),
+  # each run through godyn's vetTool wiring over the `-tags test` build
+  # (test-gated helpers need the tag, as for madderGodynTests). Replaces the
+  # bare `go build` + `go vet -vettool` recipe: no go.mod resolution, so it
+  # does not depend on tommy shipping a root go.mod. vetAll fails on any
+  # finding in a local package.
+  madderVetWith =
+    vetTool:
+    (pkgs.buildGodynModule {
+      pname = "madder";
+      inherit version goFlakeInputs vetTool;
+      src = goPkgsTest;
+      modules = ./gomod2nix.toml;
+      cc = pkgs.stdenv.cc;
+      tags = [ "test" ];
+    }).passthru.vetAll;
+
   # Burned into the test-server fixtures' test binaries by both test lanes
   # (godyn testLdflagsX, bga `go test -ldflags`): their TestMain would
   # otherwise `go build` the binary, and a nix test run has no `go`. Full
@@ -676,6 +694,9 @@ in
   }
   // pkgs-master.lib.optionalAttrs godynSystem {
     madder-godyn-tests = madderGodynTests.passthru.checkAll;
+    madder-vet-seqerror = madderVetWith purse-first.packages.${system}.seqerror;
+    madder-vet-repool = madderVetWith purse-first.packages.${system}.repool;
+    madder-vet-defererr = madderVetWith purse-first.packages.${system}.defererr;
   }
   // batsLaneOutputs
   # grammar-vectors-test is only defined meaningfully when langlang is
