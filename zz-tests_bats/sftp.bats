@@ -409,6 +409,70 @@ function sftp_source_cross_hash_sync_into_local_dest { # @test
   assert_line 'sftp-cross-hash-source'
 }
 
+function sftp_sync_carries_aliases_as_symlinks { # @test
+  # The second leg of dodder's take4 migration: a blake2b256 store that
+  # holds each blob once plus a sha256 alias (left by the cross-hash sync
+  # that filled it) is pushed to an SFTP remote. Each alias must arrive as
+  # a relative symlink, not as a second full copy under sha256/, which
+  # doubled the remote's size.
+
+  init_store # .default, blake2b256: the store with aliases
+
+  run_madder init -hash_type-id sha256 -encryption none .legacy
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "one copy on the remote" >"$blob"
+  run_madder write -format tap .legacy "$blob"
+  assert_success
+  local legacy_id
+  legacy_id="$(echo "$output" | grep -oP 'sha256-\S+' | head -1)"
+  [[ -n $legacy_id ]] || fail "write returned no sha256 id: $output"
+
+  run_madder sync -format ndjson .legacy .default
+  assert_success
+  local native_id
+  native_id="$(grep -o '"dest_id":"[^"]*"' <<<"$output" | cut -d'"' -f4)"
+  [[ -n $native_id ]] || fail "the cross-hash sync reported no dest_id"
+
+  local remote_root="$BATS_TEST_TMPDIR/sftp-remote"
+  init_sftp_test_store "$remote_root"
+
+  run_madder sync -format ndjson .default .sftp-test
+  assert_success
+  assert_output --regexp "\"id\":\"$legacy_id\",\"dest_id\":\"$native_id\",\"size\":[0-9-]+,\"state\":\"transferred\""
+  refute_output --partial '"state":"failed"'
+
+  local files links
+  files="$(find "$remote_root" -type f ! -name 'blob_store-*' | wc -l | tr -d ' ')"
+  links="$(find "$remote_root" -type l | wc -l | tr -d ' ')"
+  [[ $files == 1 ]] || fail "expected 1 blob file on the remote, found $files"
+  [[ $links == 1 ]] || fail "expected 1 alias symlink on the remote, found $links"
+
+  # The link is relative, so the store can be moved or restored elsewhere.
+  local link
+  link="$(find "$remote_root" -type l -print -quit)"
+  [[ "$(readlink "$link")" == ../../blake2b256/* ]] ||
+    fail "alias target is not a relative path into blake2b256/: $(readlink "$link")"
+
+  # Both names read the blob over SFTP.
+  run_madder cat .sftp-test "$legacy_id"
+  assert_success
+  assert_line 'one copy on the remote'
+  run_madder cat .sftp-test "$native_id"
+  assert_success
+  assert_line 'one copy on the remote'
+
+  run_madder fsck -format ndjson .sftp-test
+  assert_success
+  refute_output --partial 'blobs failed'
+
+  # A resumed sync finds both present and still reports the mapping.
+  run_madder sync -format ndjson .default .sftp-test
+  assert_success
+  assert_output --partial "\"id\":\"$legacy_id\",\"dest_id\":\"$native_id\",\"size\":-1,\"state\":\"transferred\""
+}
+
 function sftp_sync_same_hash_preserves_digest { # @test
   # NOT a cross-hash test, despite its former name
   # (`sftp_cross_hash_sync`): init_store and init_sftp_test_store both

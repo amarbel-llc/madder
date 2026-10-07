@@ -58,6 +58,21 @@ func CopyBlobIfNecessary(
 
 	errors.PanicIfError(markl.AssertIdIsNotNull(expectedDigest))
 
+	// With no rehash requested, an id the source holds only as an alias of
+	// another blob is carried across as an alias, not as a second copy of
+	// the bytes under another name.
+	if hashType == nil {
+		if aliasResult, handled := copyForeignDigestAlias(
+			ctx,
+			dst,
+			src,
+			expectedDigest,
+			extraWriter,
+		); handled {
+			return aliasResult
+		}
+	}
+
 	var readCloser domain_interfaces.BlobReader
 
 	{
@@ -160,6 +175,111 @@ func CopyBlobIfNecessary(
 	}
 
 	return copyResult
+}
+
+// copyForeignDigestAlias handles a blob id that src holds as a foreign-digest
+// alias of a blob stored under another hash type (the links a cross-hash
+// sync leaves behind). Copying such an id the ordinary way stores the same
+// bytes a second time under the alias's hash type; a store with tens of
+// thousands of aliases doubles in size on the destination.
+//
+// Instead: make sure the native blob is in dst, check that the alias really
+// is that blob's digest, and record the alias in dst. handled is false
+// when the id is not an alias or either store cannot do this, and the
+// caller copies as usual.
+//
+// The check reads the blob from src and digests it under the alias's hash
+// type. It costs a read of the source but no transfer, and it is what the
+// ordinary copy verified too: without it a wrong link in src would be
+// reproduced in dst unnoticed.
+func copyForeignDigestAlias(
+	ctx errors.Context,
+	dst domain_interfaces.BlobStore,
+	src domain_interfaces.BlobStore,
+	foreign domain_interfaces.MarklId,
+	extraWriter io.Writer,
+) (copyResult CopyResult, handled bool) {
+	resolver, ok := src.(domain_interfaces.BlobForeignDigestResolver)
+	if !ok {
+		return copyResult, false
+	}
+
+	adder, ok := dst.(domain_interfaces.BlobForeignDigestAdder)
+	if !ok {
+		return copyResult, false
+	}
+
+	copyResult.BlobId = foreign
+
+	native, isAlias, err := resolver.ResolveForeignBlobDigest(foreign)
+	if err != nil {
+		copyResult.SetError(err)
+		return copyResult, true
+	}
+
+	if !isAlias {
+		return copyResult, false
+	}
+
+	var bytesWritten int64
+
+	if !dst.HasBlob(native) {
+		nativeResult := CopyBlobIfNecessary(ctx, dst, src, native, extraWriter, nil)
+
+		if nativeResult.state != CopyResultStateSuccess && !nativeResult.Exists() {
+			nativeResult.BlobId = foreign
+			return nativeResult, true
+		}
+
+		if nativeResult.bytesWritten > 0 {
+			bytesWritten = nativeResult.bytesWritten
+		}
+	}
+
+	if err = verifyBlobDigest(src, foreign); err != nil {
+		copyResult.SetError(err)
+		return copyResult, true
+	}
+
+	if err = adder.AddForeignBlobDigestForNativeDigest(foreign, native); err != nil {
+		copyResult.setErrorAfterCopy(bytesWritten, err)
+		return copyResult, true
+	}
+
+	copyResult.DestBlobId = native
+	copyResult.bytesWritten = bytesWritten
+	copyResult.state = CopyResultStateSuccess
+
+	return copyResult, true
+}
+
+// verifyBlobDigest reads id from store to the end and checks the bytes
+// digest to id.
+func verifyBlobDigest(
+	store domain_interfaces.BlobStore,
+	id domain_interfaces.MarklId,
+) (err error) {
+	reader, err := store.MakeBlobReader(id)
+	if err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(io.Discard, reader); err != nil {
+		return errors.Join(err, reader.Close())
+	}
+
+	// Compared before Close: the reader may own the digest it hands out.
+	if actual := reader.GetMarklId(); !markl.Equals(actual, id) {
+		err = errors.Errorf(
+			"alias %s does not match the blob it points at, which digests to %s",
+			id,
+			actual,
+		)
+
+		return errors.Join(err, reader.Close())
+	}
+
+	return reader.Close()
 }
 
 func CopyReaderToWriter(

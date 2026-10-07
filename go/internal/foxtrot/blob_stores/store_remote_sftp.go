@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -175,6 +176,20 @@ type remoteSftp struct {
 	// bucket path that almost always already exists after the first
 	// blob lands in that bucket.
 	dirsKnown sync.Map
+
+	// Foreign-digest aliases (symlinks into another hash type's tree), all
+	// guarded by blobCacheLock and keyed like blobCache. aliasLinks is
+	// every alias a listing has seen; aliasTargets is the native digest of
+	// each one resolved so far. Once aliasesComplete is set, after
+	// PrimeBlobPresence, aliasTargets is all of them and an id not in it
+	// is not an alias.
+	aliasLinks      map[string]domain_interfaces.MarklId
+	aliasTargets    map[string]domain_interfaces.MarklId
+	aliasesComplete bool
+
+	// symlinkChecked is set once this process has created one alias and
+	// read it back; see AddForeignBlobDigestForNativeDigest.
+	symlinkChecked atomic.Bool
 }
 
 var _ domain_interfaces.BlobStore = &remoteSftp{}
@@ -663,11 +678,279 @@ func (blobStore *remoteSftp) PrimeBlobPresence() (err error) {
 		}
 	}
 
+	// A resumed sync asks for the native digest behind every alias already
+	// present, to report it. Read them all now, many at a time, rather than
+	// one round trip each as they come up.
+	blobStore.blobCacheLock.RLock()
+	pending := make([]domain_interfaces.MarklId, 0, len(blobStore.aliasLinks))
+	for key, id := range blobStore.aliasLinks {
+		if _, done := blobStore.aliasTargets[key]; !done {
+			pending = append(pending, id)
+		}
+	}
+	blobStore.blobCacheLock.RUnlock()
+
+	if err = blobStore.resolveAliasLinks(pending); err != nil {
+		return err
+	}
+
 	blobStore.blobCacheLock.Lock()
 	blobStore.blobCacheComplete = true
+	blobStore.aliasesComplete = true
 	blobStore.blobCacheLock.Unlock()
 
 	return nil
+}
+
+// sftpAliasResolveWorkerCount is how many alias links are read at once
+// when priming. Each is one small request; the client multiplexes them.
+const sftpAliasResolveWorkerCount = 32
+
+func (blobStore *remoteSftp) resolveAliasLinks(
+	aliases []domain_interfaces.MarklId,
+) error {
+	if len(aliases) == 0 {
+		return nil
+	}
+
+	var (
+		wg       sync.WaitGroup
+		errOnce  sync.Once
+		firstErr error
+	)
+
+	work := make(chan domain_interfaces.MarklId)
+
+	for range min(sftpAliasResolveWorkerCount, len(aliases)) {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for alias := range work {
+				native, err := blobStore.readAliasTarget(alias)
+				if err != nil {
+					errOnce.Do(func() { firstErr = err })
+					continue
+				}
+
+				blobStore.rememberAlias(alias, native)
+			}
+		}()
+	}
+
+	for _, alias := range aliases {
+		work <- alias
+	}
+
+	close(work)
+	wg.Wait()
+
+	return firstErr
+}
+
+func (blobStore *remoteSftp) rememberAlias(foreign, native domain_interfaces.MarklId) {
+	key := string(foreign.GetBytes())
+
+	blobStore.blobCacheLock.Lock()
+	defer blobStore.blobCacheLock.Unlock()
+
+	if blobStore.aliasTargets == nil {
+		blobStore.aliasTargets = make(map[string]domain_interfaces.MarklId)
+	}
+
+	blobStore.aliasTargets[key] = native
+	blobStore.blobCache[key] = struct{}{}
+}
+
+// readAliasTarget reads the link at foreign's path and parses the path it
+// points at back into the native digest, the way AllBlobs parses paths.
+func (blobStore *remoteSftp) readAliasTarget(
+	foreign domain_interfaces.MarklId,
+) (native domain_interfaces.MarklId, err error) {
+	rootPath := blobStore.config.GetRemotePath()
+	foreignPath := blobStore.remotePathForMerkleId(foreign)
+
+	var target string
+
+	if target, err = blobStore.sftpClient.ReadLink(foreignPath); err != nil {
+		err = errors.Wrapf(err, "reading foreign digest alias %q", foreignPath)
+		return nil, err
+	}
+
+	nativePath := target
+
+	if !path.IsAbs(nativePath) {
+		nativePath = path.Join(path.Dir(foreignPath), target)
+	}
+
+	var relNative string
+
+	if relNative, err = filepath.Rel(rootPath, nativePath); err != nil {
+		err = errors.Wrap(err)
+		return nil, err
+	}
+
+	hashTypeId, _, _ := strings.Cut(relNative, "/")
+
+	if hashTypeId == ".." || hashTypeId == relNative {
+		err = errors.Errorf(
+			"foreign digest alias %q points outside the store's hash-type trees: %q",
+			foreignPath,
+			target,
+		)
+
+		return nil, err
+	}
+
+	var hashType markl.FormatHash
+
+	if hashType, err = markl.GetFormatHashOrError(hashTypeId); err != nil {
+		err = errors.Wrapf(err, "foreign digest alias %q", foreignPath)
+		return nil, err
+	}
+
+	id, repool := hashType.GetBlobId()
+	defer repool()
+
+	if err = markl.SetHexStringFromAbsolutePath(
+		id,
+		nativePath,
+		path.Join(rootPath, hashTypeId),
+	); err != nil {
+		err = errors.Wrapf(err, "foreign digest alias %q", foreignPath)
+		return nil, err
+	}
+
+	native, _ = markl.Clone(id) //repool:owned
+
+	return native, nil
+}
+
+var (
+	_ domain_interfaces.BlobForeignDigestAdder    = (*remoteSftp)(nil)
+	_ domain_interfaces.BlobForeignDigestResolver = (*remoteSftp)(nil)
+)
+
+// AddForeignBlobDigestForNativeDigest records foreign as an alias of the
+// blob stored under native: a relative symlink at foreign's path pointing
+// at native's, the same layout the local store uses. The server follows it
+// on read, so the alias reads as the blob, and it costs no second copy of
+// the bytes.
+func (blobStore *remoteSftp) AddForeignBlobDigestForNativeDigest(
+	foreign domain_interfaces.MarklId,
+	native domain_interfaces.MarklId,
+) (err error) {
+	if err = blobStore.tryInitialize(); err != nil {
+		return err
+	}
+
+	if !blobStore.multiHash {
+		err = errors.Errorf(
+			"single-hash store does not support foreign digest mapping",
+		)
+		return err
+	}
+
+	nativePath := blobStore.remotePathForMerkleId(native)
+	foreignPath := blobStore.remotePathForMerkleId(foreign)
+	foreignDir := path.Dir(foreignPath)
+
+	if err = blobStore.ensureRemoteDir(foreignDir); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	var relTarget string
+
+	if relTarget, err = filepath.Rel(foreignDir, nativePath); err != nil {
+		err = errors.Wrap(err)
+		return err
+	}
+
+	if err = blobStore.sftpClient.Symlink(relTarget, foreignPath); err != nil {
+		// Already there is fine if it is the same alias; anything else at
+		// that path is not ours to replace.
+		existing, readErr := blobStore.readAliasTarget(foreign)
+		if readErr != nil || !markl.Equals(existing, native) {
+			err = errors.Wrapf(err, "creating foreign digest alias %q", foreignPath)
+			return err
+		}
+
+		err = nil
+	} else if blobStore.symlinkChecked.CompareAndSwap(false, true) {
+		// SFTP servers disagree about the argument order of the symlink
+		// request. Read the first link of the process back; a server that
+		// took the arguments the other way round has made something else,
+		// and a store full of those would be unreadable.
+		existing, readErr := blobStore.readAliasTarget(foreign)
+		if readErr != nil || !markl.Equals(existing, native) {
+			blobStore.symlinkChecked.Store(false)
+
+			return errors.Join(
+				errors.Errorf(
+					"the alias just created at %q does not read back as a link to %q; "+
+						"this server's symlink support is not usable for aliases",
+					foreignPath,
+					relTarget,
+				),
+				readErr,
+				blobStore.sftpClient.Remove(foreignPath),
+			)
+		}
+	}
+
+	blobStore.rememberAlias(foreign, native)
+
+	return nil
+}
+
+// ResolveForeignBlobDigest reads back the alias
+// AddForeignBlobDigestForNativeDigest wrote. After PrimeBlobPresence it
+// answers from memory.
+func (blobStore *remoteSftp) ResolveForeignBlobDigest(
+	foreign domain_interfaces.MarklId,
+) (native domain_interfaces.MarklId, ok bool, err error) {
+	if err = blobStore.tryInitialize(); err != nil {
+		return nil, false, err
+	}
+
+	if !blobStore.multiHash || foreign.IsNull() {
+		return nil, false, nil
+	}
+
+	blobStore.blobCacheLock.RLock()
+	native, ok = blobStore.aliasTargets[string(foreign.GetBytes())]
+	complete := blobStore.aliasesComplete
+	blobStore.blobCacheLock.RUnlock()
+
+	if ok || complete {
+		return native, ok, nil
+	}
+
+	var info os.FileInfo
+
+	if info, err = blobStore.sftpClient.Lstat(
+		blobStore.remotePathForMerkleId(foreign),
+	); err != nil {
+		if errors.IsNotExist(err) {
+			return nil, false, nil
+		}
+
+		return nil, false, errors.Wrap(err)
+	}
+
+	if info.Mode()&os.ModeSymlink == 0 {
+		return nil, false, nil
+	}
+
+	if native, err = blobStore.readAliasTarget(foreign); err != nil {
+		return nil, false, err
+	}
+
+	blobStore.rememberAlias(foreign, native)
+
+	return native, true, nil
 }
 
 func (blobStore *remoteSftp) AllBlobs() interfaces.SeqError[domain_interfaces.MarklId] {
@@ -784,8 +1067,9 @@ func (blobStore *remoteSftp) allBlobsForBase(
 		}
 
 		type bucketResult struct {
-			ids []domain_interfaces.MarklId
-			err error
+			ids   []domain_interfaces.MarklId
+			links map[string]struct{}
+			err   error
 		}
 
 		// One result channel per bucket, buffered to 1 so the worker
@@ -831,7 +1115,7 @@ func (blobStore *remoteSftp) allBlobsForBase(
 					default:
 					}
 					subPath := filepath.Join(basePath, bucketNames[idx])
-					ids, walkErr := walkBucketCollect(
+					ids, links, walkErr := walkBucketCollect(
 						blobStore.sftpClient,
 						subPath,
 						basePath,
@@ -839,7 +1123,7 @@ func (blobStore *remoteSftp) allBlobsForBase(
 					)
 					// Send is non-blocking: each results[idx] is a
 					// buffer-of-1 that only ever receives this one send.
-					results[idx] <- bucketResult{ids: ids, err: walkErr}
+					results[idx] <- bucketResult{ids: ids, links: links, err: walkErr}
 				}
 			}()
 		}
@@ -861,8 +1145,16 @@ func (blobStore *remoteSftp) allBlobsForBase(
 				continue
 			}
 			for _, id := range r.ids {
+				key := string(id.GetBytes())
+
 				blobStore.blobCacheLock.Lock()
-				blobStore.blobCache[string(id.GetBytes())] = struct{}{}
+				blobStore.blobCache[key] = struct{}{}
+				if _, isLink := r.links[key]; isLink {
+					if blobStore.aliasLinks == nil {
+						blobStore.aliasLinks = make(map[string]domain_interfaces.MarklId)
+					}
+					blobStore.aliasLinks[key] = id
+				}
 				blobStore.blobCacheLock.Unlock()
 				if !yield(id, nil) {
 					return
@@ -878,17 +1170,20 @@ func (blobStore *remoteSftp) allBlobsForBase(
 // turn and posts the resulting slice to its bucket's result channel.
 // The digest is per-worker pooled; clones are emitted because callers
 // retain the ids past the next walk step.
+//
+// links holds the raw bytes of each id whose entry is a symlink, i.e. a
+// foreign-digest alias; nil when the bucket has none.
 func walkBucketCollect(
 	client *sftp.Client,
 	subPath string,
 	basePath string,
 	digest domain_interfaces.MarklIdMutable,
-) (ids []domain_interfaces.MarklId, err error) {
+) (ids []domain_interfaces.MarklId, links map[string]struct{}, err error) {
 	walker := client.Walk(subPath)
 	for walker.Step() {
 		if stepErr := walker.Err(); stepErr != nil {
 			err = errors.Wrap(stepErr)
-			return ids, err
+			return ids, links, err
 		}
 		if walker.Stat().IsDir() {
 			continue
@@ -899,21 +1194,27 @@ func walkBucketCollect(
 		relPath, relErr := filepath.Rel(basePath, walker.Path())
 		if relErr != nil {
 			err = errors.Wrap(relErr)
-			return ids, err
+			return ids, links, err
 		}
 		if hexErr := markl.SetHexStringFromRelPath(
 			digest, relPath,
 		); hexErr != nil {
 			err = errors.Wrap(hexErr)
-			return ids, err
+			return ids, links, err
 		}
 		cloned, _ := markl.Clone(digest) //repool:owned
 		ids = append(ids, cloned)
+		if walker.Stat().Mode()&os.ModeSymlink != 0 {
+			if links == nil {
+				links = make(map[string]struct{})
+			}
+			links[string(cloned.GetBytes())] = struct{}{}
+		}
 	}
 	sort.Slice(ids, func(i, j int) bool {
 		return bytes.Compare(ids[i].GetBytes(), ids[j].GetBytes()) < 0
 	})
-	return ids, nil
+	return ids, links, nil
 }
 
 func (blobStore *remoteSftp) MakeBlobWriter(

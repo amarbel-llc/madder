@@ -156,6 +156,60 @@ function sync_cross_hash_reports_dest_id { # @test
   assert_output --partial "\"id\":\"$source_id\",\"dest_id\":\"$dest_id\",\"size\":-1,\"state\":\"transferred\""
 }
 
+function sync_carries_aliases_across_without_copying_the_bytes_again { # @test
+
+  # A store that was the destination of a cross-hash sync holds each blob
+  # once, plus an alias under the source's hash type. Syncing THAT store
+  # onward to one with the same default hash type used to store every
+  # alias as a second full copy of the bytes under the alias's hash type,
+  # doubling the destination. It must carry the alias across as an alias.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "stored once" >"$blob"
+  local source_id
+  source_id="$(write_blob_id "$blob")"
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+  local native_id
+  native_id="$(grep -o '"dest_id":"[^"]*"' <<<"$output" | cut -d'"' -f4)"
+  [[ -n $native_id ]] || fail "the cross-hash sync reported no dest_id"
+
+  run_madder init -hash_type-id sha256 -encryption none .onward
+  assert_success
+
+  run_madder sync -format ndjson .sha256 .onward
+  assert_success
+  # The alias id is reported with the native digest it points at ...
+  assert_output --regexp "\"id\":\"$source_id\",\"dest_id\":\"$native_id\",\"size\":[0-9-]+,\"state\":\"transferred\""
+  refute_output --partial '"state":"failed"'
+
+  # ... and the destination holds the bytes once: one blob file, one link.
+  local onward=".madder/local/share/blob_stores/onward"
+  local files links
+  files="$(find "$onward" -type f ! -name 'blob_store-*' | wc -l | tr -d ' ')"
+  links="$(find "$onward" -type l | wc -l | tr -d ' ')"
+  [[ $files == 1 ]] || fail "expected 1 blob file in .onward, found $files"
+  [[ $links == 1 ]] || fail "expected 1 alias link in .onward, found $links"
+
+  # Both names read the blob.
+  run_madder cat .onward "$source_id"
+  assert_success
+  assert_line 'stored once'
+  run_madder cat .onward "$native_id"
+  assert_success
+  assert_line 'stored once'
+
+  # A second pass finds both present and still reports the mapping.
+  run_madder sync -format ndjson .sha256 .onward
+  assert_success
+  assert_output --partial "\"id\":\"$source_id\",\"dest_id\":\"$native_id\",\"size\":-1,\"state\":\"transferred\""
+}
+
 function sync_same_hash_omits_dest_id { # @test
 
   # No rehash, so nothing to map: dest_id would only repeat id.
