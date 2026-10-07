@@ -36,6 +36,81 @@ func TestSftpSupportsForeignDigestAliases_OnlyWhenMultiHash(t *testing.T) {
 	}
 }
 
+// A remote root is usually RELATIVE to the sftp login directory
+// ("Library/store"). Aliases must be created, read back and resolved there
+// too. Every other sftp alias test uses an absolute temp dir, which is how
+// a bug in exactly this case reached a real remote: the alias was created,
+// its read-back failed to parse, and madder removed it again.
+func TestSftpForeignDigestAlias_RelativeRemoteRoot(t *testing.T) {
+	// The harness server resolves relative paths against the process's
+	// working directory.
+	t.Chdir(t.TempDir())
+
+	h := newSFTPBenchHarness(t, 0, concurrentClientOptions()...)
+	defer h.Close()
+
+	const (
+		root    = "Library/store"
+		payload = "under a relative root"
+	)
+
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	store := newSftpAliasTestStore(t, h, root)
+	native := writeSftpTestBlob(t, store, payload)
+	foreign := sha256IdOf(t, payload)
+
+	if err := store.AddForeignBlobDigestForNativeDigest(foreign, native); err != nil {
+		t.Fatalf("AddForeignBlobDigestForNativeDigest: %v", err)
+	}
+
+	if _, links := countRegularFiles(t, root); links != 1 {
+		t.Fatalf("store holds %d links, want 1", links)
+	}
+
+	fresh := newSftpAliasTestStore(t, h, root)
+
+	resolved, ok, err := fresh.ResolveForeignBlobDigest(foreign)
+	if err != nil || !ok {
+		t.Fatalf("ResolveForeignBlobDigest: ok=%t err=%v", ok, err)
+	}
+
+	if !markl.Equals(resolved, native) {
+		t.Errorf("alias resolved to %s, want %s", resolved, native)
+	}
+
+	primed := newSftpAliasTestStore(t, h, root)
+
+	if err = primed.PrimeBlobPresence(); err != nil {
+		t.Fatalf("PrimeBlobPresence: %v", err)
+	}
+
+	if resolved, ok, err = primed.ResolveForeignBlobDigest(foreign); err != nil || !ok ||
+		!markl.Equals(resolved, native) {
+		t.Errorf("primed resolve: %v ok=%t err=%v, want %s", resolved, ok, err, native)
+	}
+
+	// And a whole alias-carrying copy between two relative roots.
+	const dstRoot = "Library/onward"
+
+	if err = os.MkdirAll(dstRoot, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+
+	dst := newSftpAliasTestStore(t, h, dstRoot)
+
+	result := CopyBlobIfNecessary(errors.MakeContextDefault(), dst, store, foreign, nil, nil)
+	if err = result.GetError(); err != nil {
+		t.Fatalf("copying the alias: %v", err)
+	}
+
+	if regular, links := countRegularFiles(t, dstRoot); regular != 1 || links != 1 {
+		t.Errorf("destination holds %d files and %d links, want 1 and 1", regular, links)
+	}
+}
+
 // An alias in the source that points at itself must end in an error, not
 // in unbounded recursion.
 func TestCopyBlobIfNecessary_SelfReferencingAliasDoesNotRecurse(t *testing.T) {

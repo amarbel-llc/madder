@@ -791,7 +791,7 @@ func (blobStore *remoteSftp) readAliasTarget(
 		return nil, err
 	}
 
-	hashTypeId, _, _ := strings.Cut(relNative, "/")
+	hashTypeId, relBlob, _ := strings.Cut(relNative, "/")
 
 	if hashTypeId == ".." || hashTypeId == relNative {
 		err = errors.Errorf(
@@ -813,12 +813,12 @@ func (blobStore *remoteSftp) readAliasTarget(
 	id, repool := hashType.GetBlobId()
 	defer repool()
 
-	if err = markl.SetHexStringFromAbsolutePath(
-		id,
-		nativePath,
-		path.Join(rootPath, hashTypeId),
-	); err != nil {
-		err = errors.Wrapf(err, "foreign digest alias %q", foreignPath)
+	// relBlob is the blob's path inside its hash type's tree. Not
+	// SetHexStringFromAbsolutePath: a remote root is often relative
+	// ("Library/store"), and that function takes any non-absolute path to
+	// be relative to the hash-type tree already.
+	if err = markl.SetHexStringFromRelPath(id, relBlob); err != nil {
+		err = errors.Wrapf(err, "foreign digest alias %q -> %q", foreignPath, target)
 		return nil, err
 	}
 
@@ -900,13 +900,16 @@ func (blobStore *remoteSftp) AddForeignBlobDigestForNativeDigest(
 		if readErr != nil || !markl.Equals(existing, native) {
 			blobStore.symlinkChecked.Store(false)
 
-			return errors.Join(
-				errors.Errorf(
-					"the alias just created at %q does not read back as a link to %q; "+
-						"this server's symlink support is not usable for aliases",
-					foreignPath,
-					relTarget,
-				),
+			// One error with everything in its text: a joined error
+			// reaches the sync record as "error group: N errors" and
+			// hides the reason.
+			return errors.Errorf(
+				"the alias just created at %q does not read back as a link to %q "+
+					"(read back: %v; reading it: %v; removing it: %v); "+
+					"this server's symlink support is not usable for aliases",
+				foreignPath,
+				relTarget,
+				existing,
 				readErr,
 				blobStore.sftpClient.Remove(foreignPath),
 			)
