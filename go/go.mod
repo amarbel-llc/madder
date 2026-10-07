@@ -8,7 +8,7 @@ require (
 	code.linenisgreat.com/piggy/go v0.1.24-0.20261005200428-a4e604af02b4
 	code.linenisgreat.com/purse-first/libs/dewey v0.5.0
 	code.linenisgreat.com/tap/go v0.2.0
-	code.linenisgreat.com/tommy v0.5.0
+	code.linenisgreat.com/tommy v0.6.1-0.20261007014725-fcabbbf2df49
 	github.com/DataDog/zstd v1.5.7
 	github.com/aws/aws-sdk-go-v2 v1.41.7
 	github.com/aws/aws-sdk-go-v2/config v1.32.17
