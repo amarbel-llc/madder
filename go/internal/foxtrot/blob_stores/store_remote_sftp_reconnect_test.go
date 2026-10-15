@@ -359,6 +359,52 @@ func TestSftpReconnect_WriteCutOffByADrop(t *testing.T) {
 
 // A blob copy that a drop interrupts is tried once more on the fresh
 // connection, so one drop costs a retry and not a failed blob.
+// A request that fails with the bare io.EOF an ssh channel returns when it
+// closes under it must come back as a connection-lost error the callers can
+// wrap, not as a value that makes errors.Wrap panic.
+func TestSftpWithClient_BareEOFBecomesConnectionLost(t *testing.T) {
+	fastReconnects(t)
+
+	rig := newReconnectRig(t)
+	store := newReconnectingStore(t, rig)
+
+	var (
+		err       error
+		recovered any
+	)
+
+	// As in the other tests the connection is dropped first: closing a
+	// still-live harness client waits on a pipe half only drop() closes.
+	rig.drop()
+
+	finished := make(chan struct{})
+
+	go func() {
+		defer close(finished)
+
+		recovered = recoverPanic(func() {
+			_, err = withClient(store, func(*sftp.Client) (struct{}, error) {
+				return struct{}{}, io.EOF
+			})
+			err = errors.Wrap(err)
+		})
+	}()
+
+	select {
+	case <-finished:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("withClient did not return within 10s")
+	}
+
+	if recovered != nil {
+		t.Fatalf("wrapping the result panicked: %v", recovered)
+	}
+
+	if !IsConnectionLost(err) {
+		t.Errorf("a bare EOF came back as %v, want connection lost", err)
+	}
+}
+
 func TestIsConnectionLost(t *testing.T) {
 	for name, err := range map[string]error{
 		"connection lost": sftp.ErrSSHFxConnectionLost,

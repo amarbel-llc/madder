@@ -2,6 +2,7 @@ package blob_stores
 
 import (
 	stderrors "errors"
+	"io"
 	"os"
 	"time"
 
@@ -94,7 +95,21 @@ func withClient[T any](
 		return result, reconnectErr
 	}
 
-	return op(blobStore.client())
+	result, err = op(blobStore.client())
+
+	return result, asConnectionLost(err)
+}
+
+// asConnectionLost turns the bare io.EOF an ssh channel returns when it
+// closes under a request into the sftp connection-lost error. A bare EOF
+// makes dewey's errors.Wrap panic (see isSftpConnectionGone) and says
+// nothing; the callers wrap what withClient returns.
+func asConnectionLost(err error) error {
+	if err == io.EOF || err == io.ErrUnexpectedEOF {
+		return sftp.ErrSSHFxConnectionLost
+	}
+
+	return err
 }
 
 // withClientErr is withClient for an op that returns only an error.
