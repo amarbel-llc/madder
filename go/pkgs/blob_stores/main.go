@@ -93,6 +93,19 @@ var (
 	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
 )
 
+// ErrorText is err as one line a person can act on. A joined error's own
+// text is only "error group: N errors", which is what a sync record carried
+// when a connection dropped (madder#306); this spells out the errors inside.
+var ErrorText = internal.ErrorText
+
+// IsConnectionLost reports whether err says a request failed because the
+// connection to a remote store dropped mid-flight. Doing the same request
+// again on a fresh connection is expected to work, so a caller that can
+// safely repeat it (the copy of one content-addressed blob can) may try once
+// more. A store that has given up reconnecting is a different matter; see
+// IsStoreGivenUp.
+var IsConnectionLost = internal.IsConnectionLost
+
 // IsErrBlobUnreadable reports whether a VerifyBlob failure says nothing
 // about the blob's bytes: the key agent could not be reached or would not
 // answer, or the store itself was unavailable. Such a blob may be
@@ -105,6 +118,12 @@ var IsErrBlobUnreadable = internal.IsErrBlobUnreadable
 // IsRemoteConfigAlreadyExists reports whether err signals that the
 // remote blob_store-config object already exists in the target bucket.
 var IsRemoteConfigAlreadyExists = internal.IsRemoteConfigAlreadyExists
+
+// IsStoreGivenUp reports whether err says a store could not be reached and
+// will not be tried again: it was unreachable at the start, or its
+// connection dropped and every reconnect attempt failed. Going on to the
+// next blob would only fail the same way, so a bulk operation should stop.
+var IsStoreGivenUp = internal.IsStoreGivenUp
 
 // NOTE: blobStores parameter added to support inventory archive's
 // loose-blob-store-id resolution. This couples MakeBlobStore to the

@@ -157,6 +157,23 @@ func (blobImporter *BlobImporter) ImportBlobToStoreIfNecessary(
 				hashType,
 			)
 
+			// A connection that dropped part-way through one blob fails that
+			// blob; the store reconnects on its next request, and a
+			// content-addressed copy can simply be done again from the
+			// start. Once, so a remote that keeps dropping is reported, not
+			// retried forever.
+			if copyResult.IsError() &&
+				blob_stores.IsConnectionLost(copyResult.GetError()) {
+				copyResult = blob_stores.CopyBlobIfNecessary(
+					blobImporter.EnvBlobStore,
+					dst.GetBlobStore(),
+					blobImporter.Src.GetBlobStore(),
+					blobId,
+					&progressWriter,
+					hashType,
+				)
+			}
+
 			if copyResult.IsError() {
 				blobImporter.Counts.Failed++
 				ctx.Cancel(copyResult.GetError())

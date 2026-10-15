@@ -208,7 +208,11 @@ func (s *syncJsonSink) transferred(
 }
 
 func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, err error) {
-	rec := syncRecord{Id: id.String(), State: syncStateFailed, Error: err.Error()}
+	rec := syncRecord{
+		Id:    id.String(),
+		State: syncStateFailed,
+		Error: blob_stores.ErrorText(err),
+	}
 	if bytesWritten > 0 {
 		size := bytesWritten
 		rec.Size = &size
@@ -217,7 +221,7 @@ func (s *syncJsonSink) failed(id domain_interfaces.MarklId, bytesWritten int64, 
 }
 
 func (s *syncJsonSink) listError(err error) {
-	s.emit(syncRecord{State: syncStateListError, Error: err.Error()})
+	s.emit(syncRecord{State: syncStateListError, Error: blob_stores.ErrorText(err)})
 }
 
 func (s *syncJsonSink) notice(msg string) {
@@ -441,8 +445,12 @@ func (cmd Sync) runStoreCrap(
 		if errIter != nil {
 			// A list error mid-transfer (rare — the scan pass already
 			// succeeded) surfaces as a failed item with no id.
-			op.Fail("(unknown blob)", errIter)
+			op.Fail("(unknown blob)", fmt.Errorf("%s", blob_stores.ErrorText(errIter)))
 			listErrors++
+
+			if blob_stores.IsStoreGivenUp(errIter) {
+				break
+			}
 
 			continue
 		}
@@ -455,7 +463,16 @@ func (cmd Sync) runStoreCrap(
 				// "done" item with bytes -1. See madder#285.
 				op.Skip(formatSyncTestPoint(blobId, 0), syncStateExists)
 			} else {
-				op.Fail(formatSyncTestPoint(blobId, lastBytesWritten), err)
+				op.Fail(
+					formatSyncTestPoint(blobId, lastBytesWritten),
+					fmt.Errorf("%s", blob_stores.ErrorText(err)),
+				)
+
+				// See the JSON path: stop instead of failing every
+				// remaining blob the same way (madder#306).
+				if blob_stores.IsStoreGivenUp(err) {
+					break
+				}
 			}
 		} else {
 			op.Item(formatSyncTestPoint(blobId, lastBytesWritten), lastBytesWritten)
@@ -691,6 +708,15 @@ func (cmd Sync) streamToSink(
 			sink.listError(errIter)
 			listErrors++
 
+			if blob_stores.IsStoreGivenUp(errIter) {
+				sink.notice(fmt.Sprintf(
+					"the source is unreachable, stopping: %s",
+					blob_stores.ErrorText(errIter),
+				))
+
+				break
+			}
+
 			continue
 		}
 
@@ -709,6 +735,19 @@ func (cmd Sync) streamToSink(
 				sink.transferred(blobId, lastDestId, lastBytesWritten)
 			} else {
 				sink.failed(blobId, lastBytesWritten, err)
+
+				// A store that cannot be reached, or that dropped and could
+				// not be reconnected to, will fail every blob after this one
+				// the same way. Stop and say so rather than report each
+				// (madder#306: 20,024 identical failures from one drop).
+				if blob_stores.IsStoreGivenUp(err) {
+					sink.notice(fmt.Sprintf(
+						"a blob store is unreachable, stopping: %s",
+						blob_stores.ErrorText(err),
+					))
+
+					break
+				}
 			}
 		} else {
 			sink.transferred(blobId, lastDestId, lastBytesWritten)

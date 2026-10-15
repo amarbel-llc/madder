@@ -168,8 +168,21 @@ type remoteSftp struct {
 	config blob_store_configs.ConfigSFTPRemotePath
 
 	sshClientInitializer func() (*ssh.Client, error)
-	sshClient            *ssh.Client
-	sftpClient           *sftp.Client
+
+	// connector, when set, replaces the dial built from
+	// sshClientInitializer. Tests use it to hand out connections they can
+	// break.
+	connector func() (*ssh.Client, *sftp.Client, error)
+
+	// connLock guards sshClient, sftpClient and connectErr, which a
+	// reconnect replaces. Read the client through client().
+	connLock   sync.RWMutex
+	sshClient  *ssh.Client
+	sftpClient *sftp.Client
+
+	// connectErr is set when reconnecting was given up on; from then on
+	// every request that needs a connection returns it at once.
+	connectErr error
 
 	// dirsKnown remembers directories the store has already confirmed
 	// exist on the remote (either by creating them at init or by a
@@ -252,8 +265,18 @@ func (blobStore *remoteSftp) GetDefaultHashType() domain_interfaces.FormatHash {
 }
 
 func (blobStore *remoteSftp) close() (err error) {
-	if blobStore.sftpClient != nil {
-		if err = blobStore.sftpClient.Close(); err != nil {
+	blobStore.connLock.RLock()
+	sftpClient, sshClient := blobStore.sftpClient, blobStore.sshClient
+	blobStore.connLock.RUnlock()
+
+	// The ssh connection under the sftp client is ours too, and a
+	// reconnect leaves a fresh one behind that nothing else would close.
+	if sshClient != nil {
+		defer func() { _ = sshClient.Close() }()
+	}
+
+	if sftpClient != nil {
+		if err = sftpClient.Close(); err != nil {
 			// Closing a client whose connection has already dropped
 			// reports that fact (io.EOF, closed network connection). It
 			// is the state teardown was after, not a failure of it, and
@@ -441,7 +464,9 @@ func (blobStore *remoteSftp) readRemoteStoreKeySidecar() (sidecar []byte, err er
 
 	var file *sftp.File
 
-	if file, err = blobStore.sftpClient.Open(sidecarPath); err != nil {
+	if file, err = withClient(blobStore, func(client *sftp.Client) (*sftp.File, error) {
+		return client.Open(sidecarPath)
+	}); err != nil {
 		err = errors.Wrapf(err, "failed to open remote store key %q", sidecarPath)
 		return nil, err
 	}
@@ -471,37 +496,30 @@ func (blobStore *remoteSftp) WriteStoreKeySidecar(sidecar []byte) error {
 		return err
 	}
 
-	return writeRemoteStoreKeySidecar(
-		blobStore.sftpClient,
-		path.Join(
-			blobStore.config.GetRemotePath(),
-			directory_layout.FileNameBlobStoreKey,
-		),
-		sidecar,
-	)
+	return blobStore.withClientErr(func(client *sftp.Client) error {
+		return writeRemoteStoreKeySidecar(
+			client,
+			path.Join(
+				blobStore.config.GetRemotePath(),
+				directory_layout.FileNameBlobStoreKey,
+			),
+			sidecar,
+		)
+	})
 }
 
 func (blobStore *remoteSftp) initialize() (err error) {
-	if blobStore.sshClient, err = blobStore.sshClientInitializer(); err != nil {
+	var sshClient *ssh.Client
+	var sftpClient *sftp.Client
+
+	if sshClient, sftpClient, err = blobStore.dial(); err != nil {
 		err = errors.Wrap(err)
 		return err
 	}
 
-	// Enable pkg/sftp's pipelined reads and writes. Without these the
-	// client issues one MaxPacket-sized request per file at a time,
-	// which caps throughput at ~MaxPacket/RTT regardless of available
-	// bandwidth. The single *sftp.Client is goroutine-safe; concurrent
-	// requests multiplex over the one SSH channel. Keeping MaxPacket
-	// at the default (32 KB) preserves compatibility with SFTP servers
-	// that cap packet size to the protocol minimum.
-	if blobStore.sftpClient, err = sftp.NewClient(
-		blobStore.sshClient,
-		sftp.UseConcurrentReads(true),
-		sftp.UseConcurrentWrites(true),
-	); err != nil {
-		err = errors.Wrapf(err, "failed to create SFTP client")
-		return err
-	}
+	blobStore.connLock.Lock()
+	blobStore.sshClient, blobStore.sftpClient = sshClient, sftpClient
+	blobStore.connLock.Unlock()
 
 	blobStore.startKeepalive()
 
@@ -575,7 +593,10 @@ func (blobStore *remoteSftp) startKeepalive() {
 	if sshClient == nil {
 		return
 	}
-	done := blobStore.ctx.Done()
+	var done <-chan struct{}
+	if blobStore.ctx != nil {
+		done = blobStore.ctx.Done()
+	}
 	go func() {
 		ticker := time.NewTicker(sftpKeepaliveInterval)
 		defer ticker.Stop()
@@ -602,7 +623,9 @@ func (blobStore *remoteSftp) ensureRemoteDir(dir string) (err error) {
 	if _, ok := blobStore.dirsKnown.Load(dir); ok {
 		return nil
 	}
-	if err = blobStore.sftpClient.MkdirAll(dir); err != nil {
+	if err = blobStore.withClientErr(func(client *sftp.Client) error {
+		return client.MkdirAll(dir)
+	}); err != nil {
 		return err
 	}
 	rootPath := blobStore.config.GetRemotePath()
@@ -676,7 +699,9 @@ func (blobStore *remoteSftp) HasBlob(
 
 	remotePath := blobStore.remotePathForMerkleId(merkleId)
 
-	if _, err := blobStore.sftpClient.Stat(remotePath); err == nil {
+	if _, err := withClient(blobStore, func(client *sftp.Client) (os.FileInfo, error) {
+		return client.Stat(remotePath)
+	}); err == nil {
 		blobStore.blobCacheLock.Lock()
 		blobStore.blobCache[string(merkleId.GetBytes())] = struct{}{}
 		blobStore.blobCacheLock.Unlock()
@@ -803,7 +828,9 @@ func (blobStore *remoteSftp) readAliasTarget(
 
 	var target string
 
-	if target, err = blobStore.sftpClient.ReadLink(foreignPath); err != nil {
+	if target, err = withClient(blobStore, func(client *sftp.Client) (string, error) {
+		return client.ReadLink(foreignPath)
+	}); err != nil {
 		err = errors.Wrapf(err, "reading foreign digest alias %q", foreignPath)
 		return nil, err
 	}
@@ -911,7 +938,12 @@ func (blobStore *remoteSftp) AddForeignBlobDigestForNativeDigest(
 		return err
 	}
 
-	if err = blobStore.sftpClient.Symlink(relTarget, foreignPath); err != nil {
+	// Sent again after a reconnect if the connection dropped mid-request:
+	// the second attempt finds the link already there and the branch below
+	// accepts it when it is the same alias.
+	if err = blobStore.withClientErr(func(client *sftp.Client) error {
+		return client.Symlink(relTarget, foreignPath)
+	}); err != nil {
 		// Already there is fine if it is the same alias; anything else at
 		// that path is not ours to replace.
 		existing, readErr := blobStore.readAliasTarget(foreign)
@@ -941,7 +973,7 @@ func (blobStore *remoteSftp) AddForeignBlobDigestForNativeDigest(
 				relTarget,
 				existing,
 				readErr,
-				blobStore.sftpClient.Remove(foreignPath),
+				blobStore.client().Remove(foreignPath),
 			)
 		}
 	}
@@ -976,9 +1008,9 @@ func (blobStore *remoteSftp) ResolveForeignBlobDigest(
 
 	var info os.FileInfo
 
-	if info, err = blobStore.sftpClient.Lstat(
-		blobStore.remotePathForMerkleId(foreign),
-	); err != nil {
+	if info, err = withClient(blobStore, func(client *sftp.Client) (os.FileInfo, error) {
+		return client.Lstat(blobStore.remotePathForMerkleId(foreign))
+	}); err != nil {
 		if errors.IsNotExist(err) {
 			return nil, false, nil
 		}
@@ -1022,7 +1054,9 @@ func (blobStore *remoteSftp) allBlobsMultiHash() interfaces.SeqError[domain_inte
 	return func(yield func(domain_interfaces.MarklId, error) bool) {
 		basePath := blobStore.config.GetRemotePath()
 
-		entries, err := blobStore.sftpClient.ReadDir(basePath)
+		entries, err := withClient(blobStore, func(client *sftp.Client) ([]os.FileInfo, error) {
+			return client.ReadDir(basePath)
+		})
 		if err != nil {
 			yield(nil, errors.Wrapf(err, "BasePath: %q", basePath))
 			return
@@ -1090,7 +1124,9 @@ func (blobStore *remoteSftp) allBlobsForBase(
 	hashType markl.FormatHash,
 ) interfaces.SeqError[domain_interfaces.MarklId] {
 	return func(yield func(domain_interfaces.MarklId, error) bool) {
-		topEntries, err := blobStore.sftpClient.ReadDir(basePath)
+		topEntries, err := withClient(blobStore, func(client *sftp.Client) ([]os.FileInfo, error) {
+			return client.ReadDir(basePath)
+		})
 		if err != nil {
 			yield(nil, errors.Wrapf(err, "BasePath: %q", basePath))
 			return
@@ -1161,12 +1197,24 @@ func (blobStore *remoteSftp) allBlobsForBase(
 					default:
 					}
 					subPath := filepath.Join(basePath, bucketNames[idx])
-					ids, links, walkErr := walkBucketCollect(
-						blobStore.sftpClient,
-						subPath,
-						basePath,
-						digest,
-					)
+					// A bucket walk is a read, so a dropped connection is
+					// answered by reconnecting and walking it again.
+					type walked struct {
+						ids   []domain_interfaces.MarklId
+						links map[string]struct{}
+					}
+
+					result, walkErr := withClient(blobStore, func(client *sftp.Client) (walked, error) {
+						ids, links, err := walkBucketCollect(
+							client,
+							subPath,
+							basePath,
+							digest,
+						)
+
+						return walked{ids, links}, err
+					})
+					ids, links := result.ids, result.links
 					// Send is non-blocking: each results[idx] is a
 					// buffer-of-1 that only ever receives this one send.
 					results[idx] <- bucketResult{ids: ids, links: links, err: walkErr}
@@ -1322,7 +1370,9 @@ func (blobStore *remoteSftp) MakeBlobReader(
 
 	var remoteFile *sftp.File
 
-	if remoteFile, err = blobStore.sftpClient.Open(remotePath); err != nil {
+	if remoteFile, err = withClient(blobStore, func(client *sftp.Client) (*sftp.File, error) {
+		return client.Open(remotePath)
+	}); err != nil {
 		if os.IsNotExist(err) {
 			clonedDigest, _ := markl.Clone(digest) //repool:owned
 			err = blob_io.ErrBlobMissing{
@@ -1430,9 +1480,9 @@ func (mover *sftpMover) initialize(hash domain_interfaces.Hash) (err error) {
 	tempName := fmt.Sprintf("tmp_%x", tempNameBytes)
 	mover.tempPath = path.Join(mover.store.config.GetRemotePath(), tempName)
 
-	if mover.tempFile, err = mover.store.sftpClient.Create(
-		mover.tempPath,
-	); err != nil {
+	if mover.tempFile, err = withClient(mover.store, func(client *sftp.Client) (*sftp.File, error) {
+		return client.Create(mover.tempPath)
+	}); err != nil {
 		ui.Debug().Printf("unable to create temp file: %q", mover.tempPath)
 		err = errors.Wrapf(err, "unable to create temp file: %q", mover.tempPath)
 		return err
@@ -1448,7 +1498,7 @@ func (mover *sftpMover) initialize(hash domain_interfaces.Hash) (err error) {
 		return errors.Join(
 			errors.Wrap(err),
 			mover.tempFile.Close(),
-			mover.store.sftpClient.Remove(mover.tempPath),
+			mover.store.removeTemp(mover.tempPath),
 		)
 	}
 
@@ -1492,10 +1542,14 @@ func (mover *sftpMover) Close() (err error) {
 	defer func() {
 		var cerr, rerr error
 		if mover.tempFile != nil {
-			cerr = mover.tempFile.Close()
+			// A file on a connection that has since dropped reports that
+			// on close; the failure that matters is already in err.
+			if cerr = mover.tempFile.Close(); isSftpConnectionGone(cerr) {
+				cerr = nil
+			}
 		}
 		if mover.tempPath != "" {
-			rerr = mover.store.sftpClient.Remove(mover.tempPath)
+			rerr = mover.store.removeTemp(mover.tempPath)
 		}
 		if joined := errors.Join(err, cerr, rerr); joined != nil {
 			err = joined
@@ -1536,9 +1590,13 @@ func (mover *sftpMover) Close() (err error) {
 	}
 
 	// Atomically move temp file to final location
-	if err = mover.store.sftpClient.Rename(mover.tempPath, finalPath); err != nil {
+	if err = mover.store.withClientErr(func(client *sftp.Client) error {
+		return client.Rename(mover.tempPath, finalPath)
+	}); err != nil {
 		// Check if file already exists
-		if _, statErr := mover.store.sftpClient.Stat(finalPath); statErr == nil {
+		if _, statErr := withClient(mover.store, func(client *sftp.Client) (os.FileInfo, error) {
+			return client.Stat(finalPath)
+		}); statErr == nil {
 			// File already exists, this is OK — leave tempPath set so
 			// the deferred cleanup removes the temp file and surfaces
 			// any error from that removal.
