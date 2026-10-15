@@ -23,13 +23,19 @@ type StoredSizeReporter interface {
 	StoredSize(id domain_interfaces.MarklId) (int64, error)
 }
 
+// RegularObjectReporter is implemented by a store that can say whether an
+// object it holds is a full copy rather than a link to another object.
+type RegularObjectReporter interface {
+	IsRegularObject(id domain_interfaces.MarklId) (bool, error)
+}
+
 // RelinkState says what a read-only relink check found for one object.
 type RelinkState string
 
 const (
 	// RelinkRelinkable: the object is a full copy under a foreign digest,
-	// its bytes do hash to that digest, and the native object with the same
-	// bytes exists. Replacing the copy by an alias would reclaim its bytes.
+	// its bytes do hash to that digest, and the native object they resolve
+	// to is a full copy that reads back to its own id. Replacing the copy by an alias would reclaim its bytes.
 	RelinkRelinkable RelinkState = "relinkable"
 
 	// RelinkPlaintextMismatch: the bytes read back do not hash to the
@@ -40,6 +46,14 @@ const (
 	// resolve to does not exist, so the copy is the only one and is not a
 	// duplicate of anything.
 	RelinkNativeMissing RelinkState = "native_missing"
+
+	// RelinkNativeNotRegular: the native id exists only as an alias (it may
+	// dangle or point back at the copy), so the copy is the only real one.
+	RelinkNativeNotRegular RelinkState = "native_not_regular"
+
+	// RelinkNativeInvalid: the native object exists but does not read back
+	// to its own id, so the copy may be the only good one.
+	RelinkNativeInvalid RelinkState = "native_invalid"
 
 	// RelinkUnreadable: the object could not be read, so there is no
 	// native id to resolve.
@@ -110,6 +124,26 @@ func CheckRelinkCandidate(
 	record.Native, _ = markl.Clone(nativeId) //repool:owned
 	record.NativeExists = store.HasBlob(record.Native)
 
+	// A native that exists only as a link, possibly a dangling one or one
+	// pointing back at the copy, is not a second copy of anything.
+	var nativeNotRegular error
+
+	if record.NativeExists {
+		if reporter, ok := store.(RegularObjectReporter); ok {
+			regular, regularErr := reporter.IsRegularObject(record.Native)
+
+			switch {
+			case regularErr != nil:
+				nativeNotRegular = regularErr
+			case !regular:
+				nativeNotRegular = errors.Errorf(
+					"%s exists but is an alias, not a full copy",
+					record.Native,
+				)
+			}
+		}
+	}
+
 	switch {
 	case !record.PlaintextMatches:
 		record.State = RelinkPlaintextMismatch
@@ -122,7 +156,21 @@ func CheckRelinkCandidate(
 	case !record.NativeExists:
 		record.State = RelinkNativeMissing
 
+	case nativeNotRegular != nil:
+		record.State = RelinkNativeNotRegular
+		record.Err = nativeNotRegular
+
 	default:
+		// Only the copy has been read so far. A native that is truncated,
+		// corrupt, or stored differently from what the store now decodes
+		// would make the copy the only good one, so read it back too.
+		if verifyErr := verifyNative(store, record.Native); verifyErr != nil {
+			record.State = RelinkNativeInvalid
+			record.Err = verifyErr
+
+			return record
+		}
+
 		record.State = RelinkRelinkable
 		record.ReclaimableBytes = record.Bytes
 
@@ -138,6 +186,33 @@ func CheckRelinkCandidate(
 	}
 
 	return record
+}
+
+// verifyNative reads native back through the store and checks that its bytes
+// hash to its own id.
+func verifyNative(
+	store domain_interfaces.BlobStore,
+	native domain_interfaces.MarklId,
+) error {
+	reader, err := store.MakeBlobReader(native)
+	if err != nil {
+		return err
+	}
+
+	if _, err = io.Copy(io.Discard, reader); err != nil {
+		_ = reader.Close()
+		return err
+	}
+
+	if !markl.Equals(native, reader.GetMarklId()) {
+		_ = reader.Close()
+
+		return errors.Errorf(
+			"native %s reads back as %s", native, reader.GetMarklId(),
+		)
+	}
+
+	return reader.Close()
 }
 
 type countingWriter struct{ n int64 }

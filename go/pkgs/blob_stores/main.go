@@ -68,6 +68,10 @@ type PackOptions = internal.PackOptions
 // blobs into archive files.
 type PackableArchive = internal.PackableArchive
 
+// RegularObjectReporter is implemented by a store that can say whether an
+// object it holds is a full copy rather than a link to another object.
+type RegularObjectReporter = internal.RegularObjectReporter
+
 // RelinkRecord is the result of checking one object. Native is nil when the
 // object could not be read to completion.
 type RelinkRecord = internal.RelinkRecord
@@ -260,18 +264,26 @@ const (
 	CopyResultStateUnknown                  = internal.CopyResultStateUnknown
 )
 
+// RelinkNativeInvalid: the native object exists but does not read back
+// to its own id, so the copy may be the only good one.
+const RelinkNativeInvalid = internal.RelinkNativeInvalid
+
 // RelinkNativeMissing: the bytes are intact but the native object they
 // resolve to does not exist, so the copy is the only one and is not a
 // duplicate of anything.
 const RelinkNativeMissing = internal.RelinkNativeMissing
+
+// RelinkNativeNotRegular: the native id exists only as an alias (it may
+// dangle or point back at the copy), so the copy is the only real one.
+const RelinkNativeNotRegular = internal.RelinkNativeNotRegular
 
 // RelinkPlaintextMismatch: the bytes read back do not hash to the
 // object's own id. Nothing may be relinked on the strength of it.
 const RelinkPlaintextMismatch = internal.RelinkPlaintextMismatch
 
 // RelinkRelinkable: the object is a full copy under a foreign digest,
-// its bytes do hash to that digest, and the native object with the same
-// bytes exists. Replacing the copy by an alias would reclaim its bytes.
+// its bytes do hash to that digest, and the native object they resolve
+// to is a full copy that reads back to its own id. Replacing the copy by an alias would reclaim its bytes.
 const RelinkRelinkable = internal.RelinkRelinkable
 
 // RelinkUnreadable: the object could not be read, so there is no

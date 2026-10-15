@@ -38,6 +38,8 @@ type relinkSummary struct {
 	Relinkable       int    `json:"relinkable"`
 	PlaintextDiffers int    `json:"plaintext_mismatch"`
 	NativeMissing    int    `json:"native_missing"`
+	NativeNotRegular int    `json:"native_not_regular"`
+	NativeInvalid    int    `json:"native_invalid"`
 	Unreadable       int    `json:"unreadable"`
 	ReclaimableBytes int64  `json:"reclaimable_bytes"`
 }
@@ -68,10 +70,10 @@ func (cmd Fsck) runRelinkReport(
 		store := blobStore.GetBlobStore()
 
 		reporter, ok := store.(blob_stores.ForeignDigestAliasReporter)
-		if !ok {
+		if !ok || !blob_stores.SupportsForeignDigestAliases(store) {
 			return mismatches, errors.Errorf(
 				"fsck -relink-report: blob store %q cannot tell aliases from full copies; "+
-					"only sftp stores support it",
+					"only multi-hash sftp stores support it",
 				storeId,
 			)
 		}
@@ -129,6 +131,10 @@ func (cmd Fsck) runRelinkReport(
 				summary.PlaintextDiffers++
 			case blob_stores.RelinkNativeMissing:
 				summary.NativeMissing++
+			case blob_stores.RelinkNativeNotRegular:
+				summary.NativeNotRegular++
+			case blob_stores.RelinkNativeInvalid:
+				summary.NativeInvalid++
 			case blob_stores.RelinkUnreadable:
 				summary.Unreadable++
 			}
@@ -161,13 +167,16 @@ func (cmd Fsck) runRelinkReport(
 
 		ui.Err().Printf(
 			"(blob_store: %s) relink report: %d checked, %d relinkable (%d bytes reclaimable), "+
-				"%d plaintext mismatch, %d native missing, %d unreadable",
+				"%d plaintext mismatch, %d native missing, %d native not regular, "+
+				"%d native invalid, %d unreadable",
 			storeId,
 			summary.Checked,
 			summary.Relinkable,
 			summary.ReclaimableBytes,
 			summary.PlaintextDiffers,
 			summary.NativeMissing,
+			summary.NativeNotRegular,
+			summary.NativeInvalid,
 			summary.Unreadable,
 		)
 	}

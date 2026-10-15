@@ -82,6 +82,40 @@ func (blobStore *remoteSftp) IsForeignDigestAlias(
 	return ok
 }
 
+// IsRegularObject reports whether id is a full copy on the remote rather
+// than a symlink. An id a listing saw as a link is not; an id a listing saw
+// otherwise is; an id the store has not listed is asked of the remote, which
+// does not follow links.
+func (blobStore *remoteSftp) IsRegularObject(
+	id domain_interfaces.MarklId,
+) (bool, error) {
+	key := string(id.GetBytes())
+
+	blobStore.blobCacheLock.RLock()
+	_, isLink := blobStore.aliasLinks[key]
+	_, listed := blobStore.blobCache[key]
+	blobStore.blobCacheLock.RUnlock()
+
+	if isLink {
+		return false, nil
+	}
+
+	if listed {
+		return true, nil
+	}
+
+	path := blobStore.remotePathForMerkleId(id)
+
+	info, err := withClient(blobStore, func(client *sftp.Client) (os.FileInfo, error) {
+		return client.Lstat(path)
+	})
+	if err != nil {
+		return false, errors.Wrapf(err, "lstat %q", path)
+	}
+
+	return info.Mode().IsRegular(), nil
+}
+
 // StoredSize is how many bytes id occupies on the remote.
 func (blobStore *remoteSftp) StoredSize(
 	id domain_interfaces.MarklId,

@@ -116,6 +116,68 @@ func TestCheckRelinkCandidate(t *testing.T) {
 	})
 }
 
+// A native that is only a link, or does not read back to its own id, must
+// not make the copy look relinkable: relinking would leave no good copy.
+func TestCheckRelinkCandidate_RefusesAnUnsoundNative(t *testing.T) {
+	h := newSFTPBenchHarness(t, 0, concurrentClientOptions()...)
+	defer h.Close()
+
+	store := newSftpAliasTestStore(t, h, h.remotePath)
+
+	asLink := writeSftpTestBlobWith(t, store, markl.FormatHashBlake2b256, "native replaced by a link")
+	asLinkCopy := writeSftpTestBlobWith(t, store, markl.FormatHashSha256, "native replaced by a link")
+
+	damaged := writeSftpTestBlobWith(t, store, markl.FormatHashBlake2b256, "native damaged in place")
+	damagedCopy := writeSftpTestBlobWith(t, store, markl.FormatHashSha256, "native damaged in place")
+
+	// The native becomes a symlink straight back at the copy.
+	nativePath := store.remotePathForMerkleId(asLink)
+	if err := os.Remove(nativePath); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	if err := os.Symlink(store.remotePathForMerkleId(asLinkCopy), nativePath); err != nil {
+		t.Fatalf("Symlink: %v", err)
+	}
+
+	if err := os.WriteFile(store.remotePathForMerkleId(damaged), []byte("not what it was"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// A fresh store, whose listing is what the command works from.
+	fresh := newSftpAliasTestStore(t, h, h.remotePath)
+
+	for _, err := range fresh.AllBlobs() {
+		if err != nil {
+			t.Fatalf("AllBlobs: %v", err)
+		}
+	}
+
+	t.Run("native is a link", func(t *testing.T) {
+		record := CheckRelinkCandidate(fresh, asLinkCopy, markl.FormatHashBlake2b256)
+
+		if record.State != RelinkNativeNotRegular || !record.Mismatch() {
+			t.Fatalf("state = %s (err %v), want native_not_regular", record.State, record.Err)
+		}
+
+		if record.ReclaimableBytes != 0 {
+			t.Errorf("reclaimable = %d, want 0", record.ReclaimableBytes)
+		}
+	})
+
+	t.Run("native does not read back to its id", func(t *testing.T) {
+		record := CheckRelinkCandidate(fresh, damagedCopy, markl.FormatHashBlake2b256)
+
+		if record.State != RelinkNativeInvalid || !record.Mismatch() {
+			t.Fatalf("state = %s (err %v), want native_invalid", record.State, record.Err)
+		}
+
+		if record.ReclaimableBytes != 0 {
+			t.Errorf("reclaimable = %d, want 0", record.ReclaimableBytes)
+		}
+	})
+}
+
 // Only an alias the listing saw as a symlink is reported as one; a full copy
 // under a foreign digest is not.
 func TestSftpIsForeignDigestAlias(t *testing.T) {
