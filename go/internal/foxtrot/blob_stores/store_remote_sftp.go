@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
+	stderrors "errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -252,12 +254,40 @@ func (blobStore *remoteSftp) GetDefaultHashType() domain_interfaces.FormatHash {
 func (blobStore *remoteSftp) close() (err error) {
 	if blobStore.sftpClient != nil {
 		if err = blobStore.sftpClient.Close(); err != nil {
+			// Closing a client whose connection has already dropped
+			// reports that fact (io.EOF, closed network connection). It
+			// is the state teardown was after, not a failure of it, and
+			// io.EOF in particular must never reach errors.Wrap, which
+			// panics on it (madder#306).
+			if isSftpConnectionGone(err) {
+				return nil
+			}
+
 			err = errors.Wrap(err)
 			return err
 		}
 	}
 
 	return nil
+}
+
+// isSftpConnectionGone reports whether err says the connection to the
+// server is no longer there: the transport hit EOF or was closed, or the
+// sftp client reports the connection lost. It is deliberately about the
+// connection and not about a request: a "no such file" or a permission
+// error is the server answering.
+func isSftpConnectionGone(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return err == io.EOF ||
+		stderrors.Is(err, io.EOF) ||
+		stderrors.Is(err, io.ErrUnexpectedEOF) ||
+		stderrors.Is(err, net.ErrClosed) ||
+		stderrors.Is(err, os.ErrClosed) ||
+		stderrors.Is(err, sftp.ErrSSHFxConnectionLost) ||
+		stderrors.Is(err, sftp.ErrSSHFxNoConnection)
 }
 
 // initializeOnce lazily connects to the remote SFTP server and reads

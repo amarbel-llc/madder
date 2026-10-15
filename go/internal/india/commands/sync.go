@@ -659,6 +659,14 @@ func (cmd Sync) streamToSink(
 
 	defer req.Must(
 		func(_ interfaces.ActiveContext) error {
+			if listErrors > 0 {
+				sink.notice(fmt.Sprintf(
+					"listing incomplete: %d error(s); the counts below cover "+
+						"only the blobs listed before it failed, not the whole store",
+					listErrors,
+				))
+			}
+
 			sink.summary(
 				blobImporter.Counts.Succeeded,
 				blobImporter.Counts.Failed,
@@ -720,6 +728,20 @@ func (cmd Sync) streamToSink(
 func syncFailureError(failed, listErrors int) error {
 	if failed == 0 && listErrors == 0 {
 		return nil
+	}
+
+	if listErrors > 0 {
+		// The totals in the summary count the blobs the sync got to, and a
+		// listing that failed part-way never offered the rest (madder#306:
+		// a dropped connection cut the listing at 47,361 of 91,501 ids and
+		// the summary read as if that were the whole store).
+		return errors.Errorf(
+			"sync: %d blob(s) failed, %d source listing error(s); the listing "+
+				"is incomplete, so blobs after the error were never considered "+
+				"and the totals do not cover the whole store",
+			failed,
+			listErrors,
+		)
 	}
 
 	return errors.Errorf(
