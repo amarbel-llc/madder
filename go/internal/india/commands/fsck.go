@@ -29,8 +29,9 @@ type Fsck struct {
 	command_components.EnvBlobStore
 	command_components.BlobStore
 
-	Format output_format.Format
-	Limit  int
+	Format       output_format.Format
+	Limit        int
+	RelinkReport bool
 }
 
 var _ futility.CommandWithParams = (*Fsck)(nil)
@@ -73,7 +74,13 @@ func (cmd Fsck) GetDescription() futility.Description {
 			"verifies each aliased blob twice, once under each digest. " +
 			"Both verify correctly, since one blob's bytes have a valid " +
 			"digest under either hash, but the reported blob and byte " +
-			"totals count it twice.",
+			"totals count it twice. With -relink-report, fsck instead " +
+			"does a read-only check of a multi-hash sftp store for " +
+			"sha256 full copies that duplicate a blake2b256 native " +
+			"object: per object it reports the native id, whether it " +
+			"exists, whether the bytes hash to the object's own id, " +
+			"and the bytes a relink would free; a summary line per " +
+			"store totals them. It writes nothing.",
 	}
 }
 
@@ -83,7 +90,14 @@ func (cmd *Fsck) SetFlagDefinitions(
 	flagSet.Var(&cmd.Format, "format", output_format.FlagDescription)
 	flagSet.IntVar(&cmd.Limit, "limit", 0,
 		"stop after verifying this many blobs per store (0 = no limit). "+
-			"Useful for quickly sanity-checking a large legacy store.")
+			"Useful for quickly sanity-checking a large legacy store. "+
+			"With -relink-report it counts sha256 copies examined.")
+	flagSet.BoolVar(&cmd.RelinkReport, "relink-report", false,
+		"read-only: report each sha256 full copy in a multi-hash sftp store "+
+			"that duplicates a blake2b256 native object and could be "+
+			"replaced by an alias, with the bytes that would free. "+
+			"Reads every such copy; writes nothing. Exits non-zero if any "+
+			"copy is not cleanly relinkable.")
 }
 
 func (cmd Fsck) Complete(
@@ -102,6 +116,26 @@ func (cmd Fsck) Run(req futility.Request) {
 	envBlobStore := cmd.MakeEnvBlobStore(req)
 
 	blobStores := cmd.MakeBlobStoresFromIdsOrAll(req, envBlobStore)
+
+	if cmd.RelinkReport {
+		mismatches, err := cmd.runRelinkReport(envBlobStore, blobStores)
+		if err != nil {
+			errors.ContextCancelWithError(req, err)
+			return
+		}
+
+		if mismatches > 0 {
+			errors.ContextCancelWithError(
+				req,
+				errors.Errorf(
+					"fsck -relink-report: %d object(s) are not cleanly relinkable",
+					mismatches,
+				),
+			)
+		}
+
+		return
+	}
 
 	var sink blob_verify_sink.Sink
 	switch cmd.Format.Resolve(os.Stdout) {

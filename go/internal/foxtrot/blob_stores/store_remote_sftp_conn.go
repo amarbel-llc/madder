@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
+	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_io"
 	"code.linenisgreat.com/purse-first/libs/dewey/pkgs/errors"
 )
@@ -65,6 +66,36 @@ func (blobStore *remoteSftp) dial() (*ssh.Client, *sftp.Client, error) {
 	}
 
 	return dialSftp(blobStore.sshClientInitializer)
+}
+
+// IsForeignDigestAlias reports whether a listing of this store found id to be
+// a symlink alias rather than a full copy. It answers from what AllBlobs
+// saw, so it is false for an id the store has not listed.
+func (blobStore *remoteSftp) IsForeignDigestAlias(
+	id domain_interfaces.MarklId,
+) bool {
+	blobStore.blobCacheLock.RLock()
+	defer blobStore.blobCacheLock.RUnlock()
+
+	_, ok := blobStore.aliasLinks[string(id.GetBytes())]
+
+	return ok
+}
+
+// StoredSize is how many bytes id occupies on the remote.
+func (blobStore *remoteSftp) StoredSize(
+	id domain_interfaces.MarklId,
+) (int64, error) {
+	path := blobStore.remotePathForMerkleId(id)
+
+	info, err := withClient(blobStore, func(client *sftp.Client) (os.FileInfo, error) {
+		return client.Lstat(path)
+	})
+	if err != nil {
+		return 0, errors.Wrapf(err, "stat %q", path)
+	}
+
+	return info.Size(), nil
 }
 
 // client returns the connection requests should use right now. A reconnect

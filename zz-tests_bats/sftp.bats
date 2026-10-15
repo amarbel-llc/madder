@@ -789,6 +789,78 @@ function sftp_init_without_encryption { # @test
   assert_output --partial 'encryption = []'
 }
 
+function sftp_fsck_relink_report_is_read_only_and_names_duplicates { # @test
+  # The state of a store filled before sftp stores could hold aliases: each
+  # blob present twice, as a full copy under sha256/ and as the native
+  # object under blake2b256/. Build it by syncing an alias over and turning
+  # the symlink into a copy of its target.
+  init_store # .default, blake2b256
+
+  run_madder init -hash_type-id sha256 -encryption none .legacy
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "stored twice" >"$blob"
+  run_madder write -format tap .legacy "$blob"
+  assert_success
+  local legacy_id
+  legacy_id="$(echo "$output" | grep -oP 'sha256-\S+' | head -1)"
+  [[ -n $legacy_id ]] || fail "write returned no sha256 id: $output"
+
+  run_madder sync -format ndjson .legacy .default
+  assert_success
+  local native_id
+  native_id="$(grep -o '"dest_id":"[^"]*"' <<<"$output" | cut -d'"' -f4)"
+  [[ -n $native_id ]] || fail "the cross-hash sync reported no dest_id"
+
+  local remote_root="$BATS_TEST_TMPDIR/sftp-remote"
+  init_sftp_test_store "$remote_root"
+
+  run_madder sync -format ndjson .default .sftp-test
+  assert_success
+
+  local link native_file
+  link="$(find "$remote_root" -type l -print -quit)"
+  [[ -n $link ]] || fail "the sync left no alias symlink"
+  native_file="$(realpath "$link")"
+  rm "$link"
+  cp "$native_file" "$link"
+
+  local size
+  size="$(stat -c %s "$native_file")"
+
+  run_madder fsck -relink-report -format ndjson .sftp-test
+  assert_success
+  assert_output --partial '"type":"object"'
+  assert_output --partial "\"id\":\"$legacy_id\""
+  assert_output --partial "\"native\":\"$native_id\""
+  assert_output --partial '"native_exists":true,"plaintext_matches":true'
+  assert_output --partial '"state":"relinkable"'
+  assert_output --partial "\"stored_bytes\":$size,\"reclaimable_bytes\":$size"
+  assert_output --partial '"type":"summary"'
+  assert_output --partial '"checked":1,"relinkable":1'
+  assert_output --partial "\"reclaimable_bytes\":$size}"
+
+  # Read-only: both copies are still there, still regular files.
+  local files links
+  files="$(find "$remote_root" -type f ! -name 'blob_store-*' | wc -l | tr -d ' ')"
+  links="$(find "$remote_root" -type l | wc -l | tr -d ' ')"
+  [[ $files == 2 ]] || fail "expected 2 blob files on the remote, found $files"
+  [[ $links == 0 ]] || fail "expected no symlinks on the remote, found $links"
+
+  # A copy that can no longer be read back is reported with its reason,
+  # not relinked, and fails the command. (This store compresses, so garbage
+  # fails to decompress; the bytes-decode-but-hash-differently case needs an
+  # uncompressed store and is covered by TestCheckRelinkCandidate.)
+  echo "damaged on the remote" >"$link"
+
+  run_madder fsck -relink-report -format ndjson .sftp-test
+  assert_failure
+  assert_output --partial '"state":"unreadable"'
+  assert_output --partial '"error":"failed to decompress'
+  assert_output --partial '"reclaimable_bytes":0'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store

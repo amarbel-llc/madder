@@ -39,6 +39,12 @@ type (
 // treats it as "defer to the next iteration", not a hard failure.
 type ErrMultiRefNotReady = internal.ErrMultiRefNotReady
 
+// ForeignDigestAliasReporter is implemented by a store that can say whether
+// a blob it listed is a foreign-digest alias (a link to the blob's native
+// object) rather than a full copy of the bytes under that digest. The answer
+// is only meaningful for ids the store has listed, so call AllBlobs first.
+type ForeignDigestAliasReporter = internal.ForeignDigestAliasReporter
+
 // ForeignDigestAliasSupporter is implemented by a store whose ability to
 // record foreign-digest aliases depends on how it is configured, so that
 // satisfying BlobForeignDigestAdder is not by itself the answer. A store
@@ -62,10 +68,22 @@ type PackOptions = internal.PackOptions
 // blobs into archive files.
 type PackableArchive = internal.PackableArchive
 
+// RelinkRecord is the result of checking one object. Native is nil when the
+// object could not be read to completion.
+type RelinkRecord = internal.RelinkRecord
+
+// RelinkState says what a read-only relink check found for one object.
+type RelinkState = internal.RelinkState
+
 // StoreKeySidecarStore is implemented by the store types that can be
 // sealed-key stores (FDR 0011): access to the mutable blob_store-key
 // sidecar next to the store's config.
 type StoreKeySidecarStore = internal.StoreKeySidecarStore
+
+// StoredSizeReporter is implemented by a store that can say how many bytes
+// an object occupies where it is stored, which differs from the length of
+// its bytes read back when the store compresses or encrypts.
+type StoredSizeReporter = internal.StoredSizeReporter
 
 // BootstrapWebdavRemoteConfig is the WebDAV analogue of WriteRemoteConfig
 // for the fresh-bootstrap path: HEAD checks that no remote config
@@ -86,11 +104,16 @@ var BootstrapWebdavRemoteConfig = internal.BootstrapWebdavRemoteConfig
 // store rather than a store whose key is gone. Neither holds a secret.
 // Like BootstrapWebdavRemoteConfig it refuses a base that already has a
 // config.
+var BootstrapWebdavSealedKeyConfig = internal.BootstrapWebdavSealedKeyConfig
+
+// CheckRelinkCandidate reads id from store once, hashing the bytes under both
+// id's own hash type (through the store's reader) and nativeHash, then asks
+// whether the native object exists. It writes nothing.
 var (
-	BootstrapWebdavSealedKeyConfig = internal.BootstrapWebdavSealedKeyConfig
-	CopyBlobIfNecessary            = internal.CopyBlobIfNecessary
-	CopyReaderToWriter             = internal.CopyReaderToWriter
-	DiscoverRemoteConfig           = internal.DiscoverRemoteConfig
+	CheckRelinkCandidate = internal.CheckRelinkCandidate
+	CopyBlobIfNecessary  = internal.CopyBlobIfNecessary
+	CopyReaderToWriter   = internal.CopyReaderToWriter
+	DiscoverRemoteConfig = internal.DiscoverRemoteConfig
 )
 
 // ErrorText is err as one line a person can act on. A joined error's own
@@ -236,3 +259,21 @@ const (
 	CopyResultStateSuccess                  = internal.CopyResultStateSuccess
 	CopyResultStateUnknown                  = internal.CopyResultStateUnknown
 )
+
+// RelinkNativeMissing: the bytes are intact but the native object they
+// resolve to does not exist, so the copy is the only one and is not a
+// duplicate of anything.
+const RelinkNativeMissing = internal.RelinkNativeMissing
+
+// RelinkPlaintextMismatch: the bytes read back do not hash to the
+// object's own id. Nothing may be relinked on the strength of it.
+const RelinkPlaintextMismatch = internal.RelinkPlaintextMismatch
+
+// RelinkRelinkable: the object is a full copy under a foreign digest,
+// its bytes do hash to that digest, and the native object with the same
+// bytes exists. Replacing the copy by an alias would reclaim its bytes.
+const RelinkRelinkable = internal.RelinkRelinkable
+
+// RelinkUnreadable: the object could not be read, so there is no
+// native id to resolve.
+const RelinkUnreadable = internal.RelinkUnreadable
