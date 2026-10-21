@@ -363,6 +363,9 @@
         "nixpkgs-master": [
           "nixpkgs-master"
         ],
+        "nixpkgs-x86_64-darwin": [
+          "nixpkgs-master"
+        ],
         "oracle-javacard-sdks": "oracle-javacard-sdks",
         "pivapplet": "pivapplet",
         "purse-first": [
@@ -373,11 +376,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792151445,
-        "narHash": "sha256-IcqiAslPjgb5bCKGjD9bfl4kTaLSBuaAa4tzw3qNrdY=",
-        "rev": "88fed0fa0424b42e0619d9fda413ae71b252cc85",
+        "lastModified": 1792589602,
+        "narHash": "sha256-9giJ8zyXBUhPoQy9LyLNPMHotEOXdD64J1w5lOHPNR0=",
+        "rev": "3702e6e22bea28caca8346a2567671b33d420cf3",
         "type": "tarball",
-        "url": "https://code.linenisgreat.com/piggy/archive/88fed0fa0424b42e0619d9fda413ae71b252cc85.tar.gz"
+        "url": "https://code.linenisgreat.com/piggy/archive/3702e6e22bea28caca8346a2567671b33d420cf3.tar.gz"
       },
       "original": {
         "type": "tarball",

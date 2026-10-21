@@ -104,6 +104,11 @@
       url = "https://code.linenisgreat.com/piggy/archive/master.tar.gz";
       inputs.igloo.follows = "igloo";
       inputs.nixpkgs-master.follows = "nixpkgs-master";
+      # piggy's Intel-Mac-only nixpkgs (26.05-darwin). madder's systems come
+      # from igloo and exclude x86_64-darwin, so piggy's x86_64-darwin
+      # output is never consumed; collapse onto nixpkgs-master so the lock
+      # keeps one NixOS/nixpkgs rev (doppelgang multi-version inputs).
+      inputs.nixpkgs-x86_64-darwin.follows = "nixpkgs-master";
       inputs.utils.follows = "utils";
       inputs.bats.follows = "bats";
       inputs.purse-first.follows = "purse-first";
