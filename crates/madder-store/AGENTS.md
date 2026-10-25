@@ -41,5 +41,6 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   wasm32-portable. The RustCrypto versions follow piggy-pigpen's.
 - Never guess an on-disk detail; the Go code and the fixtures are the
   contract. Anything outside the implemented subset is refused loudly.
-- The piggy crates are git deps pinned to the `piggy` flake input's rev;
-  bump both together (`just update-piggy`).
+- The piggy crates are git deps meant to sit at the `piggy` flake input's
+  rev; `just update-piggy <sha>` moves flake.lock, go.mod and the Cargo
+  pin together. When they are apart, Cargo.toml's comment says why.

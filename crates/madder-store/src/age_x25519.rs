@@ -13,7 +13,7 @@ use std::io::{self, BufRead, BufReader, Read, Write};
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD_NO_PAD as B64;
-use chacha20poly1305::aead::{Aead, KeyInit, Payload};
+use chacha20poly1305::aead::{Aead, AeadInPlace, KeyInit};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
@@ -216,6 +216,9 @@ pub struct Decryptor<R: Read> {
     counter: u128,
     /// The next ciphertext chunk, read ahead so the last one is known.
     pending: Vec<u8>,
+    /// The current chunk, decrypted in place. Once consumed, its buffer is
+    /// reused for the next read-ahead, so the two rotate and a stream costs
+    /// no allocation per chunk.
     plaintext: Vec<u8>,
     plaintext_pos: usize,
     done: bool,
@@ -248,8 +251,11 @@ impl<R: Read> Decryptor<R> {
         })
     }
 
-    fn read_chunk(&mut self) -> io::Result<Vec<u8>> {
-        let mut chunk = vec![0u8; CHUNK + TAG_LEN];
+    /// Fill `chunk` (reusing its allocation) with the next ciphertext
+    /// chunk; it comes back shorter at the end of the stream.
+    fn read_chunk(&mut self, chunk: &mut Vec<u8>) -> io::Result<()> {
+        chunk.clear();
+        chunk.resize(CHUNK + TAG_LEN, 0);
         let mut filled = 0;
         while filled < chunk.len() {
             let n = self.input.read(&mut chunk[filled..])?;
@@ -259,21 +265,25 @@ impl<R: Read> Decryptor<R> {
             filled += n;
         }
         chunk.truncate(filled);
-        Ok(chunk)
+        Ok(())
     }
 
+    /// Decrypt the next chunk. Called only once `plaintext` is consumed,
+    /// so its buffer is free to become the read-ahead.
     fn open_next(&mut self) -> io::Result<()> {
+        let mut spare = std::mem::take(&mut self.plaintext);
         if !self.started {
-            self.pending = self.read_chunk()?;
+            self.read_chunk(&mut spare)?;
+            self.pending = std::mem::take(&mut spare);
             self.started = true;
         }
-        let current = std::mem::take(&mut self.pending);
-        let next = if current.len() == CHUNK + TAG_LEN {
-            self.read_chunk()?
+        let mut current = std::mem::take(&mut self.pending);
+        if current.len() == CHUNK + TAG_LEN {
+            self.read_chunk(&mut spare)?;
         } else {
-            Vec::new()
-        };
-        let last = next.is_empty();
+            spare.clear();
+        }
+        let last = spare.is_empty();
 
         if current.len() < TAG_LEN {
             return Err(age_err("payload chunk is shorter than its tag"));
@@ -284,14 +294,13 @@ impl<R: Read> Decryptor<R> {
 
         let nonce = stream_nonce(self.counter, last);
         self.counter += 1;
-        let plaintext = self
-            .aead
-            .decrypt(Nonce::from_slice(&nonce), Payload::from(&current[..]))
+        self.aead
+            .decrypt_in_place(Nonce::from_slice(&nonce), &[], &mut current)
             .map_err(|_| age_err("payload chunk failed to authenticate (altered or truncated)"))?;
 
-        self.plaintext = plaintext;
+        self.plaintext = current;
         self.plaintext_pos = 0;
-        self.pending = next;
+        self.pending = spare;
         self.done = last;
         Ok(())
     }

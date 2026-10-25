@@ -44,4 +44,22 @@ pub enum Error {
     Io(#[from] std::io::Error),
 }
 
+impl Error {
+    /// Recover an `Error` the streaming readers carried through
+    /// `std::io::Read` (as the source of an `InvalidData` error); any other
+    /// I/O error is wrapped as [`Error::Io`].
+    pub fn from_io(e: std::io::Error) -> Error {
+        if e.kind() == std::io::ErrorKind::InvalidData
+            && e.get_ref().is_some_and(|inner| inner.is::<Error>())
+        {
+            return *e
+                .into_inner()
+                .expect("get_ref was Some")
+                .downcast::<Error>()
+                .expect("checked with is::<Error>");
+        }
+        Error::Io(e)
+    }
+}
+
 pub type Result<T> = std::result::Result<T, Error>;

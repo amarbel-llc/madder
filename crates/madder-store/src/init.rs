@@ -112,26 +112,23 @@ fn render_sidecar_body(
     locator: Option<&str>,
     pigpen: Option<&str>,
     document: &str,
-) -> Result<String> {
+) -> String {
     let mut out = String::new();
     out.push_str("[recipients]\n");
-    out.push_str(&format!("source_kind = {}\n", toml_basic_string(kind)?));
+    out.push_str(&format!("source_kind = {}\n", toml_basic_string(kind)));
     if let Some(locator) = locator {
-        out.push_str(&format!("source = {}\n", toml_basic_string(locator)?));
+        out.push_str(&format!("source = {}\n", toml_basic_string(locator)));
     }
     if let Some(pigpen) = pigpen {
-        out.push_str(&format!("pigpen = {}\n", toml_multiline_string(pigpen)?));
+        out.push_str(&format!("pigpen = {}\n", toml_multiline_string(pigpen)));
     }
     out.push_str("\n[sealed]\n");
-    out.push_str(&format!(
-        "document = {}\n",
-        toml_multiline_string(document)?
-    ));
-    Ok(out)
+    out.push_str(&format!("document = {}\n", toml_multiline_string(document)));
+    out
 }
 
 /// A TOML basic string, `"…"`, with the escapes TOML needs.
-fn toml_basic_string(s: &str) -> Result<String> {
+fn toml_basic_string(s: &str) -> String {
     let mut out = String::from("\"");
     for c in s.chars() {
         match c {
@@ -139,24 +136,20 @@ fn toml_basic_string(s: &str) -> Result<String> {
             '\\' => out.push_str("\\\\"),
             '\n' => out.push_str("\\n"),
             '\t' => out.push_str("\\t"),
-            c if (c as u32) < 0x20 || c == '\u{7f}' => {
-                return Err(Error::Malformed(format!(
-                    "control character {:?} in a sidecar string",
-                    c
-                )));
-            }
+            c if is_toml_control(c) => out.push_str(&toml_control_escape(c)),
             c => out.push(c),
         }
     }
     out.push('"');
-    Ok(out)
+    out
 }
 
 /// A TOML basic multi-line string, `"""\n…"""`: the opening newline is
 /// trimmed by TOML, so the value is exactly `s`. Backslashes and any `"""`
 /// inside are escaped; control characters other than newline and tab are
-/// refused rather than written.
-fn toml_multiline_string(s: &str) -> Result<String> {
+/// written as escapes (a CRLF pigpen file is still a pigpen file, as it
+/// is for Go).
+fn toml_multiline_string(s: &str) -> String {
     let mut out = String::from("\"\"\"\n");
     let mut quotes = 0;
     for c in s.chars() {
@@ -173,12 +166,7 @@ fn toml_multiline_string(s: &str) -> Result<String> {
             }
             '\\' => out.push_str("\\\\"),
             '\n' | '\t' => out.push(c),
-            c if (c as u32) < 0x20 || c == '\u{7f}' => {
-                return Err(Error::Malformed(format!(
-                    "control character {:?} in a sidecar string",
-                    c
-                )));
-            }
+            c if is_toml_control(c) => out.push_str(&toml_control_escape(c)),
             c => out.push(c),
         }
         quotes = 0;
@@ -189,7 +177,23 @@ fn toml_multiline_string(s: &str) -> Result<String> {
         out.push('\n');
     }
     out.push_str("\"\"\"");
-    Ok(out)
+    out
+}
+
+/// The characters a TOML basic string may not carry raw: U+0000 to U+001F
+/// (tab and, in a multi-line string, newline are handled by the callers)
+/// and U+007F.
+fn is_toml_control(c: char) -> bool {
+    (c as u32) < 0x20 || c == '\u{7f}'
+}
+
+fn toml_control_escape(c: char) -> String {
+    match c {
+        '\r' => "\\r".to_owned(),
+        '\u{8}' => "\\b".to_owned(),
+        '\u{c}' => "\\f".to_owned(),
+        c => format!("\\u{:04X}", c as u32),
+    }
 }
 
 #[derive(Serialize)]
@@ -242,6 +246,16 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
             config_path.display()
         )));
     }
+    // The sidecar is written first (below), so an interrupted init leaves
+    // one without a config. It seals a key no store uses; say so rather
+    // than fail on it later with a bare "file exists".
+    let key_path = base.join(FILE_NAME_KEY);
+    if fs.exists(&key_path) {
+        return Err(Error::Malformed(format!(
+            "{} exists without a {FILE_NAME_CONFIG} beside it (an interrupted init?); remove it to init here",
+            key_path.display()
+        )));
+    }
 
     // The store key.
     let mut secret = Zeroizing::new([0u8; 32]);
@@ -275,7 +289,7 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
         options.source.locator.as_deref(),
         pigpen,
         &encode_sealed_document(&sealed_raw),
-    )?;
+    );
     let sidecar_bytes = format!("---\n! {TYPE_V2}\n---\n\n{sidecar_body}").into_bytes();
 
     // Refuse to write a sidecar that does not read back as what was meant.
@@ -308,7 +322,7 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
     Config::parse(&config_bytes)?;
 
     fs.create_dir_all(base)?;
-    fs.write_new(&base.join(FILE_NAME_KEY), &sidecar_bytes)?;
+    fs.write_new(&key_path, &sidecar_bytes)?;
     fs.write_new(&config_path, &config_bytes)?;
     fs.sync_dir(base)?;
 
@@ -506,9 +520,11 @@ mod tests {
             "piggy-recipient-v1@age_x25519_pub-abc\n",
             "has a \\ backslash and \"quotes\" and \"\"\" three\n",
             "ends with a quote\"",
+            "windows line endings\r\nsecond line\r\n",
+            "bell\u{7} and del\u{7f}",
             "",
         ] {
-            let body = render_sidecar_body("embedded", None, Some(text), "QUJD\n").unwrap();
+            let body = render_sidecar_body("embedded", None, Some(text), "QUJD\n");
             assert!(body.contains("pigpen = \"\"\"\n"), "{body}");
             assert!(body.contains("document = \"\"\"\n"), "{body}");
             let parsed: toml::Value = toml::from_str(&body).unwrap();
@@ -519,14 +535,33 @@ mod tests {
             );
             assert_eq!(parsed["sealed"]["document"].as_str(), Some("QUJD\n"));
         }
-        let body = render_sidecar_body("path", Some("/tmp/a \"b\"/ids"), None, "QUJD\n").unwrap();
+        let body = render_sidecar_body("path", Some("/tmp/a \"b\"/ids\r"), None, "QUJD\n");
         let parsed: toml::Value = toml::from_str(&body).unwrap();
         assert_eq!(
             parsed["recipients"]["source"].as_str(),
-            Some("/tmp/a \"b\"/ids")
+            Some("/tmp/a \"b\"/ids\r")
         );
         assert!(parsed["recipients"].get("pigpen").is_none());
-        assert!(render_sidecar_body("embedded", None, Some("bell\u{7}"), "x").is_err());
+    }
+
+    #[test]
+    fn a_stray_sidecar_from_an_interrupted_init_is_named() {
+        let dir = scratch();
+        let base = dir.join("store");
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join(FILE_NAME_KEY), b"left behind").unwrap();
+        let (recipient, _) = identity(8);
+        let err = match init(
+            &base,
+            InitOptions::embedded("", vec![recipient]),
+            OpenOptions::default(),
+        ) {
+            Err(e) => e,
+            Ok(_) => panic!("init over a stray sidecar must fail"),
+        };
+        assert!(err.to_string().contains(FILE_NAME_KEY), "{err}");
+        assert!(!base.join(FILE_NAME_CONFIG).exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

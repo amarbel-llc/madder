@@ -148,6 +148,18 @@ fn has_and_ids_need_no_key() {
 }
 
 #[test]
+fn a_stray_file_at_a_multi_hash_store_base_is_skipped_like_go() {
+    let name = FIXTURES[0];
+    let dir = fixture_dir(name);
+    let (_scratch, base) = scratch_copy(name);
+    // What an interrupted Go `key-reseal` leaves behind.
+    fs::write(base.join("blob_store-key.tmp-123"), b"half a sidecar").unwrap();
+    let store = Store::open(&base).unwrap();
+    assert!(store.config().multi_hash);
+    assert_eq!(store.ids().unwrap().len(), expected_blobs(&dir).len());
+}
+
+#[test]
 fn reading_before_unseal_is_locked_except_for_the_null_blob() {
     let dir = fixture_dir(FIXTURES[0]);
     let store = Store::open(dir.join("store")).unwrap();
@@ -177,12 +189,14 @@ fn reads_every_go_written_blob_byte_exact() {
             assert_eq!(got, plaintext(&dir, &plain), "{name}/{plain}");
         }
 
-        // Streaming in small reads gives the same bytes.
+        // Streaming in small reads gives the same bytes, and an empty read
+        // request mid-stream is not taken for EOF.
         let (plain, id) = expected_blobs(&dir).pop().unwrap();
         let mut reader = store.read(&id).unwrap();
         let mut out = Vec::new();
         let mut buf = [0u8; 1000];
         loop {
+            assert_eq!(reader.read(&mut []).unwrap(), 0);
             let n = reader.read(&mut buf).unwrap();
             if n == 0 {
                 break;

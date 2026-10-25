@@ -45,7 +45,6 @@ pub trait Fs {
     fn sync_dir(&self, path: &Path) -> io::Result<()>;
     /// Create `path`, failing if it exists, and write `bytes` to it.
     fn write_new(&self, path: &Path, bytes: &[u8]) -> io::Result<()>;
-    fn rename(&self, from: &Path, to: &Path) -> io::Result<()>;
 }
 
 /// `std::fs`.
@@ -133,9 +132,5 @@ impl Fs for StdFs {
         let mut file = OpenOptions::new().write(true).create_new(true).open(path)?;
         file.write_all(bytes)?;
         file.sync_all()
-    }
-
-    fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
-        fs::rename(from, to)
     }
 }

@@ -198,7 +198,7 @@ impl Store {
     pub fn read_to_vec(&self, id: &BlobId) -> Result<Vec<u8>> {
         let mut reader = self.read(id)?;
         let mut out = Vec::new();
-        reader.read_to_end(&mut out).map_err(unwrap_io)?;
+        reader.read_to_end(&mut out).map_err(Error::from_io)?;
         Ok(out)
     }
 
@@ -208,8 +208,8 @@ impl Store {
     /// 0444, link(2) into the tree (an existing blob is the same bytes),
     /// fsync the directory. Zero bytes produce the null id and no file.
     pub fn write(&self, plaintext: impl Read) -> Result<BlobId> {
+        // Encryptor::new validates the recipient point.
         let recipient = self.config.public_key_bytes();
-        age_x25519::check_recipient(&recipient)?;
 
         self.fs.create_dir_all(&self.temp_dir)?;
         let (temp_path, temp_file) = self.fs.create_temp(&self.temp_dir)?;
@@ -273,9 +273,13 @@ impl Store {
         self.fs.create_dir_all(dir)?;
         self.fs.set_readonly(temp_path)?;
 
+        // Once link(2) has returned, the blob is published and the write
+        // has succeeded; failing to unlink the temp name afterwards leaves a
+        // stray file in the temp dir, not a failed write, so it is not
+        // reported as one.
         match self.fs.hard_link(temp_path, &final_path) {
             Ok(()) => {
-                self.fs.remove_file(temp_path)?;
+                let _ = self.fs.remove_file(temp_path);
                 self.fs.sync_dir(dir)?;
                 Ok(())
             }
@@ -283,7 +287,7 @@ impl Store {
                 // A same-digest blob is already published: the same bytes
                 // (ADR 0002). verify-on-collision is not implemented here;
                 // it would need the unsealed key on the write path.
-                self.fs.remove_file(temp_path)?;
+                let _ = self.fs.remove_file(temp_path);
                 Ok(())
             }
             Err(e) if e.kind() == io::ErrorKind::CrossesDevices => Err(Error::Io(io::Error::new(
@@ -298,20 +302,18 @@ impl Store {
         }
     }
 
-    /// Every blob id in the store, in path order. Store metadata files are
-    /// skipped; anything else that is not a blob path is an error, as in Go.
+    /// Every blob id in the store, in path order. In the multi-hash layout
+    /// only directories at the base are walked (Go's
+    /// `localAllBlobsMultihash` skips files there, which is where its
+    /// `key-reseal` leaves a temp sidecar); inside a hash directory, and in
+    /// the single-hash layout, store metadata files are skipped and anything
+    /// else that is not a blob path is an error, as in Go.
     pub fn ids(&self) -> Result<Vec<BlobId>> {
         let mut ids = Vec::new();
         if self.config.multi_hash {
             for entry in self.fs.read_dir(&self.base)? {
                 if !entry.is_dir {
-                    if is_store_metadata_file(&entry.name) {
-                        continue;
-                    }
-                    return Err(Error::Malformed(format!(
-                        "unexpected file {:?} at the store base",
-                        entry.name
-                    )));
+                    continue;
                 }
                 let format = HashFormat::parse(&entry.name).map_err(|_| {
                     Error::Malformed(format!(
@@ -365,17 +367,6 @@ fn default_temp_dir(base: &Path) -> PathBuf {
     parent.join(format!(".{name}.tmp"))
 }
 
-fn unwrap_io(e: io::Error) -> Error {
-    if e.kind() == io::ErrorKind::InvalidData {
-        if let Some(inner) = e.get_ref() {
-            if inner.is::<Error>() {
-                return *e.into_inner().unwrap().downcast::<Error>().unwrap();
-            }
-        }
-    }
-    Error::Io(e)
-}
-
 /// A blob being read; see [`Store::read`].
 pub struct BlobReader<'a> {
     inner: Box<dyn Read + 'a>,
@@ -386,7 +377,9 @@ pub struct BlobReader<'a> {
 
 impl Read for BlobReader<'_> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.verified {
+        // An empty buffer is not a read: inner.read returns 0 for it, which
+        // must not be taken for EOF.
+        if self.verified || buf.is_empty() {
             return Ok(0);
         }
         let n = self.inner.read(buf)?;

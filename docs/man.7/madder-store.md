@@ -102,8 +102,10 @@ against one live store in both directions, with the real piggy-agent
 over fibby. **just lint-worktree** runs clippy
 (**conformist-impure.nix**); **nix fmt** runs rustfmt.
 
-The piggy crates are Cargo git dependencies pinned to the same rev as
-madder's **piggy** flake input; **just update-piggy** moves both.
+The piggy crates are Cargo git dependencies meant to sit at the rev of
+madder's **piggy** flake input; **just update-piggy** moves flake.lock,
+go.mod and the Cargo pin together. When the two are apart, the comment
+in **crates/madder-store/Cargo.toml** says why.
 
 # SEE ALSO
 

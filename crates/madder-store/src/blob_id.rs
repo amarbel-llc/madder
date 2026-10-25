@@ -59,9 +59,31 @@ impl HashFormat {
 
     /// The null id: the digest of zero bytes. Go stores nothing for it.
     pub fn null_id(self) -> BlobId {
-        self.hasher().finish()
+        BlobId {
+            format: self,
+            digest: *self.null_digest(),
+        }
+    }
+
+    /// The digest of zero bytes under this format, a constant (pinned
+    /// against the live hasher by a test) so `is_null` costs a comparison.
+    pub fn null_digest(self) -> &'static [u8; 32] {
+        match self {
+            HashFormat::Sha256 => &SHA256_OF_NOTHING,
+            HashFormat::Blake2b256 => &BLAKE2B256_OF_NOTHING,
+        }
     }
 }
+
+const SHA256_OF_NOTHING: [u8; 32] = [
+    0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+    0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
+];
+
+const BLAKE2B256_OF_NOTHING: [u8; 32] = [
+    0x0e, 0x57, 0x51, 0xc0, 0x26, 0xe5, 0x43, 0xb2, 0xe8, 0xab, 0x2e, 0xb0, 0x60, 0x99, 0xda, 0xa1,
+    0xd1, 0xe5, 0xdf, 0x47, 0x77, 0x8f, 0x77, 0x87, 0xfa, 0xab, 0x45, 0xcd, 0xf1, 0x2f, 0xe3, 0xa8,
+];
 
 /// An incremental digest under one hash format.
 pub enum Hasher {
@@ -168,7 +190,7 @@ impl BlobId {
     /// Whether this is the digest of zero bytes, for which Go stores no
     /// file and reads back nothing.
     pub fn is_null(&self) -> bool {
-        *self == self.format.null_id()
+        self.digest == *self.format.null_digest()
     }
 
     /// The blob's path relative to the store base: `<format>/` first when
@@ -234,6 +256,11 @@ mod tests {
 
     #[test]
     fn the_null_id_is_the_digest_of_nothing() {
+        // The constants against the live hashers.
+        for format in [HashFormat::Sha256, HashFormat::Blake2b256] {
+            assert_eq!(format.hasher().finish(), format.null_id(), "{format:?}");
+            assert!(format.null_id().is_null());
+        }
         assert!(HashFormat::Sha256.null_id().is_null());
         let mut h = HashFormat::Sha256.hasher();
         h.update(b"x");

@@ -654,9 +654,10 @@ let
   # vault. `cargo test` in checkPhase is the Go->Rust conformance lane: the
   # committed Go-written fixture stores under crates/madder-store/tests/
   # fixtures read back byte-exact, and the age X25519 subset round-trips
-  # with the reference `age` CLI. The piggy crates are Cargo git deps pinned
-  # to the same rev as the `piggy` flake input; allowBuiltinFetchGit fetches
-  # them by that rev without a second hash to maintain. The crate's bin
+  # with the reference `age` CLI. The piggy crates are Cargo git deps meant
+  # to sit at the `piggy` flake input's rev (`just update-piggy` moves both;
+  # Cargo.toml's comment says when they are apart); allowBuiltinFetchGit
+  # fetches them by their rev without a second hash to maintain. The crate's bin
   # target, madder-store-cli, is test-only: it drives the rust_interop bats
   # lane (Rust writes, Go reads through the agent, and back).
   madder-store = pkgs-master.rustPlatform.buildRustPackage {

@@ -650,15 +650,19 @@ update-dewey version:
 
 # Bump piggy in BOTH places it is pinned: the flake input (what every nix
 # lane builds against, via goFlakeInputs) and go.mod (what the devshell
-# `go build` / `go test`, including test-go-race, resolves). Left out of
-# step, the two toolchains test different piggy code. Pass a full commit
-# sha. Usage: just update-piggy 7f5509cd2936f9a4e28a635428b64cddae984bed
+# `go build` / `go test`, including test-go-race, resolves) and the Cargo
+# git deps of crates/madder-store (the rev in Cargo.toml, resolved into
+# Cargo.lock). Left out of step, the toolchains test different piggy code.
+# Pass a full commit sha.
+# Usage: just update-piggy 7f5509cd2936f9a4e28a635428b64cddae984bed
 #
-# update piggy to a commit, in flake.lock and go.mod together
+# update piggy to a commit, in flake.lock, go.mod and Cargo.lock together
 [group("maintenance")]
 update-piggy rev:
   nix flake update piggy
   cd go && go get code.linenisgreat.com/piggy/go@{{rev}} && go mod tidy
+  sed -i -E 's|(piggy\.git", rev = ")[0-9a-f]+|\1{{rev}}|' crates/madder-store/Cargo.toml
+  cargo update -p piggy-pigpen -p piggy-markl
   just build-gomod2nix
 
 # Tag a Go module release. The "go/v" prefix is added for you, so pass

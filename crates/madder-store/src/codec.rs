@@ -3,7 +3,9 @@
 //! what it changes is the bytes on disk, which only ever need to be a
 //! frame the other side's decoder accepts.
 
+use std::cell::RefCell;
 use std::io::{self, Read, Write};
+use std::rc::Rc;
 
 use crate::{Error, Result};
 
@@ -63,16 +65,84 @@ impl Compression {
         }
     }
 
-    /// A reader that yields the decompressed bytes of `src`.
+    /// A reader that yields the decompressed bytes of `src`. A damaged
+    /// stream fails with an [`io::ErrorKind::InvalidData`] error whose
+    /// source is [`Error::Codec`] (recover it with [`Error::from_io`]); an
+    /// error from `src` itself is returned as `src` raised it.
     pub fn decompress<'a, R: Read + 'a>(self, src: R) -> Result<Box<dyn Read + 'a>> {
         match self {
             Compression::None => Ok(Box::new(src)),
             Compression::Zstd => {
-                let decoder = ruzstd::decoding::StreamingDecoder::new(src)
-                    .map_err(|e| Error::Codec(format!("zstd frame header: {e}")))?;
-                Ok(Box::new(decoder))
+                // ruzstd folds every failure, the frame's and the source's,
+                // into one opaque io::Error. The source's errors are kept
+                // aside on the way in, so afterwards the two can be told
+                // apart: a kept source error is returned as it was, anything
+                // else is the frame's fault.
+                let source_error = Rc::new(RefCell::new(None));
+                let src = KeepErrors {
+                    inner: src,
+                    error: Rc::clone(&source_error),
+                };
+                let decoder = match ruzstd::decoding::StreamingDecoder::new(src) {
+                    Ok(decoder) => decoder,
+                    Err(e) => {
+                        let kept = source_error.borrow_mut().take();
+                        return Err(match kept {
+                            Some(io) => Error::from_io(io),
+                            None => Error::Codec(format!("zstd frame header: {e}")),
+                        });
+                    }
+                };
+                Ok(Box::new(ZstdReader {
+                    decoder: Box::new(decoder),
+                    source_error,
+                }))
             }
         }
+    }
+}
+
+/// Passes reads through, keeping the first error aside for [`ZstdReader`]
+/// (an `io::Error` cannot be cloned, so the decoder gets one of the same
+/// kind).
+struct KeepErrors<R> {
+    inner: R,
+    error: Rc<RefCell<Option<io::Error>>>,
+}
+
+impl<R: Read> Read for KeepErrors<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.inner.read(buf) {
+            Ok(n) => Ok(n),
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => Err(e),
+            Err(e) => {
+                let kind = e.kind();
+                let message = e.to_string();
+                if self.error.borrow().is_none() {
+                    *self.error.borrow_mut() = Some(e);
+                }
+                Err(io::Error::new(kind, message))
+            }
+        }
+    }
+}
+
+struct ZstdReader<'a> {
+    decoder: Box<dyn Read + 'a>,
+    source_error: Rc<RefCell<Option<io::Error>>>,
+}
+
+impl Read for ZstdReader<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        self.decoder.read(buf).map_err(|e| {
+            let kept = self.source_error.borrow_mut().take();
+            kept.unwrap_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    Error::Codec(format!("zstd: {e}")),
+                )
+            })
+        })
     }
 }
 
@@ -194,5 +264,63 @@ mod tests {
         let mut out = Vec::new();
         let err = Compression::Zstd.compress(Broken, &mut out).unwrap_err();
         assert!(err.to_string().contains("disk on fire"), "{err}");
+    }
+
+    fn big_compressed() -> Vec<u8> {
+        let big: Vec<u8> = (0..300_000u32)
+            .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+            .collect();
+        let mut compressed = Vec::new();
+        Compression::Zstd
+            .compress(&big[..], &mut compressed)
+            .unwrap();
+        compressed
+    }
+
+    #[test]
+    fn a_damaged_zstd_stream_is_a_codec_error() {
+        let mut compressed = big_compressed();
+        compressed.truncate(compressed.len() - 10);
+        let mut out = Vec::new();
+        let err = Compression::Zstd
+            .decompress(&compressed[..])
+            .unwrap()
+            .read_to_end(&mut out)
+            .unwrap_err();
+        assert!(
+            matches!(Error::from_io(err), Error::Codec(_)),
+            "a truncated frame must be the codec's error, not an I/O error"
+        );
+    }
+
+    #[test]
+    fn a_failing_zstd_source_keeps_its_own_error() {
+        /// The first bytes of a valid frame, then a disk error.
+        struct Dying {
+            head: io::Cursor<Vec<u8>>,
+        }
+        impl Read for Dying {
+            fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+                match self.head.read(buf)? {
+                    0 => Err(io::Error::other("disk on fire")),
+                    n => Ok(n),
+                }
+            }
+        }
+        let compressed = big_compressed();
+        let src = Dying {
+            head: io::Cursor::new(compressed[..40].to_vec()),
+        };
+        let err = match Compression::Zstd.decompress(src) {
+            Err(e) => e,
+            Ok(mut reader) => {
+                let mut out = Vec::new();
+                Error::from_io(reader.read_to_end(&mut out).unwrap_err())
+            }
+        };
+        assert!(
+            matches!(&err, Error::Io(io) if io.to_string().contains("disk on fire")),
+            "{err:?}"
+        );
     }
 }

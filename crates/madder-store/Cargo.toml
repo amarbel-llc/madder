@@ -23,10 +23,14 @@ required-features = ["agent-cli"]
 # crates share one closure.
 
 [dependencies]
-# piggy's crates, pinned to the SAME rev as madder's `piggy` flake input
-# (flake.lock nodes.piggy.locked.rev). `just update-piggy` moves both.
-# piggy-pigpen is excluded from piggy's cargo workspace and depends on
-# piggy-markl by path, so both are named here from the same checkout.
+# piggy's crates. The intent is one piggy pin for madder: this rev and the
+# `piggy` flake input (flake.lock nodes.piggy.locked.rev), moved together
+# by `just update-piggy`. Today they are apart: 9ebebd31 brought
+# piggy-pigpen's `agent` oracle (needed by the test CLI) and the flake
+# input still sits at d28e399b until the next lock bump; the two crates
+# are otherwise identical between those revs. piggy-pigpen is excluded
+# from piggy's cargo workspace and depends on piggy-markl by path, so both
+# are named here from the same checkout.
 piggy-pigpen = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
 piggy-markl = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
 

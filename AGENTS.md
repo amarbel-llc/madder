@@ -82,7 +82,9 @@ fmt`. Its own `AGENTS.md`, `madder-store(7)` and
 details. Go-written conformance fixtures live under
 `crates/madder-store/tests/fixtures/` (`just codemod-rust-fixtures`);
 the live two-way bats lane is `just test-bats-rust-interop`. The piggy
-crates are Cargo git deps pinned to the `piggy` flake input's rev.
+crates are Cargo git deps meant to sit at the `piggy` flake input's rev
+(`just update-piggy` moves both; Cargo.toml's comment says when they
+are apart).
 
 ## External consumer: cutting-garden
 
