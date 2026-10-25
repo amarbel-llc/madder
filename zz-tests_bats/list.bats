@@ -5,6 +5,11 @@ setup() {
 
 # bats file_tags=list
 
+# The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
+# CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
+# multi-store and -tree tests are Go-only.
+
+# bats test_tags=rust_cli
 function list_shows_digest_for_migrated { # @test
   init_store
   run_madder list -format=tap
@@ -15,6 +20,7 @@ function list_shows_digest_for_migrated { # @test
   assert_output --partial '.default@blake2b256-'
 }
 
+# bats test_tags=rust_cli
 function list_flags_unmigrated_with_footer { # @test
   init_store
   local config=".madder/local/share/blob_stores/default/blob_store-config"
@@ -28,6 +34,7 @@ function list_flags_unmigrated_with_footer { # @test
   assert_output --partial 'madder config-pin_digest .default'
 }
 
+# bats test_tags=rust_cli
 function list_no_footer_when_all_migrated { # @test
   init_store
   run_madder list -format=tap
@@ -36,6 +43,7 @@ function list_no_footer_when_all_migrated { # @test
   refute_output --partial '(unmigrated)'
 }
 
+# bats test_tags=rust_cli
 function list_ndjson_includes_digest { # @test
   init_store
   run_madder list -format=ndjson
@@ -43,6 +51,7 @@ function list_ndjson_includes_digest { # @test
   assert_output --partial '"digest":"madder-blob_store-config-digest-v1@blake2b256-'
 }
 
+# bats test_tags=rust_cli
 function list_ndjson_flags_legacy { # @test
   init_store
   local config=".madder/local/share/blob_stores/default/blob_store-config"

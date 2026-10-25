@@ -7,7 +7,7 @@ setup() {
 
 # The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
 # CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
-# `list` tests (madder#322) and the pack-blobs test are Go-only.
+# pack-blobs test is Go-only.
 
 # bats test_tags=rust_cli
 function write_and_cat { # @test
@@ -36,6 +36,7 @@ function write_from_stdin { # @test
   assert_success
 }
 
+# bats test_tags=rust_cli
 function list_after_write { # @test
 
   init_store
@@ -51,6 +52,7 @@ function list_after_write { # @test
   assert_output
 }
 
+# bats test_tags=rust_cli
 function list_text_includes_path_comment { # @test
 
   # #172: each text-mode line ends with `# path: <rel>` pointing at the
@@ -62,6 +64,7 @@ function list_text_includes_path_comment { # @test
   assert_output --partial "# path: "
 }
 
+# bats test_tags=rust_cli
 function list_ndjson_emits_one_record_per_store { # @test
 
   # #173: `-format=ndjson` emits one JSON object per line with the
@@ -83,6 +86,7 @@ function list_ndjson_emits_one_record_per_store { # @test
   [[ $bad -eq 0 ]] || fail "records missing required fields: $output"
 }
 
+# bats test_tags=rust_cli
 function list_json_emits_object_keyed_by_store_id { # @test
 
   # `-format=json` emits a single JSON document: an object whose keys
@@ -111,6 +115,7 @@ function list_json_emits_object_keyed_by_store_id { # @test
   [[ $bad -eq 0 ]] || fail "values missing required fields: $output"
 }
 
+# bats test_tags=rust_cli
 function list_format_rejects_unknown_value { # @test
 
   init_store
@@ -119,6 +124,7 @@ function list_format_rejects_unknown_value { # @test
   assert_failure
 }
 
+# bats test_tags=rust_cli
 function list_json_and_ndjson_output_deterministic_across_runs { # @test
 
   # Map iteration in Go is randomized; list must produce byte-identical

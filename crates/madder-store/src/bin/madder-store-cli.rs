@@ -46,6 +46,7 @@ const USAGE: &str = "usage (the madder grammar this test shim speaks):
   madder-store-cli cat-ids [<.store>]
   madder-store-cli has [-all] [<.store>] <id>...
   madder-store-cli fsck [-format tap|json|ndjson] [<.store>...]
+  madder-store-cli list [-format tap|json|ndjson]
   madder-store-cli info-repo [<.store>] [<key>...]
   madder-store-cli key-status <.store>
   madder-store-cli mint-recipient            print a fresh X25519 recipient id and its secret hex
@@ -64,6 +65,7 @@ fn run(args: &[String]) -> CliResult<()> {
         "cat-ids" => cat_ids(rest),
         "has" => has(rest),
         "fsck" => fsck(rest),
+        "list" => list(rest),
         "info-repo" => info_repo(rest),
         "key-status" => key_status(rest),
         "mint-recipient" => mint_recipient(),
@@ -1058,6 +1060,152 @@ impl FsckSink<'_> {
             FsckSink::Json(out) => out.flush(),
         }
     }
+}
+
+// --- list ----------------------------------------------------------------------------
+
+/// The purpose Go stamps on a config digest in `list`'s records (FDR 0008).
+const CONFIG_DIGEST_PURPOSE: &str = "madder-blob_store-config-digest-v1";
+
+/// What Go calls a local hash-bucketed store in `list`.
+const LOCAL_STORE_DESCRIPTION: &str = "local hash bucketed";
+
+/// `list [-format tap|json|ndjson]` over the local stores both scopes
+/// hold, in id order. Text: `<id>@<digest>: <description> # path: <rel>`,
+/// `(unmigrated)` and the `config-pin_digest` note for a config with no
+/// `@` line. ndjson: one record per store; json: one object keyed by id.
+/// `-tree` and `-all` (multi graphs, the host-wide registry) are Go-only.
+fn list(args: &[String]) -> CliResult<()> {
+    let (flags, positional) = parse_flags(args, &["tree", "all"])?;
+    if !positional.is_empty() {
+        return Err(format!("list takes no arguments, got {positional:?}").into());
+    }
+    if flags.contains_key("tree") || flags.contains_key("all") {
+        return Err(
+            "list -tree and -all are not supported by this binary (multi stores and the registry are Go-only; see madder's issue on the multi half of list.bats)"
+                .into(),
+        );
+    }
+    let format = output_format(&flags)?;
+    let as_object = flags.get("format").map(String::as_str) == Some("json");
+    let stores = Stores::in_cwd()?;
+    let cwd = std::env::current_dir()?;
+    let mut stdout = io::stdout().lock();
+
+    let mut records: Vec<(String, PathBuf, PathBuf, Option<String>)> = Vec::new();
+    for (id, store) in stores.open_all()? {
+        let base = stores.base(&id)?;
+        let config_path = stores.config_path(&id)?;
+        records.push((id, base, config_path, bare_config_digest(&store)));
+    }
+
+    match format {
+        Format::Tap => {
+            let mut unmigrated = Vec::new();
+            for (id, _, config_path, digest) in &records {
+                let id_column = match digest {
+                    Some(digest) => format!("{id}@{digest}"),
+                    None => {
+                        unmigrated.push(id.clone());
+                        format!("{id} (unmigrated)")
+                    }
+                };
+                writeln!(
+                    stdout,
+                    "{id_column}: {LOCAL_STORE_DESCRIPTION} # path: {}",
+                    relative_to(&cwd, config_path).display()
+                )?;
+            }
+            if !unmigrated.is_empty() {
+                writeln!(stdout)?;
+                writeln!(
+                    stdout,
+                    "NOTE: {} store(s) above are missing tamper-detection digests.",
+                    unmigrated.len()
+                )?;
+                writeln!(stdout, "      Run this to migrate them:")?;
+                writeln!(stdout)?;
+                writeln!(
+                    stdout,
+                    "        madder config-pin_digest {}",
+                    unmigrated.join(" ")
+                )?;
+            }
+        }
+        Format::Json => {
+            let record = |id: &str, base: &Path, config_path: &Path, digest: &Option<String>| {
+                let digest_field = match digest {
+                    Some(digest) => format!(
+                        ",\"digest\":{}",
+                        json_str(&format!("{CONFIG_DIGEST_PURPOSE}@{digest}"))
+                    ),
+                    None => ",\"digest_missing\":true".to_owned(),
+                };
+                format!(
+                    "{{\"id\":{},\"description\":{},\"config_path\":{},\"base\":{}{digest_field}}}",
+                    json_str(id),
+                    json_str(LOCAL_STORE_DESCRIPTION),
+                    json_str(&config_path.to_string_lossy()),
+                    json_str(&base.to_string_lossy())
+                )
+            };
+            if as_object {
+                let entries: Vec<String> = records
+                    .iter()
+                    .map(|(id, base, config_path, digest)| {
+                        format!(
+                            "  {}: {}",
+                            json_str(id),
+                            record(id, base, config_path, digest)
+                        )
+                    })
+                    .collect();
+                writeln!(stdout, "{{\n{}\n}}", entries.join(",\n"))?;
+            } else {
+                for (id, base, config_path, digest) in &records {
+                    writeln!(stdout, "{}", record(id, base, config_path, digest))?;
+                }
+            }
+        }
+    }
+    stdout.flush()?;
+    Ok(())
+}
+
+/// The config's `@` digest as a bare `blake2b256-…` id (the purpose, if the
+/// file carries one, dropped), or None for a config without one.
+fn bare_config_digest(store: &Store) -> Option<String> {
+    let digest = store.config().digest.as_deref()?;
+    let id = Id::parse(digest).ok()?;
+    Id::new(None, id.format(), id.data().to_vec())
+        .ok()
+        .map(|bare| bare.to_wire())
+}
+
+/// `path` relative to `base`, with `..` segments where it lies outside, as
+/// Go's filepath.Rel renders it; `path` itself when either is relative.
+fn relative_to(base: &Path, path: &Path) -> PathBuf {
+    if !base.is_absolute() || !path.is_absolute() {
+        return path.to_path_buf();
+    }
+    let base_parts: Vec<_> = base.components().collect();
+    let path_parts: Vec<_> = path.components().collect();
+    let common = base_parts
+        .iter()
+        .zip(path_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+    let mut out = PathBuf::new();
+    for _ in common..base_parts.len() {
+        out.push("..");
+    }
+    for part in &path_parts[common..] {
+        out.push(part);
+    }
+    if out.as_os_str().is_empty() {
+        out.push(".");
+    }
+    out
 }
 
 // --- info-repo -------------------------------------------------------------------------

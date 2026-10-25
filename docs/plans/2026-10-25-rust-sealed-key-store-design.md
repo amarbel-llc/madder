@@ -496,6 +496,22 @@ pack-blobs tests stay Go-only.
   `Error::Unsupported` renders as "unsupported hash type …" the way Go's
   does.
 
+## `list` for local stores (madder#322)
+
+Sasha (2026-10-25): the local-store half first, the multi/`-tree` half
+(madder#323) queued after it merges. The shim's `list` walks both scopes
+in id order and renders what Go's `emitListText` / `emitListNDJSON` /
+`emitListJSONObject` render for a local hash-bucketed store: the text
+line `<id>@<digest>: local hash bucketed # path: <rel>` with the bare
+`blake2b256-…` config digest, or `<id> (unmigrated)` plus the
+`config-pin_digest` note when the config has no `@` line; the ndjson
+record with `id`, `description`, `config_path`, `base` and `digest`
+(`madder-blob_store-config-digest-v1@…`) or `digest_missing`; and
+`-format json` as one object keyed by id. Output is sorted, so it is
+byte-stable across runs. `-tree` and `-all` are refused by name. Eleven
+more tests carry the `rust_cli` tag (57 total); the three multi tests
+stay Go-only until madder#323.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -514,3 +530,5 @@ pack-blobs tests stay Go-only.
 8. The portability gate (madder#320): the wasm32 `cargo check` lane.
 9. The rest of the plain-store files (madder#321): two scopes, the shadow
    warning, strict discovery in init.
+10. `list` for local stores (madder#322); multi and `-tree` wait on
+    madder#323.
