@@ -31,7 +31,7 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   `src/hyphence.rs` — the store files.
 - `src/blob_id.rs` — digests, hex, bucket paths. `src/codec.rs` — none/zstd.
 - `src/fs.rs` — the `Fs` trait (wasm seam) and `StdFs`.
-- `src/init.rs` — creating a new sealed-key store.
+- `src/init.rs` — creating a new store: sealed-key (v5) or plain (v4).
 - `src/bin/madder-store-cli.rs` — test-only CLI speaking madder's grammar
   (cargo feature `agent-cli`, which pulls piggy-pigpen's agent oracle).
 - `tests/fixtures/<store>/` — a Go-written store, its plaintexts and the

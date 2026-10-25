@@ -274,6 +274,12 @@ fn parse_sealed_encryption(toml: &TomlLocal) -> Result<(Encryption, Option<Strin
             public_key.to_wire()
         )));
     }
+    if public_key.data().len() != 32 {
+        return Err(Error::Malformed(format!(
+            "age_x25519_pub key holds {} bytes, want 32",
+            public_key.data().len()
+        )));
+    }
     if !matches!(
         public_key.purpose(),
         None | Some(PurposeId::PiggyRecipientV1)
@@ -319,8 +325,10 @@ fn parse_plain_encryption(toml: &TomlLocal) -> Result<Encryption> {
                 )));
             }
             secret.copy_from_slice(id.data());
+            // A clamped scalar times the base point is never a low-order
+            // point, so the recipient check that guards externally supplied
+            // public keys has nothing to say here.
             let public = age_x25519::public_key(&secret);
-            age_x25519::check_recipient(&public)?;
             Ok(Encryption::Key { id, secret, public })
         }
         many => Err(Error::Unsupported(format!(
@@ -477,6 +485,11 @@ mod tests {
         format!("---\n! {type_id}\n---\n\n{body}").into_bytes()
     }
 
+    /// A syntactically valid `age_x25519_pub` id whose payload is 31 bytes.
+    fn short_key_id() -> String {
+        piggy_markl::blech32::encode("age_x25519_pub", &[7u8; 31]).unwrap()
+    }
+
     const SEALED_GOOD: &str = "hash_buckets = [2]\nhash_type-id = \"blake2b256\"\nencryption = [\"piggy-recipient-v1@age_x25519_pub-3aqvttdk3ujkyjh9kg2w5an6dmy5mq5a84a4uxk3hfhnugfc9p0sp50zfy\"]\ncompression-type = \"zstd\"\n\n[key-custody]\nholder = \"process\"\n";
 
     #[test]
@@ -493,6 +506,13 @@ mod tests {
                 good.replace("\"]\n", "\", \"piggy-recipient-v1@age_x25519_pub-3aqvttdk3ujkyjh9kg2w5an6dmy5mq5a84a4uxk3hfhnugfc9p0sp50zfy\"]\n"),
             ),
             ("secret key", good.replace("age_x25519_pub-3aqvttdk3ujkyjh9kg2w5an6dmy5mq5a84a4uxk3hfhnugfc9p0sp50zfy", "age_x25519_sec-3aqvttdk3ujkyjh9kg2w5an6dmy5mq5a84a4uxk3hfhnugfc9p0sp50zfy")),
+            (
+                "a 31-byte public key",
+                good.replace(
+                    "age_x25519_pub-3aqvttdk3ujkyjh9kg2w5an6dmy5mq5a84a4uxk3hfhnugfc9p0sp50zfy",
+                    &short_key_id(),
+                ),
+            ),
             ("unknown hash", good.replace("blake2b256", "md5")),
             ("unknown compression", good.replace("zstd", "brotli")),
             ("base_path", format!("base_path = \"/elsewhere\"\n{good}")),

@@ -23,7 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use madder_store::piggy_markl::{FormatId, Id};
-use madder_store::{BlobId, Encryption, Error, InitEncryption, Store, Unsealer, X25519Identity};
+use madder_store::{BlobId, Error, InitEncryption, Store, Unsealer, X25519Identity};
 
 type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -362,12 +362,13 @@ fn init(args: &[String]) -> CliResult<()> {
     let stores = Stores::in_cwd()?;
     let base = stores.base(store_id)?;
     let config_path = base.join(madder_store::store::FILE_NAME_CONFIG);
-    let mut tap = Tap::new(io::stdout().lock())?;
+    // The TAP stream is opened only once there is a result to put in it: a
+    // failing init leaves stdout empty rather than a header with no plan.
     if config_path.exists() {
         if flags.contains_key("if-not-exists") {
+            let mut tap = Tap::new(io::stdout().lock())?;
             tap.ok(&format!("init {} (already exists)", config_path.display()))?;
-            tap.plan()?;
-            return Ok(());
+            return tap.plan().map_err(Into::into);
         }
         return Err(format!(
             "blob store {store_id:?} already exists at {}",
@@ -376,6 +377,7 @@ fn init(args: &[String]) -> CliResult<()> {
         .into());
     }
     madder_store::init(&base, options, madder_store::OpenOptions::default())?;
+    let mut tap = Tap::new(io::stdout().lock())?;
     tap.ok(&format!("init {}", config_path.display()))?;
     tap.plan()?;
     Ok(())
@@ -531,14 +533,22 @@ fn write(args: &[String]) -> CliResult<()> {
     let check = flags.contains_key("check");
     let stores = Stores::in_cwd()?;
 
+    // The active store: named on the command line, else the default. When
+    // the first argument is a file, the default store is opened before the
+    // output stream starts, so a missing store fails with no TAP header.
+    let mut active: Option<(Option<String>, Store)> = None;
+    if positional.iter().any(|a| !is_store_switch(a))
+        && positional.first().is_some_and(|a| !is_store_switch(a))
+    {
+        let (_, store) = stores.open_default()?;
+        active = Some((None, store));
+    }
+
     let stdout = io::stdout().lock();
     let mut sink = match format {
         Format::Tap => WriteSink::Tap(Tap::new(stdout)?),
         Format::Json => WriteSink::Json { out: stdout, check },
     };
-
-    // The active store: named on the command line, else the default.
-    let mut active: Option<(Option<String>, Store)> = None;
     let mut failures = 0usize;
     let mut saw_stdin = false;
 
@@ -638,6 +648,8 @@ fn cat(args: &[String]) -> CliResult<()> {
     let stores = Stores::in_cwd()?;
     // (id, store, named explicitly)
     let mut active: Option<(String, Store, bool)> = None;
+    // Every store, opened once, for the fallback search.
+    let mut all_stores: Option<Vec<(String, Store)>> = None;
     let mut missing = 0usize;
     let mut unreadable = 0usize;
     let mut stdout = io::stdout().lock();
@@ -674,11 +686,14 @@ fn cat(args: &[String]) -> CliResult<()> {
                 // remaining stores, in order, as Go's cat does.
                 let held_but_unreadable = !matches!(active_err, Error::NotFound(_));
                 let mut served = false;
-                for (other_id, other) in stores.open_all()? {
-                    if other_id == *active_id || !other.has(&id) {
+                if all_stores.is_none() {
+                    all_stores = Some(stores.open_all()?);
+                }
+                for (other_id, other) in all_stores.as_ref().expect("set above") {
+                    if other_id == active_id || !other.has(&id) {
                         continue;
                     }
-                    match read_blob(&other, &id, &mut stdout) {
+                    match read_blob(other, &id, &mut stdout) {
                         Ok(()) => {
                             served = true;
                             break;
@@ -714,13 +729,15 @@ fn cat(args: &[String]) -> CliResult<()> {
 }
 
 /// Copy one blob to `out`; `Error::NotFound` when the store lacks it, any
-/// other error when it holds bytes it cannot read.
+/// other error when it holds bytes it cannot read. A failure to open the
+/// store key (no agent, wrong identity) is passed through as an I/O error
+/// carrying its own message: it says nothing about the store's bytes.
 fn read_blob(store: &Store, id: &BlobId, out: &mut impl Write) -> madder_store::Result<()> {
     if !id.is_null() {
         if !store.has(id) {
             return Err(Error::NotFound(id.to_wire()));
         }
-        unseal(store).map_err(|e| Error::Malformed(e.to_string()))?;
+        unseal(store).map_err(|e| Error::Io(io::Error::other(e.to_string())))?;
     }
     let bytes = store.read_to_vec(id)?;
     out.write_all(&bytes)?;
@@ -745,6 +762,8 @@ fn has(args: &[String]) -> CliResult<()> {
     let all = flags.contains_key("all");
     let stores = Stores::in_cwd()?;
     let mut explicit: Option<(String, Store)> = None;
+    // Every store, opened once, for the search when none is named.
+    let mut all_stores: Option<Vec<(String, Store)>> = None;
     let mut missing = 0usize;
 
     for arg in &positional {
@@ -775,9 +794,12 @@ fn has(args: &[String]) -> CliResult<()> {
             None => {
                 // The default store first, then the rest in id order; stop
                 // at the first hit unless -all.
-                for (store_id, store) in stores.open_all()? {
+                if all_stores.is_none() {
+                    all_stores = Some(stores.open_all()?);
+                }
+                for (store_id, store) in all_stores.as_ref().expect("set above") {
                     if store.has(&id) {
-                        hits.push(store_id);
+                        hits.push(store_id.clone());
                         if !all {
                             break;
                         }
@@ -1178,9 +1200,4 @@ fn unhex(s: &str) -> CliResult<Vec<u8>> {
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.into()))
         .collect()
-}
-
-#[allow(dead_code)]
-fn describe_encryption(encryption: &Encryption) -> String {
-    encryption.describe()
 }

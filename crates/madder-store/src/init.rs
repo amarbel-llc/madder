@@ -13,7 +13,7 @@ use std::path::Path;
 
 use blake2::Blake2b;
 use blake2::digest::consts::U32;
-use piggy_markl::{FormatId, Id, blech32};
+use piggy_markl::{FormatId, Id, PurposeId, blech32};
 use piggy_pigpen::Document;
 use rand_core::{OsRng, RngCore};
 use serde::Serialize;
@@ -287,14 +287,13 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
                     minted
                 }
             };
-            age_x25519::check_recipient(&age_x25519::public_key(&secret))?;
-            let bare = Id::new(None, FormatId::AgeX25519Sec, secret.to_vec())
-                .map_err(|e| Error::Markl(e.to_string()))?;
-            // The purpose Go stamps; piggy-markl carries it as `Other`.
-            let id = Id::parse(&format!(
-                "{PURPOSE_MADDER_PRIVATE_KEY_V1}@{}",
-                bare.to_wire()
-            ))
+            // The purpose Go stamps; piggy-markl carries it as `Other`, and
+            // `Id::new` skips the format check for such a purpose.
+            let id = Id::new(
+                Some(PurposeId::Other(PURPOSE_MADDER_PRIVATE_KEY_V1.to_owned())),
+                FormatId::AgeX25519Sec,
+                secret.to_vec(),
+            )
             .map_err(|e| Error::Markl(e.to_string()))?;
             (TYPE_V4, vec![id.to_wire()], None)
         }
@@ -371,7 +370,7 @@ fn seal_store_key(
     let public = age_x25519::public_key(&secret);
     age_x25519::check_recipient(&public)?;
     let public_id = Id::new(
-        Some(piggy_markl::PurposeId::PiggyRecipientV1),
+        Some(PurposeId::PiggyRecipientV1),
         FormatId::AgeX25519Pub,
         public.to_vec(),
     )

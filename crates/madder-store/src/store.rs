@@ -60,8 +60,8 @@ pub struct Store {
     config: Config,
     /// Present for a sealed-key store only.
     sidecar: Option<Sidecar>,
-    /// The X25519 secret blobs decrypt with: set at open for a raw-key
-    /// store, by `unseal` for a sealed one, never for an unencrypted one.
+    /// The unsealed store key of a sealed-key store, set by `unseal`. A
+    /// raw-key store's secret lives in `config.encryption` instead.
     key: OnceCell<Zeroizing<[u8; 32]>>,
 }
 
@@ -84,11 +84,6 @@ impl Store {
             None
         };
 
-        let key = OnceCell::new();
-        if let Encryption::Key { secret, .. } = &config.encryption {
-            let _ = key.set(secret.clone());
-        }
-
         let temp_dir = options.temp_dir.unwrap_or_else(|| default_temp_dir(&base));
 
         Ok(Store {
@@ -97,7 +92,7 @@ impl Store {
             fs,
             config,
             sidecar,
-            key,
+            key: OnceCell::new(),
         })
     }
 
@@ -134,7 +129,10 @@ impl Store {
     /// Whether blobs can be read now: always for a plain store, after
     /// [`Store::unseal`] for a sealed-key one.
     pub fn is_unsealed(&self) -> bool {
-        matches!(self.config.encryption, Encryption::None) || self.key.get().is_some()
+        match self.config.encryption {
+            Encryption::Sealed { .. } => self.key.get().is_some(),
+            Encryption::None | Encryption::Key { .. } => true,
+        }
     }
 
     /// Open the sealed store key. Done at most once per `Store`; a P-256
@@ -170,7 +168,12 @@ impl Store {
         Ok(())
     }
 
+    /// The X25519 secret blobs decrypt with: the config's for a raw-key
+    /// store, the unsealed key for a sealed one.
     fn secret(&self) -> Result<&[u8; 32]> {
+        if let Encryption::Key { secret, .. } = &self.config.encryption {
+            return Ok(secret);
+        }
         self.key.get().map(|k| &**k).ok_or(Error::Locked)
     }
 
