@@ -72,14 +72,16 @@ codemod-tommy:
 # Regenerate the Go-written conformance fixtures the Rust crate
 # (crates/madder-store) must read back byte-exact: two sealed-key stores
 # (FDR 0011) whose key is sealed to an X25519 recipient minted from a fixed
-# seed, plus a P-256 recipient line the Rust side parses but cannot open,
-# and blobs that cross a 64 KiB age STREAM chunk. Every input is
-# deterministic, but age picks a fresh ephemeral key and nonce per blob, so
-# a regeneration changes the committed store bytes and never a blob id.
-# Needs openssl (devshell) for the incompressible large plaintext. See
-# docs/plans/2026-10-25-rust-sealed-key-store-design.md.
+# seed, plus a P-256 recipient line the Rust side parses but cannot open;
+# two plain V4 stores (madder#318), one unencrypted and one with a raw
+# age_x25519_sec key in its config; and blobs that cross a 64 KiB age
+# STREAM chunk. Every input is deterministic, but age picks a fresh
+# ephemeral key and nonce per blob (and `-encryption generate` a fresh
+# key), so a regeneration changes the committed store bytes and never a
+# blob id. Needs openssl (devshell) for the incompressible large plaintext.
+# See docs/plans/2026-10-25-rust-sealed-key-store-design.md.
 #
-# regenerate the Go-written sealed-key store fixtures for the Rust crate
+# regenerate the Go-written store fixtures for the Rust crate
 [group("codemod")]
 codemod-rust-fixtures:
   #!/usr/bin/env bash
@@ -89,28 +91,33 @@ codemod-rust-fixtures:
   fixtures="{{justfile_directory()}}/crates/madder-store/tests/fixtures"
   seed=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
 
-  make_store() {
-    local name="$1"; shift
-    local out="$fixtures/$name"
-    local work; work="$(mktemp -d)"
-    local home="$work/home"
-    mkdir -p "$home" "$work/cwd"
+  reset_out() {
+    local out="$1"
     if [ -d "$out" ]; then chmod -R u+w "$out"; rm -rf "$out"; fi
+    mkdir -p "$out"
+  }
+
+  # Plaintexts: empty, one byte, a short line, and 160 KiB of
+  # deterministic incompressible bytes (three 64 KiB STREAM chunks, the
+  # last partial; two 128 KiB zstd blocks).
+  write_plaintexts() {
+    local out="$1"
     mkdir -p "$out/plaintexts"
-
-    "$mint" -seed "$seed" >"$out/piggy-ids"
-    "$mint" -seed "$seed" -print-secret >"$out/x25519-secret.hex"
-
-    # Plaintexts: empty, one byte, a short line, and 160 KiB of
-    # deterministic incompressible bytes (three 64 KiB STREAM chunks, the
-    # last partial; two 128 KiB zstd blocks).
     : >"$out/plaintexts/empty"
     printf 'x' >"$out/plaintexts/one-byte"
     printf 'hello, pigsty\n' >"$out/plaintexts/hello"
     head -c 163840 /dev/zero \
       | openssl enc -aes-256-ctr -nosalt -K "$seed" -iv 00000000000000000000000000000000 \
       >"$out/plaintexts/large"
+  }
 
+  # init a store `.fx` with the given init flags in an isolated HOME, write
+  # the plaintexts into it, and copy the store directory out.
+  fill_store() {
+    local out="$1"; shift
+    local work; work="$(mktemp -d)"
+    local home="$work/home"
+    mkdir -p "$home" "$work/cwd"
     (
       cd "$work/cwd"
       # Isolated like debug-init-repro: tmp HOME, every XDG_* under it, and
@@ -118,8 +125,7 @@ codemod-rust-fixtures:
       export HOME="$home" MADDER_CEILING_DIRECTORIES="$work/cwd"
       export XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share"
       export XDG_CACHE_HOME="$home/.cache" XDG_STATE_HOME="$home/.local/state"
-      # embedded: the sidecar carries the pigpen itself, no host path.
-      "$madder" init -pigpen "$out/piggy-ids" -pigpen-kind embedded "$@" .fx
+      "$madder" init "$@" .fx
       # `empty` is deliberately not written: Go treats the digest of zero
       # bytes as the null id and stores nothing for it (blob_io/mover.go);
       # the Rust tests assert that same semantics from the plaintext alone.
@@ -134,13 +140,41 @@ codemod-rust-fixtures:
       done
       cp -r .madder/local/share/blob_stores/fx "$out/store"
     )
-    chmod -R u+w "$out"
     rm -rf "$work"
+  }
+
+  # A sealed-key store: the pigpen (two recipients from the seed) is
+  # embedded in the sidecar, no host path; the X25519 secret is the seed.
+  make_sealed_store() {
+    local name="$1"; shift
+    local out="$fixtures/$name"
+    reset_out "$out"
+    "$mint" -seed "$seed" >"$out/piggy-ids"
+    "$mint" -seed "$seed" -print-secret >"$out/x25519-secret.hex"
+    write_plaintexts "$out"
+    fill_store "$out" -pigpen "$out/piggy-ids" -pigpen-kind embedded "$@"
+    chmod -R u+w "$out"
     echo "==> $out"
   }
 
-  make_store zstd-blake2b256
-  make_store none-sha256 -compression-type none -hash_type-id sha256
+  # A plain store (madder#318): a V4 config and no sidecar. `-encryption
+  # none` stores compressed plaintext; `-encryption generate` mints an
+  # age_x25519_sec key that lives in the config itself, so the fixture
+  # needs no secret file of its own.
+  make_plain_store() {
+    local name="$1"; shift
+    local out="$fixtures/$name"
+    reset_out "$out"
+    write_plaintexts "$out"
+    fill_store "$out" "$@"
+    chmod -R u+w "$out"
+    echo "==> $out"
+  }
+
+  make_sealed_store zstd-blake2b256
+  make_sealed_store none-sha256 -compression-type none -hash_type-id sha256
+  make_plain_store plain-none-v4 -encryption none
+  make_plain_store plain-key-v4 -encryption generate
 
 #    ____ _
 #   / ___| | ___  __ _ _ __

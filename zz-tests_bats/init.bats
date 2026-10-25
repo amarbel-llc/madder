@@ -5,10 +5,16 @@ setup() {
 
 # bats file_tags=init
 
+# The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
+# CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
+# inventory-archive inits and the discovery error report are Go-only.
+
+# bats test_tags=rust_cli
 function init_default { # @test
   init_store
 }
 
+# bats test_tags=rust_cli
 function init_default_config_is_read_only { # @test
   # Per ADR 0005, blob_store-config files are immutable per store
   # identity. #65 enforces this on disk via 0o444 mode bits so vim or
@@ -21,24 +27,28 @@ function init_default_config_is_read_only { # @test
   assert_equal "$(file_mode "$config")" '444'
 }
 
+# bats test_tags=rust_cli
 function init_idempotent_fails { # @test
   init_store
   run_madder init -encryption none .default
   assert_failure
 }
 
+# bats test_tags=rust_cli
 function init_compression_default { # @test
   init_store
   run_madder info-repo compression-type
   assert_output 'zstd'
 }
 
+# bats test_tags=rust_cli
 function init_without_encryption { # @test
   init_store
   run_madder info-repo encryption
   assert_output ''
 }
 
+# bats test_tags=rust_cli
 function init_with_encryption { # @test
   run_madder init -encryption generate .encrypted
   assert_success
@@ -62,6 +72,7 @@ function init_inventory_archive_with_encryption { # @test
   assert_output --regexp '.+'
 }
 
+# bats test_tags=rust_cli
 function init_default_config_has_digest_line { # @test
   # FDR-0008 Phase 1: every fresh config carries an @ line in its
   # hyphence metadata header with a blake2b256 digest. The hyphence

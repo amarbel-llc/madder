@@ -72,9 +72,10 @@ flags.
 
 ## Rust crate: crates/madder-store
 
-`crates/madder-store` is a Rust reader/writer for **sealed-key local
-stores** (FDR 0011), byte-compatible with the Go madder, for the pigsty
-vault (Linux + Android). It is a cargo workspace member rooted at the
+`crates/madder-store` is a Rust reader/writer for madder's **local
+stores**, byte-compatible with the Go madder, for the pigsty vault
+(Linux + Android): the sealed-key store (FDR 0011) and the plain V3/V4
+stores `madder init -encryption none|generate` writes (madder#318). It is a cargo workspace member rooted at the
 repo's `Cargo.toml`, built by `nix build .#madder-store` (`just
 test-rust`), linted by clippy in the impure lane and rustfmt in `nix
 fmt`. Its own `AGENTS.md`, `madder-store(7)` and

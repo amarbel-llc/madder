@@ -1,13 +1,13 @@
 ---
 ! toml-blob_store_config-v5
-@ blake2b256-e3n2fuxwvlhj9eda3kn5mr9hszk3xhf5c5mj6ath6z3vfxwem8kseu3lr4
+@ blake2b256-xcepmexz7ta2rdzmwc5al6few86a0s9278sravfdhejf9038vegsk2cs52
 ---
 
 hash_buckets = [2]
 hash_type-id = "blake2b256"
-encryption = ["piggy-recipient-v1@age_x25519_pub-7p7jyfehwxz9qw46jjlt3zut2eljx76ehkzhcaxctfjcztl2dyts7uckf0"]
+encryption = ["piggy-recipient-v1@age_x25519_pub-e0ef6nqj0sk06d4hz6nsfjpl2j3r7angmhz9fj0jcrqsh5hggy3q6ygs4k"]
 compression-type = "zstd"
-instance-id = "uuidv7-qxshzr7vsf7s08efyawfy56x9sxdwhk3"
+instance-id = "uuidv7-qxsh84fgndegmgfrltgsawgpssa4cz6m"
 
 [key-custody]
 holder = "process"

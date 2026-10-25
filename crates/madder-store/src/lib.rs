@@ -1,13 +1,16 @@
-//! madder-store: read and write madder sealed-key local blob stores
-//! (FDR 0011), byte-compatible with the Go `madder`.
+//! madder-store: read and write madder local blob stores, byte-compatible
+//! with the Go `madder`: the sealed-key store (FDR 0011) and the plain
+//! V3/V4 stores Go writes by default.
 //!
 //! A store is a directory holding `blob_store-config` (immutable, digest
-//! pinned), `blob_store-key` (the store key sealed to a pigpen recipient
-//! set) and blobs as age files bucketed by digest. Writing needs only the
-//! public key in the config. Reading opens the sealed key once, through
-//! an injected [`piggy_pigpen::EcdhOracle`] for a PIV recipient or a
-//! software [`piggy_pigpen::X25519Identity`], and decrypts every blob in
-//! software after that.
+//! pinned) and blobs bucketed by digest. A sealed-key store adds
+//! `blob_store-key` (the store key sealed to a pigpen recipient set) and
+//! stores each blob as an age file to its public key: writing needs only
+//! that public key, reading opens the sealed key once, through an injected
+//! [`piggy_pigpen::EcdhOracle`] for a PIV recipient or a software
+//! [`piggy_pigpen::X25519Identity`], and decrypts every blob in software
+//! after that. A plain store is either unencrypted (compressed plaintext
+//! on disk) or carries one raw X25519 key in its config.
 //!
 //! A blob's id is the digest of its plaintext: compression never changes
 //! an id, and two writers of the same bytes publish the same path.
@@ -30,10 +33,10 @@ pub mod store;
 
 pub use blob_id::{BlobId, HashFormat};
 pub use codec::Compression;
-pub use config::Config;
+pub use config::{Config, ConfigVersion, Encryption};
 pub use error::{Error, Result};
 pub use fs::{Fs, StdFs};
-pub use init::{InitOptions, init, parse_recipients};
+pub use init::{InitEncryption, InitOptions, init, parse_recipients};
 pub use sidecar::RecipientSource;
 pub use store::{BlobReader, OpenOptions, Store, Unsealer};
 

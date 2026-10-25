@@ -5,6 +5,12 @@ setup() {
 
 # bats file_tags=write,read
 
+# The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
+# CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
+# `list` tests and the file-shadows-store warnings are Go-only (madder#321,
+# madder#322).
+
+# bats test_tags=rust_cli
 function write_and_cat { # @test
 
   init_store
@@ -19,6 +25,7 @@ function write_and_cat { # @test
   assert_output --partial "hello world"
 }
 
+# bats test_tags=rust_cli
 function write_from_stdin { # @test
 
   init_store
@@ -171,6 +178,7 @@ function pack_blobs_warns_when_file_shadows_store { # @test
   assert_output --partial "shadows blob-store-id"
 }
 
+# bats test_tags=rust_cli
 function write_no_warning_when_no_store_collision { # @test
 
   # Control for write_warns_when_file_shadows_store.
@@ -185,6 +193,7 @@ function write_no_warning_when_no_store_collision { # @test
 
 # NDJSON output mode (issue #26) -----------------------------------------
 
+# bats test_tags=rust_cli
 function write_json_emits_ndjson_record { # @test
 
   init_store
@@ -197,6 +206,7 @@ function write_json_emits_ndjson_record { # @test
   assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
 }
 
+# bats test_tags=rust_cli
 function write_auto_detects_json_when_stdout_is_pipe { # @test
 
   # bats `run` is never a TTY, so auto-format must pick JSON.
@@ -210,6 +220,7 @@ function write_auto_detects_json_when_stdout_is_pipe { # @test
   assert_line --regexp '^\{"id":"[^"]+","size":12,"source":"[^"]+blob\.txt"\}$'
 }
 
+# bats test_tags=rust_cli
 function write_json_check_present { # @test
 
   init_store
@@ -224,6 +235,7 @@ function write_json_check_present { # @test
   assert_output --partial '"present":true'
 }
 
+# bats test_tags=rust_cli
 function write_json_check_missing { # @test
 
   init_store
@@ -236,6 +248,7 @@ function write_json_check_missing { # @test
   assert_output --partial '"present":false'
 }
 
+# bats test_tags=rust_cli
 function write_tap_override_on_pipe { # @test
 
   init_store
@@ -250,6 +263,7 @@ function write_tap_override_on_pipe { # @test
   refute_output --partial '"id":'
 }
 
+# bats test_tags=rust_cli
 function write_json_rejects_unknown_format { # @test
 
   init_store

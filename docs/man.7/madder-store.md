@@ -7,15 +7,17 @@ title: MADDER-STORE(7) Madder \| Miscellaneous
 
 # NAME
 
-madder-store - Rust reader and writer for sealed-key local blob stores
+madder-store - Rust reader and writer for madder's local blob stores
 
 # DESCRIPTION
 
 **madder-store** is the Rust crate at **crates/madder-store** that reads
-and writes a madder **sealed-key local hash-bucketed** store
-(**blob-store**(7) SEALED-KEY STORES, FDR-0011) byte-compatibly with the
-Go **madder**, so a program that cannot link Go can use such a store as
-its backing storage. Its first consumer is **pigsty**, a Linux and
+and writes a madder **local hash-bucketed** store byte-compatibly with
+the Go **madder**: the **sealed-key** store (**blob-store**(7) SEALED-KEY
+STORES, FDR-0011) and the plain V3/V4 stores **madder init** writes by
+default, unencrypted or with a raw key in the config. A program that
+cannot link Go can thus use such a store as its backing storage. Its
+first consumer is **pigsty**, a Linux and
 Android password vault that keeps hyphence entry documents and
 attachments as blobs. The crate is pure Rust (the RustCrypto stack
 piggy's **piggy-pigpen** crate already uses) with no system libraries, so
@@ -25,24 +27,31 @@ implementation, and nothing is async.
 
 The crate implements exactly the on-disk facts the Go code pins:
 
-- **blob_store-config** of type **toml-blob_store_config-v5**, whose
-  **@** line is the **blake2b256** digest of the body bytes after the
-  last **---** boundary plus blank line; a mismatch is
-  **Error::ConfigTampered**. The config must name the **process** key
-  holder and exactly one **age_x25519_pub** public key.
-- **blob_store-key** of type **toml-blob_store_key-v2** (v1 is read):
-  the recipient source (**path**, **papi**, **embedded**) and the sealed
-  **pigpen-v1** document, base64 on disk, whose 32-byte payload is the
-  store key's secret half.
+- **blob_store-config** of type **toml-blob_store_config-v3**, **-v4**
+  or **-v5**, whose **@** line (when present) is the **blake2b256**
+  digest of the body bytes after the last **---** boundary plus blank
+  line; a mismatch is **Error::ConfigTampered**. A v5 config (the
+  sealed-key store) must name the **process** key holder and exactly one
+  **age_x25519_pub** public key. A v3/v4 config (a plain store) has no
+  **key-custody** table and either no **encryption** (compressed
+  plaintext on disk) or exactly one **age_x25519_sec** key, the
+  **madder init -encryption generate** shape; several keys (Go's age
+  MultiIdentity) and the v1/v2 config shapes are refused.
+- **blob_store-key** of type **toml-blob_store_key-v2** (v1 is read),
+  present for a sealed-key store only: the recipient source (**path**,
+  **papi**, **embedded**) and the sealed **pigpen-v1** document, base64
+  on disk, whose 32-byte payload is the store key's secret half.
 - Blob paths **\<base\>/\<hash-format\>/\<buckets\>/\<rest\>** from the
   lower-case hex digest (multi-hash layout; **single_hash** drops the
   format directory). The digest of zero bytes is the null id: nothing is
   stored for it and it reads back empty, as in Go.
 - Blob bytes: plaintext, then compression (**none** or **zstd**; gzip
-  and zlib are refused), then an age v1 file with one **X25519** stanza.
-  The age subset is hand-written on the same RustCrypto crates; it
-  refuses any other stanza type, several stanzas, or a missing header
-  MAC rather than guessing.
+  and zlib are refused), then, for an encrypted store, an age v1 file
+  with one **X25519** stanza to the store's public key (a sealed-key
+  store's, or the public half of a plain store's raw key). The age
+  subset is hand-written on the same RustCrypto crates; it refuses any
+  other stanza type, several stanzas, or a missing header MAC rather
+  than guessing.
 - Publishing per **blob-store**(7) CONCURRENCY AND DURABILITY: temp
   file, **fsync**, **chmod 0444**, **link**(2) into the tree with
   **EEXIST** treated as the same bytes already published, **fsync** of
@@ -53,50 +62,64 @@ The crate implements exactly the on-disk facts the Go code pins:
 
 # API
 
-**Store::open(base)** parses and verifies both files and unseals
-nothing. **sealed_recipients()** and **recipient_source()** are the read
-half of **madder key-status** and need no agent. **unseal(&Unsealer {
-oracle, identities })** opens the sealed key once, through an injected
-**piggy_pigpen::EcdhOracle** for a PIV recipient or a software
-**X25519Identity**, and checks the result is the secret half of the
-config's public key (**Error::WrongKey** otherwise). **write(reader)**
-needs no key and returns the **BlobId**; **has(id)**, **ids()** and
-**read(id)** (digest-verified at EOF; **Error::Locked** before
-**unseal**) complete the surface. A blob's id is the digest of its
-plaintext, so compression never changes an id.
+**Store::open(base)** parses and verifies the config, and for a
+sealed-key store the sidecar, and unseals nothing. **config()** carries
+the **ConfigVersion** and the **Encryption** (**None**, **Key** or
+**Sealed**). **sealed_recipients()** and **recipient_source()** are the
+read half of **madder key-status** and need no agent (empty and absent
+for a plain store). **unseal(&Unsealer { oracle, identities })** opens
+the sealed key once, through an injected **piggy_pigpen::EcdhOracle**
+for a PIV recipient or a software **X25519Identity**, and checks the
+result is the secret half of the config's public key
+(**Error::WrongKey** otherwise); on a plain store it is a no-op and
+**is_unsealed()** is true from the start. **write(reader)** needs no key
+and returns the **BlobId**; **has(id)**, **ids()** and **read(id)**
+(digest-verified at EOF; **Error::Locked** before **unseal** on a
+sealed-key store) complete the surface. A blob's id is the digest of
+its plaintext, so compression never changes an id.
 
-**madder_store::init** creates a new sealed-key store (sidecar first,
-then the digest-pinned config), since pigsty on Android has no Go
-**madder** to shell out to.
+**madder_store::init** creates a new store from an **InitEncryption**:
+**Sealed** (sidecar first, then the digest-pinned v5 config), **None**
+or **Key** (a v4 config). The config is written read-only (mode 0444),
+as Go's **WriteImmutable** does. pigsty on Android has no Go **madder**
+to shell out to.
 
 Out of scope: **key-reseal**, **config-gen**, remote store types,
 inventory archives, pointer and multi stores, the drift check against a
-re-resolved pigpen, **verify-on-collision**, and V4/V3 stores whose
-secret key sits in the config (madder#318).
+re-resolved pigpen, **verify-on-collision**, several raw keys in one
+config, and the v1/v2 config shapes.
 
 # TEST CLI
 
 **madder-store-cli**, the crate's binary target (cargo feature
 **agent-cli**, never shipped), speaks the subset of **madder**'s grammar
-the sealed-key bats tests use: **init -pigpen**, **write -format tap**,
-**cat**, **cat-ids**, **fsck -format ndjson**, **key-status**, with
-CWD-relative **.name** blob-store-ids only. It opens the sealed key with
+the store bats tests use: **init** (**-pigpen**, or **-encryption
+none|generate**), **write** (TAP or NDJSON, **-check**, **-** for
+stdin), **cat**, **cat-ids**, **has**, **fsck**, **info-repo**,
+**key-status**, with CWD-relative **.name** blob-store-ids only. With no
+id named it uses the default store the way Go's discovery picks it (the
+alphabetically first store that opens), and **cat** and **has** fall
+back to the remaining stores. It opens a sealed key with
 **MADDER_STORE_IDENTITY_HEX** (an X25519 secret) when set, else through
 piggy-agent via **piggy_pigpen::agent** (**PIGGY_AUTH_SOCK**,
 **SSH_AUTH_SOCK**, **PIVY_AUTH_SOCK**). Its purpose is to let the
-existing bats files run against the Rust implementation.
+existing bats files run against the Rust implementation; madder's own
+CLI surface beyond the store (the arg resolver's shadow warnings,
+**list**, multi and archive stores) is not reproduced (madder#321,
+madder#322).
 
 # CONFORMANCE
 
 **just test-rust** builds the crate and runs **cargo test** in the nix
 sandbox: unit tests, the Go-written fixture stores under
-**crates/madder-store/tests/fixtures** (regenerated by **just
-codemod-rust-fixtures** from the test-only **madder-test-mint-recipient**
-binary and **madder init -pigpen**) read back byte-exact, and age files
-round-trip with the nixpkgs **age** CLI. **just test-bats-rust-cli**
-runs the tests of **zz-tests_bats/pigpen_store.bats** tagged
-**rust_cli** with **MADDER_BIN** pointed at the Rust test CLI, so the
-same tests run against both implementations. **just
+**crates/madder-store/tests/fixtures** (two sealed-key and two plain
+stores, regenerated by **just codemod-rust-fixtures** from the test-only
+**madder-test-mint-recipient** binary and **madder init**) read back
+byte-exact, and age files round-trip with the nixpkgs **age** CLI.
+**just test-bats-rust-cli** runs every bats test tagged **rust_cli**
+(in **pigpen_store**, **write_read**, **fsck**, **init**,
+**cli_contract** and **info_repo**) with **MADDER_BIN** pointed at the
+Rust test CLI, so the same tests run against both implementations. **just
 test-bats-rust-interop** runs **zz-tests_bats/pigpen_rust_interop.bats**
 against one live store in both directions, with the real piggy-agent
 over fibby. **just lint-worktree** runs clippy

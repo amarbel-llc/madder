@@ -5,6 +5,10 @@ setup() {
 
 # bats file_tags=fsck
 
+# The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
+# CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`.
+
+# bats test_tags=rust_cli
 function tap14_output { # @test
   init_store
   run_madder fsck -format tap
@@ -14,6 +18,7 @@ function tap14_output { # @test
   refute_output --partial 'not ok'
 }
 
+# bats test_tags=rust_cli
 function with_blobs { # @test
   init_store
 
@@ -28,6 +33,7 @@ function with_blobs { # @test
   refute_output --partial 'not ok'
 }
 
+# bats test_tags=rust_cli
 function fsck_json_auto_detects { # @test
   init_store
 
@@ -43,6 +49,7 @@ function fsck_json_auto_detects { # @test
   refute_output --partial 'TAP version 14'
 }
 
+# bats test_tags=rust_cli
 function fsck_json_reports_missing { # @test
   # Delete blob files after writing to simulate corruption, then confirm
   # fsck emits a missing record. The AllBlobs iterator still sees the

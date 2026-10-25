@@ -1,4 +1,5 @@
-//! A sealed-key local hash-bucketed store (FDR 0011).
+//! A local hash-bucketed store: sealed-key (FDR 0011) or plain (V3/V4,
+//! unencrypted or with a raw key in its config).
 
 use std::cell::OnceCell;
 use std::io::{self, BufWriter, Read, Write};
@@ -10,7 +11,7 @@ use zeroize::Zeroizing;
 
 use crate::age_x25519::{self, Decryptor, Encryptor};
 use crate::blob_id::{BlobId, HashFormat, Hasher};
-use crate::config::Config;
+use crate::config::{Config, Encryption};
 use crate::fs::{Fs, StdFs};
 use crate::sidecar::{RecipientSource, Sidecar};
 use crate::{Error, Result};
@@ -50,13 +51,17 @@ impl Default for OpenOptions {
     }
 }
 
-/// An open store. Reading needs [`Store::unseal`] first; writing never does.
+/// An open store. A sealed-key store needs [`Store::unseal`] before it
+/// reads; a plain store never does. Writing never needs a key.
 pub struct Store {
     base: PathBuf,
     temp_dir: PathBuf,
     fs: Box<dyn Fs>,
     config: Config,
-    sidecar: Sidecar,
+    /// Present for a sealed-key store only.
+    sidecar: Option<Sidecar>,
+    /// The X25519 secret blobs decrypt with: set at open for a raw-key
+    /// store, by `unseal` for a sealed one, never for an unencrypted one.
     key: OnceCell<Zeroizing<[u8; 32]>>,
 }
 
@@ -66,14 +71,23 @@ impl Store {
         Store::open_with(base, OpenOptions::default())
     }
 
-    /// Open the store at `base`: parse and verify the config, parse the
-    /// sidecar. Nothing is unsealed.
+    /// Open the store at `base`: parse and verify the config, and for a
+    /// sealed-key store parse the sidecar. Nothing is unsealed.
     pub fn open_with(base: impl AsRef<Path>, options: OpenOptions) -> Result<Store> {
         let base = base.as_ref().to_path_buf();
         let fs = options.fs;
 
         let config = Config::parse(&fs.read(&base.join(FILE_NAME_CONFIG))?)?;
-        let sidecar = Sidecar::parse(&fs.read(&base.join(FILE_NAME_KEY))?)?;
+        let sidecar = if config.is_sealed_key() {
+            Some(Sidecar::parse(&fs.read(&base.join(FILE_NAME_KEY))?)?)
+        } else {
+            None
+        };
+
+        let key = OnceCell::new();
+        if let Encryption::Key { secret, .. } = &config.encryption {
+            let _ = key.set(secret.clone());
+        }
 
         let temp_dir = options.temp_dir.unwrap_or_else(|| default_temp_dir(&base));
 
@@ -83,7 +97,7 @@ impl Store {
             fs,
             config,
             sidecar,
-            key: OnceCell::new(),
+            key,
         })
     }
 
@@ -95,36 +109,47 @@ impl Store {
         &self.config
     }
 
-    /// The store's public key, a `piggy-recipient-v1@age_x25519_pub-…` id.
-    pub fn public_key(&self) -> &Id {
-        &self.config.public_key
+    /// The key blobs are encrypted to: the `piggy-recipient-v1@age_x25519_pub-…`
+    /// id of a sealed-key store, the derived public key of a raw-key store,
+    /// none for an unencrypted one.
+    pub fn public_key(&self) -> Option<Id> {
+        self.config.public_key()
     }
 
     /// The recipients the store key is sealed to (the read half of
-    /// `madder key-status`). Needs no agent.
+    /// `madder key-status`). Needs no agent; empty for a plain store.
     pub fn sealed_recipients(&self) -> Vec<Id> {
-        self.sidecar.sealed_recipients()
+        self.sidecar
+            .as_ref()
+            .map(Sidecar::sealed_recipients)
+            .unwrap_or_default()
     }
 
-    /// Where the recipients were read from when the key was sealed.
-    pub fn recipient_source(&self) -> &RecipientSource {
-        &self.sidecar.source
+    /// Where the recipients were read from when the key was sealed; none
+    /// for a plain store.
+    pub fn recipient_source(&self) -> Option<&RecipientSource> {
+        self.sidecar.as_ref().map(|s| &s.source)
     }
 
+    /// Whether blobs can be read now: always for a plain store, after
+    /// [`Store::unseal`] for a sealed-key one.
     pub fn is_unsealed(&self) -> bool {
-        self.key.get().is_some()
+        matches!(self.config.encryption, Encryption::None) || self.key.get().is_some()
     }
 
     /// Open the sealed store key. Done at most once per `Store`; a P-256
     /// recipient costs one oracle call. The opened key must be the secret
     /// half of the config's public key, else the sidecar belongs to another
-    /// store.
+    /// store. A plain store has nothing to unseal and returns `Ok`.
     pub fn unseal(&self, with: &Unsealer<'_>) -> Result<()> {
+        let Some(sidecar) = &self.sidecar else {
+            return Ok(());
+        };
         if self.key.get().is_some() {
             return Ok(());
         }
 
-        let payload = Zeroizing::new(self.sidecar.sealed.open(with.oracle, with.identities)?);
+        let payload = Zeroizing::new(sidecar.sealed.open(with.oracle, with.identities)?);
         if payload.len() != 32 {
             return Err(Error::Malformed(format!(
                 "sealed store key holds {} bytes, want 32",
@@ -135,7 +160,7 @@ impl Store {
         secret.copy_from_slice(&payload);
         drop(payload);
 
-        if age_x25519::public_key(&secret) != self.config.public_key_bytes() {
+        if Some(age_x25519::public_key(&secret)) != self.config.encryption.recipient() {
             return Err(Error::WrongKey);
         }
 
@@ -173,7 +198,12 @@ impl Store {
             });
         }
 
-        let secret = self.secret()?;
+        // Locked before NotFound: a sealed store that cannot read says so
+        // before it says whether the blob is there.
+        let secret = match self.config.encryption {
+            Encryption::None => None,
+            _ => Some(self.secret()?),
+        };
         let path = self.blob_path(id);
         let file = match self.fs.open(&path) {
             Ok(file) => file,
@@ -183,7 +213,10 @@ impl Store {
             Err(e) => return Err(e.into()),
         };
 
-        let decrypted = Decryptor::new(secret, file)?;
+        let decrypted: Box<dyn Read> = match secret {
+            None => file,
+            Some(secret) => Box::new(Decryptor::new(secret, file)?),
+        };
         let decompressed = self.config.compression.decompress(decrypted)?;
 
         Ok(BlobReader {
@@ -203,18 +236,19 @@ impl Store {
     }
 
     /// Write a blob and return its id. Needs no key: the bytes are
-    /// encrypted to the store's public key. Publishing follows
-    /// blob-store(7) CONCURRENCY AND DURABILITY: temp file, fsync, chmod
-    /// 0444, link(2) into the tree (an existing blob is the same bytes),
-    /// fsync the directory. Zero bytes produce the null id and no file.
+    /// encrypted to the store's public key (or stored as compressed
+    /// plaintext in an unencrypted store). Publishing follows blob-store(7)
+    /// CONCURRENCY AND DURABILITY: temp file, fsync, chmod 0444, link(2)
+    /// into the tree (an existing blob is the same bytes), fsync the
+    /// directory. Zero bytes produce the null id and no file.
     pub fn write(&self, plaintext: impl Read) -> Result<BlobId> {
         // Encryptor::new validates the recipient point.
-        let recipient = self.config.public_key_bytes();
+        let recipient = self.config.encryption.recipient();
 
         self.fs.create_dir_all(&self.temp_dir)?;
         let (temp_path, temp_file) = self.fs.create_temp(&self.temp_dir)?;
 
-        let result = self.write_temp(&recipient, plaintext, temp_file);
+        let result = self.write_temp(recipient.as_ref(), plaintext, temp_file);
         let id = match result {
             Ok(id) => id,
             Err(e) => {
@@ -242,24 +276,33 @@ impl Store {
 
     fn write_temp(
         &self,
-        recipient: &[u8; 32],
+        recipient: Option<&[u8; 32]>,
         plaintext: impl Read,
         temp_file: Box<dyn crate::fs::TempFile>,
     ) -> Result<BlobId> {
         let mut temp_file = temp_file;
-        let hashing = HashingReader {
+        let mut hashing = HashingReader {
             inner: plaintext,
             hasher: self.config.hash_format.hasher(),
         };
-        let encryptor = Encryptor::new(recipient, BufWriter::new(&mut temp_file))?;
-        let mut encryptor = encryptor;
-        let mut hashing = hashing;
-        self.config
-            .compression
-            .compress(&mut hashing, &mut encryptor)?;
-        let mut buffered = encryptor.finish()?;
-        buffered.flush()?;
-        drop(buffered);
+        {
+            let mut buffered = BufWriter::new(&mut temp_file);
+            match recipient {
+                Some(recipient) => {
+                    let mut encryptor = Encryptor::new(recipient, buffered)?;
+                    self.config
+                        .compression
+                        .compress(&mut hashing, &mut encryptor)?;
+                    buffered = encryptor.finish()?;
+                }
+                None => {
+                    self.config
+                        .compression
+                        .compress(&mut hashing, &mut buffered)?;
+                }
+            }
+            buffered.flush()?;
+        }
         temp_file.sync()?;
         drop(temp_file);
         Ok(hashing.hasher.finish())

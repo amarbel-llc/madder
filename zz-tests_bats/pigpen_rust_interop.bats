@@ -276,3 +276,82 @@ function the_other_hash_and_no_compression_interoperate_too { # @test
   assert_success
   assert_line 'go, sha256'
 }
+
+function plain_stores_interoperate_without_any_key { # @test
+  # madder#318: the V4 stores `madder init -encryption none|generate`
+  # writes, unencrypted or with a raw key in the config. Neither side needs
+  # an identity or an agent for them. Go inits both shapes and Rust reads
+  # and writes them; then Rust inits both shapes and Go reads and writes
+  # them.
+  run_madder_no_agent init -encryption none .plain
+  assert_success
+  run_madder_no_agent init -encryption generate .keyed
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/plain.txt"
+  local store go_id rust_id
+  for store in .plain .keyed; do
+    echo "go writes into $store, rust reads" >"$blob"
+    run_madder_no_agent write -format tap "$store" "$blob"
+    assert_success
+    go_id="$(tap_blob_id)"
+    [[ -n $go_id ]] || fail "madder write returned no blob id. output: $output"
+
+    run env -u MADDER_STORE_IDENTITY_HEX -u PIGGY_AUTH_SOCK -u SSH_AUTH_SOCK -u PIVY_AUTH_SOCK \
+      "$MADDER_STORE_CLI" cat "$store" "$go_id"
+    assert_success
+    assert_line "go writes into $store, rust reads"
+
+    echo "rust writes into $store, go reads" >"$blob"
+    rust_id="$(rust_write_blob "$blob" "$store")"
+    run_madder_no_agent cat "$store" "$rust_id"
+    assert_success
+    assert_line "rust writes into $store, go reads"
+
+    run_madder_no_agent fsck -format ndjson "$store"
+    assert_success
+    assert_output --partial 'blobs verified: 2'
+    refute_output --partial 'blobs failed'
+  done
+
+  # The raw-key store's blobs are age files; the unencrypted one's are not.
+  local on_disk
+  on_disk="$(find "$(store_dir keyed)" -type f -path '*/blake2b256/*' -print -quit)"
+  run head -c 21 "$on_disk"
+  assert_output 'age-encryption.org/v1'
+  on_disk="$(find "$(store_dir plain)" -type f -path '*/blake2b256/*' -print -quit)"
+  run head -c 21 "$on_disk"
+  refute_output 'age-encryption.org/v1'
+
+  run_rust init -encryption none .rplain
+  assert_success
+  run_rust init -encryption generate .rkeyed
+  assert_success
+  for store in .rplain .rkeyed; do
+    run cat "$(store_dir "${store#.}")/blob_store-config"
+    assert_output --partial '! toml-blob_store_config-v4'
+    assert_line --regexp '^@ blake2b256-'
+    [[ "$(file_mode "$(store_dir "${store#.}")/blob_store-config")" == "444" ]] ||
+      fail "rust-written config is not 0444"
+
+    echo "go writes into a rust-made $store" >"$blob"
+    run_madder_no_agent write -format tap "$store" "$blob"
+    assert_success
+    go_id="$(tap_blob_id)"
+    [[ -n $go_id ]] || fail "madder write returned no blob id. output: $output"
+    run_rust cat "$store" "$go_id"
+    assert_success
+    assert_line "go writes into a rust-made $store"
+
+    run_madder_no_agent fsck -format ndjson "$store"
+    assert_success
+    refute_output --partial 'blobs failed'
+  done
+
+  run_madder_no_agent info-repo .rplain encryption
+  assert_success
+  assert_output ''
+  run_madder_no_agent info-repo .rkeyed encryption
+  assert_success
+  assert_output --partial 'madder-private_key-v1@age_x25519_sec-'
+}

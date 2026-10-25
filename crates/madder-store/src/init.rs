@@ -1,7 +1,9 @@
-//! Creating a new sealed-key store, as `madder init -pigpen` does: mint
-//! an X25519 store key, seal it to a recipient set, write the sidecar and
-//! then the digest-pinned config (FDR 0011). pigsty on Android has no Go
-//! madder to shell out to, so this lives here.
+//! Creating a new store, as `madder init` does. For a sealed-key store
+//! (`-pigpen`): mint an X25519 store key, seal it to a recipient set, write
+//! the sidecar and then the digest-pinned V5 config (FDR 0011). For a plain
+//! store (`-encryption none|generate`): a V4 config, unencrypted or carrying
+//! a raw key. pigsty on Android has no Go madder to shell out to, so this
+//! lives here.
 //!
 //! The TOML these files carry is not byte-identical to what Go's tommy
 //! writes and need not be: the config's `@` digest pins the bytes written
@@ -21,7 +23,7 @@ use zeroize::Zeroizing;
 use crate::age_x25519;
 use crate::blob_id::HashFormat;
 use crate::codec::Compression;
-use crate::config::{Config, KEY_HOLDER_PROCESS, TYPE_V5};
+use crate::config::{Config, KEY_HOLDER_PROCESS, PURPOSE_MADDER_PRIVATE_KEY_V1, TYPE_V4, TYPE_V5};
 use crate::fs::Fs;
 use crate::sidecar::{
     RecipientSource, SOURCE_KIND_EMBEDDED, SOURCE_KIND_PAPI, SOURCE_KIND_PATH, Sidecar, TYPE_V2,
@@ -30,34 +32,55 @@ use crate::sidecar::{
 use crate::store::{FILE_NAME_CONFIG, FILE_NAME_KEY, OpenOptions, Store};
 use crate::{Error, Result};
 
+/// How the new store's blobs are encrypted.
+pub enum InitEncryption {
+    /// `madder init -pigpen`: a sealed-key store (V5). The store key is
+    /// minted here and sealed to `recipients`, `piggy-recipient-v1@…` ids
+    /// (an X25519 or P-256 key each), at least one; `source` records where
+    /// they came from (for a `path` source without a `pigpen` snapshot, one
+    /// is rendered).
+    Sealed {
+        recipients: Vec<Id>,
+        source: RecipientSource,
+    },
+    /// `madder init -encryption none`: a plain V4 store, compressed
+    /// plaintext on disk.
+    None,
+    /// `madder init -encryption generate`: a plain V4 store with a raw
+    /// X25519 key in its config; `None` mints one.
+    Key(Option<Zeroizing<[u8; 32]>>),
+}
+
 /// What a new store looks like. The defaults are `madder init`'s.
 pub struct InitOptions {
     pub hash_format: HashFormat,
     pub hash_buckets: Vec<usize>,
     pub compression: Compression,
-    /// The recipients the store key is sealed to, as `piggy-recipient-v1@…`
-    /// ids (an X25519 or P-256 key each). At least one.
-    pub recipients: Vec<Id>,
-    /// Where those recipients came from, recorded in the sidecar. For a
-    /// `path` source the `pigpen` snapshot is rendered here when absent.
-    pub source: RecipientSource,
+    pub encryption: InitEncryption,
 }
 
 impl InitOptions {
-    /// `madder init -pigpen <file> -pigpen-kind embedded`: the pigpen text
-    /// becomes the sidecar's own pigpen, nothing host-specific is recorded.
-    pub fn embedded(pigpen_text: &str, recipients: Vec<Id>) -> Self {
+    /// `madder init`'s defaults with the given encryption.
+    pub fn with_encryption(encryption: InitEncryption) -> Self {
         InitOptions {
             hash_format: HashFormat::Blake2b256,
             hash_buckets: vec![2],
             compression: Compression::Zstd,
+            encryption,
+        }
+    }
+
+    /// `madder init -pigpen <file> -pigpen-kind embedded`: the pigpen text
+    /// becomes the sidecar's own pigpen, nothing host-specific is recorded.
+    pub fn embedded(pigpen_text: &str, recipients: Vec<Id>) -> Self {
+        Self::with_encryption(InitEncryption::Sealed {
             recipients,
             source: RecipientSource {
                 kind: SOURCE_KIND_EMBEDDED.to_owned(),
                 locator: None,
                 pigpen: Some(pigpen_text.to_owned()),
             },
-        }
+        })
     }
 }
 
@@ -201,13 +224,16 @@ struct ConfigToml<'a> {
     hash_buckets: &'a [usize],
     #[serde(rename = "hash_type-id")]
     hash_type_id: &'a str,
-    encryption: [String; 1],
+    /// Omitted when empty, as Go's tommy omits it.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    encryption: Vec<String>,
     #[serde(rename = "compression-type")]
     compression_type: &'a str,
     #[serde(rename = "instance-id")]
     instance_id: String,
-    #[serde(rename = "key-custody")]
-    key_custody: KeyCustodyToml<'a>,
+    /// The sealed-key store's table; absent on a plain store.
+    #[serde(rename = "key-custody", skip_serializing_if = "Option::is_none")]
+    key_custody: Option<KeyCustodyToml<'a>>,
 }
 
 #[derive(Serialize)]
@@ -215,23 +241,22 @@ struct KeyCustodyToml<'a> {
     holder: &'a str,
 }
 
+/// The sealed-key half of `init`: the sidecar bytes and the config's
+/// public key id.
+struct SealedParts {
+    sidecar_bytes: Vec<u8>,
+    public_id: Id,
+}
+
 /// Create the store at `base` (which must not already hold one), then open
-/// it. The sidecar is written before the config, as Go does: an
-/// interrupted init leaves a stray sidecar and no store, never a store
-/// whose key is gone.
+/// it. For a sealed-key store the sidecar is written before the config, as
+/// Go does: an interrupted init leaves a stray sidecar and no store, never
+/// a store whose key is gone. The config is written read-only (mode 0444),
+/// as Go's `WriteImmutable` does.
 pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> Result<Store> {
     let base = base.as_ref();
     let fs: &dyn Fs = &*open.fs;
 
-    if options.recipients.is_empty() {
-        return Err(Error::Malformed(
-            "no encryption recipients; a key sealed to nobody could never be opened".into(),
-        ));
-    }
-    match options.source.kind.as_str() {
-        SOURCE_KIND_PATH | SOURCE_KIND_PAPI | SOURCE_KIND_EMBEDDED => {}
-        other => return Err(Error::Unsupported(format!("pigpen source kind {other:?}"))),
-    }
     if options.hash_buckets.iter().sum::<usize>() > 64 {
         return Err(Error::Malformed(format!(
             "hash_buckets {:?} exceed the 64 hex characters of a digest",
@@ -246,9 +271,92 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
             config_path.display()
         )));
     }
-    // The sidecar is written first (below), so an interrupted init leaves
-    // one without a config. It seals a key no store uses; say so rather
-    // than fail on it later with a bare "file exists".
+
+    let (type_id, encryption_ids, sealed) = match &options.encryption {
+        InitEncryption::Sealed { recipients, source } => {
+            let parts = seal_store_key(fs, base, recipients, source)?;
+            (TYPE_V5, vec![parts.public_id.to_wire()], Some(parts))
+        }
+        InitEncryption::None => (TYPE_V4, Vec::new(), None),
+        InitEncryption::Key(scalar) => {
+            let secret = match scalar {
+                Some(scalar) => scalar.clone(),
+                None => {
+                    let mut minted = Zeroizing::new([0u8; 32]);
+                    OsRng.fill_bytes(&mut *minted);
+                    minted
+                }
+            };
+            age_x25519::check_recipient(&age_x25519::public_key(&secret))?;
+            let bare = Id::new(None, FormatId::AgeX25519Sec, secret.to_vec())
+                .map_err(|e| Error::Markl(e.to_string()))?;
+            // The purpose Go stamps; piggy-markl carries it as `Other`.
+            let id = Id::parse(&format!(
+                "{PURPOSE_MADDER_PRIVATE_KEY_V1}@{}",
+                bare.to_wire()
+            ))
+            .map_err(|e| Error::Markl(e.to_string()))?;
+            (TYPE_V4, vec![id.to_wire()], None)
+        }
+    };
+
+    // The config, digest-pinned over exactly the body bytes written.
+    let config_body = toml::to_string(&ConfigToml {
+        hash_buckets: &options.hash_buckets,
+        hash_type_id: options.hash_format.as_str(),
+        encryption: encryption_ids,
+        compression_type: options.compression.as_str(),
+        instance_id: mint_instance_id(),
+        key_custody: sealed.as_ref().map(|_| KeyCustodyToml {
+            holder: KEY_HOLDER_PROCESS,
+        }),
+    })
+    .map_err(|e| Error::Malformed(format!("rendering the config: {e}")))?;
+    let digest = Blake2b::<U32>::digest(config_body.as_bytes());
+    let digest_id =
+        blech32::encode("blake2b256", &digest).map_err(|e| Error::Markl(e.to_string()))?;
+    let config_bytes =
+        format!("---\n! {type_id}\n@ {digest_id}\n---\n\n{config_body}").into_bytes();
+    Config::parse(&config_bytes)?;
+
+    fs.create_dir_all(base)?;
+    if let Some(parts) = &sealed {
+        fs.write_new(&base.join(FILE_NAME_KEY), &parts.sidecar_bytes)?;
+    }
+    fs.write_new(&config_path, &config_bytes)?;
+    fs.set_readonly(&config_path)?;
+    fs.sync_dir(base)?;
+
+    Store::open_with(
+        base,
+        OpenOptions {
+            temp_dir: open.temp_dir,
+            fs: open.fs,
+        },
+    )
+}
+
+/// Mint the store key, seal it to the recipients and render the sidecar
+/// (not yet written), as `madder init -pigpen` does.
+fn seal_store_key(
+    fs: &dyn Fs,
+    base: &Path,
+    recipients: &[Id],
+    source: &RecipientSource,
+) -> Result<SealedParts> {
+    if recipients.is_empty() {
+        return Err(Error::Malformed(
+            "no encryption recipients; a key sealed to nobody could never be opened".into(),
+        ));
+    }
+    match source.kind.as_str() {
+        SOURCE_KIND_PATH | SOURCE_KIND_PAPI | SOURCE_KIND_EMBEDDED => {}
+        other => return Err(Error::Unsupported(format!("pigpen source kind {other:?}"))),
+    }
+
+    // The sidecar is written before the config, so an interrupted init
+    // leaves one without a config. It seals a key no store uses; say so
+    // rather than fail on it later with a bare "file exists".
     let key_path = base.join(FILE_NAME_KEY);
     if fs.exists(&key_path) {
         return Err(Error::Malformed(format!(
@@ -269,24 +377,24 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
     )
     .map_err(|e| Error::Markl(e.to_string()))?;
 
-    let sealed = Document::seal(&*secret, &options.recipients)?;
+    let sealed = Document::seal(&*secret, recipients)?;
     drop(secret);
     let sealed_raw = sealed.to_bytes()?;
 
     // The sidecar. A path source gets a snapshot of the recipients, so the
     // sidecar says who the pigpen named when the key was sealed.
     let snapshot;
-    let pigpen = match (&options.source.pigpen, options.source.kind.as_str()) {
+    let pigpen = match (&source.pigpen, source.kind.as_str()) {
         (Some(text), _) => Some(text.as_str()),
         (None, SOURCE_KIND_PATH) => {
-            snapshot = render_recipient_set(&options.recipients)?;
+            snapshot = render_recipient_set(recipients)?;
             Some(snapshot.as_str())
         }
         (None, _) => None,
     };
     let sidecar_body = render_sidecar_body(
-        &options.source.kind,
-        options.source.locator.as_deref(),
+        &source.kind,
+        source.locator.as_deref(),
         pigpen,
         &encode_sealed_document(&sealed_raw),
     );
@@ -294,45 +402,17 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
 
     // Refuse to write a sidecar that does not read back as what was meant.
     let read_back = Sidecar::parse(&sidecar_bytes)?;
-    if read_back.sealed_raw != sealed_raw
-        || read_back.source != options.source && options.source.pigpen.is_some()
+    if read_back.sealed_raw != sealed_raw || read_back.source != *source && source.pigpen.is_some()
     {
         return Err(Error::Malformed(
             "the store key sidecar does not read back as written; refusing to write it".into(),
         ));
     }
 
-    // The config, digest-pinned over exactly the body bytes written.
-    let config_body = toml::to_string(&ConfigToml {
-        hash_buckets: &options.hash_buckets,
-        hash_type_id: options.hash_format.as_str(),
-        encryption: [public_id.to_wire()],
-        compression_type: options.compression.as_str(),
-        instance_id: mint_instance_id(),
-        key_custody: KeyCustodyToml {
-            holder: KEY_HOLDER_PROCESS,
-        },
+    Ok(SealedParts {
+        sidecar_bytes,
+        public_id,
     })
-    .map_err(|e| Error::Malformed(format!("rendering the config: {e}")))?;
-    let digest = Blake2b::<U32>::digest(config_body.as_bytes());
-    let digest_id =
-        blech32::encode("blake2b256", &digest).map_err(|e| Error::Markl(e.to_string()))?;
-    let config_bytes =
-        format!("---\n! {TYPE_V5}\n@ {digest_id}\n---\n\n{config_body}").into_bytes();
-    Config::parse(&config_bytes)?;
-
-    fs.create_dir_all(base)?;
-    fs.write_new(&key_path, &sidecar_bytes)?;
-    fs.write_new(&config_path, &config_bytes)?;
-    fs.sync_dir(base)?;
-
-    Store::open_with(
-        base,
-        OpenOptions {
-            temp_dir: open.temp_dir,
-            fs: open.fs,
-        },
-    )
 }
 
 /// A pigpen-v1 recipient set naming `recipients`, as Go's
@@ -414,11 +494,11 @@ mod tests {
         .unwrap();
 
         assert_eq!(store.sealed_recipients(), vec![recipient]);
-        assert_eq!(store.recipient_source().kind, SOURCE_KIND_EMBEDDED);
-        assert_eq!(
-            store.recipient_source().pigpen.as_deref(),
-            Some(pigpen.as_str())
-        );
+        let source = store.recipient_source().unwrap();
+        assert_eq!(source.kind, SOURCE_KIND_EMBEDDED);
+        assert_eq!(source.pigpen.as_deref(), Some(pigpen.as_str()));
+        assert_eq!(store.config().version, crate::config::ConfigVersion::V5);
+        assert!(!store.is_unsealed());
         assert!(
             store
                 .config()
@@ -470,16 +550,16 @@ mod tests {
     fn a_path_source_gets_a_recipient_snapshot() {
         let dir = scratch();
         let (recipient, _) = identity(6);
-        let options = InitOptions {
+        let options = InitOptions::with_encryption(InitEncryption::Sealed {
+            recipients: vec![recipient.clone()],
             source: RecipientSource {
                 kind: SOURCE_KIND_PATH.to_owned(),
                 locator: Some("/home/me/piggy-ids".to_owned()),
                 pigpen: None,
             },
-            ..InitOptions::embedded("", vec![recipient.clone()])
-        };
+        });
         let store = init(dir.join("store"), options, OpenOptions::default()).unwrap();
-        let source = store.recipient_source();
+        let source = store.recipient_source().unwrap();
         assert_eq!(source.kind, SOURCE_KIND_PATH);
         assert_eq!(source.locator.as_deref(), Some("/home/me/piggy-ids"));
         let snapshot = source.pigpen.as_deref().unwrap();
@@ -561,6 +641,83 @@ mod tests {
         };
         assert!(err.to_string().contains(FILE_NAME_KEY), "{err}");
         assert!(!base.join(FILE_NAME_CONFIG).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn plain_stores_init_as_v4_and_read_back_without_a_key() {
+        use crate::config::{ConfigVersion, Encryption};
+
+        let dir = scratch();
+        for (name, encryption) in [
+            ("none", InitEncryption::None),
+            ("minted", InitEncryption::Key(None)),
+            (
+                "given",
+                InitEncryption::Key(Some(Zeroizing::new([7u8; 32]))),
+            ),
+        ] {
+            let base = dir.join(name);
+            let store = init(
+                &base,
+                InitOptions::with_encryption(encryption),
+                OpenOptions::default(),
+            )
+            .unwrap();
+            assert_eq!(store.config().version, ConfigVersion::V4, "{name}");
+            assert!(store.is_unsealed(), "{name}");
+            assert!(store.sealed_recipients().is_empty(), "{name}");
+            assert!(store.recipient_source().is_none(), "{name}");
+            assert!(!base.join(FILE_NAME_KEY).exists(), "{name}: no sidecar");
+
+            let config = std::fs::read_to_string(base.join(FILE_NAME_CONFIG)).unwrap();
+            assert!(
+                config.starts_with(&format!("---\n! {TYPE_V4}\n@ blake2b256-")),
+                "{config}"
+            );
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(base.join(FILE_NAME_CONFIG))
+                    .unwrap()
+                    .permissions()
+                    .mode();
+                assert_eq!(mode & 0o777, 0o444, "{name}: config is immutable");
+            }
+
+            match (name, &store.config().encryption) {
+                ("none", Encryption::None) => {
+                    assert!(!config.contains("encryption"), "{config}");
+                }
+                ("minted", Encryption::Key { id, .. }) => {
+                    assert!(
+                        id.to_wire()
+                            .starts_with("madder-private_key-v1@age_x25519_sec-"),
+                        "{}",
+                        id.to_wire()
+                    );
+                }
+                ("given", Encryption::Key { secret, .. }) => {
+                    assert_eq!(**secret, [7u8; 32]);
+                }
+                (name, other) => panic!("{name}: unexpected encryption {other:?}"),
+            }
+
+            let id = store.write_bytes(b"plain store blob").unwrap();
+            assert_eq!(store.read_to_vec(&id).unwrap(), b"plain store blob");
+            let again = Store::open(&base).unwrap();
+            assert_eq!(again.read_to_vec(&id).unwrap(), b"plain store blob");
+
+            // init over an existing store fails.
+            assert!(
+                init(
+                    &base,
+                    InitOptions::with_encryption(InitEncryption::None),
+                    OpenOptions::default()
+                )
+                .is_err()
+            );
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 

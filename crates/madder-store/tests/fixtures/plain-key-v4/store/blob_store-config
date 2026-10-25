@@ -1,0 +1,10 @@
+---
+! toml-blob_store_config-v4
+@ blake2b256-f2e23ctlqzjsu66cwynahmn96wq62wrg5d02tlkz54s5sds8gtns23rygk
+---
+
+hash_buckets = [2]
+hash_type-id = "blake2b256"
+encryption = ["madder-private_key-v1@age_x25519_sec-9pj84nxc2vhnttahpgzuyh8tdghcyydd0k5vhjxp0j6rer9ujsasr35u35"]
+compression-type = "zstd"
+instance-id = "uuidv7-qxsh84f2splh4ddy8guysd9erydvyt7y"

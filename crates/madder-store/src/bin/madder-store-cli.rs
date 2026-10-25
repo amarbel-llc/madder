@@ -1,27 +1,29 @@
 //! A test-only command line over the madder-store crate that speaks the
-//! subset of `madder`'s grammar the sealed-key store tests use, so the
-//! existing bats files run against the Rust implementation with
-//! `MADDER_BIN` pointed here (zz-tests_bats/pigpen_store.bats, tests tagged
-//! `rust_cli`; zz-tests_bats/pigpen_rust_interop.bats). Not shipped; pigsty
-//! talks to the crate, not to this.
+//! subset of `madder`'s grammar the store tests use, so the existing bats
+//! files run against the Rust implementation with `MADDER_BIN` pointed
+//! here (tests tagged `rust_cli` in zz-tests_bats; pigpen_rust_interop.bats).
+//! Not shipped; pigsty talks to the crate, not to this.
 //!
-//! Supported: `init -pigpen`, `write`, `cat`, `cat-ids`, `fsck`,
-//! `key-status`, plus the shim-only `mint-recipient`. Only CWD-relative
-//! blob-store-ids (`.name`, resolved to
-//! `$PWD/.madder/local/share/blob_stores/name`) are understood.
+//! Supported: `init` (`-pigpen`, or `-encryption none|generate`), `write`,
+//! `cat`, `cat-ids`, `has`, `fsck`, `info-repo`, `key-status`, plus the
+//! shim-only `mint-recipient`. Blob-store-ids are CWD-relative only
+//! (`.name`, resolved to `$PWD/.madder/local/share/blob_stores/name`);
+//! with no id named, the default store is the alphabetically first one that
+//! opens, as Go's discovery picks it, and `cat`/`has` fall back to the
+//! remaining stores in that order.
 //!
-//! Opening the sealed key: with `MADDER_STORE_IDENTITY_HEX` set, the X25519
+//! Opening a sealed key: with `MADDER_STORE_IDENTITY_HEX` set, the X25519
 //! secret it holds; otherwise piggy-agent through piggy-pigpen's pure-Rust
 //! `agent` oracle, with the socket resolved as Go does (`PIGGY_AUTH_SOCK`,
-//! `SSH_AUTH_SOCK`, `PIVY_AUTH_SOCK`).
+//! `SSH_AUTH_SOCK`, `PIVY_AUTH_SOCK`). A plain store needs neither.
 
 use std::collections::BTreeMap;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use madder_store::piggy_markl::{FormatId, Id};
-use madder_store::{BlobId, Error, Store, Unsealer, X25519Identity};
+use madder_store::{BlobId, Encryption, Error, InitEncryption, Store, Unsealer, X25519Identity};
 
 type CliResult<T> = Result<T, Box<dyn std::error::Error>>;
 
@@ -37,16 +39,18 @@ fn main() -> ExitCode {
 }
 
 const USAGE: &str = "usage (the madder grammar this test shim speaks):
-  madder-store-cli init -pigpen <piggy-ids> [-pigpen-kind path|embedded]
+  madder-store-cli init [-encryption none|generate] [-pigpen <piggy-ids> [-pigpen-kind path|embedded]]
                         [-compression-type none|zstd] [-hash_type-id sha256|blake2b256] <.store>
-  madder-store-cli write [-format tap|ndjson] <.store> <file>...
-  madder-store-cli cat <.store> <id>...
-  madder-store-cli cat-ids <.store>
-  madder-store-cli fsck [-format tap|ndjson] <.store>
+  madder-store-cli write [-format tap|json|ndjson] [-check] [<.store>] <file|->...
+  madder-store-cli cat [<.store>] <id>...
+  madder-store-cli cat-ids [<.store>]
+  madder-store-cli has [-all] [<.store>] <id>...
+  madder-store-cli fsck [-format tap|json|ndjson] [<.store>...]
+  madder-store-cli info-repo [<.store>] [<key>...]
   madder-store-cli key-status <.store>
   madder-store-cli mint-recipient            print a fresh X25519 recipient id and its secret hex
-Reading opens the sealed key with MADDER_STORE_IDENTITY_HEX (the store's X25519 secret) when
-set, else through piggy-agent (PIGGY_AUTH_SOCK, SSH_AUTH_SOCK, PIVY_AUTH_SOCK).";
+Reading a sealed-key store opens its key with MADDER_STORE_IDENTITY_HEX (the store's X25519
+secret) when set, else through piggy-agent (PIGGY_AUTH_SOCK, SSH_AUTH_SOCK, PIVY_AUTH_SOCK).";
 
 fn run(args: &[String]) -> CliResult<()> {
     let Some(command) = args.first() else {
@@ -58,7 +62,9 @@ fn run(args: &[String]) -> CliResult<()> {
         "write" => write(rest),
         "cat" => cat(rest),
         "cat-ids" => cat_ids(rest),
+        "has" => has(rest),
         "fsck" => fsck(rest),
+        "info-repo" => info_repo(rest),
         "key-status" => key_status(rest),
         "mint-recipient" => mint_recipient(),
         "-h" | "--help" | "help" => {
@@ -82,6 +88,11 @@ fn parse_flags(
     let mut i = 0;
     while i < args.len() {
         let arg = &args[i];
+        if arg == "-" {
+            positional.push(arg.clone());
+            i += 1;
+            continue;
+        }
         if arg.len() > 1 && arg.starts_with('-') && !arg.starts_with("--") && !is_store_id(arg) {
             let name = arg.trim_start_matches('-').to_owned();
             if bools.contains(&name.as_str()) {
@@ -117,26 +128,166 @@ fn is_store_id(arg: &str) -> bool {
         })
 }
 
-fn store_base(id: &str) -> CliResult<PathBuf> {
-    if !is_store_id(id) {
-        return Err(format!(
-            "blob-store-id {id:?}: this binary resolves CWD-relative ids only (.name)"
-        )
-        .into());
-    }
-    let cwd = std::env::current_dir()?;
-    Ok(cwd.join(".madder/local/share/blob_stores").join(&id[1..]))
+/// Whether an argument names a store to switch to (a store id that is not
+/// also an existing path, as madder's arg resolver decides).
+fn is_store_switch(arg: &str) -> bool {
+    is_store_id(arg) && !Path::new(arg).exists()
 }
 
-fn switch_notice(id: &str) {
-    eprintln!("switched to blob-store-id: {id}");
+/// The CWD's blob stores, `$PWD/.madder/local/share/blob_stores/<name>`.
+struct Stores {
+    dir: PathBuf,
+}
+
+impl Stores {
+    fn in_cwd() -> CliResult<Stores> {
+        Ok(Stores {
+            dir: std::env::current_dir()?.join(".madder/local/share/blob_stores"),
+        })
+    }
+
+    fn base(&self, id: &str) -> CliResult<PathBuf> {
+        if !is_store_id(id) {
+            return Err(format!(
+                "blob-store-id {id:?}: this binary resolves CWD-relative ids only (.name)"
+            )
+            .into());
+        }
+        Ok(self.dir.join(&id[1..]))
+    }
+
+    /// Every store id with a config file, sorted, which is also Go's
+    /// discovery order (and its default-store rule: the first that opens).
+    fn ids(&self) -> CliResult<Vec<String>> {
+        let mut ids = Vec::new();
+        let entries = match std::fs::read_dir(&self.dir) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(ids),
+            Err(e) => return Err(e.into()),
+        };
+        for entry in entries {
+            let entry = entry?;
+            if entry
+                .path()
+                .join(madder_store::store::FILE_NAME_CONFIG)
+                .is_file()
+            {
+                ids.push(format!(".{}", entry.file_name().to_string_lossy()));
+            }
+        }
+        ids.sort();
+        Ok(ids)
+    }
+
+    fn open(&self, id: &str) -> CliResult<Store> {
+        Store::open(self.base(id)?).map_err(|e| format!("blob store {id:?}: {e}").into())
+    }
+
+    /// The default store: the first id in order whose config this crate
+    /// reads (Go skips stores that fail to build when picking its default).
+    fn open_default(&self) -> CliResult<(String, Store)> {
+        for id in self.ids()? {
+            if let Ok(store) = self.open(&id) {
+                return Ok((id, store));
+            }
+        }
+        Err(format!(
+            "no blob store found under {} (init one first)",
+            self.dir.display()
+        )
+        .into())
+    }
+
+    /// Every store that opens, in id order; one this crate cannot read is
+    /// skipped with a note on stderr.
+    fn open_all(&self) -> CliResult<Vec<(String, Store)>> {
+        let mut stores = Vec::new();
+        for id in self.ids()? {
+            match self.open(&id) {
+                Ok(store) => stores.push((id, store)),
+                Err(e) => eprintln!("skipping {e}"),
+            }
+        }
+        Ok(stores)
+    }
+}
+
+// --- output ----------------------------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Format {
+    Tap,
+    Json,
+}
+
+/// madder's `-format`: tap, json or ndjson; unset means TAP on a terminal
+/// and NDJSON on a pipe.
+fn output_format(flags: &BTreeMap<String, String>) -> CliResult<Format> {
+    match flags.get("format").map(String::as_str) {
+        None | Some("") | Some("auto") => Ok(if io::stdout().is_terminal() {
+            Format::Tap
+        } else {
+            Format::Json
+        }),
+        Some("tap") => Ok(Format::Tap),
+        Some("json") | Some("ndjson") => Ok(Format::Json),
+        Some(other) => Err(format!("unsupported output format: {other:?}").into()),
+    }
+}
+
+/// A TAP 14 stream: the version line up front, numbered test points as they
+/// come, the plan at the end.
+struct Tap<W: Write> {
+    out: W,
+    count: usize,
+}
+
+impl<W: Write> Tap<W> {
+    fn new(mut out: W) -> io::Result<Self> {
+        writeln!(out, "TAP version 14")?;
+        Ok(Tap { out, count: 0 })
+    }
+
+    fn ok(&mut self, description: &str) -> io::Result<()> {
+        self.count += 1;
+        writeln!(self.out, "ok {} - {description}", self.count)
+    }
+
+    fn not_ok(&mut self, description: &str, message: &str) -> io::Result<()> {
+        self.count += 1;
+        writeln!(
+            self.out,
+            "not ok {} - {description}\n  ---\n  message: {}\n  ...",
+            self.count,
+            json_str(message)
+        )
+    }
+
+    fn skip(&mut self, description: &str, reason: &str) -> io::Result<()> {
+        self.count += 1;
+        writeln!(
+            self.out,
+            "ok {} - {description} # SKIP {reason}",
+            self.count
+        )
+    }
+
+    fn comment(&mut self, message: &str) -> io::Result<()> {
+        writeln!(self.out, "# {message}")
+    }
+
+    fn plan(&mut self) -> io::Result<()> {
+        writeln!(self.out, "1..{}", self.count)?;
+        self.out.flush()
+    }
 }
 
 // --- the sealed key ----------------------------------------------------------
 
-/// Open the store key: a software identity from the environment, else the
-/// agent, which this build cannot yet talk to. The error texts for the
-/// no-socket case match the Go madder's, which the bats tests assert.
+/// Make the store readable: nothing to do for a plain store; for a sealed
+/// one, a software identity from the environment, else the agent. The
+/// error texts for the no-socket case match the Go madder's, which the bats
+/// tests assert.
 fn unseal(store: &Store) -> CliResult<()> {
     if store.is_unsealed() {
         return Ok(());
@@ -181,45 +332,26 @@ fn init(args: &[String]) -> CliResult<()> {
     let [store_id] = positional.as_slice() else {
         return Err("init takes exactly one blob-store-id".into());
     };
-    let Some(pigpen_path) = flags.get("pigpen") else {
-        return Err("this binary creates sealed-key stores only: pass -pigpen <piggy-ids>".into());
+
+    let encryption = match (flags.get("pigpen"), flags.get("encryption")) {
+        (Some(_), Some(_)) => {
+            return Err("-pigpen cannot be combined with -encryption: a sealed-key store mints its own key and seals it to the pigpen's recipients".into());
+        }
+        (Some(pigpen_path), None) => sealed_init_encryption(pigpen_path, &flags)?,
+        (None, Some(value)) => match value.as_str() {
+            "none" => InitEncryption::None,
+            "" | "generate" => InitEncryption::Key(None),
+            other => {
+                return Err(format!(
+                    "-encryption {other:?}: this binary supports none and generate (or -pigpen for a sealed-key store)"
+                )
+                .into());
+            }
+        },
+        (None, None) => InitEncryption::None,
     };
-    if flags.contains_key("encryption") {
-        return Err("-pigpen cannot be combined with -encryption: a sealed-key store mints its own key and seals it to the pigpen's recipients".into());
-    }
-    let kind = flags
-        .get("pigpen-kind")
-        .map(String::as_str)
-        .unwrap_or("path");
 
-    let pigpen_text = std::fs::read_to_string(pigpen_path)
-        .map_err(|e| format!("reading pigpen: {pigpen_path}: {e}"))?;
-    let recipients = madder_store::parse_recipients(&pigpen_text)?;
-    if recipients.is_empty() {
-        return Err(format!("pigpen {pigpen_path} names no encryption recipients").into());
-    }
-
-    let mut options = madder_store::InitOptions::embedded(&pigpen_text, recipients);
-    match kind {
-        "embedded" => {}
-        "path" => {
-            options.source = madder_store::RecipientSource {
-                kind: "path".to_owned(),
-                locator: Some(
-                    std::path::absolute(pigpen_path)?
-                        .to_string_lossy()
-                        .into_owned(),
-                ),
-                pigpen: None,
-            };
-        }
-        other => {
-            return Err(format!(
-                "pigpen kind {other:?} is not supported by this binary (path, embedded)"
-            )
-            .into());
-        }
-    }
+    let mut options = madder_store::InitOptions::with_encryption(encryption);
     if let Some(compression) = flags.get("compression-type") {
         options.compression = madder_store::Compression::parse(compression)?;
     }
@@ -227,11 +359,14 @@ fn init(args: &[String]) -> CliResult<()> {
         options.hash_format = madder_store::HashFormat::parse(hash)?;
     }
 
-    let base = store_base(store_id)?;
+    let stores = Stores::in_cwd()?;
+    let base = stores.base(store_id)?;
     let config_path = base.join(madder_store::store::FILE_NAME_CONFIG);
+    let mut tap = Tap::new(io::stdout().lock())?;
     if config_path.exists() {
         if flags.contains_key("if-not-exists") {
-            print_tap(&[format!("init {} (already exists)", config_path.display())]);
+            tap.ok(&format!("init {} (already exists)", config_path.display()))?;
+            tap.plan()?;
             return Ok(());
         }
         return Err(format!(
@@ -241,151 +376,332 @@ fn init(args: &[String]) -> CliResult<()> {
         .into());
     }
     madder_store::init(&base, options, madder_store::OpenOptions::default())?;
-    print_tap(&[format!("init {}", config_path.display())]);
+    tap.ok(&format!("init {}", config_path.display()))?;
+    tap.plan()?;
     Ok(())
 }
 
-fn print_tap(ok_lines: &[String]) {
-    println!("TAP version 14");
-    for (i, line) in ok_lines.iter().enumerate() {
-        println!("ok {} - {line}", i + 1);
+/// `init -pigpen <file> [-pigpen-kind path|embedded]`.
+fn sealed_init_encryption(
+    pigpen_path: &str,
+    flags: &BTreeMap<String, String>,
+) -> CliResult<InitEncryption> {
+    let pigpen_text = std::fs::read_to_string(pigpen_path)
+        .map_err(|e| format!("reading pigpen: {pigpen_path}: {e}"))?;
+    let recipients = madder_store::parse_recipients(&pigpen_text)?;
+    if recipients.is_empty() {
+        return Err(format!("pigpen {pigpen_path} names no encryption recipients").into());
     }
-    println!("1..{}", ok_lines.len());
+    let source = match flags
+        .get("pigpen-kind")
+        .map(String::as_str)
+        .unwrap_or("path")
+    {
+        "embedded" => madder_store::RecipientSource {
+            kind: "embedded".to_owned(),
+            locator: None,
+            pigpen: Some(pigpen_text),
+        },
+        "path" => madder_store::RecipientSource {
+            kind: "path".to_owned(),
+            locator: Some(
+                std::path::absolute(pigpen_path)?
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
+            pigpen: None,
+        },
+        other => {
+            return Err(format!(
+                "pigpen kind {other:?} is not supported by this binary (path, embedded)"
+            )
+            .into());
+        }
+    };
+    Ok(InitEncryption::Sealed { recipients, source })
 }
 
 // --- write --------------------------------------------------------------------
 
+/// The per-blob result stream of `write`, in madder's two encodings.
+enum WriteSink<'a> {
+    Tap(Tap<io::StdoutLock<'a>>),
+    Json {
+        out: io::StdoutLock<'a>,
+        check: bool,
+    },
+}
+
+impl WriteSink<'_> {
+    fn success(
+        &mut self,
+        id: &BlobId,
+        size: u64,
+        source: &str,
+        store: Option<&str>,
+    ) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.ok(&format!("{id} {source}")),
+            WriteSink::Json { out, check } => {
+                let present = if *check { ",\"present\":true" } else { "" };
+                writeln!(
+                    out,
+                    "{{\"id\":{},\"size\":{size},\"source\":{}{}{present}}}",
+                    json_str(&id.to_wire()),
+                    json_str(source),
+                    store_field(store)
+                )
+            }
+        }
+    }
+
+    fn check_miss(
+        &mut self,
+        id: &BlobId,
+        size: u64,
+        source: &str,
+        store: Option<&str>,
+    ) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.not_ok(&format!("{id} {source}"), "untracked"),
+            WriteSink::Json { out, .. } => writeln!(
+                out,
+                "{{\"id\":{},\"size\":{size},\"source\":{}{},\"present\":false}}",
+                json_str(&id.to_wire()),
+                json_str(source),
+                store_field(store)
+            ),
+        }
+    }
+
+    fn failure(&mut self, source: &str, error: &str) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.not_ok(source, error),
+            WriteSink::Json { out, .. } => writeln!(
+                out,
+                "{{\"source\":{},\"error\":{}}}",
+                json_str(source),
+                json_str(error)
+            ),
+        }
+    }
+
+    fn skip(&mut self, source: &str, reason: &str) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.skip(source, reason),
+            WriteSink::Json { out, .. } => writeln!(
+                out,
+                "{{\"source\":{},\"skipped\":{}}}",
+                json_str(source),
+                json_str(reason)
+            ),
+        }
+    }
+
+    /// A TAP comment; on stderr in JSON mode so stdout stays NDJSON.
+    fn notice(&mut self, message: &str) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.comment(message),
+            WriteSink::Json { .. } => {
+                eprintln!("{message}");
+                Ok(())
+            }
+        }
+    }
+
+    fn finish(&mut self) -> io::Result<()> {
+        match self {
+            WriteSink::Tap(tap) => tap.plan(),
+            WriteSink::Json { out, .. } => out.flush(),
+        }
+    }
+}
+
+/// Go's record carries `store` only when a store id was named on the
+/// command line.
+fn store_field(store: Option<&str>) -> String {
+    store
+        .map(|s| format!(",\"store\":{}", json_str(s)))
+        .unwrap_or_default()
+}
+
 fn write(args: &[String]) -> CliResult<()> {
     let (flags, positional) = parse_flags(args, &["check"])?;
-    let ndjson = matches!(
-        flags.get("format").map(String::as_str),
-        Some("ndjson") | Some("json")
-    );
-    let mut store: Option<(String, Store)> = None;
-    let mut lines: Vec<String> = Vec::new();
+    let format = output_format(&flags)?;
+    let check = flags.contains_key("check");
+    let stores = Stores::in_cwd()?;
+
+    let stdout = io::stdout().lock();
+    let mut sink = match format {
+        Format::Tap => WriteSink::Tap(Tap::new(stdout)?),
+        Format::Json => WriteSink::Json { out: stdout, check },
+    };
+
+    // The active store: named on the command line, else the default.
+    let mut active: Option<(Option<String>, Store)> = None;
     let mut failures = 0usize;
-    let mut stdout = io::stdout().lock();
-    if !ndjson {
-        writeln!(stdout, "TAP version 14")?;
-    }
+    let mut saw_stdin = false;
 
     for arg in &positional {
-        if is_store_id(arg) && !Path::new(arg).exists() {
-            switch_notice(arg);
-            store = Some((arg.clone(), Store::open(store_base(arg)?)?));
+        if arg == "-" && saw_stdin {
+            sink.notice("'-' passed in more than once. Ignoring")?;
             continue;
         }
-        let Some((store_id, store)) = store.as_ref() else {
-            return Err(
-                "no blob store selected: pass a .name blob-store-id before the files".into(),
-            );
+        if is_store_switch(arg) {
+            sink.notice(&format!("switched to blob-store-id: {arg}"))?;
+            active = Some((Some(arg.clone()), stores.open(arg)?));
+            continue;
+        }
+        if active.is_none() {
+            let (_, store) = stores.open_default()?;
+            active = Some((None, store));
+        }
+        let (named, store) = active.as_ref().expect("set above");
+
+        let outcome = if arg == "-" {
+            saw_stdin = true;
+            digest_or_write(store, io::stdin().lock(), check)
+        } else {
+            match std::fs::File::open(arg) {
+                Ok(file) => digest_or_write(store, file, check),
+                Err(e) => Err(Error::Io(e)),
+            }
         };
-        let outcome = (|| -> madder_store::Result<(BlobId, u64)> {
-            let file = std::fs::File::open(arg).map_err(Error::Io)?;
-            let size = file.metadata().map(|m| m.len()).unwrap_or(0);
-            Ok((store.write(file)?, size))
-        })();
         match outcome {
-            Ok((id, _)) if id.is_null() => {
-                if ndjson {
-                    writeln!(
-                        stdout,
-                        "{{\"source\":{},\"skipped\":\"null digest\"}}",
-                        json_str(arg)
-                    )?;
-                } else {
-                    lines.push(format!("{arg} # SKIP null digest"));
-                }
-            }
-            Ok((id, size)) => {
-                if ndjson {
-                    writeln!(
-                        stdout,
-                        "{{\"id\":{},\"size\":{size},\"source\":{},\"store\":{}}}",
-                        json_str(&id.to_wire()),
-                        json_str(arg),
-                        json_str(store_id)
-                    )?;
-                } else {
-                    lines.push(format!("{id} {arg}"));
-                }
-            }
             Err(e) => {
                 failures += 1;
-                if ndjson {
-                    writeln!(
-                        stdout,
-                        "{{\"source\":{},\"error\":{}}}",
-                        json_str(arg),
-                        json_str(&e.to_string())
-                    )?;
+                sink.failure(arg, &e.to_string())?;
+            }
+            Ok((id, _)) if id.is_null() => sink.skip(arg, "null digest")?,
+            Ok((id, size)) => {
+                if store.has(&id) || !check {
+                    sink.success(&id, size, arg, named.as_deref())?;
                 } else {
-                    lines.push(format!(
-                        "NOT OK {arg}\n  ---\n  message: {}\n  ...",
-                        json_str(&e.to_string())
-                    ));
+                    failures += 1;
+                    sink.check_miss(&id, size, arg, named.as_deref())?;
                 }
             }
         }
     }
 
-    if !ndjson {
-        for (i, line) in lines.iter().enumerate() {
-            match line.strip_prefix("NOT OK ") {
-                Some(rest) => writeln!(stdout, "not ok {} - {rest}", i + 1)?,
-                None => writeln!(stdout, "ok {} - {line}", i + 1)?,
-            }
-        }
-        writeln!(stdout, "1..{}", lines.len())?;
-    }
+    sink.finish()?;
     if failures > 0 {
         return Err(format!("untracked objects: {failures}").into());
     }
     Ok(())
 }
 
-// --- cat / cat-ids --------------------------------------------------------------
+/// Write the bytes into the store, or under `-check` only digest them.
+/// Returns the id and the byte count.
+fn digest_or_write(
+    store: &Store,
+    reader: impl Read,
+    check: bool,
+) -> madder_store::Result<(BlobId, u64)> {
+    let mut counting = Counting {
+        inner: reader,
+        count: 0,
+    };
+    let id = if check {
+        let mut hasher = store.config().hash_format.hasher();
+        let mut buf = [0u8; 64 * 1024];
+        loop {
+            let n = counting.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            hasher.update(&buf[..n]);
+        }
+        hasher.finish()
+    } else {
+        store.write(&mut counting)?
+    };
+    Ok((id, counting.count))
+}
+
+struct Counting<R: Read> {
+    inner: R,
+    count: u64,
+}
+
+impl<R: Read> Read for Counting<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let n = self.inner.read(buf)?;
+        self.count += n as u64;
+        Ok(n)
+    }
+}
+
+// --- cat / cat-ids / has ------------------------------------------------------------
 
 fn cat(args: &[String]) -> CliResult<()> {
-    let mut store: Option<Store> = None;
+    let stores = Stores::in_cwd()?;
+    // (id, store, named explicitly)
+    let mut active: Option<(String, Store, bool)> = None;
     let mut missing = 0usize;
     let mut unreadable = 0usize;
     let mut stdout = io::stdout().lock();
 
     for arg in args {
-        if let Ok(id) = BlobId::parse(arg) {
-            let Some(store) = store.as_ref() else {
-                return Err(
-                    "no blob store selected: pass a .name blob-store-id before the ids".into(),
-                );
-            };
-            if !id.is_null() {
-                if let Err(e) = unseal(store) {
-                    eprintln!("{e}");
-                    unreadable += 1;
-                    continue;
-                }
-            }
-            match store.read_to_vec(&id) {
-                Ok(bytes) => stdout.write_all(&bytes)?,
-                Err(Error::NotFound(_)) => {
-                    eprintln!("blob {id} not found in the store");
+        if is_store_switch(arg) {
+            eprintln!("switched to blob-store-id: {arg}");
+            active = Some((arg.clone(), stores.open(arg)?, true));
+            continue;
+        }
+        let Ok(id) = BlobId::parse(arg) else {
+            eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
+            missing += 1;
+            continue;
+        };
+        if active.is_none() {
+            let (default_id, store) = stores.open_default()?;
+            active = Some((default_id, store, false));
+        }
+        let (active_id, store, explicit) = active.as_ref().expect("set above");
+
+        match read_blob(store, &id, &mut stdout) {
+            Ok(()) => {}
+            Err(e) if *explicit => {
+                eprintln!("{e}");
+                if matches!(e, Error::NotFound(_)) {
                     missing += 1;
-                }
-                Err(e) => {
-                    eprintln!("blob {id}: {e}");
+                } else {
                     unreadable += 1;
                 }
             }
-            continue;
+            Err(active_err) => {
+                // Not in (or not readable from) the active store: the
+                // remaining stores, in order, as Go's cat does.
+                let held_but_unreadable = !matches!(active_err, Error::NotFound(_));
+                let mut served = false;
+                for (other_id, other) in stores.open_all()? {
+                    if other_id == *active_id || !other.has(&id) {
+                        continue;
+                    }
+                    match read_blob(&other, &id, &mut stdout) {
+                        Ok(()) => {
+                            served = true;
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("{e}");
+                            unreadable += 1;
+                            served = true;
+                            break;
+                        }
+                    }
+                }
+                if !served {
+                    if held_but_unreadable {
+                        eprintln!("{active_err}");
+                        unreadable += 1;
+                    } else {
+                        eprintln!("blob not found in any blob store: {id}");
+                        missing += 1;
+                    }
+                }
+            }
         }
-        if is_store_id(arg) {
-            switch_notice(arg);
-            store = Some(Store::open(store_base(arg)?)?);
-            continue;
-        }
-        eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
-        missing += 1;
     }
     stdout.flush()?;
 
@@ -397,13 +713,90 @@ fn cat(args: &[String]) -> CliResult<()> {
     }
 }
 
+/// Copy one blob to `out`; `Error::NotFound` when the store lacks it, any
+/// other error when it holds bytes it cannot read.
+fn read_blob(store: &Store, id: &BlobId, out: &mut impl Write) -> madder_store::Result<()> {
+    if !id.is_null() {
+        if !store.has(id) {
+            return Err(Error::NotFound(id.to_wire()));
+        }
+        unseal(store).map_err(|e| Error::Malformed(e.to_string()))?;
+    }
+    let bytes = store.read_to_vec(id)?;
+    out.write_all(&bytes)?;
+    Ok(())
+}
+
 fn cat_ids(args: &[String]) -> CliResult<()> {
-    let [store_id] = args else {
-        return Err("cat-ids takes exactly one blob-store-id".into());
+    let stores = Stores::in_cwd()?;
+    let store = match args {
+        [] => stores.open_default()?.1,
+        [store_id] => stores.open(store_id)?,
+        _ => return Err("cat-ids takes at most one blob-store-id".into()),
     };
-    let store = Store::open(store_base(store_id)?)?;
     for id in store.ids()? {
         println!("{id}");
+    }
+    Ok(())
+}
+
+fn has(args: &[String]) -> CliResult<()> {
+    let (flags, positional) = parse_flags(args, &["all"])?;
+    let all = flags.contains_key("all");
+    let stores = Stores::in_cwd()?;
+    let mut explicit: Option<(String, Store)> = None;
+    let mut missing = 0usize;
+
+    for arg in &positional {
+        if is_store_switch(arg) {
+            if all {
+                return Err(format!(
+                    "-all is incompatible with an explicit blob-store-id arg {arg:?}"
+                )
+                .into());
+            }
+            eprintln!("switched to blob-store-id: {arg}");
+            explicit = Some((arg.clone(), stores.open(arg)?));
+            continue;
+        }
+        let Ok(id) = BlobId::parse(arg) else {
+            eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
+            missing += 1;
+            continue;
+        };
+
+        let mut hits: Vec<String> = Vec::new();
+        match &explicit {
+            Some((store_id, store)) => {
+                if store.has(&id) {
+                    hits.push(store_id.clone());
+                }
+            }
+            None => {
+                // The default store first, then the rest in id order; stop
+                // at the first hit unless -all.
+                for (store_id, store) in stores.open_all()? {
+                    if store.has(&id) {
+                        hits.push(store_id);
+                        if !all {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if hits.is_empty() {
+            println!("{id}\tnot found");
+            missing += 1;
+        }
+        for store_id in hits {
+            println!("{id}\tfound\t{store_id}");
+        }
+    }
+
+    if missing > 0 {
+        return Err(format!("{missing} blob(s) not found").into());
     }
     Ok(())
 }
@@ -412,88 +805,207 @@ fn cat_ids(args: &[String]) -> CliResult<()> {
 
 fn fsck(args: &[String]) -> CliResult<()> {
     let (flags, positional) = parse_flags(args, &["relink-report"])?;
-    let [store_id] = positional.as_slice() else {
-        return Err("fsck takes exactly one blob-store-id".into());
+    let format = output_format(&flags)?;
+    let stores = Stores::in_cwd()?;
+    let targets = if positional.is_empty() {
+        stores.open_all()?
+    } else {
+        let mut targets = Vec::new();
+        for store_id in &positional {
+            targets.push((store_id.clone(), stores.open(store_id)?));
+        }
+        targets
     };
-    let ndjson = matches!(
-        flags.get("format").map(String::as_str),
-        Some("ndjson") | Some("json")
-    );
-    let store = Store::open(store_base(store_id)?)?;
-    let ids = store.ids()?;
 
-    let mut verified = 0usize;
-    let mut failed = 0usize;
-    let mut bytes = 0usize;
-    let mut tap_lines: Vec<String> = Vec::new();
-    let mut stdout = io::stdout().lock();
-    if !ndjson {
-        writeln!(stdout, "TAP version 14")?;
-    }
+    let mut sink = match format {
+        Format::Tap => FsckSink::Tap(Tap::new(io::stdout().lock())?),
+        Format::Json => FsckSink::Json(io::stdout().lock()),
+    };
 
-    for id in &ids {
-        let state = match unseal(&store) {
-            Err(e) => ("read_error", Some(e.to_string())),
-            Ok(()) => match store.read_to_vec(id) {
-                Ok(plain) => {
-                    bytes += plain.len();
-                    ("verified", None)
-                }
-                Err(Error::NotFound(_)) => ("missing", None),
-                Err(e @ (Error::DigestMismatch { .. } | Error::Age(_) | Error::Codec(_))) => {
-                    ("corrupt", Some(e.to_string()))
-                }
+    let mut total_failed = 0usize;
+    for (store_id, store) in &targets {
+        sink.notice(&format!("(blob_store: {store_id}) starting fsck..."))?;
+        let mut verified = 0usize;
+        let mut failed = 0usize;
+        let mut bytes = 0usize;
+
+        for id in store.ids()? {
+            let (state, error) = match unseal(store) {
                 Err(e) => ("read_error", Some(e.to_string())),
-            },
-        };
-        if state.0 == "verified" {
-            verified += 1;
-        } else {
-            failed += 1;
-        }
-        if ndjson {
-            let error = state
-                .1
-                .as_ref()
-                .map(|e| format!(",\"error\":{}", json_str(e)))
-                .unwrap_or_default();
-            writeln!(
-                stdout,
-                "{{\"id\":{},\"store\":{},\"state\":\"{}\"{error}}}",
-                json_str(&id.to_wire()),
-                json_str(store_id),
-                state.0
-            )?;
-        } else if state.0 == "verified" {
-            tap_lines.push(format!("ok {}", id));
-        } else {
-            tap_lines.push(format!(
-                "not ok {}\n  ---\n  message: {}\n  ...",
-                id,
-                json_str(state.1.as_deref().unwrap_or(state.0))
-            ));
-        }
-    }
-    if !ndjson {
-        for (i, line) in tap_lines.iter().enumerate() {
-            let (status, rest) = match line.strip_prefix("not ok ") {
-                Some(rest) => ("not ok", rest),
-                None => ("ok", line.strip_prefix("ok ").unwrap_or(line)),
+                Ok(()) => match store.read_to_vec(&id) {
+                    Ok(plain) => {
+                        bytes += plain.len();
+                        ("verified", None)
+                    }
+                    Err(Error::NotFound(_)) => ("missing", None),
+                    Err(e @ (Error::DigestMismatch { .. } | Error::Age(_) | Error::Codec(_))) => {
+                        ("corrupt", Some(e.to_string()))
+                    }
+                    Err(e) => ("read_error", Some(e.to_string())),
+                },
             };
-            writeln!(stdout, "{status} {} - {rest}", i + 1)?;
+            if state == "verified" {
+                verified += 1;
+            } else {
+                failed += 1;
+            }
+            sink.record(&id, store_id, state, error.as_deref())?;
         }
-        writeln!(stdout, "1..{}", tap_lines.len())?;
-    }
-    stdout.flush()?;
 
-    let mut summary =
-        format!("# (blob_store: {store_id}) blobs verified: {verified}, bytes verified: {bytes} B");
-    if failed > 0 {
-        summary.push_str(&format!(", blobs failed: {failed}"));
+        let mut summary = format!(
+            "(blob_store: {store_id}) blobs verified: {verified}, bytes verified: {bytes} B"
+        );
+        if failed > 0 {
+            summary.push_str(&format!(", blobs failed: {failed}"));
+        }
+        sink.notice(&summary)?;
+        total_failed += failed;
     }
-    eprintln!("{summary}");
-    if failed > 0 {
-        return Err(format!("{failed} blob(s) failed verification").into());
+
+    sink.finish()?;
+    if total_failed > 0 {
+        return Err(format!("fsck: {total_failed} blob(s) failed verification").into());
+    }
+    Ok(())
+}
+
+/// The per-blob result stream of `fsck`, in madder's two encodings.
+enum FsckSink<'a> {
+    Tap(Tap<io::StdoutLock<'a>>),
+    Json(io::StdoutLock<'a>),
+}
+
+impl FsckSink<'_> {
+    fn record(
+        &mut self,
+        id: &BlobId,
+        store_id: &str,
+        state: &str,
+        error: Option<&str>,
+    ) -> io::Result<()> {
+        match self {
+            FsckSink::Tap(tap) => {
+                if state == "verified" {
+                    tap.ok(&id.to_wire())
+                } else {
+                    tap.not_ok(&id.to_wire(), error.unwrap_or(state))
+                }
+            }
+            FsckSink::Json(out) => {
+                let error = error
+                    .map(|e| format!(",\"error\":{}", json_str(e)))
+                    .unwrap_or_default();
+                writeln!(
+                    out,
+                    "{{\"id\":{},\"store\":{},\"state\":\"{state}\"{error}}}",
+                    json_str(&id.to_wire()),
+                    json_str(store_id),
+                )
+            }
+        }
+    }
+
+    /// A TAP comment; on stderr with a `# ` prefix in JSON mode, as Go's
+    /// verify sink does.
+    fn notice(&mut self, message: &str) -> io::Result<()> {
+        match self {
+            FsckSink::Tap(tap) => tap.comment(message),
+            FsckSink::Json(_) => {
+                eprintln!("# {message}");
+                Ok(())
+            }
+        }
+    }
+
+    fn finish(&mut self) -> io::Result<()> {
+        match self {
+            FsckSink::Tap(tap) => tap.plan(),
+            FsckSink::Json(out) => out.flush(),
+        }
+    }
+}
+
+// --- info-repo -------------------------------------------------------------------------
+
+/// `info-repo [<.store>] [<key>...]`: Go's `ConfigKeyValues` entries for a
+/// local store, or the raw config file for a lone store id.
+fn info_repo(args: &[String]) -> CliResult<()> {
+    let stores = Stores::in_cwd()?;
+    let (store_id, store, keys): (String, Store, Vec<String>) = match args {
+        [] => {
+            let (id, store) = stores.open_default()?;
+            (id, store, vec!["config-immutable".to_owned()])
+        }
+        [one]
+            if is_store_id(one)
+                && stores
+                    .base(one)?
+                    .join(madder_store::store::FILE_NAME_CONFIG)
+                    .is_file() =>
+        {
+            (
+                one.clone(),
+                stores.open(one)?,
+                vec!["config-immutable".to_owned()],
+            )
+        }
+        [key] => {
+            let (id, store) = stores.open_default()?;
+            (id, store, vec![key.clone()])
+        }
+        [store_id, keys @ ..] => (store_id.clone(), stores.open(store_id)?, keys.to_vec()),
+    };
+
+    let config = store.config();
+    let mut values: BTreeMap<&str, String> = BTreeMap::new();
+    values.insert("blob-store-type", "local".to_owned());
+    values.insert("hash_type-id", config.hash_format.as_str().to_owned());
+    values.insert("supports-multi-hash", config.multi_hash.to_string());
+    values.insert("encryption", config.encryption.describe());
+    values.insert("compression-type", config.compression.as_str().to_owned());
+    values.insert(
+        "hash_buckets",
+        format!(
+            "[{}]",
+            config
+                .hash_buckets
+                .iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(" ")
+        ),
+    );
+
+    for key in &keys {
+        match key.to_lowercase().as_str() {
+            "config-immutable" => {
+                let raw = std::fs::read(
+                    stores
+                        .base(&store_id)?
+                        .join(madder_store::store::FILE_NAME_CONFIG),
+                )?;
+                io::stdout().write_all(&raw)?;
+            }
+            "config-path" => println!(
+                "{}",
+                stores
+                    .base(&store_id)?
+                    .join(madder_store::store::FILE_NAME_CONFIG)
+                    .display()
+            ),
+            "dir-blob_stores" => println!("{}", stores.dir.display()),
+            other => match values.get(other) {
+                Some(value) => println!("{value}"),
+                None => {
+                    let available: Vec<&str> = values.keys().copied().collect();
+                    return Err(format!(
+                        "unsupported info key: {key:?}\navailable keys: {}",
+                        available.join(", ")
+                    )
+                    .into());
+                }
+            },
+        }
     }
     Ok(())
 }
@@ -504,8 +1016,14 @@ fn key_status(args: &[String]) -> CliResult<()> {
     let [store_id] = args else {
         return Err("key-status takes exactly one blob-store-id".into());
     };
-    let store = Store::open(store_base(store_id)?)?;
-    let source = store.recipient_source();
+    let store = Stores::in_cwd()?.open(store_id)?;
+    let Some(source) = store.recipient_source() else {
+        return Err(format!(
+            "blob store {store_id:?} is not a sealed-key store (its config is {}); key-status applies to sealed-key stores",
+            store.config().version.type_id()
+        )
+        .into());
+    };
     let sealed = store.sealed_recipients();
 
     let pigpen = match source.kind.as_str() {
@@ -660,4 +1178,9 @@ fn unhex(s: &str) -> CliResult<Vec<u8>> {
         .step_by(2)
         .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.into()))
         .collect()
+}
+
+#[allow(dead_code)]
+fn describe_encryption(encryption: &Encryption) -> String {
+    encryption.describe()
 }

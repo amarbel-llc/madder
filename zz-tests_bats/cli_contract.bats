@@ -5,6 +5,10 @@ setup() {
 
 # bats file_tags=contract,write,read,has
 
+# Every test here is also tagged `rust_cli`: the file runs against the Rust
+# crate's madder-grammar CLI (crates/madder-store) as MADDER_BIN too, via
+# `just test-bats-rust-cli`.
+
 # compute_unstored_hash writes content to $1, computes its digest with
 # `write -check` (which hashes without storing), and echoes the resulting
 # blech32-valid blake2b256-... string. The caller's blob store must be
@@ -15,6 +19,7 @@ compute_unstored_hash() {
   echo "$output" | jq -r 'select(.id) | .id' | head -n1
 }
 
+# bats test_tags=rust_cli
 function write_prints_digest_to_stdout { # @test
 
   init_store
@@ -27,6 +32,7 @@ function write_prints_digest_to_stdout { # @test
   assert_line --regexp '^ok 1 - blake2b256-[A-Za-z0-9]+ '
 }
 
+# bats test_tags=rust_cli
 function cat_exits_nonzero_on_missing_blob { # @test
 
   init_store
@@ -41,6 +47,7 @@ function cat_exits_nonzero_on_missing_blob { # @test
   assert_failure
 }
 
+# bats test_tags=rust_cli
 function has_exits_zero_for_existing_blob { # @test
 
   init_store
@@ -55,6 +62,7 @@ function has_exits_zero_for_existing_blob { # @test
   assert_output --partial "found"
 }
 
+# bats test_tags=rust_cli
 function has_exits_nonzero_for_missing_blob { # @test
 
   init_store
@@ -70,6 +78,7 @@ function has_exits_nonzero_for_missing_blob { # @test
   assert_output --partial "not found"
 }
 
+# bats test_tags=rust_cli
 function has_mixed_found_and_missing { # @test
 
   init_store
@@ -91,6 +100,7 @@ function has_mixed_found_and_missing { # @test
   assert_output --partial "not found"
 }
 
+# bats test_tags=rust_cli
 function has_scopes_to_explicit_blob_store_id { # @test
 
   # Regression for #25: scoped `has .default <hash>` must not fall back to
@@ -117,6 +127,7 @@ function has_scopes_to_explicit_blob_store_id { # @test
   assert_output --partial $'\tfound'
 }
 
+# bats test_tags=rust_cli
 function has_default_output_includes_store_id { # @test
 
   # #171: a single-store hit emits `<digest>\tfound\t<store-id>` (three
@@ -133,6 +144,7 @@ function has_default_output_includes_store_id { # @test
   assert_line --regexp $'^'"$hash"$'\tfound\t.+$'
 }
 
+# bats test_tags=rust_cli
 function has_all_emits_one_line_per_store { # @test
 
   # #171: with -all, every store that holds the blob produces its own
@@ -158,6 +170,7 @@ function has_all_emits_one_line_per_store { # @test
   [[ $found_lines -eq 2 ]] || fail "expected 2 found lines, got $found_lines: $output"
 }
 
+# bats test_tags=rust_cli
 function has_all_with_explicit_store_errors { # @test
 
   # #171: -all combined with an explicit blob-store-id arg is a usage

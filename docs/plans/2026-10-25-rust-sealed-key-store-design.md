@@ -358,6 +358,84 @@ The wasm32 (and Android) `cargo check` lane is not built yet: madder#320.
   grep for). V: Go `list`, `key-status`, `write`, `cat` and `fsck` all
   accept a Rust-initialized store (`pigpen_rust_interop.bats`).
 
+## Decision 5 reopened: plain stores (madder#318; Sasha, 2026-10-25)
+
+Sasha's scope (asked and answered 2026-10-25): make the **store-behaviour**
+tests of the plain-store bats files pass against the Rust CLI shim; the
+crate learns **V4 read+write and V3 read**; addendum first, then build.
+The rest of those files is split off: madder#321 (whole files: the arg
+resolver's shadow warnings, `info-repo` in full, discovery error
+reporting) and madder#322 (`list.bats`), both sequenced after madder#319
+and madder#320 unless the parent or the coordinator orders otherwise.
+
+On-disk facts, from the Go code (R):
+
+- `toml-blob_store_config-v3` and `-v4` share `hash_buckets`,
+  `hash_type-id`, `encryption` (an array of markl ids; empty means no
+  encryption layer), `compression-type`, `verify-on-collision`,
+  `single_hash`, `base_path`; V4 adds `instance-id`. V4 is
+  `TypeTomlBlobStoreConfigVCurrent`: `madder init -encryption
+  none|generate` writes V4 with the `@` digest and a uuidv7 instance id,
+  through `files.WriteImmutable` (mode 0444). V3 upgrades to V4 in memory
+  on read, fields copied verbatim. V1/V2 (a single `encryption` string)
+  stay out: Unsupported, loudly.
+- `encryption = []`: `EncryptionKeys.GetIOWrapper` returns nil and
+  `blob_io.MakeConfig` uses the identity wrapper, so the file on disk is
+  the compressed plaintext and nothing else.
+- One key, `madder-private_key-v1@age_x25519_sec-<blech32>` (32-byte
+  X25519 scalar): piggy's `AgeX25519GetIOWrapper` re-encodes it as an
+  `AGE-SECRET-KEY-` string and hands it to dewey's `age.Identity`, a
+  filippo.io/age `X25519Identity`: encrypt to its recipient, decrypt with
+  the identity. The blob is the same age v1 single-X25519-stanza file the
+  sealed path writes, to the public key of that scalar; no sidecar, no
+  unseal. Two or more keys are `age.MultiIdentity` (several stanzas) and
+  are refused here.
+- The default store is the alphabetically first discovered store whose
+  backend built (`blob_store_env.selectDefaultBlobStoreId`); `cat` and
+  `has` fall back to the remaining stores in id order when the blob is not
+  in the active one; `fsck` with no argument checks every store.
+- Output shapes the tests pin: `write`'s NDJSON record is `id`, `size`,
+  `source`, then `store` only when a store id was named on the command
+  line, `present` under `-check`; `-format` other than tap/json/ndjson is
+  "unsupported output format"; TAP on a terminal, NDJSON on a pipe.
+  `has` prints `<id>\tfound\t<store-id>` or `<id>\tnot found`, refuses
+  `-all` with an explicit store, exits non-zero on a miss. `info-repo
+  <key>` prints Go's `ConfigKeyValues` entry (`encryption` is the keys'
+  `StringWithFormat` joined by ", ", empty for none).
+
+Crate changes:
+
+- `Config` carries a version and `encryption: Encryption::{None,
+  Key(secret), Sealed(public)}`; `public_key()` is derived for a `Key`
+  store. `Config::parse` accepts v3, v4 and v5 with per-version checks
+  (v5 as before; v3/v4: zero or one `age_x25519_sec` id, no
+  `[key-custody]`).
+- `Store::open` reads the sidecar only for a sealed-key config. A plain
+  store is unsealed from the start (`unseal` is a no-op, `is_unsealed`
+  true), has no sealed recipients, and `recipient_source()` becomes an
+  `Option`. `read` skips the age layer for `None` and decrypts with the
+  config's secret for `Key`; `write` mirrors it.
+- `init` takes an `InitEncryption::{Sealed{recipients, source}, None,
+  Key(Option<scalar>)}` and writes V4 for plain stores, V5 for sealed; the
+  config is chmod 0444 in both cases (Go's `WriteImmutable`; the sealed
+  sidecar stays writable, as Go leaves it).
+- Fixtures: two more Go-written stores, `plain-none-v4` and
+  `plain-key-v4`, from `just codemod-rust-fixtures`.
+- The shim gains store discovery under `$PWD/.madder/local/share/
+  blob_stores/`, the default-store rule, `write` to the default store with
+  `-` for stdin, `-check`, Go's record fields and terminal detection,
+  `has`, `cat`'s fallback, `fsck` over every store, `info-repo [.store]
+  <key>` (plus the raw config for a lone store id), and `init -encryption
+  none|generate`.
+- Tests tagged `rust_cli`: the store-behaviour subset of `write_read`
+  (9), `fsck` (4), `init` (7), `cli_contract` (9) and, since the shim
+  grows `info-repo <key>` for `init.bats` anyway, `info_repo` (4).
+  V: all 43 `rust_cli` tests (these 33 plus pigpen_store's 10) pass
+  against the Rust shim unchanged; `pigpen_rust_interop.bats` gained a
+  plain-store test (Go-inited stores of both shapes read and written by
+  Rust, Rust-inited ones by Go) and its 7 tests pass; `cargo test` is at
+  55.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -368,3 +446,6 @@ The wasm32 (and Android) `cargo check` lane is not built yet: madder#320.
 3. `age_x25519` + `codec` + `read`/`has`/`ids` reading the fixtures.
 4. `publish` + `write`; bats interop lane; justfile gate; manpage.
 5. `init` if approved; `update-piggy` learns the Cargo pin.
+6. Plain stores (madder#318): fixtures, `Config` versions and
+   `Encryption`, read/write/init, the shim's discovery and commands, the
+   `rust_cli` tags.

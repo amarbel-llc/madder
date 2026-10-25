@@ -8,7 +8,9 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use madder_store::piggy_markl::FormatId;
-use madder_store::{BlobId, Error, OpenOptions, Store, Unsealer, X25519Identity};
+use madder_store::{
+    BlobId, ConfigVersion, Encryption, Error, OpenOptions, Store, Unsealer, X25519Identity,
+};
 
 const FIXTURES: &[&str] = &["zstd-blake2b256", "none-sha256"];
 
@@ -108,6 +110,7 @@ fn opens_each_fixture_and_reports_its_sealed_recipients_without_a_key() {
         assert!(
             store
                 .public_key()
+                .unwrap()
                 .to_wire()
                 .starts_with("piggy-recipient-v1@age_x25519_pub-")
         );
@@ -121,11 +124,148 @@ fn opens_each_fixture_and_reports_its_sealed_recipients_without_a_key() {
         assert_eq!(recipients[0].format(), FormatId::AgeX25519Pub);
         assert_eq!(recipients[1].format(), FormatId::PivyEcdhP256Pub);
 
-        let source = store.recipient_source();
+        let source = store.recipient_source().unwrap();
         assert_eq!(source.kind, "embedded");
         assert_eq!(source.locator, None);
         assert_eq!(source.pigpen.as_deref(), Some(piggy_ids.as_str()));
     }
+}
+
+/// The Go-written plain stores (madder#318): a V4 config, no sidecar,
+/// nothing to unseal.
+const PLAIN_FIXTURES: &[&str] = &["plain-none-v4", "plain-key-v4"];
+
+#[test]
+fn plain_fixtures_open_unsealed_and_read_byte_exact() {
+    for name in PLAIN_FIXTURES {
+        let dir = fixture_dir(name);
+        let store = Store::open(dir.join("store")).unwrap();
+
+        assert_eq!(store.config().version, ConfigVersion::V4, "{name}");
+        assert!(store.is_unsealed(), "{name}: a plain store needs no unseal");
+        assert!(store.sealed_recipients().is_empty(), "{name}");
+        assert!(store.recipient_source().is_none(), "{name}");
+        match (*name, &store.config().encryption) {
+            ("plain-none-v4", Encryption::None) => assert_eq!(store.public_key(), None),
+            ("plain-key-v4", Encryption::Key { id, .. }) => {
+                assert!(
+                    id.to_wire()
+                        .starts_with("madder-private_key-v1@age_x25519_sec-")
+                );
+                assert_eq!(store.public_key().unwrap().format(), FormatId::AgeX25519Pub);
+            }
+            (name, other) => panic!("{name}: unexpected encryption {other:?}"),
+        }
+        // unseal is a no-op that succeeds.
+        store
+            .unseal(&Unsealer {
+                oracle: None,
+                identities: &[],
+            })
+            .unwrap();
+
+        let expected = expected_blobs(&dir);
+        for (plain, id) in &expected {
+            assert!(store.has(id), "{name}: has({id})");
+            assert_eq!(
+                store.read_to_vec(id).unwrap(),
+                plaintext(&dir, plain),
+                "{name}/{plain}"
+            );
+        }
+        let listed: BTreeSet<String> = store.ids().unwrap().iter().map(|id| id.to_wire()).collect();
+        let wanted: BTreeSet<String> = expected.iter().map(|(_, id)| id.to_wire()).collect();
+        assert_eq!(listed, wanted, "{name}: ids()");
+        assert_eq!(
+            store
+                .read_to_vec(&store.config().hash_format.null_id())
+                .unwrap(),
+            b""
+        );
+    }
+}
+
+#[test]
+fn plain_fixtures_round_trip_writes_in_go_s_on_disk_shape() {
+    for name in PLAIN_FIXTURES {
+        let dir = fixture_dir(name);
+        let (_scratch, base) = scratch_copy(name);
+        let store = Store::open(&base).unwrap();
+
+        for (plain, id) in expected_blobs(&dir) {
+            assert_eq!(
+                store.write_bytes(&plaintext(&dir, &plain)).unwrap(),
+                id,
+                "{name}/{plain}"
+            );
+        }
+        assert!(store.write_bytes(b"").unwrap().is_null());
+
+        let content: Vec<u8> = (0..200_000u32).map(|i| (i * 13 % 251) as u8).collect();
+        let id = store.write(&content[..]).unwrap();
+        assert_eq!(store.read_to_vec(&id).unwrap(), content, "{name}");
+
+        // On disk: a zstd frame for the unencrypted store, an age file for
+        // the raw-key one.
+        let path =
+            base.join(id.relative_path(&store.config().hash_buckets, store.config().multi_hash));
+        let bytes = fs::read(&path).unwrap();
+        match *name {
+            "plain-none-v4" => {
+                assert_eq!(&bytes[..4], &[0x28, 0xb5, 0x2f, 0xfd], "{name}: zstd magic")
+            }
+            _ => assert!(bytes.starts_with(b"age-encryption.org/v1\n"), "{name}"),
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o444
+            );
+        }
+    }
+}
+
+#[test]
+fn a_v3_config_opens_as_a_plain_store() {
+    let name = "plain-none-v4";
+    let dir = fixture_dir(name);
+    let (_scratch, base) = scratch_copy(name);
+    let config_path = base.join("blob_store-config");
+    let text = fs::read_to_string(&config_path).unwrap();
+    let v3: String = text
+        .lines()
+        .filter(|l| !l.starts_with("@ ") && !l.starts_with("instance-id"))
+        .map(|l| l.replace("toml-blob_store_config-v4", "toml-blob_store_config-v3"))
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&config_path, fs::Permissions::from_mode(0o644)).unwrap();
+    }
+    fs::write(&config_path, v3).unwrap();
+
+    let store = Store::open(&base).unwrap();
+    assert_eq!(store.config().version, ConfigVersion::V3);
+    for (plain, id) in expected_blobs(&dir) {
+        assert_eq!(store.read_to_vec(&id).unwrap(), plaintext(&dir, &plain));
+    }
+}
+
+#[test]
+fn a_plain_store_has_no_sidecar_and_a_sealed_one_needs_its() {
+    // A sealed-key store whose sidecar is gone cannot open; a plain store
+    // never looks for one.
+    let (_scratch, base) = scratch_copy(FIXTURES[0]);
+    fs::remove_file(base.join("blob_store-key")).unwrap();
+    assert!(matches!(Store::open(&base), Err(Error::Io(_))));
+
+    let (_scratch, base) = scratch_copy("plain-none-v4");
+    fs::write(base.join("blob_store-key"), b"irrelevant").unwrap();
+    assert!(Store::open(&base).is_ok());
 }
 
 #[test]
