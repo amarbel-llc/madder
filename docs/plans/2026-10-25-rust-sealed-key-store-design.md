@@ -469,6 +469,33 @@ target's std and a build needs the NDK linker, and pigsty's own toolchain
 builds the crate for Android as its primary target, so a second copy of
 that setup here would add maintenance and no assurance.
 
+## The rest of the plain-store files (madder#321)
+
+Three more tests from the plain-store files run against the shim; the
+`list` tests stay with madder#322 and the inventory-archive and
+pack-blobs tests stay Go-only.
+
+- **Two scopes.** The shim resolves `.name` (CWD scope) and a bare
+  `name` or `~name` (XDG user scope, `$XDG_DATA_HOME/madder/blob_stores/
+  <name>`, `~/.local/share` without XDG_DATA_HOME), discovers both
+  directories, and sorts the id strings, which keeps Go's default-store
+  rule (`.default` sorts before any bare name).
+- **The shadow warning.** A file argument whose bare name is also a
+  configured store's name gets Go's `FormatShadowWarning` text through
+  the write sink (a TAP comment, or stderr in JSON mode), with the `~name`
+  spelling as the unambiguous hint for a user-scope store and the
+  prefixed id for any other, as `DisambiguatedString` renders them.
+- **Strict discovery in init.** Go's init decodes every configured store
+  first and fails by name on one it cannot decode. The shim does the same
+  for local-store configs (v3/v4/v5 type lines) and passes over other
+  store types, which are not this crate's to judge. For the broken-store
+  fixture that test writes (`encryption = ""`, `hash-buckets`
+  misspelled, `hash_type-id = ""`), `Config::parse` now accepts
+  `encryption` as a single string and a missing `hash_buckets` (no
+  bucketing, as Go reads it), so the error is the hash type's, and
+  `Error::Unsupported` renders as "unsupported hash type …" the way Go's
+  does.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -485,3 +512,5 @@ that setup here would add maintenance and no assurance.
 7. The identity variant of the agent tests (madder#319): the mode in
    `pigpen_store.bats`, `mkBatsLane`'s `extraEnv`, the lane and recipe.
 8. The portability gate (madder#320): the wasm32 `cargo check` lane.
+9. The rest of the plain-store files (madder#321): two scopes, the shadow
+   warning, strict discovery in init.

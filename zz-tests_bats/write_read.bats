@@ -7,8 +7,7 @@ setup() {
 
 # The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
 # CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
-# `list` tests and the file-shadows-store warnings are Go-only (madder#321,
-# madder#322).
+# `list` tests (madder#322) and the pack-blobs test are Go-only.
 
 # bats test_tags=rust_cli
 function write_and_cat { # @test
@@ -144,6 +143,7 @@ function list_json_and_ndjson_output_deterministic_across_runs { # @test
   done
 }
 
+# bats test_tags=rust_cli
 function write_warns_when_file_shadows_store { # @test
 
   # Bare `write shadowed` resolves to the file but must warn about the
@@ -273,6 +273,7 @@ function write_json_rejects_unknown_format { # @test
   assert_output --partial 'unsupported output format'
 }
 
+# bats test_tags=rust_cli
 function write_json_warning_goes_to_stderr { # @test
 
   # In JSON mode the warning must route to stderr so stdout stays valid

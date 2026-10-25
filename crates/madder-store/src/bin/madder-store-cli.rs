@@ -118,61 +118,109 @@ fn parse_flags(
     Ok((flags, positional))
 }
 
-/// A CWD-relative blob-store-id, `.name` with madder's id alphabet.
+/// A blob-store-id in the subset of madder's scoped ids the store tests
+/// use: `.name` is the CWD scope, a bare `name` or `~name` the XDG user
+/// scope (`~` is the parse-only alias for a name a file in CWD shadows).
+/// The system, cache and custom-rooted scopes are not resolved here.
 fn is_store_id(arg: &str) -> bool {
-    arg.strip_prefix('.')
-        .filter(|rest| !rest.is_empty())
-        .is_some_and(|rest| {
-            rest.bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
-        })
+    let name = store_name(arg);
+    // A name starts with a letter or digit, so a flag (`-format`) is never
+    // taken for a bare store id.
+    name.bytes()
+        .next()
+        .is_some_and(|b| b.is_ascii_alphanumeric())
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
 }
 
-/// Whether an argument names a store to switch to (a store id that is not
-/// also an existing path, as madder's arg resolver decides).
+/// The bare name of a store id, without its scope prefix.
+fn store_name(id: &str) -> &str {
+    id.strip_prefix('.')
+        .or_else(|| id.strip_prefix('~'))
+        .unwrap_or(id)
+}
+
+/// Whether an argument names a store to switch to: a store id that is not
+/// also an existing path, since madder's arg resolver tries the file first.
 fn is_store_switch(arg: &str) -> bool {
     is_store_id(arg) && !Path::new(arg).exists()
 }
 
-/// The CWD's blob stores, `$PWD/.madder/local/share/blob_stores/<name>`.
+/// Where blob stores live: the CWD scope,
+/// `$PWD/.madder/local/share/blob_stores/<name>`, and the XDG user scope,
+/// `$XDG_DATA_HOME/madder/blob_stores/<name>` (`~/.local/share` without
+/// XDG_DATA_HOME).
 struct Stores {
-    dir: PathBuf,
+    cwd_dir: PathBuf,
+    /// Empty when neither XDG_DATA_HOME nor HOME is set.
+    user_dir: PathBuf,
 }
 
 impl Stores {
     fn in_cwd() -> CliResult<Stores> {
+        let data_home = std::env::var_os("XDG_DATA_HOME")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .or_else(|| {
+                std::env::var_os("HOME")
+                    .filter(|v| !v.is_empty())
+                    .map(|home| PathBuf::from(home).join(".local/share"))
+            });
         Ok(Stores {
-            dir: std::env::current_dir()?.join(".madder/local/share/blob_stores"),
+            cwd_dir: std::env::current_dir()?.join(".madder/local/share/blob_stores"),
+            user_dir: data_home
+                .map(|d| d.join("madder/blob_stores"))
+                .unwrap_or_default(),
         })
     }
 
     fn base(&self, id: &str) -> CliResult<PathBuf> {
         if !is_store_id(id) {
             return Err(format!(
-                "blob-store-id {id:?}: this binary resolves CWD-relative ids only (.name)"
+                "blob-store-id {id:?}: this binary resolves .name (CWD), ~name and bare name (XDG user) ids only"
             )
             .into());
         }
-        Ok(self.dir.join(&id[1..]))
+        if id.starts_with('.') {
+            return Ok(self.cwd_dir.join(store_name(id)));
+        }
+        if self.user_dir.as_os_str().is_empty() {
+            return Err(format!(
+                "blob-store-id {id:?} is in the XDG user scope, but neither XDG_DATA_HOME nor HOME is set"
+            )
+            .into());
+        }
+        Ok(self.user_dir.join(store_name(id)))
     }
 
-    /// Every store id with a config file, sorted, which is also Go's
-    /// discovery order (and its default-store rule: the first that opens).
+    fn config_path(&self, id: &str) -> CliResult<PathBuf> {
+        Ok(self.base(id)?.join(madder_store::store::FILE_NAME_CONFIG))
+    }
+
+    /// Every store id with a config file, in both scopes, sorted by id
+    /// string, which is also Go's discovery order (and its default-store
+    /// rule: the first that opens).
     fn ids(&self) -> CliResult<Vec<String>> {
         let mut ids = Vec::new();
-        let entries = match std::fs::read_dir(&self.dir) {
-            Ok(entries) => entries,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(ids),
-            Err(e) => return Err(e.into()),
-        };
-        for entry in entries {
-            let entry = entry?;
-            if entry
-                .path()
-                .join(madder_store::store::FILE_NAME_CONFIG)
-                .is_file()
-            {
-                ids.push(format!(".{}", entry.file_name().to_string_lossy()));
+        for (dir, prefix) in [(&self.cwd_dir, "."), (&self.user_dir, "")] {
+            if dir.as_os_str().is_empty() {
+                continue;
+            }
+            let entries = match std::fs::read_dir(dir) {
+                Ok(entries) => entries,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.into()),
+            };
+            for entry in entries {
+                let entry = entry?;
+                if entry
+                    .path()
+                    .join(madder_store::store::FILE_NAME_CONFIG)
+                    .is_file()
+                {
+                    ids.push(format!("{prefix}{}", entry.file_name().to_string_lossy()));
+                }
             }
         }
         ids.sort();
@@ -192,8 +240,9 @@ impl Stores {
             }
         }
         Err(format!(
-            "no blob store found under {} (init one first)",
-            self.dir.display()
+            "no blob store found under {} or {} (init one first)",
+            self.cwd_dir.display(),
+            self.user_dir.display()
         )
         .into())
     }
@@ -209,6 +258,53 @@ impl Stores {
             }
         }
         Ok(stores)
+    }
+
+    /// Go's discovery decodes every config before a command runs, and a
+    /// local store config it cannot decode fails the command, naming the
+    /// store and its config file (init.bats pins that). Configs of other
+    /// store types (multi, archive, remote) are not this crate's to judge
+    /// and are passed over.
+    fn check_local_configs(&self) -> CliResult<()> {
+        for id in self.ids()? {
+            let config_path = self.config_path(&id)?;
+            let raw = std::fs::read(&config_path)?;
+            let is_local = madder_store::hyphence::parse(&raw).is_ok_and(|framed| {
+                [
+                    madder_store::config::TYPE_V3,
+                    madder_store::config::TYPE_V4,
+                    madder_store::config::TYPE_V5,
+                ]
+                .contains(&framed.type_id.as_str())
+            });
+            if !is_local {
+                continue;
+            }
+            madder_store::Config::parse(&raw)
+                .map_err(|e| format!("blob store {id:?} at {:?}: {e}", config_path.display()))?;
+        }
+        Ok(())
+    }
+
+    /// madder's arg resolver warns when a file argument shares its bare
+    /// name with a configured store: the shadowed id and the spelling that
+    /// names the store unambiguously (`~name` for a user-scope store, whose
+    /// bare name is what just resolved to the file).
+    fn shadowing(&self, arg: &str) -> CliResult<Option<(String, String)>> {
+        if !is_store_id(arg) || store_name(arg) != arg {
+            return Ok(None);
+        }
+        for id in self.ids()? {
+            if store_name(&id) == arg {
+                let hint = if id == arg {
+                    format!("~{id}")
+                } else {
+                    id.clone()
+                };
+                return Ok(Some((id, hint)));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -360,6 +456,9 @@ fn init(args: &[String]) -> CliResult<()> {
     }
 
     let stores = Stores::in_cwd()?;
+    // As in Go, init runs discovery first, and a local store whose config
+    // does not decode fails it by name.
+    stores.check_local_configs()?;
     let base = stores.base(store_id)?;
     let config_path = base.join(madder_store::store::FILE_NAME_CONFIG);
     // The TAP stream is opened only once there is a result to put in it: a
@@ -572,6 +671,11 @@ fn write(args: &[String]) -> CliResult<()> {
             saw_stdin = true;
             digest_or_write(store, io::stdin().lock(), check)
         } else {
+            if let Some((shadowed, hint)) = stores.shadowing(arg)? {
+                sink.notice(&format!(
+                    "warning: {arg:?} shadows blob-store-id {shadowed:?}; use './{arg}' for the file or {hint:?} for the blob-store-id"
+                ))?;
+            }
             match std::fs::File::open(arg) {
                 Ok(file) => digest_or_write(store, file, check),
                 Err(e) => Err(Error::Io(e)),
@@ -655,15 +759,20 @@ fn cat(args: &[String]) -> CliResult<()> {
     let mut stdout = io::stdout().lock();
 
     for arg in args {
-        if is_store_switch(arg) {
-            eprintln!("switched to blob-store-id: {arg}");
-            active = Some((arg.clone(), stores.open(arg)?, true));
-            continue;
-        }
-        let Ok(id) = BlobId::parse(arg) else {
-            eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
-            missing += 1;
-            continue;
+        // A blob id first, as madder's resolver orders it: a bare store name
+        // is spelled like a blob id's hash prefix.
+        let id = match BlobId::parse(arg) {
+            Ok(id) => id,
+            Err(_) if is_store_switch(arg) => {
+                eprintln!("switched to blob-store-id: {arg}");
+                active = Some((arg.clone(), stores.open(arg)?, true));
+                continue;
+            }
+            Err(_) => {
+                eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
+                missing += 1;
+                continue;
+            }
         };
         if active.is_none() {
             let (default_id, store) = stores.open_default()?;
@@ -767,21 +876,25 @@ fn has(args: &[String]) -> CliResult<()> {
     let mut missing = 0usize;
 
     for arg in &positional {
-        if is_store_switch(arg) {
-            if all {
-                return Err(format!(
-                    "-all is incompatible with an explicit blob-store-id arg {arg:?}"
-                )
-                .into());
+        // A blob id first, as madder's resolver orders it.
+        let id = match BlobId::parse(arg) {
+            Ok(id) => id,
+            Err(_) if is_store_switch(arg) => {
+                if all {
+                    return Err(format!(
+                        "-all is incompatible with an explicit blob-store-id arg {arg:?}"
+                    )
+                    .into());
+                }
+                eprintln!("switched to blob-store-id: {arg}");
+                explicit = Some((arg.clone(), stores.open(arg)?));
+                continue;
             }
-            eprintln!("switched to blob-store-id: {arg}");
-            explicit = Some((arg.clone(), stores.open(arg)?));
-            continue;
-        }
-        let Ok(id) = BlobId::parse(arg) else {
-            eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
-            missing += 1;
-            continue;
+            Err(_) => {
+                eprintln!("{arg:?} is neither a blob id nor a blob-store-id");
+                missing += 1;
+                continue;
+            }
         };
 
         let mut hits: Vec<String> = Vec::new();
@@ -1015,7 +1128,14 @@ fn info_repo(args: &[String]) -> CliResult<()> {
                     .join(madder_store::store::FILE_NAME_CONFIG)
                     .display()
             ),
-            "dir-blob_stores" => println!("{}", stores.dir.display()),
+            "dir-blob_stores" => println!(
+                "{}",
+                stores
+                    .base(&store_id)?
+                    .parent()
+                    .unwrap_or(&stores.cwd_dir)
+                    .display()
+            ),
             other => match values.get(other) {
                 Some(value) => println!("{value}"),
                 None => {

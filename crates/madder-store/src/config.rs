@@ -141,13 +141,16 @@ impl Encryption {
 /// The fields V3, V4 and V5 share, each optional where a version omits it.
 #[derive(Deserialize)]
 struct TomlLocal {
+    /// Absent means no bucketing: the whole hex digest is one file name.
+    #[serde(default)]
     hash_buckets: Vec<usize>,
     #[serde(default)]
     base_path: Option<String>,
     #[serde(rename = "hash_type-id")]
     hash_type_id: String,
-    /// Omitted entirely by Go when empty.
-    #[serde(default)]
+    /// Omitted entirely by Go when empty; older hand-written configs spell
+    /// it as a single string, which Go's decoder accepts too.
+    #[serde(default, deserialize_with = "string_or_strings")]
     encryption: Vec<String>,
     #[serde(rename = "compression-type", default)]
     compression_type: String,
@@ -164,6 +167,24 @@ struct TomlLocal {
 #[derive(Deserialize)]
 struct KeyCustody {
     holder: String,
+}
+
+/// `encryption = []`, `encryption = ["id"]` or the one-string spelling
+/// `encryption = "id"` (empty string: no key).
+fn string_or_strings<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> std::result::Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+    Ok(match OneOrMany::deserialize(d)? {
+        OneOrMany::One(s) if s.is_empty() => Vec::new(),
+        OneOrMany::One(s) => vec![s],
+        OneOrMany::Many(v) => v,
+    })
 }
 
 /// A parsed, digest-verified store config.
@@ -332,7 +353,7 @@ fn parse_plain_encryption(toml: &TomlLocal) -> Result<Encryption> {
             Ok(Encryption::Key { id, secret, public })
         }
         many => Err(Error::Unsupported(format!(
-            "{} encryption keys (several age identities, Go's MultiIdentity, are not implemented)",
+            "encryption by {} keys (several age identities, Go's MultiIdentity, are not implemented)",
             many.len()
         ))),
     }
@@ -556,6 +577,29 @@ mod tests {
                 Err(Error::Unsupported(_))
             ));
         }
+    }
+
+    #[test]
+    fn a_hand_written_v3_with_an_empty_hash_type_fails_on_the_hash_type() {
+        // init.bats's broken-store fixture: `encryption` spelled as a
+        // string, `hash-buckets` misspelled, `hash_type-id` empty. Go
+        // reports the hash type; so does this crate.
+        let raw = rebuild(
+            TYPE_V3,
+            "hash_type-id = \"\"\ncompression-type = \"zstd\"\nencryption = \"\"\nhash-buckets = [2]\n",
+        );
+        let err = Config::parse(&raw).unwrap_err();
+        assert!(err.to_string().contains("unsupported hash type"), "{err}");
+
+        // The same spellings with a real hash type read as a plain store
+        // without bucketing.
+        let raw = rebuild(
+            TYPE_V3,
+            "hash_type-id = \"sha256\"\ncompression-type = \"zstd\"\nencryption = \"\"\n",
+        );
+        let config = Config::parse(&raw).unwrap();
+        assert!(matches!(config.encryption, Encryption::None));
+        assert!(config.hash_buckets.is_empty());
     }
 
     #[test]

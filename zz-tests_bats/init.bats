@@ -7,7 +7,7 @@ setup() {
 
 # The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
 # CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
-# inventory-archive inits and the discovery error report are Go-only.
+# inventory-archive inits are Go-only.
 
 # bats test_tags=rust_cli
 function init_default { # @test
@@ -101,6 +101,7 @@ function init_inventory_archive_config_has_digest_line { # @test
   assert_success
 }
 
+# bats test_tags=rust_cli
 function init_error_includes_store_id_and_path { # @test
   # Regression for #21: when store discovery hits an invalid config on
   # disk, the error must identify which store and which config file.

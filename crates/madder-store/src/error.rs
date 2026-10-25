@@ -10,8 +10,10 @@ pub enum Error {
     /// The config body does not match its recorded digest.
     #[error("blob_store-config body does not match its @ digest")]
     ConfigTampered,
-    /// A config or sidecar names something this crate cannot use.
-    #[error("unsupported: {0}")]
+    /// A config or sidecar names something this crate cannot use. The
+    /// message starts with the noun ("hash type …"), so it reads as Go's
+    /// errors do ("unsupported hash type").
+    #[error("unsupported {0}")]
     Unsupported(String),
     /// A config or sidecar is well framed but malformed inside.
     #[error("malformed: {0}")]

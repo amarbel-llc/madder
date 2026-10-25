@@ -35,8 +35,10 @@ The crate implements exactly the on-disk facts the Go code pins:
   **age_x25519_pub** public key. A v3/v4 config (a plain store) has no
   **key-custody** table and either no **encryption** (compressed
   plaintext on disk) or exactly one **age_x25519_sec** key, the
-  **madder init -encryption generate** shape; several keys (Go's age
-  MultiIdentity) and the v1/v2 config shapes are refused.
+  **madder init -encryption generate** shape (also accepted spelled as a
+  single string, and with **hash_buckets** absent, meaning no
+  bucketing); several keys (Go's age MultiIdentity) and the v1/v2 config
+  shapes are refused.
 - **blob_store-key** of type **toml-blob_store_key-v2** (v1 is read),
   present for a sealed-key store only: the recipient source (**path**,
   **papi**, **embedded**) and the sealed **pigpen-v1** document, base64
@@ -96,17 +98,19 @@ config, and the v1/v2 config shapes.
 the store bats tests use: **init** (**-pigpen**, or **-encryption
 none|generate**), **write** (TAP or NDJSON, **-check**, **-** for
 stdin), **cat**, **cat-ids**, **has**, **fsck**, **info-repo**,
-**key-status**, with CWD-relative **.name** blob-store-ids only. With no
-id named it uses the default store the way Go's discovery picks it (the
-alphabetically first store that opens), and **cat** and **has** fall
-back to the remaining stores. It opens a sealed key with
+**key-status**, with blob-store-ids in the CWD scope (**.name**) and the
+XDG user scope (a bare **name**, or **~name** when a file in CWD shadows
+it). With no id named it uses the default store the way Go's discovery
+picks it (the alphabetically first store that opens), **cat** and
+**has** fall back to the remaining stores, **write** warns when a file
+argument shadows a store's name, and **init** fails by name on a local
+store config it cannot decode, as Go's discovery does. It opens a sealed key with
 **MADDER_STORE_IDENTITY_HEX** (an X25519 secret) when set, else through
 piggy-agent via **piggy_pigpen::agent** (**PIGGY_AUTH_SOCK**,
 **SSH_AUTH_SOCK**, **PIVY_AUTH_SOCK**). Its purpose is to let the
 existing bats files run against the Rust implementation; madder's own
-CLI surface beyond the store (the arg resolver's shadow warnings,
-**list**, multi and archive stores) is not reproduced (madder#321,
-madder#322).
+CLI surface beyond the store (**list**, multi and archive stores,
+**pack-blobs**) is not reproduced (**list**: madder#322).
 
 # CONFORMANCE
 
