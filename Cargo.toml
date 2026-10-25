@@ -1,0 +1,9 @@
+# The Rust half of madder: a cargo workspace whose members live under crates/.
+# It sits beside the Go module (go/) so the eng-rust lanes (rustfmt via
+# conformist.nix, clippy via conformist-impure.nix) find the workspace at the
+# tree root, the shape conformist's eng-rust template assumes. See
+# docs/plans/2026-10-25-rust-sealed-key-store-design.md.
+
+[workspace]
+resolver = "2"
+members = ["crates/madder-store"]

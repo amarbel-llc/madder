@@ -1,0 +1,51 @@
+[package]
+name = "madder-store"
+version = "0.4.7"
+edition = "2021"
+description = "Read and write madder sealed-key local blob stores (FDR 0011), byte-compatible with the Go madder"
+license = "MIT"
+
+[features]
+default = []
+# The test CLI's piggy-agent ECDH oracle (piggy_pigpen::agent, std
+# UnixStream + p256). Off for the library, which stays wasm-clean; the
+# consumer wires its own oracle.
+agent-cli = ["piggy-pigpen/agent"]
+
+[[bin]]
+name = "madder-store-cli"
+path = "src/bin/madder-store-cli.rs"
+required-features = ["agent-cli"]
+
+# Pure Rust only: this crate must build for aarch64-linux-android and
+# wasm32-unknown-unknown with no system libraries. The RustCrypto set below
+# is the one piggy-pigpen already uses, at the same versions, so the two
+# crates share one closure.
+
+[dependencies]
+# piggy's crates, pinned to the SAME rev as madder's `piggy` flake input
+# (flake.lock nodes.piggy.locked.rev). `just update-piggy` moves both.
+# piggy-pigpen is excluded from piggy's cargo workspace and depends on
+# piggy-markl by path, so both are named here from the same checkout.
+piggy-pigpen = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
+piggy-markl = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
+
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+chacha20poly1305 = "0.10"
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+blake2 = "0.10"
+base64 = "0.22"
+rand_core = { version = "0.6", features = ["getrandom"] }
+zeroize = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+ruzstd = "0.8"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[dev-dependencies]
+hex = "0.4"

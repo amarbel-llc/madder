@@ -1,6 +1,8 @@
 # madder-store: a Rust reader/writer for sealed-key local stores
 
-Status: design, awaiting confirmation from piggy/live-sequoia (2026-10-25).
+Status: confirmed by piggy's lane and implemented (2026-10-25); the
+"Decided after the first implementation" section below records what
+changed on the way.
 Consumer: **pigsty**, a Flutter + flutter_rust_bridge password vault
 (Linux and Android) that keeps hyphence entry documents and attachments
 as blobs in a madder store whose key is sealed to a pigpen recipient set
@@ -301,9 +303,10 @@ writes, `madder cat` and `madder fsck -format ndjson` verify; Rust also
 like `test-bats-piv-agent`. If Decision 4 lands, the same file covers a
 Rust-initialized store read by Go.
 
-Justfile: `test-rust` (`nix build .#madder-store`), `test-rust-wasm`
-(the wasm32 check), `test-bats-rust-interop`; all join `test`, and the
+Justfile: `test-rust` (`nix build .#madder-store`),
+`test-bats-rust-interop` and `test-bats-rust-cli` join `test`, and the
 clippy lane joins `lint-worktree`. `default` stays `lint build test`.
+The wasm32 (and Android) `cargo check` lane is not built yet: madder#320.
 
 ## Anything not pinned by FDR 0011 or a vector
 
@@ -318,6 +321,40 @@ clippy lane joins `lint-worktree`. `default` stays `lint build test`.
   "the other side reads it", not byte equality.
 - `instance-id` is opaque to this crate; if pigsty ever needs to compare
   store identities it compares the string.
+
+## Decided after the first implementation (Sasha, 2026-10-25)
+
+- **The existing bats files are the Rust conformance suite too.** The
+  crate's test binary, `madder-store-cli`, speaks the subset of madder's
+  grammar the sealed-key tests use (`init -pigpen`, `write -format tap`,
+  `cat`, `cat-ids`, `fsck -format ndjson`, `key-status`; CWD-relative
+  `.name` ids only), and `.#bats-rust_cli` (`just test-bats-rust-cli`)
+  runs the tests of `zz-tests_bats/pigpen_store.bats` tagged
+  `# bats test_tags=rust_cli` with `MADDER_BIN` pointed at it. V: 10 of
+  the file's 17 tests pass against Rust unchanged, including the reads
+  through the real piggy-agent over fibby with one card ECDH per
+  process. The other 7 are out of the crate's scope: `key-reseal` (4),
+  the drift warning and pigpen pointers (2), and a plain store (1).
+  madder#318 (plain-store files, reopens decision 5) and madder#319 (an
+  X25519-identity variant of the agent tests) are sequenced at the end
+  of the queue.
+- **Agent oracle.** piggy landed `piggy_pigpen::agent::{AgentEcdhOracle,
+  resolve_auth_sock}` behind the non-default `agent` feature (pure std
+  `UnixStream` + p256; piggy rev 9ebebd31a74e). The crate exposes it to
+  its CLI only, through the cargo feature `agent-cli` the bin target
+  requires; the library's default build stays feature-free and
+  wasm-clean, and pigsty wires its own oracle.
+- **Two piggy pins, temporarily apart.** Cargo.lock pins piggy at
+  9ebebd31a74e (the oracle); flake.lock still pins d28e399b (the Go
+  side). piggy-pigpen and piggy-markl are identical between the two
+  except for the new `agent` module, which the Go side does not consume.
+  `just update-piggy 9ebebd31a74e` realigns them; it is a lock bump and
+  waits for the operator.
+- **init is in**: `madder_store::init` writes the sidecar then the
+  digest-pinned config, hand-rendering the sidecar's two long fields as
+  TOML basic multi-line strings (the shape Go writes and the bats tests
+  grep for). V: Go `list`, `key-status`, `write`, `cat` and `fsck` all
+  accept a Rust-initialized store (`pigpen_rust_interop.bats`).
 
 ## Plan of record (TDD per task, merge when green)
 

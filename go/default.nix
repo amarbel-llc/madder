@@ -257,9 +257,22 @@ let
     };
   };
 
+  # The Rust<->Go interop lane (zz-tests_bats/pigpen_rust_interop.bats):
+  # the Rust crate's test CLI writes blobs the Go madder reads through the
+  # real agent, and reads Go-written blobs with a software identity. Needs
+  # the piv_agent binaries (Go opens a sealed key only through the agent)
+  # plus the Rust build, so it has its own tag and lane.
+  rustInteropExtraBinaries = pivAgentExtraBinaries // {
+    MADDER_STORE_CLI = {
+      base = madder-store;
+      name = "madder-store-cli";
+    };
+  };
+
   # Tags the default lanes skip: net_cap binds loopback and needs the
-  # fixture servers; piv_agent needs the piggy binaries above.
-  defaultLaneFilter = "!net_cap,!piv_agent";
+  # fixture servers; piv_agent and rust_interop need the piggy binaries
+  # above (and rust_interop the Rust crate).
+  defaultLaneFilter = "!net_cap,!piv_agent,!rust_interop";
 
   # madder-cli-cover's coverIntegrationCommand is a phase fragment
   # (shell embedded in buildGoCover's own installCheckPhase), not a
@@ -558,6 +571,8 @@ let
                 netCapExtraBinaries
               else if tag == "piv_agent" then
                 pivAgentExtraBinaries
+              else if tag == "rust_interop" then
+                rustInteropExtraBinaries
               else
                 { };
           })
@@ -565,6 +580,22 @@ let
       )
       // {
         bats-default = mkBatsLane { filter = defaultLaneFilter; };
+        # The Rust implementation under the EXISTING bats files: the tests
+        # tagged `rust_cli` (per-test tags in pigpen_store.bats) run with
+        # MADDER_BIN pointed at the Rust crate's madder-grammar test CLI
+        # instead of the Go madder. A per-test tag is not auto-discovered
+        # above, so the lane is spelled out. fibby + piggy-agent ride along
+        # because the file's setup starts them.
+        bats-rust_cli = mkBatsLane {
+          filter = "rust_cli";
+          base = madder-store;
+          extraBinaries = rustInteropExtraBinaries // {
+            MADDER_BIN = {
+              base = madder-store;
+              name = "madder-store-cli";
+            };
+          };
+        };
         # No bats-race-net_cap: the race-instrumented binary doubles
         # build time and the SFTP/WebDAV harnesses already exercise
         # the same data paths under the non-race net_cap lane.
@@ -615,6 +646,45 @@ let
     pname = "madder-test-mint-recipient";
     version = "0.0.0";
     subPackages = [ "cmd/madder-test-mint-recipient" ];
+  };
+
+  # madder-store: the Rust crate that reads and writes sealed-key local
+  # stores byte-compatible with the Go madder (FDR 0011; design in
+  # docs/plans/2026-10-25-rust-sealed-key-store-design.md), for the pigsty
+  # vault. `cargo test` in checkPhase is the Go->Rust conformance lane: the
+  # committed Go-written fixture stores under crates/madder-store/tests/
+  # fixtures read back byte-exact, and the age X25519 subset round-trips
+  # with the reference `age` CLI. The piggy crates are Cargo git deps pinned
+  # to the same rev as the `piggy` flake input; allowBuiltinFetchGit fetches
+  # them by that rev without a second hash to maintain. The crate's bin
+  # target, madder-store-cli, is test-only: it drives the rust_interop bats
+  # lane (Rust writes, Go reads through the agent, and back).
+  madder-store = pkgs-master.rustPlatform.buildRustPackage {
+    pname = "madder-store";
+    inherit version;
+    src = pkgs-master.lib.cleanSourceWith {
+      src = ../.;
+      filter =
+        name: type:
+        let
+          rel = pkgs-master.lib.removePrefix (toString ../. + "/") (toString name);
+        in
+        rel == "Cargo.toml"
+        || rel == "Cargo.lock"
+        || rel == "crates"
+        || (pkgs-master.lib.hasPrefix "crates/" rel && baseNameOf rel != "target");
+    };
+    cargoLock = {
+      lockFile = ../Cargo.lock;
+      allowBuiltinFetchGit = true;
+    };
+    # The test CLI needs piggy-pigpen's `agent` oracle (crate feature
+    # agent-cli, required by the bin target); the library's default build
+    # stays feature-free.
+    buildFeatures = [ "agent-cli" ];
+    nativeCheckInputs = [ pkgs-master.age ];
+    env.MADDER_STORE_AGE_BIN = "${pkgs-master.age}/bin/age";
+    meta.description = "Rust reader/writer for madder sealed-key local blob stores";
   };
 
   # grammar-vectors-test (FDR-0010): the langlang -input cross-check of the
@@ -700,6 +770,7 @@ in
       madder-clown-plugin
       madder-test-sftp-server
       madder-test-mint-recipient
+      madder-store
       store-import-smoke
       ;
     default = madder;

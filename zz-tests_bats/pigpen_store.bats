@@ -22,6 +22,15 @@ teardown() {
 # are ordinary age files encrypted to the public half, so writing needs
 # no agent; reading opens the sealed key once per process through the
 # agent and decrypts every blob in software after that.
+#
+# Tests tagged `rust_cli` also run against the Rust implementation
+# (crates/madder-store, via its madder-grammar test CLI as MADDER_BIN) in
+# the `.#bats-rust_cli` lane (`just test-bats-rust-cli`). The tag marks
+# the tests whose behaviour the Rust crate implements today: init, write,
+# reads through piggy-agent (piggy-pigpen's pure-Rust `agent` oracle), the
+# agent-less failure path, fsck and key-status. key-reseal, the drift
+# warning and pigpen pointers are out of the crate's scope, and plain
+# stores wait on madder#318 (madder#319 tracks an X25519-identity variant).
 
 run_madder_agent() {
   run timeout --preserve-status 20s "${MADDER_BIN:-madder}" "$@"
@@ -58,6 +67,7 @@ card_ecdh_count() {
   grep -c 'GA ECDH 9D' "$PIV_FIBBY_LOG" || true
 }
 
+# bats test_tags=rust_cli
 function init_pigpen_writes_no_secret { # @test
   init_sealed_store
 
@@ -86,6 +96,7 @@ function init_pigpen_writes_no_secret { # @test
   [[ "$(card_ecdh_count)" == "0" ]] || fail "init used the card"
 }
 
+# bats test_tags=rust_cli
 function sealed_store_writes_without_an_agent { # @test
   init_sealed_store
 
@@ -104,6 +115,7 @@ function sealed_store_writes_without_an_agent { # @test
   [[ "$(card_ecdh_count)" == "0" ]] || fail "writing used the card"
 }
 
+# bats test_tags=rust_cli
 function sealed_store_reads_many_blobs_with_one_card_operation { # @test
   init_sealed_store
 
@@ -125,6 +137,7 @@ function sealed_store_reads_many_blobs_with_one_card_operation { # @test
     fail "expected 1 card ECDH for 3 blobs, got $(card_ecdh_count)"
 }
 
+# bats test_tags=rust_cli
 function sealed_store_fsck_verifies_through_the_agent { # @test
   init_sealed_store
 
@@ -141,6 +154,7 @@ function sealed_store_fsck_verifies_through_the_agent { # @test
     fail "expected 1 card ECDH for the fsck, got $(card_ecdh_count)"
 }
 
+# bats test_tags=rust_cli
 function sealed_store_without_an_agent_is_unreadable_not_missing { # @test
   init_sealed_store
 
@@ -160,6 +174,7 @@ function sealed_store_without_an_agent_is_unreadable_not_missing { # @test
   refute_output --partial '"state":"corrupt"'
 }
 
+# bats test_tags=rust_cli
 function init_pigpen_refuses_bad_input_and_creates_nothing { # @test
   # A pigpen that does not exist.
   run_madder_agent init -pigpen "$BATS_TEST_TMPDIR/no-such-pigpen" .sealed
@@ -229,6 +244,7 @@ resolver_call_count() {
   wc -l <"$RESOLVER_LOG" | tr -d ' '
 }
 
+# bats test_tags=rust_cli
 function sidecar_is_plain_text_with_heredocs { # @test
   init_sealed_store
 
@@ -248,6 +264,7 @@ function sidecar_is_plain_text_with_heredocs { # @test
   assert_output '0'
 }
 
+# bats test_tags=rust_cli
 function pigpen_kind_embedded_records_no_path { # @test
   run_madder_agent init -pigpen "$PIGPEN" -pigpen-kind embedded .sealed
   assert_success
@@ -413,6 +430,7 @@ function key_reseal_refuses_a_changed_set_without_confirm { # @test
   [[ "$(card_ecdh_count)" == "$ecdh_before" ]] || fail "the refused reseal used the card"
 }
 
+# bats test_tags=rust_cli
 function key_status_reports_in_sync_without_the_card { # @test
   init_sealed_store
 
@@ -559,6 +577,7 @@ function key_commands_refuse_a_store_without_a_sealed_key { # @test
   assert_output --partial 'is not a sealed-key store'
 }
 
+# bats test_tags=rust_cli
 function init_pigpen_does_not_replace_an_existing_stores_key { # @test
   init_sealed_store
 

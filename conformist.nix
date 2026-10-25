@@ -16,6 +16,9 @@
   programs.gofumpt.enable = true; # -w, *.go (module defaults)
   programs.gofumpt.priority = 2;
   programs.nixfmt.enable = true;
+  # rustfmt for the Rust workspace (crates/madder-store), from the eng-rust
+  # template; the clippy lane lives in ./conformist-impure.nix.
+  programs.rustfmt.enable = true;
 
   # go.mod lives at go/, not the tree root. Without this, goimports/gofumpt
   # run with cwd at the tree root, where Go tooling can't resolve the
@@ -93,6 +96,10 @@
     "result-*"
     ".tmp/**"
     "go/pkgs/**"
+    # cargo's build output and the Go-written store fixtures (opaque bytes
+    # under digest paths, plus their recorded plaintexts).
+    "target/**"
+    "crates/madder-store/tests/fixtures/**"
   ];
 
   # conformist-git(7) MERGE DRIVERS. presets.eng binds flake.lock by default;

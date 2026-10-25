@@ -70,6 +70,20 @@ initialize (observed: `failed to initialize Linux bridge`). Prefer the
 nix lanes; reach for these only when you specifically need bats' own
 flags.
 
+## Rust crate: crates/madder-store
+
+`crates/madder-store` is a Rust reader/writer for **sealed-key local
+stores** (FDR 0011), byte-compatible with the Go madder, for the pigsty
+vault (Linux + Android). It is a cargo workspace member rooted at the
+repo's `Cargo.toml`, built by `nix build .#madder-store` (`just
+test-rust`), linted by clippy in the impure lane and rustfmt in `nix
+fmt`. Its own `AGENTS.md`, `madder-store(7)` and
+`docs/plans/2026-10-25-rust-sealed-key-store-design.md` carry the
+details. Go-written conformance fixtures live under
+`crates/madder-store/tests/fixtures/` (`just codemod-rust-fixtures`);
+the live two-way bats lane is `just test-bats-rust-interop`. The piggy
+crates are Cargo git deps pinned to the `piggy` flake input's rev.
+
 ## External consumer: cutting-garden
 
 `amarbel-llc/cutting-garden` is the standalone filesystem-tree

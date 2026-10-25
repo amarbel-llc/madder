@@ -168,7 +168,54 @@ clean: clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-grammar-vectors test-store-import-smoke
+test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-bats-rust-interop test-bats-rust-cli test-grammar-vectors test-store-import-smoke test-rust
+
+# Run the EXISTING bats tests tagged `rust_cli` (pigpen_store.bats) against
+# the Rust implementation: MADDER_BIN is the madder-store crate's
+# madder-grammar test CLI instead of the Go madder (`.#bats-rust_cli`, see
+# go/default.nix). The same tests run against Go in test-bats-piv-agent, so
+# a divergence between the two implementations shows up as one lane
+# failing. Linux only, like test-bats-piv-agent (the file's setup starts
+# fibby + piggy-agent).
+#
+# run the rust_cli-tagged bats tests against the Rust crate's CLI
+[group("post-build")]
+test-bats-rust-cli:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "test-bats-rust-cli: skipped (needs AF_UNIX bind in the nix sandbox; Linux only, see piggy#208)"
+    exit 0
+  fi
+  nix build .#bats-rust_cli --no-link --print-build-logs
+
+# Build the Rust crate crates/madder-store and run its `cargo test` in the
+# nix sandbox (`.#madder-store`): unit tests, the Go->Rust conformance tests
+# against the committed fixture stores (see codemod-rust-fixtures), and the
+# age X25519 round trip with the nixpkgs `age` CLI. The piggy crates are
+# fetched by the rev Cargo.lock pins. Design:
+# docs/plans/2026-10-25-rust-sealed-key-store-design.md.
+#
+# build and test the Rust madder-store crate via the nix lane
+[group("post-build")]
+test-rust:
+  nix build .#madder-store --no-link --print-build-logs
+
+# Run the rust_interop-tagged bats tests: the Rust crate's test CLI and the
+# Go madder against ONE sealed-key store, in both directions, with the real
+# piggy-agent over fibby for the Go reads (see rustInteropExtraBinaries in
+# go/default.nix). Linux only, for the same reason as test-bats-piv-agent.
+#
+# run rust_interop-tagged bats tests via the nix-sandbox lane
+[group("post-build")]
+test-bats-rust-interop:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "test-bats-rust-interop: skipped (needs AF_UNIX bind in the nix sandbox; Linux only, see piggy#208)"
+    exit 0
+  fi
+  nix build .#bats-rust_interop --no-link --print-build-logs
 
 # Run Go benchmarks. Usage: just run-bench ./internal/foxtrot/blob_stores
 # Defaults: -benchtime=1x for a fast smoke run; pass `-benchtime=3s` etc.
@@ -784,6 +831,18 @@ debug-rename-go-package dir old new:
     -e 's/^package {{old}}$/package {{new}}/' \
     -e 's/^package {{old}}_test$/package {{new}}_test/'
   echo "renamed package {{old}} -> {{new}} in {{dir}}"
+
+# The Rust dev loop for crates/madder-store, in the devShell (which carries
+# cargo/rustc/clippy/rustfmt): format, clippy with warnings denied (the same
+# command the impure clippy lane runs), then `cargo test --workspace`. The
+# age CLI round-trip test runs when `age` is on PATH. Faster than the nix
+# lane (`test-rust`) because cargo's target/ cache survives between runs;
+# the nix lane stays authoritative.
+#
+# format, clippy and test the Rust workspace in the devShell
+[group("debug")]
+debug-rust-dev-loop *cargo_test_args:
+  nix develop {{justfile_directory()}} --command sh -c 'set -e; cargo fmt --all; cargo clippy --workspace --all-targets --all-features -- -D warnings; cargo test --workspace --all-features {{cargo_test_args}}'
 
 # Usage: just debug-gen_man madder.1
 #

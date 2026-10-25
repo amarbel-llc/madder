@@ -1,0 +1,7 @@
+# Two rustfmts touch this tree: the devShell's `cargo fmt` (the dev loop) and
+# conformist's bare `rustfmt` (`nix fmt`, `just lint-fmt`, the merge gate).
+# Pin what they would otherwise infer differently so they agree: the parse
+# edition (a bare rustfmt does not read Cargo.toml) and the 2024 style
+# edition (version-sorted imports, the layout conformist's rustfmt emits).
+edition = "2021"
+style_edition = "2024"

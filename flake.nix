@@ -273,6 +273,8 @@
             conformist.lib.presets.eng-impure
             purse-first.lib.conformistLinters.dewey-facade-export
             conformistFacadeModule
+            # clippy over crates/ (the eng-rust template's impure lane).
+            ./conformist-impure.nix
           ];
           package = conformist.packages.${system}.default;
           projectRootFile = "flake.nix";

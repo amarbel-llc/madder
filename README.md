@@ -223,6 +223,12 @@ per-blob audit log is exposed via the `inventory_log` facade —
 see `madder-inventory-log(7)` for wiring patterns. Breaking changes to
 `pkgs/` are coordinated with downstream consumers.
 
+Rust programs that cannot link Go (the pigsty vault on Linux and
+Android) use the `madder-store` crate under `crates/`, a pure-Rust
+reader and writer for **sealed-key local stores** (FDR 0011) that is
+byte-compatible with the Go `madder` and proven so by the Go-written
+fixtures and the bats lanes it shares with Go. See `madder-store(7)`.
+
 ## Environment
 
 | Variable | Effect |
