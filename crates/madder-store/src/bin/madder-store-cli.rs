@@ -46,7 +46,9 @@ const USAGE: &str = "usage (the madder grammar this test shim speaks):
   madder-store-cli cat-ids [<.store>]
   madder-store-cli has [-all] [<.store>] <id>...
   madder-store-cli fsck [-format tap|json|ndjson] [<.store>...]
-  madder-store-cli list [-format tap|json|ndjson]
+  madder-store-cli list [-format tap|json|ndjson] [-tree]
+  madder-store-cli init-multi --mode mirror|write_through [--write-store <id>] [--read-store <id>]...
+                        [--mirror-store <id>]... [--read-fill|--no-read-fill] <.store>
   madder-store-cli info-repo [<.store>] [<key>...]
   madder-store-cli key-status <.store>
   madder-store-cli mint-recipient            print a fresh X25519 recipient id and its secret hex
@@ -66,6 +68,7 @@ fn run(args: &[String]) -> CliResult<()> {
         "has" => has(rest),
         "fsck" => fsck(rest),
         "list" => list(rest),
+        "init-multi" => init_multi(rest),
         "info-repo" => info_repo(rest),
         "key-status" => key_status(rest),
         "mint-recipient" => mint_recipient(),
@@ -1070,50 +1073,258 @@ const CONFIG_DIGEST_PURPOSE: &str = "madder-blob_store-config-digest-v1";
 /// What Go calls a local hash-bucketed store in `list`.
 const LOCAL_STORE_DESCRIPTION: &str = "local hash bucketed";
 
-/// `list [-format tap|json|ndjson]` over the local stores both scopes
+/// The multi store's config type (FDR 0009). The crate reads no blobs
+/// through a multi store; the shim carries the config for madder's `list`
+/// output and `init-multi` only, so list.bats and init_multi.bats run.
+const TYPE_MULTI_V1: &str = "toml-blob_store_config-multi-v1";
+
+/// A multi config's body: the mode, its digest-bearing store references
+/// (`name@blake2b256-…`, as Go's scoped_id renders them on disk) and the
+/// read-fill switch, which defaults to true when absent.
+#[derive(serde::Deserialize, serde::Serialize)]
+struct MultiToml {
+    mode: String,
+    #[serde(
+        rename = "write-store",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    write_store: Option<String>,
+    #[serde(rename = "read-stores", default, skip_serializing_if = "Vec::is_empty")]
+    read_stores: Vec<String>,
+    #[serde(
+        rename = "mirror-stores",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    mirror_stores: Vec<String>,
+    #[serde(rename = "read-fill", default, skip_serializing_if = "Option::is_none")]
+    read_fill: Option<bool>,
+    #[serde(
+        rename = "instance-id",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    instance_id: Option<String>,
+}
+
+/// One store reference inside a multi config, split as Go's `makeRef`
+/// splits it: the bare name (the id another store is listed under) and
+/// the digest it was pinned at.
+struct MultiRef {
+    name: String,
+    digest: String,
+    role: &'static str,
+}
+
+impl MultiToml {
+    fn refs(&self) -> Vec<MultiRef> {
+        let split = |reference: &str, role: &'static str| {
+            let (name, digest) = reference.rsplit_once('@').unwrap_or((reference, ""));
+            MultiRef {
+                name: name.to_owned(),
+                digest: digest.to_owned(),
+                role,
+            }
+        };
+        match self.mode.as_str() {
+            "mirror" => self
+                .mirror_stores
+                .iter()
+                .map(|r| split(r, "mirror"))
+                .collect(),
+            "write_through" => self
+                .write_store
+                .iter()
+                .map(|r| split(r, "write"))
+                .chain(self.read_stores.iter().map(|r| split(r, "read")))
+                .collect(),
+            _ => Vec::new(),
+        }
+    }
+
+    fn read_fill(&self) -> bool {
+        self.read_fill.unwrap_or(true)
+    }
+}
+
+/// A store as `list` sees it.
+enum ListEntry {
+    Local,
+    Multi(MultiToml),
+}
+
+struct Listed {
+    id: String,
+    base: PathBuf,
+    config_path: PathBuf,
+    /// The config's `@` digest, bare; None for an unmigrated config.
+    digest: Option<String>,
+    entry: ListEntry,
+}
+
+impl Stores {
+    /// Every store `list` shows, in id order: the local stores this crate
+    /// opens and the multi configs the shim reads for listing. Any other
+    /// store type is passed over with a note on stderr.
+    fn list_entries(&self) -> CliResult<Vec<Listed>> {
+        let mut listed = Vec::new();
+        for id in self.ids()? {
+            let base = self.base(&id)?;
+            let config_path = self.config_path(&id)?;
+            let raw = std::fs::read(&config_path)?;
+            let framed = match madder_store::hyphence::parse(&raw) {
+                Ok(framed) => framed,
+                Err(e) => {
+                    eprintln!("skipping blob store {id:?}: {e}");
+                    continue;
+                }
+            };
+            let digest = framed.digest.as_deref().and_then(bare_digest);
+            let entry = if framed.type_id == TYPE_MULTI_V1 {
+                let body = String::from_utf8_lossy(framed.body);
+                match toml::from_str::<MultiToml>(&body) {
+                    Ok(config) => ListEntry::Multi(config),
+                    Err(e) => {
+                        eprintln!("skipping blob store {id:?}: multi config body: {e}");
+                        continue;
+                    }
+                }
+            } else {
+                match Store::open(&base) {
+                    Ok(_) => ListEntry::Local,
+                    Err(e) => {
+                        eprintln!("skipping blob store {id:?}: {e}");
+                        continue;
+                    }
+                }
+            };
+            listed.push(Listed {
+                id,
+                base,
+                config_path,
+                digest,
+                entry,
+            });
+        }
+        Ok(listed)
+    }
+}
+
+/// Go's description of a store: fixed for a local one; for a multi, its
+/// mode and its children's descriptions (`multi/mirror(a,b)`,
+/// `multi/write-through(W=a, R=b)`), looked up by name among the listed
+/// stores. `depth` bounds a reference cycle.
+fn describe(listed: &[Listed], entry: &ListEntry, depth: usize) -> String {
+    let ListEntry::Multi(config) = entry else {
+        return LOCAL_STORE_DESCRIPTION.to_owned();
+    };
+    let child = |name: &str| -> String {
+        if depth > 8 {
+            return String::new();
+        }
+        listed
+            .iter()
+            .find(|l| l.id == name)
+            .map(|l| describe(listed, &l.entry, depth + 1))
+            .unwrap_or_default()
+    };
+    match config.mode.as_str() {
+        "mirror" => format!(
+            "multi/mirror({})",
+            config
+                .refs()
+                .iter()
+                .map(|r| child(&r.name))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        "write_through" => format!(
+            "multi/write-through({})",
+            config
+                .refs()
+                .iter()
+                .map(|r| format!(
+                    "{}={}",
+                    if r.role == "write" { "W" } else { "R" },
+                    child(&r.name)
+                ))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+        other => format!("multi/{other}"),
+    }
+}
+
+/// `list [-format tap|json|ndjson] [-tree]` over the stores both scopes
 /// hold, in id order. Text: `<id>@<digest>: <description> # path: <rel>`,
 /// `(unmigrated)` and the `config-pin_digest` note for a config with no
-/// `@` line. ndjson: one record per store; json: one object keyed by id.
-/// `-tree` and `-all` (multi graphs, the host-wide registry) are Go-only.
+/// `@` line. ndjson: one record per store (a multi's carries `mode`,
+/// `read_fill` and `refs`); json: one object keyed by id. `-tree` forces
+/// text and draws a multi's references beneath it. `-all` (the host-wide
+/// registry) is Go-only.
 fn list(args: &[String]) -> CliResult<()> {
     let (flags, positional) = parse_flags(args, &["tree", "all"])?;
     if !positional.is_empty() {
         return Err(format!("list takes no arguments, got {positional:?}").into());
     }
-    if flags.contains_key("tree") || flags.contains_key("all") {
+    if flags.contains_key("all") {
         return Err(
-            "list -tree and -all are not supported by this binary (multi stores and the registry are Go-only; see madder's issue on the multi half of list.bats)"
-                .into(),
+            "list -all is not supported by this binary (the host-wide registry is Go-only)".into(),
         );
     }
     let format = output_format(&flags)?;
+    let tree = flags.contains_key("tree");
     let as_object = flags.get("format").map(String::as_str) == Some("json");
     let stores = Stores::in_cwd()?;
     let cwd = std::env::current_dir()?;
+    let listed = stores.list_entries()?;
     let mut stdout = io::stdout().lock();
 
-    let mut records: Vec<(String, PathBuf, PathBuf, Option<String>)> = Vec::new();
-    for (id, store) in stores.open_all()? {
-        let base = stores.base(&id)?;
-        let config_path = stores.config_path(&id)?;
-        records.push((id, base, config_path, bare_config_digest(&store)));
+    let id_column = |l: &Listed| match &l.digest {
+        Some(digest) => format!("{}@{digest}", l.id),
+        None => format!("{} (unmigrated)", l.id),
+    };
+
+    if tree {
+        for l in &listed {
+            let description = describe(&listed, &l.entry, 0);
+            match &l.entry {
+                ListEntry::Local => writeln!(stdout, "{}: {description}", id_column(l))?,
+                ListEntry::Multi(config) => {
+                    writeln!(
+                        stdout,
+                        "{}: {description} [multi/{}]",
+                        id_column(l),
+                        config.mode
+                    )?;
+                    for r in config.refs() {
+                        let child = listed
+                            .iter()
+                            .find(|c| c.id == r.name)
+                            .map(|c| describe(&listed, &c.entry, 0))
+                            .unwrap_or_default();
+                        writeln!(stdout, "  └── {}  {child}  ({})", r.name, r.role)?;
+                    }
+                }
+            }
+        }
+        return stdout.flush().map_err(Into::into);
     }
 
     match format {
         Format::Tap => {
             let mut unmigrated = Vec::new();
-            for (id, _, config_path, digest) in &records {
-                let id_column = match digest {
-                    Some(digest) => format!("{id}@{digest}"),
-                    None => {
-                        unmigrated.push(id.clone());
-                        format!("{id} (unmigrated)")
-                    }
-                };
+            for l in &listed {
+                if l.digest.is_none() {
+                    unmigrated.push(l.id.clone());
+                }
                 writeln!(
                     stdout,
-                    "{id_column}: {LOCAL_STORE_DESCRIPTION} # path: {}",
-                    relative_to(&cwd, config_path).display()
+                    "{}: {} # path: {}",
+                    id_column(l),
+                    describe(&listed, &l.entry, 0),
+                    relative_to(&cwd, &l.config_path).display()
                 )?;
             }
             if !unmigrated.is_empty() {
@@ -1133,37 +1344,53 @@ fn list(args: &[String]) -> CliResult<()> {
             }
         }
         Format::Json => {
-            let record = |id: &str, base: &Path, config_path: &Path, digest: &Option<String>| {
-                let digest_field = match digest {
-                    Some(digest) => format!(
+            let record = |l: &Listed| {
+                let mut fields = format!(
+                    "\"id\":{},\"description\":{},\"config_path\":{},\"base\":{}",
+                    json_str(&l.id),
+                    json_str(&describe(&listed, &l.entry, 0)),
+                    json_str(&l.config_path.to_string_lossy()),
+                    json_str(&l.base.to_string_lossy())
+                );
+                match &l.digest {
+                    Some(digest) => fields.push_str(&format!(
                         ",\"digest\":{}",
                         json_str(&format!("{CONFIG_DIGEST_PURPOSE}@{digest}"))
-                    ),
-                    None => ",\"digest_missing\":true".to_owned(),
-                };
-                format!(
-                    "{{\"id\":{},\"description\":{},\"config_path\":{},\"base\":{}{digest_field}}}",
-                    json_str(id),
-                    json_str(LOCAL_STORE_DESCRIPTION),
-                    json_str(&config_path.to_string_lossy()),
-                    json_str(&base.to_string_lossy())
-                )
+                    )),
+                    None => fields.push_str(",\"digest_missing\":true"),
+                }
+                if let ListEntry::Multi(config) = &l.entry {
+                    fields.push_str(&format!(",\"mode\":{}", json_str(&config.mode)));
+                    if config.mode == "write_through" {
+                        fields.push_str(&format!(",\"read_fill\":{}", config.read_fill()));
+                    }
+                    let refs = config.refs();
+                    if !refs.is_empty() {
+                        let refs: Vec<String> = refs
+                            .iter()
+                            .map(|r| {
+                                format!(
+                                    "{{\"name\":{},\"digest\":{},\"role\":{}}}",
+                                    json_str(&r.name),
+                                    json_str(&r.digest),
+                                    json_str(r.role)
+                                )
+                            })
+                            .collect();
+                        fields.push_str(&format!(",\"refs\":[{}]", refs.join(",")));
+                    }
+                }
+                format!("{{{fields}}}")
             };
             if as_object {
-                let entries: Vec<String> = records
+                let entries: Vec<String> = listed
                     .iter()
-                    .map(|(id, base, config_path, digest)| {
-                        format!(
-                            "  {}: {}",
-                            json_str(id),
-                            record(id, base, config_path, digest)
-                        )
-                    })
+                    .map(|l| format!("  {}: {}", json_str(&l.id), record(l)))
                     .collect();
                 writeln!(stdout, "{{\n{}\n}}", entries.join(",\n"))?;
             } else {
-                for (id, base, config_path, digest) in &records {
-                    writeln!(stdout, "{}", record(id, base, config_path, digest))?;
+                for l in &listed {
+                    writeln!(stdout, "{}", record(l))?;
                 }
             }
         }
@@ -1172,14 +1399,160 @@ fn list(args: &[String]) -> CliResult<()> {
     Ok(())
 }
 
-/// The config's `@` digest as a bare `blake2b256-…` id (the purpose, if the
-/// file carries one, dropped), or None for a config without one.
-fn bare_config_digest(store: &Store) -> Option<String> {
-    let digest = store.config().digest.as_deref()?;
+/// A config digest as a bare `blake2b256-…` id (the purpose, if the line
+/// carries one, dropped).
+fn bare_digest(digest: &str) -> Option<String> {
     let id = Id::parse(digest).ok()?;
     Id::new(None, id.format(), id.data().to_vec())
         .ok()
         .map(|bare| bare.to_wire())
+}
+
+// --- init-multi -----------------------------------------------------------------------
+
+/// `init-multi --mode mirror|write_through [--write-store <id>]
+/// [--read-store <id>]... [--mirror-store <id>]... [--read-fill|--no-read-fill]
+/// <.store>`: compose existing stores into a multi config (FDR 0009), each
+/// reference pinned to the referenced config's digest, as Go's init-multi
+/// writes it. The flags take Go's double-dash spelling.
+fn init_multi(args: &[String]) -> CliResult<()> {
+    let mut mode: Option<String> = None;
+    let mut write_store: Option<String> = None;
+    let mut read_stores: Vec<String> = Vec::new();
+    let mut mirror_stores: Vec<String> = Vec::new();
+    let mut read_fill: Option<bool> = None;
+    let mut positional: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        let name = arg.trim_start_matches('-');
+        let is_flag = arg.starts_with('-') && arg.len() > 1 && !is_store_id(arg);
+        if !is_flag {
+            positional.push(arg.clone());
+            i += 1;
+            continue;
+        }
+        match name {
+            "read-fill" => read_fill = Some(true),
+            "no-read-fill" => read_fill = Some(false),
+            "mode" | "write-store" | "read-store" | "mirror-store" => {
+                let value = args
+                    .get(i + 1)
+                    .ok_or_else(|| format!("flag --{name} needs a value"))?
+                    .clone();
+                match name {
+                    "mode" => mode = Some(value),
+                    "write-store" => write_store = Some(value),
+                    "read-store" => read_stores.push(value),
+                    _ => mirror_stores.push(value),
+                }
+                i += 1;
+            }
+            other => return Err(format!("init-multi: unknown flag --{other}").into()),
+        }
+        i += 1;
+    }
+    let [store_id] = positional.as_slice() else {
+        return Err("init-multi takes exactly one blob-store-id, after its flags".into());
+    };
+
+    let stores = Stores::in_cwd()?;
+    stores.check_local_configs()?;
+
+    // A bare reference is pinned to its leaf's current config digest; a
+    // digest-bearing one passes through. The reference is spelled in its
+    // canonical form (`.name` for the CWD scope, bare for the user scope).
+    let resolve = |reference: &str| -> CliResult<String> {
+        if reference.contains('@') {
+            return Ok(reference.to_owned());
+        }
+        if !is_store_id(reference) {
+            return Err(format!("reference {reference:?} is not a blob-store-id").into());
+        }
+        let raw = std::fs::read(stores.config_path(reference)?)
+            .map_err(|e| format!("reference {reference:?}: {e}"))?;
+        let framed = madder_store::hyphence::parse(&raw)
+            .map_err(|e| format!("reference {reference:?}: {e}"))?;
+        let digest = framed
+            .digest
+            .as_deref()
+            .and_then(bare_digest)
+            .ok_or_else(|| {
+                format!(
+                    "reference {reference:?} targets an unmigrated config; run `madder config-pin_digest {reference}` first"
+                )
+            })?;
+        let canonical = if reference.starts_with('.') {
+            reference.to_owned()
+        } else {
+            store_name(reference).to_owned()
+        };
+        Ok(format!("{canonical}@{digest}"))
+    };
+
+    let mut config = MultiToml {
+        mode: mode.clone().unwrap_or_default(),
+        write_store: None,
+        read_stores: Vec::new(),
+        mirror_stores: Vec::new(),
+        read_fill: None,
+        instance_id: Some(madder_store::init::mint_instance_id()),
+    };
+    match mode.as_deref().unwrap_or("") {
+        "mirror" => {
+            for reference in &mirror_stores {
+                config.mirror_stores.push(resolve(reference)?);
+            }
+        }
+        "write_through" => {
+            let Some(write_store) = write_store.as_deref() else {
+                return Err("--mode write_through needs --write-store".into());
+            };
+            config.write_store = Some(resolve(write_store)?);
+            for reference in &read_stores {
+                config.read_stores.push(resolve(reference)?);
+            }
+            // Default true unless --no-read-fill, as Go's init-multi.
+            config.read_fill = Some(read_fill.unwrap_or(true));
+        }
+        other => {
+            return Err(format!("--mode must be mirror or write_through, got {other:?}").into());
+        }
+    }
+
+    let base = stores.base(store_id)?;
+    let config_path = base.join(madder_store::store::FILE_NAME_CONFIG);
+    if config_path.exists() {
+        return Err(format!(
+            "blob store {store_id:?} already exists at {}",
+            config_path.display()
+        )
+        .into());
+    }
+    let body = toml::to_string(&config).map_err(|e| format!("rendering the config: {e}"))?;
+    let mut hasher = madder_store::HashFormat::Blake2b256.hasher();
+    hasher.update(body.as_bytes());
+    let digest = hasher.finish().to_wire();
+    let bytes = format!("---\n! {TYPE_MULTI_V1}\n@ {digest}\n---\n\n{body}");
+
+    std::fs::create_dir_all(&base)?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&config_path)?;
+    file.write_all(bytes.as_bytes())?;
+    file.sync_all()?;
+    drop(file);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&config_path, std::fs::Permissions::from_mode(0o444))?;
+    }
+
+    let mut tap = Tap::new(io::stdout().lock())?;
+    tap.ok(&format!("init-multi {}", config_path.display()))?;
+    tap.plan()?;
+    Ok(())
 }
 
 /// `path` relative to `base`, with `..` segments where it lies outside, as

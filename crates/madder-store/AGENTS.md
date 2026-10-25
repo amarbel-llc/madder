@@ -18,7 +18,8 @@ symlink to this file. Reference prose lives in `madder-store(7)`
 - `cargo test --workspace` — the dev loop (the devShell carries the Rust
   toolchain; `age` on PATH enables the age CLI round-trip test).
 - `just test-bats-rust-cli` — the EXISTING bats tests tagged `rust_cli`
-  (pigpen_store, write_read, fsck, init, cli_contract, info_repo, list), run
+  (pigpen_store, write_read, fsck, init, cli_contract, info_repo, list,
+  init_multi), run
   against this crate's madder-grammar CLI as `MADDER_BIN` (Linux only).
   `just test-bats-rust-cli-identity` runs them again with the sealed key
   opened through a software X25519 identity instead of piggy-agent.

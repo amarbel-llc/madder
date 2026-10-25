@@ -8,8 +8,14 @@ setup() {
 # Flags must precede the positional blob-store-id: dewey's flag parser
 # (Go-stdlib semantics) stops at the first non-flag token, so the
 # store-id always comes last (mirrors `init -encryption none .default`).
+#
+# Every test here is also tagged `rust_cli`: the file runs against the Rust
+# crate's madder-grammar CLI (crates/madder-store) as MADDER_BIN too, via
+# `just test-bats-rust-cli`; the shim writes and lists multi configs but
+# reads no blobs through them.
 
 # Scenario 1: mirror across two local leaves.
+# bats test_tags=rust_cli
 function init_multi_mirror { # @test
   init_store
   run_madder init -encryption none .ssd
@@ -35,6 +41,7 @@ function init_multi_mirror { # @test
 }
 
 # Scenario 2: write_through WITH read_fill.
+# bats test_tags=rust_cli
 function init_multi_write_through_read_fill { # @test
   init_store
   run_madder init -encryption none .archive
@@ -51,6 +58,7 @@ function init_multi_write_through_read_fill { # @test
 }
 
 # Scenario 3: write_through WITHOUT read_fill.
+# bats test_tags=rust_cli
 function init_multi_write_through_no_read_fill { # @test
   init_store
   run_madder init -encryption none .archive
@@ -67,6 +75,7 @@ function init_multi_write_through_no_read_fill { # @test
 }
 
 # Scenario 4: nested multi-of-multi.
+# bats test_tags=rust_cli
 function init_multi_nested { # @test
   init_store
   run_madder init -encryption none .ssd

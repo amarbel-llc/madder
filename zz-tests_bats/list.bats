@@ -5,9 +5,9 @@ setup() {
 
 # bats file_tags=list
 
-# The tests tagged `rust_cli` also run against the Rust crate's madder-grammar
-# CLI (crates/madder-store) as MADDER_BIN, via `just test-bats-rust-cli`. The
-# multi-store and -tree tests are Go-only.
+# Every test here is also tagged `rust_cli`: the file runs against the Rust
+# crate's madder-grammar CLI (crates/madder-store) as MADDER_BIN too, via
+# `just test-bats-rust-cli` (the shim reads multi configs for list only).
 
 # bats test_tags=rust_cli
 function list_shows_digest_for_migrated { # @test
@@ -64,6 +64,7 @@ function list_ndjson_flags_legacy { # @test
   assert_output --partial '"digest_missing":true'
 }
 
+# bats test_tags=rust_cli
 function list_tree_renders_multi_graph { # @test
   init_store
   run_madder init -encryption none .archive
@@ -85,6 +86,7 @@ function list_tree_renders_multi_graph { # @test
   assert_output --partial '(read)'
 }
 
+# bats test_tags=rust_cli
 function list_ndjson_multi_fields { # @test
   init_store
   run_madder init -encryption none .archive
@@ -99,6 +101,7 @@ function list_ndjson_multi_fields { # @test
   assert_output --partial '"read_fill":true'
 }
 
+# bats test_tags=rust_cli
 function list_tree_forces_text_when_piped { # @test
   # #225: -tree must render the tree even when stdout is piped. bats
   # captures stdout (non-TTY), so Format.Resolve would otherwise default

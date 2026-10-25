@@ -512,6 +512,24 @@ byte-stable across runs. `-tree` and `-all` are refused by name. Eleven
 more tests carry the `rust_cli` tag (57 total); the three multi tests
 stay Go-only until madder#323.
 
+## The multi half of `list` (madder#323)
+
+The shim, not the crate, learns `toml-blob_store_config-multi-v1` (FDR
+0009) for two purposes only: `list` and `init-multi`. It reads no blobs
+through a multi store. `list` shows a multi with Go's description
+(`multi/mirror(a,b)`, `multi/write-through(W=a, R=b)`, children looked up
+by name among the listed stores), its ndjson record carries `mode`,
+`read_fill` (write-through only) and `refs` (name, digest, role), and
+`-tree` forces text and draws `[multi/<mode>]` with each reference
+indented beneath as `└── <name>  <description>  (<role>)`. `init-multi`
+takes Go's double-dash flags, pins each bare reference to the referenced
+config's `@` digest in its canonical spelling (`.name@blake2b256-…`), and
+writes the config 0444 with an instance id, through the crate's now
+public `init::mint_instance_id`. This makes all of `list.bats` and
+`init_multi.bats` run against the shim too. V: 64 `rust_cli` tests pass;
+in the plain-store files only the inventory-archive inits and the
+pack-blobs test remain Go-only.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -530,5 +548,5 @@ stay Go-only until madder#323.
 8. The portability gate (madder#320): the wasm32 `cargo check` lane.
 9. The rest of the plain-store files (madder#321): two scopes, the shadow
    warning, strict discovery in init.
-10. `list` for local stores (madder#322); multi and `-tree` wait on
-    madder#323.
+10. `list` for local stores (madder#322).
+11. The multi half of `list` and `init-multi` in the shim (madder#323).

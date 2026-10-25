@@ -433,8 +433,10 @@ fn render_recipient_set(recipients: &[Id]) -> Result<String> {
 
 /// A fresh RFC 9562 UUIDv7 as the `uuidv7-<blech32>` markl id Go mints
 /// (`markl_registrations.MintInstanceId`): 48-bit big-endian Unix
-/// milliseconds, then random, with the version and variant bits set.
-fn mint_instance_id() -> String {
+/// milliseconds, then random, with the version and variant bits set. Every
+/// store config carries one (`instance-id`, FDR 0010); public so a config
+/// of another store type written beside this crate's gets the same shape.
+pub fn mint_instance_id() -> String {
     let mut bytes = [0u8; 16];
     OsRng.fill_bytes(&mut bytes[6..]);
     let ms = std::time::SystemTime::now()
