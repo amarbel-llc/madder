@@ -606,6 +606,17 @@ let
     subPackages = [ "cmd/madder-test-webdav-server" ];
   };
 
+  # Test-only fixture binary that mints a sealed-key store's recipients
+  # without a card (an X25519 recipient from a seed, plus a fixed P-256
+  # line), for the Go-written fixtures the Rust crate's conformance tests
+  # read (docs/plans/2026-10-25-rust-sealed-key-store-design.md). Same
+  # NOT-shipped policy as madder-test-craft-legacy-blob.
+  madder-test-mint-recipient = buildMadderGo {
+    pname = "madder-test-mint-recipient";
+    version = "0.0.0";
+    subPackages = [ "cmd/madder-test-mint-recipient" ];
+  };
+
   # grammar-vectors-test (FDR-0010): the langlang -input cross-check of the
   # scoped_id vector corpus' `grammar` dimension against scoped_id.peg —
   # the structural counterpart to vectors_test.go's Id.Set (parser) half.
@@ -688,6 +699,7 @@ in
       madder-cli-cover
       madder-clown-plugin
       madder-test-sftp-server
+      madder-test-mint-recipient
       store-import-smoke
       ;
     default = madder;
@@ -765,6 +777,17 @@ in
       just
       pandoc
       shfmt
+    ])
+    # The Rust toolchain for crates/madder-store (the eng-rust template's
+    # devShell set): `just test-rust`'s cargo test and interactive use; the
+    # clippy lane bakes its own copy (conformist-impure.nix). gcc is the
+    # linker cargo invokes.
+    ++ (with pkgs-master; [
+      cargo
+      rustc
+      clippy
+      rustfmt
+      gcc
     ]);
 
     GOTOOLCHAIN = "local";

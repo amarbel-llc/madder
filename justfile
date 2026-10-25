@@ -69,6 +69,79 @@ codemod-tommy:
   goimports -w {{justfile_directory()}}/go/internal/charlie/blob_store_configs/*_tommy.go
   nix develop {{justfile_directory()}} --command sh -c 'conformist --config-file "$MADDER_CONFORMIST_CONFIG"'
 
+# Regenerate the Go-written conformance fixtures the Rust crate
+# (crates/madder-store) must read back byte-exact: two sealed-key stores
+# (FDR 0011) whose key is sealed to an X25519 recipient minted from a fixed
+# seed, plus a P-256 recipient line the Rust side parses but cannot open,
+# and blobs that cross a 64 KiB age STREAM chunk. Every input is
+# deterministic, but age picks a fresh ephemeral key and nonce per blob, so
+# a regeneration changes the committed store bytes and never a blob id.
+# Needs openssl (devshell) for the incompressible large plaintext. See
+# docs/plans/2026-10-25-rust-sealed-key-store-design.md.
+#
+# regenerate the Go-written sealed-key store fixtures for the Rust crate
+[group("codemod")]
+codemod-rust-fixtures:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  madder="$(nix build {{justfile_directory()}}#madder --no-link --print-out-paths)/bin/madder"
+  mint="$(nix build {{justfile_directory()}}#madder-test-mint-recipient --no-link --print-out-paths)/bin/madder-test-mint-recipient"
+  fixtures="{{justfile_directory()}}/crates/madder-store/tests/fixtures"
+  seed=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+
+  make_store() {
+    local name="$1"; shift
+    local out="$fixtures/$name"
+    local work; work="$(mktemp -d)"
+    local home="$work/home"
+    mkdir -p "$home" "$work/cwd"
+    if [ -d "$out" ]; then chmod -R u+w "$out"; rm -rf "$out"; fi
+    mkdir -p "$out/plaintexts"
+
+    "$mint" -seed "$seed" >"$out/piggy-ids"
+    "$mint" -seed "$seed" -print-secret >"$out/x25519-secret.hex"
+
+    # Plaintexts: empty, one byte, a short line, and 160 KiB of
+    # deterministic incompressible bytes (three 64 KiB STREAM chunks, the
+    # last partial; two 128 KiB zstd blocks).
+    : >"$out/plaintexts/empty"
+    printf 'x' >"$out/plaintexts/one-byte"
+    printf 'hello, pigsty\n' >"$out/plaintexts/hello"
+    head -c 163840 /dev/zero \
+      | openssl enc -aes-256-ctr -nosalt -K "$seed" -iv 00000000000000000000000000000000 \
+      >"$out/plaintexts/large"
+
+    (
+      cd "$work/cwd"
+      # Isolated like debug-init-repro: tmp HOME, every XDG_* under it, and
+      # a ceiling so madder never walks into a real config.
+      export HOME="$home" MADDER_CEILING_DIRECTORIES="$work/cwd"
+      export XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share"
+      export XDG_CACHE_HOME="$home/.cache" XDG_STATE_HOME="$home/.local/state"
+      # embedded: the sidecar carries the pigpen itself, no host path.
+      "$madder" init -pigpen "$out/piggy-ids" -pigpen-kind embedded "$@" .fx
+      # `empty` is deliberately not written: Go treats the digest of zero
+      # bytes as the null id and stores nothing for it (blob_io/mover.go);
+      # the Rust tests assert that same semantics from the plaintext alone.
+      : >"$out/blobs.tsv"
+      for plain in one-byte hello large; do
+        # Capture first, then parse: an awk that exits early would SIGPIPE
+        # madder and fail the pipeline.
+        tap="$("$madder" write -format tap .fx "$out/plaintexts/$plain")"
+        id="$(awk '/^ok / {print $4; exit}' <<<"$tap")"
+        [ -n "$id" ] || { echo "no blob id for $plain" >&2; exit 1; }
+        printf '%s\t%s\n' "$plain" "$id" >>"$out/blobs.tsv"
+      done
+      cp -r .madder/local/share/blob_stores/fx "$out/store"
+    )
+    chmod -R u+w "$out"
+    rm -rf "$work"
+    echo "==> $out"
+  }
+
+  make_store zstd-blake2b256
+  make_store none-sha256 -compression-type none -hash_type-id sha256
+
 #    ____ _
 #   / ___| | ___  __ _ _ __
 #  | |   | |/ _ \/ _` | '_ \

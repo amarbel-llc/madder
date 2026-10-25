@@ -46,10 +46,17 @@ All from the Go code in this repo (R) unless marked.
   these two names plus the legacy `dodder-blob_store-config`
   (`directory_layout.IsBlobStoreConfigFileName`).
 - Config file: hyphence header `---\n! toml-blob_store_config-v5\n@
-  <digest>\n---\n\n` then a TOML body. The `@` digest is
-  `madder-blob_store-config-digest-v1@blake2b256-<blech32>` over the body
-  bytes, where the body starts after the LAST `---\n\n` in the file
-  (`DecodeAndVerify`). A config with no `@` line is trusted (legacy).
+  <digest>\n---\n\n` then a TOML body. The `@` digest is the bare
+  `blake2b256-<blech32>` of the body bytes (V: the fixture shows no
+  purpose prefix; Go's `Id.String()` drops the purpose and
+  `markl.AssertEqual` compares format and bytes only), where the body
+  starts after the LAST `---\n\n` in the file (`DecodeAndVerify`). The
+  Rust parser accepts an optional purpose on that line and ignores it. A
+  config with no `@` line is trusted (legacy).
+- The null blob: Go treats the digest of zero bytes as the null id,
+  writes no file for it, reports `has` true and reads it as empty (R:
+  `blob_io/mover.go`, `store_local_hash_bucketed.go`; V: `madder write`
+  of an empty file prints no id). The crate mirrors that.
 - V5 body fields (`TomlV5`): `hash_buckets` (int array, default `[2]`),
   `hash_type-id` (`blake2b256` default, or `sha256`), `encryption` (exactly
   one `piggy-recipient-v1@age_x25519_pub-…`), `compression-type` (`zstd`
