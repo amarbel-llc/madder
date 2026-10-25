@@ -344,15 +344,14 @@ The wasm32 (and Android) `cargo check` lane is not built yet: madder#320.
   its CLI only, through the cargo feature `agent-cli` the bin target
   requires; the library's default build stays feature-free and
   wasm-clean, and pigsty wires its own oracle.
-- **Two piggy pins, temporarily apart.** Cargo.lock pins piggy at
-  9ebebd31a74e (the oracle); flake.lock still pins d28e399b (the Go
-  side). piggy-pigpen and piggy-markl are identical between the two
-  except for the new `agent` module, which the Go side does not consume.
-  `just update-piggy <full sha>` realigns them: it now rewrites the rev
-  in `crates/madder-store/Cargo.toml` and runs `cargo update` on the two
-  crates alongside the flake.lock and go.mod moves (the Cargo half is
-  untried until the next bump runs it). It is a lock bump and waits for
-  the operator.
+- **Two piggy pins, one bump.** The crate first merged with Cargo.lock
+  at piggy 9ebebd31a74e (the oracle) and flake.lock at d28e399b (the Go
+  side); `just update-piggy 9ebebd31a74e…` then realigned them. The
+  recipe rewrites the rev in `crates/madder-store/Cargo.toml` and runs
+  `cargo update` on the two crates alongside the flake.lock and go.mod
+  moves; its Cargo half has run once, for that bump. Note the flake half
+  is `nix flake update piggy`, which lands on piggy master's head, not
+  on the sha passed: the two agree only when the sha is the head.
 - **init is in**: `madder_store::init` writes the sidecar then the
   digest-pinned config, hand-rendering the sidecar's two long fields as
   TOML basic multi-line strings (the shape Go writes and the bats tests

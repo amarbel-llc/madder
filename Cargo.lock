@@ -429,7 +429,7 @@ dependencies = [
 [[package]]
 name = "piggy-markl"
 version = "0.1.0"
-source = "git+https://code.linenisgreat.com/piggy.git?rev=9ebebd31a74e#9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408"
+source = "git+https://code.linenisgreat.com/piggy.git?rev=9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408#9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408"
 dependencies = [
  "thiserror",
 ]
@@ -437,7 +437,7 @@ dependencies = [
 [[package]]
 name = "piggy-pigpen"
 version = "0.1.0"
-source = "git+https://code.linenisgreat.com/piggy.git?rev=9ebebd31a74e#9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408"
+source = "git+https://code.linenisgreat.com/piggy.git?rev=9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408#9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408"
 dependencies = [
  "chacha20poly1305",
  "getrandom",

@@ -23,16 +23,13 @@ required-features = ["agent-cli"]
 # crates share one closure.
 
 [dependencies]
-# piggy's crates. The intent is one piggy pin for madder: this rev and the
-# `piggy` flake input (flake.lock nodes.piggy.locked.rev), moved together
-# by `just update-piggy`. Today they are apart: 9ebebd31 brought
-# piggy-pigpen's `agent` oracle (needed by the test CLI) and the flake
-# input still sits at d28e399b until the next lock bump; the two crates
-# are otherwise identical between those revs. piggy-pigpen is excluded
-# from piggy's cargo workspace and depends on piggy-markl by path, so both
-# are named here from the same checkout.
-piggy-pigpen = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
-piggy-markl = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e" }
+# piggy's crates, at one piggy pin for madder: this rev is the `piggy`
+# flake input's (flake.lock nodes.piggy.locked.rev), and `just
+# update-piggy <sha>` moves both along with go.mod. piggy-pigpen is
+# excluded from piggy's cargo workspace and depends on piggy-markl by
+# path, so both are named here from the same checkout.
+piggy-pigpen = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408" }
+piggy-markl = { git = "https://code.linenisgreat.com/piggy.git", rev = "9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408" }
 
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 chacha20poly1305 = "0.10"
