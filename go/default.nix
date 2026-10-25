@@ -716,6 +716,38 @@ let
     meta.description = "Rust reader/writer for madder sealed-key local blob stores";
   };
 
+  # madder-store-wasm-check (madder#320): the crate's portability gate. A
+  # `cargo check` of the library alone, default features (so piggy-pigpen's
+  # `agent` oracle, which needs std::os::unix, stays out), for
+  # wasm32-unknown-unknown over the same vendored Cargo.lock as madder-store
+  # (nixpkgs' rustc ships the wasm32 target; the old rustc-wasm32 attribute
+  # is an alias of it now). It proves the dependency closure and the Fs
+  # seam compile with no unix sockets, tokio or C; it builds and runs
+  # nothing. aarch64-linux-android is left to pigsty's toolchain, which
+  # builds the crate for Android anyway.
+  madder-store-wasm-check = pkgs-master.rustPlatform.buildRustPackage {
+    pname = "madder-store-wasm-check";
+    inherit version;
+    src = madder-store.src;
+    cargoLock = {
+      lockFile = ../Cargo.lock;
+      allowBuiltinFetchGit = true;
+    };
+    buildPhase = ''
+      runHook preBuild
+      cargo check --offline --lib -p madder-store --target wasm32-unknown-unknown
+      runHook postBuild
+    '';
+    doCheck = false;
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out"
+      echo wasm32-unknown-unknown >"$out/checked-target"
+      runHook postInstall
+    '';
+    meta.description = "cargo check of madder-store's library for wasm32-unknown-unknown";
+  };
+
   # grammar-vectors-test (FDR-0010): the langlang -input cross-check of the
   # scoped_id vector corpus' `grammar` dimension against scoped_id.peg —
   # the structural counterpart to vectors_test.go's Id.Set (parser) half.
@@ -800,6 +832,7 @@ in
       madder-test-sftp-server
       madder-test-mint-recipient
       madder-store
+      madder-store-wasm-check
       store-import-smoke
       ;
     default = madder;

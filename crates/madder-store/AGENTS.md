@@ -12,6 +12,9 @@ symlink to this file. Reference prose lives in `madder-store(7)`
 
 - `just test-rust` — `nix build .#madder-store`: build plus `cargo test` in
   the sandbox, the authoritative lane.
+- `just test-rust-wasm` — `cargo check` of the library for
+  wasm32-unknown-unknown (`.#madder-store-wasm-check`), the portability
+  gate; Android is pigsty's toolchain's job.
 - `cargo test --workspace` — the dev loop (the devShell carries the Rust
   toolchain; `age` on PATH enables the age CLI round-trip test).
 - `just test-bats-rust-cli` — the EXISTING bats tests tagged `rust_cli`

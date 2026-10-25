@@ -452,6 +452,23 @@ that the Rust read path needs no agent, which is the shape pigsty on a
 host without piggy-agent (or a wasm target) runs in. The Go lanes see the
 mode unset and behave as before.
 
+## The portability gate (madder#320)
+
+`.#madder-store-wasm-check` (`just test-rust-wasm`, in the `test`
+aggregate) is a `cargo check --lib -p madder-store --target
+wasm32-unknown-unknown` with default features, on nixpkgs' stock
+`rustPlatform` (its rustc ships the wasm32 target; the `rustc-wasm32`
+attribute the issue named is an alias of `rustc` now) over the same
+vendored Cargo.lock as `.#madder-store`. V: the library and its whole
+closure, piggy-pigpen included, check clean for the target. Default features keep piggy-pigpen's
+`agent` oracle (std `UnixStream`) out, as pigsty's build does. The lane
+checks and installs a marker file; it builds and runs nothing, since
+wasm32-unknown-unknown has no runtime here. Decision: aarch64-linux-android
+is not cross-checked in madder. A `cargo check` for it needs that
+target's std and a build needs the NDK linker, and pigsty's own toolchain
+builds the crate for Android as its primary target, so a second copy of
+that setup here would add maintenance and no assurance.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -467,3 +484,4 @@ mode unset and behave as before.
    `rust_cli` tags.
 7. The identity variant of the agent tests (madder#319): the mode in
    `pigpen_store.bats`, `mkBatsLane`'s `extraEnv`, the lane and recipe.
+8. The portability gate (madder#320): the wasm32 `cargo check` lane.

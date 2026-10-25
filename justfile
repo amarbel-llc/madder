@@ -202,7 +202,7 @@ clean: clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-bats-rust-interop test-bats-rust-cli test-bats-rust-cli-identity test-grammar-vectors test-store-import-smoke test-rust
+test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-bats-rust-interop test-bats-rust-cli test-bats-rust-cli-identity test-grammar-vectors test-store-import-smoke test-rust test-rust-wasm
 
 # Run the EXISTING bats tests tagged `rust_cli` (pigpen_store.bats) against
 # the Rust implementation: MADDER_BIN is the madder-store crate's
@@ -253,6 +253,19 @@ test-bats-rust-cli-identity:
 [group("post-build")]
 test-rust:
   nix build .#madder-store --no-link --print-build-logs
+
+# The crate's portability gate (madder#320): `cargo check` of the library,
+# default features, for wasm32-unknown-unknown (a target nixpkgs' rustc
+# ships) over the same vendored Cargo.lock (`.#madder-store-wasm-check`). Proves
+# the dependency closure and the Fs seam compile without std::os::unix,
+# tokio or C. aarch64-linux-android is left to pigsty's toolchain, which
+# builds the crate for Android anyway (a cross check here would need the
+# NDK linker for no extra assurance).
+#
+# cargo check the Rust crate's library for wasm32-unknown-unknown via the nix lane
+[group("post-build")]
+test-rust-wasm:
+  nix build .#madder-store-wasm-check --no-link --print-build-logs
 
 # Run the rust_interop-tagged bats tests: the Rust crate's test CLI and the
 # Go madder against ONE sealed-key store, in both directions, with the real

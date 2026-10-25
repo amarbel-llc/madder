@@ -128,7 +128,13 @@ the CLI mints and the sealed key opens through
 read path is covered as a host without an agent would run it. **just
 test-bats-rust-interop** runs **zz-tests_bats/pigpen_rust_interop.bats**
 against one live store in both directions, with the real piggy-agent
-over fibby. **just lint-worktree** runs clippy
+over fibby. **just test-rust-wasm** is the portability gate: a **cargo check** of the
+library alone, default features, for **wasm32-unknown-unknown** (a
+target nixpkgs' **rustc** ships) over the same vendored **Cargo.lock**
+(**.#madder-store-wasm-check**). It proves the dependency closure and
+the **Fs** seam compile without unix sockets, tokio or C;
+**aarch64-linux-android** is left to **pigsty**'s toolchain, which
+builds the crate for Android. **just lint-worktree** runs clippy
 (**conformist-impure.nix**); **nix fmt** runs rustfmt.
 
 The piggy crates are Cargo git dependencies meant to sit at the rev of
