@@ -17,6 +17,8 @@ symlink to this file. Reference prose lives in `madder-store(7)`
 - `just test-bats-rust-cli` — the EXISTING bats tests tagged `rust_cli`
   (pigpen_store, write_read, fsck, init, cli_contract, info_repo), run
   against this crate's madder-grammar CLI as `MADDER_BIN` (Linux only).
+  `just test-bats-rust-cli-identity` runs them again with the sealed key
+  opened through a software X25519 identity instead of piggy-agent.
 - `just test-bats-rust-interop` — Rust and Go against one live store, both
   directions, via the real piggy-agent (Linux only).
 - `just codemod-rust-fixtures` — regenerate the Go-written fixture stores

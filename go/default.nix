@@ -163,11 +163,16 @@ let
   # binaries (madder-test-sftp-server, madder-test-craft-legacy-blob,
   # madder-test-webdav-server) so `nix build .#bats-net_cap` is
   # self-sufficient.
+  #
+  # `extraEnv` is an overlay onto the lane's environment; the
+  # rust_cli_identity lane uses it to switch pigpen_store.bats into its
+  # agent-less mode.
   mkBatsLane =
     {
       filter ? defaultLaneFilter,
       base ? madder,
       extraBinaries ? { },
+      extraEnv ? { },
     }:
     bats.lib.${system}.batsLane {
       inherit base filter batsSrc;
@@ -187,7 +192,8 @@ let
       ];
       extraEnv = {
         BATS_TEST_TIMEOUT = "30";
-      };
+      }
+      // extraEnv;
       # git: bats-island's setup_test_home shells out to `git config`.
       # jq: cli_contract.bats's JSON helpers.
       # openssh: zz-tests_bats/lib/sftp_legacy.bash spawns ssh-agent
@@ -594,6 +600,28 @@ let
               base = madder-store;
               name = "madder-store-cli";
             };
+          };
+        };
+        # The same rust_cli tests with the sealed key opened through a
+        # software X25519 identity instead of the card (madder#319):
+        # pigpen_store.bats's MADDER_STORE_IDENTITY_MODE skips fibby and
+        # piggy-agent, so this lane carries no piggy binaries at all and
+        # covers the read path on a host (or target) without an agent.
+        bats-rust_cli_identity = mkBatsLane {
+          filter = "rust_cli";
+          base = madder-store;
+          extraBinaries = {
+            MADDER_BIN = {
+              base = madder-store;
+              name = "madder-store-cli";
+            };
+            MADDER_STORE_CLI = {
+              base = madder-store;
+              name = "madder-store-cli";
+            };
+          };
+          extraEnv = {
+            MADDER_STORE_IDENTITY_MODE = "1";
           };
         };
         # No bats-race-net_cap: the race-instrumented binary doubles

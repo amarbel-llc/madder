@@ -82,7 +82,10 @@ fmt`. Its own `AGENTS.md`, `madder-store(7)` and
 `docs/plans/2026-10-25-rust-sealed-key-store-design.md` carry the
 details. Go-written conformance fixtures live under
 `crates/madder-store/tests/fixtures/` (`just codemod-rust-fixtures`);
-the live two-way bats lane is `just test-bats-rust-interop`. The piggy
+the live two-way bats lane is `just test-bats-rust-interop`; `just
+test-bats-rust-cli` and `just test-bats-rust-cli-identity` run the
+`rust_cli`-tagged bats tests against the crate's CLI, through
+piggy-agent and through a software identity. The piggy
 crates are Cargo git deps meant to sit at the `piggy` flake input's rev
 (`just update-piggy` moves both; Cargo.toml's comment says when they
 are apart).

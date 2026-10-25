@@ -2,13 +2,47 @@ setup() {
   load "$(dirname "$BATS_TEST_FILE")/lib/common.bash"
   load "$(dirname "$BATS_TEST_FILE")/lib/piv_agent.bash"
   export output
-  start_piv_agent
 
-  # A pigpen in its simplest form: one recipient per line. The recipient
-  # is the virtual card's slot-9D key, so opening the store's sealed key
-  # goes through the real piggy-agent.
   PIGPEN="$BATS_TEST_TMPDIR/piggy-ids"
-  echo "$PIV_RECIPIENT_ID" >"$PIGPEN"
+  if [[ -n ${MADDER_STORE_IDENTITY_MODE:-} ]]; then
+    start_identity_recipient
+  else
+    start_piv_agent
+    # A pigpen in its simplest form: one recipient per line. The recipient
+    # is the virtual card's slot-9D key, so opening the store's sealed key
+    # goes through the real piggy-agent.
+    echo "$PIV_RECIPIENT_ID" >"$PIGPEN"
+  fi
+}
+
+# start_identity_recipient is the agent-less variant (madder#319), for the
+# Rust CLI only: the pigpen names an X25519 recipient the Rust CLI mints,
+# and MADDER_STORE_IDENTITY_HEX hands it the matching secret, so the sealed
+# key opens in software with no fibby, no piggy-agent and no card. The card
+# log is an empty file, so every card count reads 0.
+start_identity_recipient() {
+  require_bin MADDER_STORE_CLI madder-store-cli
+  local minted
+  minted="$("$MADDER_STORE_CLI" mint-recipient)"
+  local recipient
+  recipient="$(sed -n 1p <<<"$minted")"
+  [[ $recipient == piggy-recipient-v1@age_x25519_pub-* ]] ||
+    fail "mint-recipient printed no recipient: $minted"
+  echo "$recipient" >"$PIGPEN"
+  export MADDER_STORE_IDENTITY_HEX
+  MADDER_STORE_IDENTITY_HEX="$(sed -n 2p <<<"$minted")"
+  export PIV_FIBBY_LOG="$BATS_TEST_TMPDIR/no-card.log"
+  : >"$PIV_FIBBY_LOG"
+}
+
+# expected_card_ecdh echoes how many card ECDH operations a step should
+# have cost: the given number with the card, 0 with a software identity.
+expected_card_ecdh() {
+  if [[ -n ${MADDER_STORE_IDENTITY_MODE:-} ]]; then
+    echo 0
+  else
+    echo "$1"
+  fi
 }
 
 teardown() {
@@ -25,19 +59,24 @@ teardown() {
 #
 # Tests tagged `rust_cli` also run against the Rust implementation
 # (crates/madder-store, via its madder-grammar test CLI as MADDER_BIN) in
-# the `.#bats-rust_cli` lane (`just test-bats-rust-cli`). The tag marks
-# the tests whose behaviour the Rust crate implements today: init, write,
-# reads through piggy-agent (piggy-pigpen's pure-Rust `agent` oracle), the
-# agent-less failure path, fsck and key-status. key-reseal, the drift
-# warning and pigpen pointers are out of the crate's scope, and plain
-# stores wait on madder#318 (madder#319 tracks an X25519-identity variant).
+# the `.#bats-rust_cli` lane (`just test-bats-rust-cli`), and once more in
+# `.#bats-rust_cli_identity` (`just test-bats-rust-cli-identity`), which
+# sets MADDER_STORE_IDENTITY_MODE so the sealed key opens through a software
+# X25519 identity instead of the card (madder#319). The tag marks the tests
+# whose behaviour the Rust crate implements today: init, write, reads
+# through piggy-agent (piggy-pigpen's pure-Rust `agent` oracle) or the
+# identity, the agent-less failure path, fsck and key-status. key-reseal,
+# the drift warning and pigpen pointers are out of the crate's scope; the
+# plain-store files run against the Rust CLI since madder#318.
 
 run_madder_agent() {
   run timeout --preserve-status 20s "${MADDER_BIN:-madder}" "$@"
 }
 
+# No agent socket, and no software identity either: the only way left to
+# open a sealed key is the agent, and there is none.
 run_madder_no_agent() {
-  run env -u PIGGY_AUTH_SOCK -u SSH_AUTH_SOCK -u PIVY_AUTH_SOCK \
+  run env -u PIGGY_AUTH_SOCK -u SSH_AUTH_SOCK -u PIVY_AUTH_SOCK -u MADDER_STORE_IDENTITY_HEX \
     timeout --preserve-status 20s "${MADDER_BIN:-madder}" "$@"
 }
 
@@ -133,8 +172,8 @@ function sealed_store_reads_many_blobs_with_one_card_operation { # @test
   # Three blobs, one process: the sealed key was opened once, so the
   # card did exactly one ECDH. This is the property the design exists
   # for (a 91,500-blob fsck must not be 91,500 card operations).
-  [[ "$(card_ecdh_count)" == "1" ]] ||
-    fail "expected 1 card ECDH for 3 blobs, got $(card_ecdh_count)"
+  [[ "$(card_ecdh_count)" == "$(expected_card_ecdh 1)" ]] ||
+    fail "expected $(expected_card_ecdh 1) card ECDH for 3 blobs, got $(card_ecdh_count)"
 }
 
 # bats test_tags=rust_cli
@@ -150,8 +189,8 @@ function sealed_store_fsck_verifies_through_the_agent { # @test
   assert_output --partial 'blobs verified: 2'
   refute_output --partial 'blobs failed'
 
-  [[ "$(card_ecdh_count)" == "1" ]] ||
-    fail "expected 1 card ECDH for the fsck, got $(card_ecdh_count)"
+  [[ "$(card_ecdh_count)" == "$(expected_card_ecdh 1)" ]] ||
+    fail "expected $(expected_card_ecdh 1) card ECDH for the fsck, got $(card_ecdh_count)"
 }
 
 # bats test_tags=rust_cli

@@ -202,7 +202,7 @@ clean: clean-nix-result
 #
 
 [group("post-build")]
-test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-bats-rust-interop test-bats-rust-cli test-grammar-vectors test-store-import-smoke test-rust
+test: verify-go-analyzers test-go-race test-go-nix test-go-godyn test-bats test-bats-net-cap test-bats-piv-agent test-bats-rust-interop test-bats-rust-cli test-bats-rust-cli-identity test-grammar-vectors test-store-import-smoke test-rust
 
 # Run the EXISTING bats tests tagged `rust_cli` (pigpen_store.bats) against
 # the Rust implementation: MADDER_BIN is the madder-store crate's
@@ -222,6 +222,25 @@ test-bats-rust-cli:
     exit 0
   fi
   nix build .#bats-rust_cli --no-link --print-build-logs
+
+# The rust_cli-tagged bats tests once more, with pigpen_store.bats in its
+# agent-less mode (MADDER_STORE_IDENTITY_MODE, madder#319): the sealed key
+# opens through a software X25519 identity the Rust CLI mints, so no fibby
+# or piggy-agent runs and the lane carries no piggy binaries. Covers the
+# Rust read path for a host without an agent. Nothing binds AF_UNIX here,
+# but the file's helpers are shared with the agent lanes, so it stays Linux
+# only with them until exercised elsewhere.
+#
+# run the rust_cli-tagged bats tests against the Rust CLI with a software identity
+[group("post-build")]
+test-bats-rust-cli-identity:
+  #!/usr/bin/env bash
+  set -euo pipefail
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "test-bats-rust-cli-identity: skipped (kept with the agent lanes; Linux only)"
+    exit 0
+  fi
+  nix build .#bats-rust_cli_identity --no-link --print-build-logs
 
 # Build the Rust crate crates/madder-store and run its `cargo test` in the
 # nix sandbox (`.#madder-store`): unit tests, the Go->Rust conformance tests

@@ -436,6 +436,22 @@ Crate changes:
   Rust, Rust-inited ones by Go) and its 7 tests pass; `cargo test` is at
   55.
 
+## The identity variant of the agent tests (madder#319)
+
+`pigpen_store.bats` gains an agent-less mode, switched by
+`MADDER_STORE_IDENTITY_MODE` in the lane's environment: `setup` mints an
+X25519 recipient with the Rust CLI instead of starting fibby and
+piggy-agent, the pigpen names it, `MADDER_STORE_IDENTITY_HEX` hands the
+CLI the secret, and the card log is an empty file so every card count is
+0 (`expected_card_ecdh` makes the two "exactly one ECDH" assertions
+expect 0 in that mode). `run_madder_no_agent` also unsets the identity,
+so the "no agent socket" failure path is still exercised. The lane
+`.#bats-rust_cli_identity` (`just test-bats-rust-cli-identity`) runs every
+`rust_cli` test that way and carries no piggy binaries: it is the proof
+that the Rust read path needs no agent, which is the shape pigsty on a
+host without piggy-agent (or a wasm target) runs in. The Go lanes see the
+mode unset and behave as before.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +
@@ -449,3 +465,5 @@ Crate changes:
 6. Plain stores (madder#318): fixtures, `Config` versions and
    `Encryption`, read/write/init, the shim's discovery and commands, the
    `rust_cli` tags.
+7. The identity variant of the agent tests (madder#319): the mode in
+   `pigpen_store.bats`, `mkBatsLane`'s `extraEnv`, the lane and recipe.

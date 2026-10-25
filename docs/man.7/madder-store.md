@@ -119,7 +119,13 @@ byte-exact, and age files round-trip with the nixpkgs **age** CLI.
 **just test-bats-rust-cli** runs every bats test tagged **rust_cli**
 (in **pigpen_store**, **write_read**, **fsck**, **init**,
 **cli_contract** and **info_repo**) with **MADDER_BIN** pointed at the
-Rust test CLI, so the same tests run against both implementations. **just
+Rust test CLI, so the same tests run against both implementations.
+**just test-bats-rust-cli-identity** runs them once more with
+**pigpen_store.bats** in its agent-less mode
+(**MADDER_STORE_IDENTITY_MODE**): the pigpen names an X25519 recipient
+the CLI mints and the sealed key opens through
+**MADDER_STORE_IDENTITY_HEX**, with no fibby, piggy-agent or card, so the
+read path is covered as a host without an agent would run it. **just
 test-bats-rust-interop** runs **zz-tests_bats/pigpen_rust_interop.bats**
 against one live store in both directions, with the real piggy-agent
 over fibby. **just lint-worktree** runs clippy
