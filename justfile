@@ -35,7 +35,8 @@ build-nix:
 # regenerate facades and show which dewey imports landed in them
 [group("debug")]
 debug-check-facade-imports:
-  nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_FACADE_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export'
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && DAGNABIT_CONFORMIST_CONFIG="$MADDER_CONFORMIST_FACADE_CONFIG" DAGNABIT_CEILING_DIRECTORIES="$(git rev-parse --show-toplevel)" dagnabit export' \
+    || { echo "warning: dagnabit export failed after regenerating; go/pkgs/ is left unformatted (madder#282). Revert with: git checkout -- go/pkgs/" >&2; exit 1; }
   grep purse-first go/pkgs/domain_interfaces/main.go || true
   grep purse-first go/pkgs/hyphence/main.go || true
   grep purse-first go/pkgs/markl/main.go || true

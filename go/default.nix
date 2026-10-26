@@ -439,11 +439,15 @@ let
   # `clown.json.in` template uses an `@madder-mcp@` placeholder which is
   # rewritten to `${madder}/bin/madder-mcp` here. Consumers wire the
   # plugin into clown by pointing `--plugin-dir` at
-  # `${madder-clown-plugin}/share/purse-first/madder/`.
+  # `${madder-clown-plugin}/share/purse-first/madder/`. The manifest's
+  # version is the build's `version` (madder#204), so it always matches
+  # `${madder}/bin/madder --version`; the source-tree plugin.json keeps a
+  # placeholder value so the directory still loads as a plugin unbuilt.
   madder-clown-plugin = pkgs.runCommand "madder-clown-plugin" { } ''
     mkdir -p $out/share/purse-first/madder/.claude-plugin
-    cp ${../plugins/madder/.claude-plugin/plugin.json} \
-       $out/share/purse-first/madder/.claude-plugin/plugin.json
+    ${pkgs.jq}/bin/jq --arg v ${pkgs.lib.escapeShellArg version} '.version = $v' \
+      ${../plugins/madder/.claude-plugin/plugin.json} \
+      > $out/share/purse-first/madder/.claude-plugin/plugin.json
     substitute \
       ${../plugins/madder/clown.json.in} \
       $out/share/purse-first/madder/clown.json \
@@ -548,6 +552,9 @@ let
           builtins.attrNames (builtins.readDir batsSrc)
         );
 
+        # Every `# bats file_tags=` directive in the file counts (bats
+        # accepts several); each contributes its comma-separated tags
+        # (madder#118).
         extractFileTags =
           file:
           let
@@ -555,12 +562,9 @@ let
             lines = pkgs-master.lib.splitString "\n" content;
             tagLines = builtins.filter (l: pkgs-master.lib.hasPrefix "# bats file_tags=" l) lines;
           in
-          if tagLines == [ ] then
-            [ ]
-          else
-            pkgs-master.lib.splitString "," (
-              pkgs-master.lib.removePrefix "# bats file_tags=" (builtins.head tagLines)
-            );
+          pkgs-master.lib.concatMap (
+            l: pkgs-master.lib.splitString "," (pkgs-master.lib.removePrefix "# bats file_tags=" l)
+          ) tagLines;
 
         allFileTags = pkgs-master.lib.unique (pkgs-master.lib.concatMap extractFileTags batsFiles);
       in

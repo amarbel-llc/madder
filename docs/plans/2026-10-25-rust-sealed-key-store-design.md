@@ -607,6 +607,63 @@ no bump is made here.
   `recipient_id`, `EcdhOracle`, `X25519Identity`; a change to any of
   those shows up in `.#madder-store` first.
 
+## Second hardening queue (circus/eager-holly, 2026-10-26)
+
+- **Concurrency and interruption tests** (`tests/concurrency.rs`, on a
+  plain store so no agent is needed): several threads writing the same
+  and different blobs into one store; a reader polling while writers
+  race, asserting a visible blob is always whole and correct and an
+  invisible one is `NotFound`, never a partial read; a writer that dies
+  after its temp file is written (the temp file is left, the store's ids
+  are unchanged, a later writer publishes cleanly); a publish that
+  completed `link(2)` but not the temp unlink (the blob is complete and
+  readable, the leftover is ignored); a published blob truncated on disk
+  by some copying tool (refused on read; a rewrite is the EEXIST no-op of
+  ADR 0002 and does *not* repair it, so repair is deleting the damaged
+  file, after which a write republishes). What pigsty's sync model needs
+  from the store is exactly these: a blob is either absent or complete,
+  two writers of one blob agree on its bytes, and a damaged blob is a
+  loud read error rather than wrong bytes, with the repair step named.
+  V: all five pass in the dev loop; the one failure on the way was a
+  check-then-read race in the test itself, not in the store.
+- **Compatibility note**: madder-store(7) COMPATIBILITY lists the frozen
+  shapes (config v3/v4/v5, sidecar v1/v2, blob layout and age/zstd
+  framing, the markl id forms) and what a bump costs: a new hyphence
+  type tag plus the Go coder, this crate's parser and `init`, a Go-written
+  fixture and bats on both binaries, roughly a day across the two
+  implementations. pigsty's signed index needs none of that: a blob is
+  opaque bytes to madder, so a signed `pigsty-index-v2` is pigsty's own
+  format through the unchanged `Store` API, and madder should not grow
+  writer authentication the store cannot ground (THREAT MODEL,
+  "Writers"). The signing key's public half living in the pigpen is a
+  piggy RFC 0008 question.
+- **Threat-model cross-check** against pigsty's
+  `docs/plans/2026-10-26-threat-model.md`: no contradiction found. Both
+  say writers are unauthenticated and anyone with the public key can
+  inject (pigsty gap 2, madder "Writers"); metadata, recipient ids and
+  the public key are cleartext (pigsty §1 citing RFC 0008 §6.7, madder
+  "Metadata"); the unsealed key lives in the process for the `Store`'s
+  life (pigsty §4, madder "Who holds the key"); a corrupt blob is refused
+  by the digest check (pigsty §2, madder "Blob integrity"); removing a
+  recipient is not revocation (both). Two wording notes for pigsty,
+  neither a defect: (1) "the sealed key needs a card ECDH per recipient"
+  reads as if every recipient's card were needed, where RFC 0008 §4.3
+  opens the document with any one recipient's key; (2) "integrity by
+  content addressing" holds for `read_to_vec`, which pigsty uses, but a
+  streaming `BlobReader` on an *unencrypted* store hands bytes on before
+  the digest check at EOF fails, so a streaming consumer must read to
+  the end before trusting anything (an encrypted store's age chunk
+  authentication refuses earlier).
+- **Triage** of the open issues: #104, #110 and #259 were already done
+  on master and are closed with the evidence; #118 (every `file_tags`
+  directive counts) and #204 (the clown plugin manifest carries the
+  build's version) are fixed here; #282 gets the cheap mitigation its
+  reporter asked for (a loud warning naming `go/pkgs/` as dirty), the
+  `go/go` chdir root cause stays open; #281 has a note that two
+  gomod2nix emitters disagree (the devshell's and the one that rewrote
+  2e86d96's file before commit), so a regen commit cannot fix it. The
+  rest went to the operator as a grouped list in the queue report.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +

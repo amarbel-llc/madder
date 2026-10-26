@@ -165,6 +165,51 @@ The crate does not defend:
   channels beyond what the RustCrypto primitives provide are not
   considered.
 
+# COMPATIBILITY
+
+The crate owns no format. Everything it reads and writes is a shape the
+Go **madder** defined and still writes, and the Go code plus the
+Go-written fixtures are the contract: a change to any of these is a
+madder format change first and a crate change second.
+
+Frozen, in the sense that the crate reads exactly these and refuses
+anything else:
+
+- Config documents **toml-blob_store_config-v3**, **-v4** (plain stores;
+  v4 is what **madder init** writes) and **-v5** (sealed-key store), in
+  hyphence framing with the optional **@** blake2b256 body digest (FDR
+  0008); the v1/v2 shapes are not read.
+- Sidecar documents **toml-blob_store_key-v2** (written) and **-v1**
+  (read), carrying a **pigpen-v1** document (piggy RFC 0008), base64 at
+  64 columns.
+- Blob bytes: zstd frames or raw bytes, inside an age v1 file with one
+  **X25519** stanza when the store encrypts; the bucketed path from the
+  lower-case hex digest, multi-hash or single-hash layout; the null id.
+- Ids: markl **blake2b256** and **sha256** digests, **age_x25519_pub**
+  and **age_x25519_sec** keys, the **uuidv7** instance id, in piggy RFC
+  0011's wire form (piggy-markl).
+
+What a format bump costs, for a consumer weighing one (pigsty's
+signed-index question is the current case):
+
+- A new hyphence type tag (**toml-blob_store_config-v6**, say) so old
+  readers, Go and Rust, refuse the file rather than misread it; the Go
+  coder, **Validate** and **init** path; this crate's **ConfigVersion**,
+  parser and **init**; a Go-written fixture for it (**just
+  codemod-rust-fixtures**) and the bats that exercise it against both
+  binaries. The same shape for a sidecar or blob-layout change. Roughly a
+  day's work across the two implementations, plus the coordination of
+  landing Go first so the fixture exists.
+- Nothing, if the change lives above the store. A blob is opaque bytes to
+  madder: a signed index, a per-device signing key, or any other
+  authenticated structure pigsty wants is pigsty's own blob format
+  (**pigsty-index-v2**, in pigsty's terms), stored and read through the
+  unchanged **Store** API. madder neither signs nor verifies blobs and
+  should not: the store does not know who its writers are (THREAT
+  MODEL, "Writers"). If the signing key's public half is to live in the
+  pigpen beside the recipients, that is a piggy RFC 0008 question, not a
+  madder one.
+
 # TEST CLI
 
 **madder-store-cli**, the crate's binary target (cargo feature

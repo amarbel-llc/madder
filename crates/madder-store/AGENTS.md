@@ -44,7 +44,9 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   expected ids; the sealed ones also carry the X25519 secret (the seed).
 - `tests/conformance.rs` reads the fixtures back and writes beside them;
   `tests/robustness.rs` feeds random and damaged input to every parser and
-  the read path (seeded PRNG, no dependency); `tests/age_cli_interop.rs`
+  the read path (seeded PRNG, no dependency); `tests/concurrency.rs` runs
+  concurrent writers, readers racing a writer, and interrupted publishes
+  against one store (no panic, no wrong bytes); `tests/age_cli_interop.rs`
   round-trips with the `age` CLI.
 
 ## Rules
