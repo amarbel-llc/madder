@@ -155,7 +155,11 @@ var EncodeStoreKey = internal.EncodeStoreKey
 // dependency on the inner coder being deterministic across two calls
 // (e.g. randomized encryption-key generation in the
 // inventory_archive variants).
-var EncodeWithDigest = internal.EncodeWithDigest
+var (
+	EncodeWithDigest = internal.EncodeWithDigest
+	FirstSecretKey   = internal.FirstSecretKey
+	IsSecretKeyId    = internal.IsSecretKeyId
+)
 
 // MakeStoreKey builds the sidecar for a store key sealed to recipients,
 // which were resolved from source. A path source gets a snapshot of the

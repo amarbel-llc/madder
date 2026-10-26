@@ -705,12 +705,13 @@ function sftp_pack_without_delta { # @test
   assert_output
 }
 
-function sftp_init_with_encryption { # @test
-  # Per ADR 0005, -encryption routes to the remote TomlV3. The
-  # on-disk cleartext check at the end catches a regression where
-  # the IO wrapper silently no-ops, even though the round-trip
-  # alone would still pass.
-  local remote_root="$BATS_TEST_TMPDIR/sftp-encrypted"
+function sftp_init_refuses_a_secret_key_on_the_remote { # @test
+  # madder#296: -encryption on a remote store lands in the remote
+  # blob_store-config (ADR 0005), so a secret key (generate, or any
+  # age_x25519_sec id) would sit next to the ciphertext it protects.
+  # init refuses before anything is created on either side. The
+  # key-blind path is -pigpen (pigpen_sftp.bats, piv_agent lane).
+  local remote_root="$BATS_TEST_TMPDIR/sftp-refused"
   run_madder init-sftp-explicit \
     -host 127.0.0.1 \
     -port "$SFTP_PORT" \
@@ -719,37 +720,73 @@ function sftp_init_with_encryption { # @test
     -remote-path "$remote_root" \
     -known-hosts-file "$SFTP_KNOWN_HOSTS" \
     -encryption generate \
-    .sftp-encrypted
+    .sftp-refused
+  assert_failure
+  assert_output --partial 'madder#296'
+  assert_output --partial 'madder-private_key-v1@age_x25519_sec'
+  assert_output --partial '-pigpen'
+
+  # Neither side got a store, and the message carried no key bytes.
+  [[ ! -e "$remote_root/blob_store-config" ]] || fail "a remote config was written despite the refusal"
+  refute_output --regexp 'age_x25519_sec-[0-9a-z]'
+  run_madder info-repo .sftp-refused hash_type-id
+  assert_failure
+}
+
+function sftp_remote_config_holding_a_secret_still_works_and_warns { # @test
+  # A remote created before madder#296 carries its key in the remote
+  # config. It keeps working (the blobs are encrypted to that key and the
+  # config is immutable), and the first blob read or write per process
+  # says so on stderr and names the way out. Listing and describing the
+  # store stays silent. The on-disk cleartext check at the end catches a
+  # regression where the IO wrapper silently no-ops.
+  run_madder init -encryption generate .seed
   assert_success
 
-  run_madder info-repo .sftp-encrypted encryption
+  local remote_root="$BATS_TEST_TMPDIR/sftp-legacy-secret"
+  mkdir -p "$remote_root"
+  cp .madder/local/share/blob_stores/seed/blob_store-config "$remote_root/blob_store-config"
+  grep -q 'age_x25519_sec' "$remote_root/blob_store-config" || fail "the seed config holds no secret"
+
+  # Adopts the existing remote config (madder#58).
+  run_madder init-sftp-explicit \
+    -host 127.0.0.1 \
+    -port "$SFTP_PORT" \
+    -user testuser \
+    -password anything \
+    -remote-path "$remote_root" \
+    -known-hosts-file "$SFTP_KNOWN_HOSTS" \
+    .sftp-legacy
   assert_success
-  assert_output --regexp '.+'
+  refute_output --partial 'madder#296'
+
+  run_madder info-repo .sftp-legacy hash_type-id
+  assert_success
+  refute_output --partial 'madder#296'
 
   local blob="$BATS_TEST_TMPDIR/blob.txt"
-  echo "encrypted-sftp-roundtrip" >"$blob"
+  echo "legacy-secret-roundtrip" >"$blob"
 
-  run_madder write -format tap .sftp-encrypted "$blob"
+  run_madder write -format tap .sftp-legacy "$blob"
   assert_success
+  assert_output --partial 'warning: the encryption key madder-private_key-v1@age_x25519_sec is stored in this store'
+  assert_output --partial 'madder#296'
   local hash
   hash="$(echo "$output" | grep '^ok ' | awk '{print $4}')"
   [[ -n $hash ]] || fail "write returned empty hash. output: $output"
 
-  run_madder cat .sftp-encrypted "$hash"
+  run_madder cat .sftp-legacy "$hash"
   assert_success
-  assert_output --partial "encrypted-sftp-roundtrip"
+  assert_output --partial "legacy-secret-roundtrip"
+  assert_output --partial 'madder#296'
 
-  # On-disk bytes MUST NOT contain the cleartext marker. If the IO
-  # wrapper silently fell back to plaintext, this assertion would
-  # catch the regression even though the round-trip above succeeds.
   # The test SFTP server re-roots absolute paths under its CWD
-  # ($BATS_TEST_TMPDIR), matching the find pattern used in
-  # sftp_write_compresses_per_remote_config.
+  # ($BATS_TEST_TMPDIR); the seed store under .madder/ holds no blob.
   local on_disk
   on_disk="$(find "$BATS_TEST_TMPDIR" -type f -path '*/blake2b256/*' -print -quit)"
   [[ -n $on_disk ]] || fail "no blob file found under $BATS_TEST_TMPDIR"
 
-  if grep -q 'encrypted-sftp-roundtrip' "$on_disk"; then
+  if grep -q 'legacy-secret-roundtrip' "$on_disk"; then
     fail "expected encrypted bytes on disk; found cleartext at $on_disk"
   fi
 }

@@ -49,6 +49,11 @@ type remoteBlobStoreBase struct {
 	// sealed-key config (FDR 0011); nil otherwise.
 	sealedKey domain_interfaces.MarklId
 
+	// warnSecretOnRemote is set by adoptSealedKey when a plain remote
+	// config carries a secret key (madder#296): the one-time stderr warning
+	// the first blob read or write prints. nil otherwise.
+	warnSecretOnRemote func()
+
 	// initErr is the sticky error captured by initializeOnce when
 	// initialize() fails. sync.Once does not re-run f after a panic, so
 	// the wrapped error is cached here and re-surfaced on each
@@ -103,19 +108,50 @@ func (base *remoteBlobStoreBase) blobEncryption() domain_interfaces.MarklId {
 		return base.sealedKey
 	}
 
-	return base.blobIOWrapper.GetBlobEncryption()
+	encryption := base.blobIOWrapper.GetBlobEncryption()
+
+	if base.warnSecretOnRemote != nil {
+		return warnOnceEncryption{
+			MarklId:  encryption,
+			warnOnce: base.warnSecretOnRemote,
+		}
+	}
+
+	return encryption
+}
+
+// warnOnceEncryption is an encryption id whose IO wrapper runs warnOnce
+// on the first blob read or write, the way sealedKeyEncryption runs the
+// drift check: commands that only list or describe stores stay silent.
+type warnOnceEncryption struct {
+	domain_interfaces.MarklId
+	warnOnce func()
+}
+
+func (encryption warnOnceEncryption) GetIOWrapper() (interfaces.IOWrapper, error) {
+	wrapper, err := encryption.MarklId.GetIOWrapper()
+	if err != nil {
+		return nil, err
+	}
+
+	return &driftWarningIOWrapper{
+		IOWrapper: wrapper,
+		warnOnce:  encryption.warnOnce,
+	}, nil
 }
 
 // adoptSealedKey is called by each transport's readRemoteConfig once
 // remoteConfig is set. For a sealed-key remote config (FDR 0011) it wires
 // in the store key, whose sealed half loadSidecar fetches from the
-// blob_store-key file at the remote root on the first blob read. For any
-// other config it does nothing.
+// blob_store-key file at the remote root on the first blob read. For a
+// plain config it arms the madder#296 warning when the config holds a
+// secret key, and otherwise does nothing.
 func (base *remoteBlobStoreBase) adoptSealedKey(
 	loadSidecar func() ([]byte, error),
 ) (err error) {
 	sealedKeyConfig, ok := base.remoteConfig.(blob_store_configs.ConfigSealedKey)
 	if !ok {
+		base.armSecretOnRemoteWarning()
 		return nil
 	}
 
@@ -129,6 +165,43 @@ func (base *remoteBlobStoreBase) adoptSealedKey(
 	}
 
 	return nil
+}
+
+// armSecretOnRemoteWarning sets warnSecretOnRemote when the plain remote
+// config carries a secret key (madder#296): a store created before `init`
+// refused that. The store keeps working, since the blobs are encrypted to
+// that key and the config is immutable, but the first blob read or write
+// per process says on stderr that anyone who can read the remote can read
+// the blobs, and names the way out. Never an error: refusing would make a
+// backup unreadable.
+func (base *remoteBlobStoreBase) armSecretOnRemoteWarning() {
+	wrapper, ok := base.remoteConfig.(domain_interfaces.BlobIOWrapper)
+	if !ok {
+		return
+	}
+
+	keys, ok := wrapper.GetBlobEncryption().(blob_store_configs.EncryptionKeys)
+	if !ok {
+		return
+	}
+
+	description, found := blob_store_configs.FirstSecretKey(keys)
+	if !found {
+		return
+	}
+
+	storeId := base.id.String()
+
+	base.warnSecretOnRemote = sync.OnceFunc(func() {
+		ui.MakePrefixPrinter(ui.Err(), "# (blob_store: "+storeId+") ").Printf(
+			"warning: the encryption key %s is stored in this store's remote "+
+				"blob_store-config, next to the blobs it protects (madder#296): "+
+				"anyone who can read the remote can read every blob. Create a "+
+				"sealed-key store with -pigpen and `madder sync` into it, then "+
+				"retire this one",
+			description,
+		)
+	})
 }
 
 // sealedKeyUnsupportedLoader is the sidecar loader for transports that

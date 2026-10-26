@@ -28,7 +28,10 @@ const remotePigpenDescription = "With -pigpen the store's key is minted by " +
 	"file); it needs a fresh remote. The remote then holds only the " +
 	"public key (blob_store-config) and the sealed key (blob_store-key), " +
 	"never a secret: blobs are written without the key agent, and " +
-	"reading asks the agent once per madder process. " +
+	"reading asks the agent once per madder process. For the same reason " +
+	"-encryption on a remote store accepts public recipient ids only; a " +
+	"secret key (generate, or an age_x25519_sec id) is refused, since it " +
+	"would be written into the remote blob_store-config (madder#296). " +
 	pigpenKindDescription
 
 func init() {
@@ -390,6 +393,24 @@ func (cmd *Init) Run(req futility.Request) {
 	var sealedKeySidecar []byte
 
 	_, isLocalStore := cmd.blobStoreConfig.(*blob_store_configs.DefaultType)
+
+	// A remote store's -encryption lands in the blob_store-config at the
+	// remote root (ADR 0005), so a secret key there would sit beside the
+	// ciphertext it protects (madder#296). Refuse before anything is
+	// created on either side; -pigpen is the key-blind design.
+	if !isLocalStore {
+		if secret, found := blob_store_configs.FirstSecretKey(cmd.encryption); found {
+			errors.ContextCancelWithBadRequestf(
+				req,
+				"-encryption %s is a secret key; on a remote store it would be "+
+					"written into the remote blob_store-config next to the blobs "+
+					"it protects (madder#296). Use -pigpen to seal the store key "+
+					"to recipients, or a public recipient id",
+				secret,
+			)
+			return
+		}
+	}
 
 	// --if-not-exists with -pigpen: an existing store must be a no-op
 	// BEFORE the pigpen is read or the remote contacted. Otherwise a re-run

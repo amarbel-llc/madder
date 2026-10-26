@@ -280,9 +280,13 @@ A YubiKey is enrolled in the pigpen later:
 
 ## More Information
 
-- madder#296: remote stores write the encryption secret into the remote
-  config. This record is the intended fix for stores created with
-  `-pigpen`.
+- madder#296: remote stores wrote the encryption secret into the remote
+  config. This record is the fix: since 2026-10-26 `init-sftp-*` and
+  `init-webdav` refuse a secret-bearing `-encryption` (`generate`, any
+  secret-key format) and point here, and a remote config that still holds
+  a secret warns on the first blob read or write per process. The
+  remaining promotion criterion above (a real remote store run on this
+  design) is the operator's to confirm.
 - `docs/decisions/0005-remote-driven-sftp-blob-stores.md`: the key-blind
   layering this implements.
 - FDR 0008 (config digest pins): why the sealed key cannot live in the

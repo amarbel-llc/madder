@@ -22,6 +22,25 @@ function webdav_init_bootstraps_remote_config { # @test
   assert_line 'blake2b256'
 }
 
+function webdav_init_refuses_a_secret_key_on_the_remote { # @test
+  # madder#296: the same rule as sftp_init_refuses_a_secret_key_on_the_remote.
+  # -encryption lands in the remote blob_store-config, so a secret key is
+  # refused before the MKCOL and the PUT; -pigpen is the key-blind path
+  # (pigpen_webdav.bats, piv_agent lane).
+  run_madder init-webdav \
+    -url "${WEBDAV_URL}store-refused/" \
+    -encryption generate \
+    .webdav-refused
+  assert_failure
+  assert_output --partial 'madder#296'
+  assert_output --partial 'madder-private_key-v1@age_x25519_sec'
+  refute_output --regexp 'age_x25519_sec-[0-9a-z]'
+
+  [[ ! -e "$WEBDAV_ROOT/store-refused/blob_store-config" ]] || fail "a remote config was written despite the refusal"
+  run_madder info-repo .webdav-refused hash_type-id
+  assert_failure
+}
+
 function webdav_write_and_cat { # @test
   init_webdav_test_store
 

@@ -87,6 +87,13 @@ var (
 
 var SetMultiEncryptionFlagDefinition = charlie_bsc.SetMultiEncryptionFlagDefinition
 
+// Secret-key detection for the key-blind rule on remote stores (ADR 0005,
+// madder#296).
+var (
+	IsSecretKeyId  = charlie_bsc.IsSecretKeyId
+	FirstSecretKey = charlie_bsc.FirstSecretKey
+)
+
 // Re-export generated Decode/Encode functions
 var (
 	DecodeTomlLocalHashBucketedV1 = charlie_bsc.DecodeTomlLocalHashBucketedV1

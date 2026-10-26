@@ -136,6 +136,18 @@ Remote blob store accessed over SSH/SFTP. Two initialization modes:
 Both support **-discover** to detect an existing remote store's configuration
 from its directory structure.
 
+The local config is transport only; hash type, buckets, compression and
+encryption live in the **blob_store-config** at the remote root (ADR
+0005). **-encryption** therefore accepts public recipient ids only: a
+secret key (**generate**, or any **age_x25519_sec** id) is refused, since
+it would be written to the remote next to the blobs it protects
+(madder#296). For an encrypted remote store use **-pigpen** (SEALED-KEY
+STORES below), which keeps the store key sealed to recipients and never
+puts a secret on the remote. A store created before that rule, whose
+remote config still holds a secret, keeps working; the first blob read or
+write in each process warns on stderr and points at **-pigpen** and
+**madder sync** as the way to move it.
+
 ## WebDAV
 
 Remote blob store accessed over HTTP/HTTPS WebDAV. Works with Nextcloud,
@@ -147,7 +159,9 @@ init-webdav**:
 :   Provision a fresh store rooted at **URL**. The local config carries
     transport only — URL and (optional) basic-auth user/password; the
     remote **blob_store-config** governs hash type, buckets, compression,
-    and encryption per ADR 0005. The parent path of the target URL must
+    and encryption per ADR 0005, so **-encryption** takes public recipient
+    ids only and refuses a secret key, as for SFTP (madder#296); use
+    **-pigpen** for an encrypted store. The parent path of the target URL must
     already exist on the server; **init-webdav** issues a single MKCOL
     against the URL itself and a PUT for the remote config file.
 
