@@ -91,6 +91,80 @@ inventory archives, pointer and multi stores, the drift check against a
 re-resolved pigpen, **verify-on-collision**, several raw keys in one
 config, and the v1/v2 config shapes.
 
+# THREAT MODEL
+
+What the crate defends, what it leaves to other layers, and what it does
+not defend at all. Guarantees that belong to piggy's pigpen format are
+stated as pigpen's and cited to piggy RFC 0008 and madder FDR 0011 by
+section; this page does not re-derive them.
+
+The crate defends:
+
+- **Blob plaintext at rest.** Every blob of an encrypted store is an age
+  v1 file to the store's X25519 public key (age specification, STREAM
+  construction). Reading needs the store's secret key: the sealed one
+  (below) or, for a raw-key store, the one in its config.
+- **Blob integrity.** A blob whose bytes were altered or truncated fails
+  the age chunk authentication before any plaintext is handed on, and a
+  blob that decrypts to other bytes fails the digest check at the end of
+  the read (**Error::DigestMismatch**). An unencrypted store has only the
+  digest check. The robustness tests (**tests/robustness.rs**) mutate
+  every fixture blob at random and assert a read is refused or returns
+  the original bytes, never different ones.
+- **The store key, sealed.** In a sealed-key store the secret half is a
+  pigpen-v1 document sealed to the recipients: only a holder of one
+  recipient's key opens it (RFC 0008 §4.3, §4.4), a recipient cannot be
+  added, dropped or swapped without invalidating the header MAC (RFC 0008
+  §6 item 1), and the opened key is checked against the config's public
+  key (**Error::WrongKey**) so a sidecar from another store is refused.
+  A software identity that is not a recipient fails with
+  **Error::Pigpen**, not with wrong bytes.
+- **Config integrity, when pinned.** A config whose **@** digest line
+  does not match its body is **Error::ConfigTampered**. A config with no
+  such line is trusted as written (FDR 0008's unmigrated state).
+- **Refusal over guessing.** Anything outside the implemented subset
+  (other config versions, several raw keys, other age stanza types, other
+  compression types, a pointer pigpen) is a loud error, never a lenient
+  read, and random or damaged input to any parser is an error, not a
+  panic.
+
+The crate leaves to its caller:
+
+- **Who holds the key.** The unsealed store key lives in the process for
+  the life of the **Store** (FDR 0011 LIMITATIONS, "The store key is in
+  madder's memory"); the only **key-custody** holder is **process**. The
+  injected **EcdhOracle** is trusted to answer honestly; the crate cannot
+  tell a card from a software oracle.
+- **The filesystem.** Durability and atomicity rest on the **Fs**
+  implementation honouring **fsync**, **link**(2) semantics and mode
+  0444; a host **Fs** that does not is outside the crate's guarantees.
+
+The crate does not defend:
+
+- **Metadata.** Blob ids, their count and approximate sizes, the bucket
+  layout, the recipient ids and the store's public key are cleartext
+  (RFC 0008 §6 item 7 for the sidecar; the same holds for age files).
+- **Writers.** Anyone holding the store's public key can write a blob
+  the store will accept; neither age nor pigpen authenticates a sender
+  (RFC 0008 §6 item 6). A plain unencrypted store accepts anything.
+- **A removed recipient.** Removing a recipient and re-sealing stops
+  that key from opening the *new* sidecar, and pigpen rotates the
+  document's file key on removal (RFC 0008 §6 item 2), but the store key
+  underneath is the same, so anyone who kept the old sidecar or the store
+  key still reads every existing blob. Revocation is a new store and a
+  full copy (FDR 0011 LIMITATIONS, "Revocation is not rotation"). This
+  crate implements neither re-sealing nor rotation.
+- **Raw-key and unencrypted stores against a reader of the config.** A
+  V3/V4 store's secret key, when it has one, is in the config in the
+  clear; whoever reads the config reads the blobs.
+- **Collisions.** **verify-on-collision** is not implemented: a blob
+  whose path already exists is taken to be the same bytes (madder ADR
+  0002).
+- **The host.** A compromised process, a debugger, swap, or a hostile
+  **Fs** implementation see the unsealed key and every plaintext. Side
+  channels beyond what the RustCrypto primitives provide are not
+  considered.
+
 # TEST CLI
 
 **madder-store-cli**, the crate's binary target (cargo feature

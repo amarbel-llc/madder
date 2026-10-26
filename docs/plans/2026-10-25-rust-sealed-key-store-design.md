@@ -530,6 +530,83 @@ public `init::mint_instance_id`. This makes all of `list.bats` and
 in the plain-store files only the inventory-archive inits and the
 pack-blobs test remain Go-only.
 
+## Hardening pass (circus/eager-holly's queue, 2026-10-26)
+
+Scope confirmed with piggy/live-sequoia: defects rooted in piggy-pigpen
+are piggy's to fix (file there, never patch around in madder); pigpen's
+guarantees are cited, not re-derived.
+
+- **Robustness tests** (`tests/robustness.rs`, a dependency-free
+  xorshift PRNG, every case reproducible by seed): random bytes through
+  every parser and the age/zstd readers; random mutations of every
+  fixture config and sidecar, in memory and on disk; random damage to
+  every fixture blob (flip, delete, insert, truncate, append), asserting
+  a read is refused or returns the original bytes, never different ones,
+  and that streaming and whole reads agree; sealed stores under one to
+  four random recipients and blob sizes from 0 to 200 KB, each recipient
+  alone opening the key and a stranger refused with the store left
+  locked. V: all pass; no panic and no defect found, in the store or in
+  pigpen, so nothing to file on piggy.
+- **Threat model**: madder-store(7) THREAT MODEL states what the crate
+  defends (plaintext at rest, blob integrity, the sealed key, pinned
+  configs, refusal over guessing), what it leaves to the caller (key
+  custody, the `Fs`) and what it does not defend (metadata, writers, a
+  removed recipient, raw-key stores against a config reader, collisions,
+  the host), citing RFC 0008 §6 and FDR 0011 LIMITATIONS by item.
+- **Portability check**: done as madder#320 (wasm32); Android stays with
+  pigsty's toolchain.
+- **Issue triage**: madder#292 (two manpage NAME lines) is already clean
+  on master, V: doppelgang `lint-man --max 72` over the built pages
+  reports 52 pages, 0 errors (new paved path `just debug-lint-man`);
+  madder#251 documented the multi-dot ancestor ids in blob-store(7);
+  madder#269 got its nil guard in `Multi.MakeBlobWriter`; madder#276 got
+  a root-cause note (an id with a broken checksum falls through to a
+  silent store switch) and waits on a semantics decision; madder#315
+  needs a reproduction first.
+- **Joint bump note**: the section below.
+
+## Note: a joint madder/piggy bump for pigsty phase 4 (2026-10-26)
+
+Written at circus/eager-holly's request, agreed with piggy/live-sequoia;
+no bump is made here.
+
+- **Three pins, one rev.** madder holds piggy in flake.lock (the Go
+  lanes), go.mod (the devShell's Go) and `crates/madder-store/Cargo.toml`
+  + Cargo.lock (the Rust crate). `just update-piggy <full sha>` moves all
+  three; its flake half is `nix flake update piggy`, which lands on
+  piggy master's head, so the sha passed must be that head (or the recipe
+  needs a `--override-input`-style pin before it can target an older rev).
+  Today all three sit at 9ebebd31a74e28f2dd6c4095a2b6ba5d284cf408, which
+  is still piggy master.
+- **What pigsty's next bump will carry.** piggy#337 (OpenSSL and pcsc
+  behind features in piggy-piv) and piggy#341 (a card-backed
+  `piggy_pigpen::EcdhOracle` in piggy-piv behind a `pigpen` feature).
+  Neither changes piggy-pigpen's or piggy-markl's API, so madder's Cargo
+  deps are unaffected by both; only pigsty, which depends on piggy-piv,
+  needs them. #341 adds a path dep piggy-piv → piggy-pigpen, which does
+  not change how madder's git dep resolves.
+- **Pin a rev, never a branch or tag.** piggy's tags are release tags of
+  the piggy binary (`vX.Y.Z` and `go/vX.Y.Z`, latest v0.1.23, before the
+  pigsty series); piggy-pigpen's own Cargo version is a static 0.1.0 that a
+  release does not bump, so a tag marks a piggy release, not a pigpen API
+  level. For a joint bump piggy cuts a release so the target rev is a tag's
+  commit, and madder pins `rev = <sha>` with a comment naming the tag.
+- **Order, each step after the previous lands.** (1) piggy lands what
+  pigsty needs and releases; (2) madder runs `just update-piggy <sha>`
+  (flake.lock, go.mod, Cargo rev and lock together) and its gate, which
+  includes `.#madder-store`, `.#bats-rust_interop`, `.#bats-rust_cli`,
+  `.#bats-rust_cli_identity` and `.#madder-store-wasm-check`, all of which
+  a piggy bump must pass; (3) pigsty bumps madder and piggy to those two
+  revs in one commit. madder bumps piggy only to a rev pigsty has asked
+  for, so the three repos never hold two piggy revs at once.
+- **Cost on madder's side.** A bump is a lock change plus the gate; no
+  code moves unless piggy-pigpen's API does (it has not since
+  9ebebd31). The one API edge madder depends on is
+  `piggy_pigpen::agent` behind the `agent` feature (test CLI only) and
+  `Document::{parse, seal, open, to_bytes, encryption_recipients}` plus
+  `recipient_id`, `EcdhOracle`, `X25519Identity`; a change to any of
+  those shows up in `.#madder-store` first.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +

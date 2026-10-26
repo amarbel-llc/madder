@@ -42,6 +42,10 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   (cargo feature `agent-cli`, which pulls piggy-pigpen's agent oracle).
 - `tests/fixtures/<store>/` — a Go-written store, its plaintexts and the
   expected ids; the sealed ones also carry the X25519 secret (the seed).
+- `tests/conformance.rs` reads the fixtures back and writes beside them;
+  `tests/robustness.rs` feeds random and damaged input to every parser and
+  the read path (seeded PRNG, no dependency); `tests/age_cli_interop.rs`
+  round-trips with the `age` CLI.
 
 ## Rules
 

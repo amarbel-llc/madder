@@ -36,6 +36,21 @@ location:
     directory rather than the ancestor directory where **.madder/** was
     found. Example: **.archive**
 
+**..**, **...**
+:   The same name in an ancestor: each extra dot moves one level up, so
+    **..default** is the second-deepest store named **default** on the
+    walk from the current directory to the root, **...default** the
+    third. Discovery (**madder list**, **madder info-repo**) tags each
+    store it finds with its depth, and ordinary commands resolve a
+    multi-dot id to the Nth same-named ancestor store that already
+    exists. **madder init** is the exception: it roots **..name** at the
+    literal Nth parent directory of the working directory, since the
+    store it creates does not exist yet, and errors rather than clamps
+    when the depth runs past the available ancestors or a ceiling
+    (**MADDER_CEILING_DIRECTORIES**). Inside a multi config a reference
+    is always written single-dot, so it survives a change of working
+    directory. Example: **..default**
+
 **//**
 :   XDG system store. Located under the fixed system root
     **/var/lib/madder/blob_stores/**, e.g. **//shared** resolves to

@@ -968,6 +968,18 @@ debug-man-name-lines limit="72":
   done
   exit "$rc"
 
+# The fleet's own NAME-line check (doppelgang lint-man, the rule circus
+# gates its first-party manpath with: one physical description line of at
+# most 72 characters after escapes are resolved) over the built pages under
+# result/share/man. debug-man-name-lines above is the in-repo approximation
+# of the same rule; this one is authoritative (madder#292). Run after
+# build-nix. doppelgang comes from the devShell.
+#
+# run doppelgang's NAME-line lint over the built man pages
+[group("debug")]
+debug-lint-man max="72":
+  nix develop {{justfile_directory()}} --command sh -c 'doppelgang lint-man --format text --max {{max}} {{justfile_directory()}}/result/share/man'
+
 # Repro for #21: try `madder init` with and without the flags bats uses.
 # Runs in an isolated tmp HOME/workdir under a ceiling that prevents madder
 # from walking into any real config. All variants keep MADDER_CEILING_DIRECTORIES

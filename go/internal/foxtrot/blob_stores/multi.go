@@ -159,6 +159,15 @@ func (parentStore Multi) MakeBlobWriter(
 		if resolvedHashType == nil {
 			resolvedHashType = parentStore.GetDefaultHashType()
 		}
+		// child[0] may itself have no configured default (a store built
+		// without one, or a stub). Passing nil on would let every member
+		// fall back to its own default again, the mismatch #268 closed,
+		// one level deeper (#269). Refuse instead of writing.
+		if resolvedHashType == nil {
+			return nil, errors.Errorf(
+				"Multi mirror: child[0] has no configured default hash type",
+			)
+		}
 
 		writers := make([]io.Writer, len(parentStore.childStores))
 
