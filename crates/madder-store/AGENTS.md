@@ -27,6 +27,8 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   directions, via the real piggy-agent (Linux only).
 - `just codemod-rust-fixtures` — regenerate the Go-written fixture stores
   under `tests/fixtures/` (changes their bytes, never their ids).
+- `just run-bench-rust [--quick] [--blobs N]` — `benches/throughput.rs`,
+  the numbers behind madder-store(7) PERFORMANCE.
 - `just lint-worktree` runs clippy; `nix fmt` runs rustfmt.
 
 ## Layout
@@ -46,8 +48,10 @@ symlink to this file. Reference prose lives in `madder-store(7)`
   `tests/robustness.rs` feeds random and damaged input to every parser and
   the read path (seeded PRNG, no dependency); `tests/concurrency.rs` runs
   concurrent writers, readers racing a writer, and interrupted publishes
-  against one store (no panic, no wrong bytes); `tests/age_cli_interop.rs`
-  round-trips with the `age` CLI.
+  against one store (no panic, no wrong bytes); `tests/half_synced.rs`
+  opens folders whose files arrive one at a time and the read-only mode
+  (`OpenOptions::read_only`, the error kinds `NoConfig`, `MissingSidecar`,
+  `ReadOnly`); `tests/age_cli_interop.rs` round-trips with the `age` CLI.
 
 ## Rules
 

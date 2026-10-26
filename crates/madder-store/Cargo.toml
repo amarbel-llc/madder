@@ -17,6 +17,12 @@ name = "madder-store-cli"
 path = "src/bin/madder-store-cli.rs"
 required-features = ["agent-cli"]
 
+# Plain timing on std::time, no harness crate: `just run-bench-rust`.
+
+[[bench]]
+name = "throughput"
+harness = false
+
 # Pure Rust only: this crate must build for aarch64-linux-android and
 # wasm32-unknown-unknown with no system libraries. The RustCrypto set below
 # is the one piggy-pigpen already uses, at the same versions, so the two

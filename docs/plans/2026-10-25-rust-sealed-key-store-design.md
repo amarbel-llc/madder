@@ -664,6 +664,43 @@ no bump is made here.
   2e86d96's file before commit), so a regen commit cannot fix it. The
   rest went to the operator as a grouped list in the queue report.
 
+## Third queue (circus/eager-holly, 2026-10-26)
+
+- **Benchmarks**: `benches/throughput.rs` behind `just run-bench-rust`
+  (plain `std::time`, no harness crate, release build in the devShell);
+  the table and the phone flags are in madder-store(7) PERFORMANCE. The
+  flags, in order: fsync-bound small writes (2 to 3 ms per blob, two
+  fsyncs, the format's protocol), pure-Rust zstd encoding as the large
+  write ceiling (40 to 45 MB/s; `Compression::None` for an attachment
+  store), one X25519 agreement per sealed blob read (about 150 µs; read
+  the index and what is on screen, not every blob), `read_to_vec` holding
+  whole plaintexts (stream large blobs). Open and `ids()` need no care.
+- **Read-only open mode** for a folder being synced under the reader:
+  `OpenOptions.read_only` / `Store::open_read_only`. Writes are
+  `Error::ReadOnly` before anything is touched; open creates nothing in
+  either mode (it never did), so a read-only reader leaves the folder's
+  shape exactly as the sync tool left it. New error kinds pigsty can show:
+  `NoConfig` (not a store yet), `MissingSidecar` (config arrived, key has
+  not), beside `NotFound` per blob. The crate takes no lock; a writer and
+  a reader on one folder do not wait. `tests/half_synced.rs`, six tests,
+  including the sync-in-name-order case (config before key before blobs)
+  and a byte-for-byte folder listing before and after a read-only session.
+  `init` with a read-only `OpenOptions` is `Error::ReadOnly`. V: all pass.
+  API note for pigsty: `OpenOptions` gained a field; a struct literal
+  breaks, `OpenOptions::default()` does not.
+- **Issue review** for facts madder-store made new: #97 (the public-only
+  config exists as v5; the open question is defaults and migration, not a
+  TomlV4 field), #235 (the Rust reader accepts every shape under
+  discussion; regenerate the fixtures if local changes), #264 (the sidecar
+  already records a `papi` source that the crate cannot resolve; Android
+  uses `embedded`), and #324 filed: `Store` is `!Send` only through the
+  unbounded `Box<dyn Fs>`, and an `Fs` over Android content URIs has no
+  `link(2)`, both parked for phase 4 with pigsty.
+- **Joint pin bump checklist**:
+  `docs/plans/2026-10-26-joint-pin-bump-checklist.md`, the pins as they
+  stand, the order (piggy, madder, pigsty), each gate's must-show lines,
+  and the failure modes. No pin moved.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +

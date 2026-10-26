@@ -65,7 +65,20 @@ The crate implements exactly the on-disk facts the Go code pins:
 # API
 
 **Store::open(base)** parses and verifies the config, and for a
-sealed-key store the sidecar, and unseals nothing. **config()** carries
+sealed-key store the sidecar, and unseals nothing; it creates nothing
+either. A folder whose files have not all arrived (a vault another
+process is syncing) is told apart by error kind: **Error::NoConfig** (no
+**blob_store-config**, so not a store yet), **Error::MissingSidecar**
+(the config names a sealed-key store but **blob_store-key** is absent),
+and, per blob, **Error::NotFound**; a half-copied blob is **Error::Age**,
+**Error::Codec** or **Error::DigestMismatch**, never wrong bytes.
+**Store::open_read_only(base)** (**OpenOptions.read_only**) is the mode
+for such a folder: every write is **Error::ReadOnly** before anything is
+touched, no temp directory is created, and the folder keeps exactly the
+shape the sync tool left, so the reader leaves nothing for it to carry.
+The crate takes no lock in either mode; a writer and a read-only reader
+on one folder do not wait on each other, and the reader sees a published
+blob on its next read. **config()** carries
 the **ConfigVersion** and the **Encryption** (**None**, **Key** or
 **Sealed**). **sealed_recipients()** and **recipient_source()** are the
 read half of **madder key-status** and need no agent (empty and absent
@@ -209,6 +222,59 @@ signed-index question is the current case):
   MODEL, "Writers"). If the signing key's public half is to live in the
   pigpen beside the recipients, that is a piggy RFC 0008 question, not a
   madder one.
+
+# PERFORMANCE
+
+Measured with **just run-bench-rust**
+(**crates/madder-store/benches/throughput.rs**, a release build, plain
+**std::time**) on 2026-10-26 on the x86_64 Linux dev host, temp dir on
+the same disk as the store, random (incompressible) bytes. Numbers are
+per operation unless marked; a phone will be slower by a factor this
+page does not know, so what matters is the shape.
+
+| operation | plain store (zstd) | sealed-key store (zstd + age) |
+|---|---|---|
+| init (mint, seal, two files) | | 4.3 ms |
+| open (config + sidecar parse) | 29 µs | 29 µs |
+| open + unseal (software identity) | | 106 µs |
+| write 1 KB | 2.1 ms | 2.6 ms |
+| read 1 KB | 34 µs | 185 µs |
+| write 1 MB | 32 ms (31 MB/s) | 29 ms (35 MB/s) |
+| read 1 MB | 2.2 ms (450 MB/s) | 2.0 ms (500 MB/s) |
+| write 50 MB | 1.24 s (40 MB/s) | 1.11 s (45 MB/s) |
+| read 50 MB | 155 ms (320 MB/s) | 187 ms (270 MB/s) |
+| has | 4 to 14 µs | 4 to 14 µs |
+| open + unseal, 10 000 blobs in the store | | 190 µs |
+| **ids()** walk, 10 000 blobs | | 11.7 ms |
+| write 10 000 blobs of 1 KB | | 30 s (3.0 ms each) |
+
+What would hurt a phone, in order:
+
+- **Writes are fsync-bound for small blobs** (two fsyncs per blob, the
+  file and its directory, per **blob-store**(7) CONCURRENCY AND
+  DURABILITY): about 2 to 3 ms each here, so a vault saving an entry pays
+  a few ms per blob and an import of 10 000 entries takes tens of
+  seconds. Flash on a phone fsyncs slower than this disk. The protocol is
+  the format's, not negotiable per store; batching several blobs into one
+  save is the consumer's lever.
+- **zstd encoding is the write ceiling for large blobs**: 40 to 45 MB/s
+  here, pure Rust (**ruzstd**) with no SIMD paths, so a 50 MB attachment
+  costs about a second on this host and several on a phone. Compression
+  is a store-wide config choice: a store meant for attachments can be
+  created with **Compression::None**, which also makes decompression
+  free. Reads are not the problem: 270 to 500 MB/s.
+- **Each sealed blob read pays an X25519 agreement**: age derives a
+  per-file key from an ephemeral public key, so a sealed read of a 1 KB
+  blob is about 150 µs more than a plain one here. Reading every entry of
+  a 10 000-entry vault at once is therefore about 2 s of key agreement on
+  this host. A vault should read its index blob and the entries on
+  screen, not every blob on open.
+- **read_to_vec** holds the whole plaintext; a 50 MB attachment is 50 MB
+  of heap. Stream large blobs through **BlobReader** (checking the digest
+  at EOF before trusting them) instead.
+- Opening is cheap regardless of store size (**open** reads two files,
+  **unseal** is one agreement), and **ids()** walks the tree in about a
+  microsecond per blob; neither needs care.
 
 # TEST CLI
 

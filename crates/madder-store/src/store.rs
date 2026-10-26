@@ -40,6 +40,14 @@ pub struct OpenOptions {
     /// Go's blob enumeration performs.
     pub temp_dir: Option<PathBuf>,
     pub fs: Box<dyn Fs>,
+    /// Open for reading only: the store never touches the filesystem except
+    /// to read (no temp directory, no blob, nothing), and every write is
+    /// [`Error::ReadOnly`]. The mode for a folder another process is
+    /// syncing: the reader leaves no trace for the sync tool to carry, and
+    /// it holds no lock (the crate never locks; a half-synced folder shows
+    /// up as [`Error::NoConfig`], [`Error::MissingSidecar`] or
+    /// [`Error::NotFound`], never as a wait).
+    pub read_only: bool,
 }
 
 impl Default for OpenOptions {
@@ -47,6 +55,17 @@ impl Default for OpenOptions {
         OpenOptions {
             temp_dir: None,
             fs: Box::new(StdFs),
+            read_only: false,
+        }
+    }
+}
+
+impl OpenOptions {
+    /// The defaults with `read_only` set.
+    pub fn read_only() -> Self {
+        OpenOptions {
+            read_only: true,
+            ..OpenOptions::default()
         }
     }
 }
@@ -63,6 +82,7 @@ pub struct Store {
     /// The unsealed store key of a sealed-key store, set by `unseal`. A
     /// raw-key store's secret lives in `config.encryption` instead.
     key: OnceCell<Zeroizing<[u8; 32]>>,
+    read_only: bool,
 }
 
 impl Store {
@@ -71,15 +91,37 @@ impl Store {
         Store::open_with(base, OpenOptions::default())
     }
 
+    /// Open the store at `base` for reading only; see
+    /// [`OpenOptions::read_only`].
+    pub fn open_read_only(base: impl AsRef<Path>) -> Result<Store> {
+        Store::open_with(base, OpenOptions::read_only())
+    }
+
     /// Open the store at `base`: parse and verify the config, and for a
-    /// sealed-key store parse the sidecar. Nothing is unsealed.
+    /// sealed-key store parse the sidecar. Nothing is unsealed and nothing
+    /// is written or created; a store whose files have not all arrived is
+    /// [`Error::NoConfig`] or [`Error::MissingSidecar`].
     pub fn open_with(base: impl AsRef<Path>, options: OpenOptions) -> Result<Store> {
         let base = base.as_ref().to_path_buf();
         let fs = options.fs;
 
-        let config = Config::parse(&fs.read(&base.join(FILE_NAME_CONFIG))?)?;
+        let config_bytes = match fs.read(&base.join(FILE_NAME_CONFIG)) {
+            Ok(bytes) => bytes,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                return Err(Error::NoConfig(base.display().to_string()));
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let config = Config::parse(&config_bytes)?;
         let sidecar = if config.is_sealed_key() {
-            Some(Sidecar::parse(&fs.read(&base.join(FILE_NAME_KEY))?)?)
+            let sidecar_bytes = match fs.read(&base.join(FILE_NAME_KEY)) {
+                Ok(bytes) => bytes,
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                    return Err(Error::MissingSidecar(base.display().to_string()));
+                }
+                Err(e) => return Err(e.into()),
+            };
+            Some(Sidecar::parse(&sidecar_bytes)?)
         } else {
             None
         };
@@ -93,7 +135,13 @@ impl Store {
             config,
             sidecar,
             key: OnceCell::new(),
+            read_only: options.read_only,
         })
+    }
+
+    /// Whether the store was opened read-only.
+    pub fn is_read_only(&self) -> bool {
+        self.read_only
     }
 
     pub fn base(&self) -> &Path {
@@ -245,6 +293,9 @@ impl Store {
     /// into the tree (an existing blob is the same bytes), fsync the
     /// directory. Zero bytes produce the null id and no file.
     pub fn write(&self, plaintext: impl Read) -> Result<BlobId> {
+        if self.read_only {
+            return Err(Error::ReadOnly);
+        }
         // Encryptor::new validates the recipient point.
         let recipient = self.config.encryption.recipient();
 

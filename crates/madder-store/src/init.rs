@@ -255,6 +255,9 @@ struct SealedParts {
 /// as Go's `WriteImmutable` does.
 pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> Result<Store> {
     let base = base.as_ref();
+    if open.read_only {
+        return Err(Error::ReadOnly);
+    }
     let fs: &dyn Fs = &*open.fs;
 
     if options.hash_buckets.iter().sum::<usize>() > 64 {
@@ -331,6 +334,7 @@ pub fn init(base: impl AsRef<Path>, options: InitOptions, open: OpenOptions) -> 
         OpenOptions {
             temp_dir: open.temp_dir,
             fs: open.fs,
+            read_only: false,
         },
     )
 }

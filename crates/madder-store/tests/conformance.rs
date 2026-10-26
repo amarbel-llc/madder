@@ -261,7 +261,7 @@ fn a_plain_store_has_no_sidecar_and_a_sealed_one_needs_its() {
     // never looks for one.
     let (_scratch, base) = scratch_copy(FIXTURES[0]);
     fs::remove_file(base.join("blob_store-key")).unwrap();
-    assert!(matches!(Store::open(&base), Err(Error::Io(_))));
+    assert!(matches!(Store::open(&base), Err(Error::MissingSidecar(_))));
 
     let (_scratch, base) = scratch_copy("plain-none-v4");
     fs::write(base.join("blob_store-key"), b"irrelevant").unwrap();

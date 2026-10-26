@@ -293,6 +293,18 @@ test-bats-rust-interop:
 run-bench pkg="./..." *flags="-benchtime=1x":
   cd go && go test -tags test -run=^$ -bench=. {{flags}} {{pkg}}
 
+# Time the Rust crate: seal/unseal, write/read at 1 KB, 1 MB and 50 MB
+# through a plain and a sealed-key store, open and ids() with many blobs
+# (crates/madder-store/benches/throughput.rs, a release build in the
+# devShell, plain std::time, no harness crate). Pass `--quick` for a smoke
+# run or `--blobs N` to size the many-blobs store. Writes under $TMPDIR.
+# The numbers in madder-store(7) PERFORMANCE come from this recipe.
+#
+# run the Rust crate's throughput benchmark
+[group("post-build")]
+run-bench-rust *args:
+  nix develop {{justfile_directory()}} --command cargo bench -p madder-store --bench throughput -- {{args}}
+
 # Run a dewey go/analysis analyzer (seqerror, repool, defererr) as godyn's
 # per-package vet lane over the `-tags test` build (`.#madder-vet-<name>`).
 # Strict: any finding in a local package fails. No bare `go`: it resolves no

@@ -21,9 +21,21 @@ pub enum Error {
     /// A markl id did not parse.
     #[error("markl: {0}")]
     Markl(String),
+    /// No `blob_store-config` at the base: not a store, or a folder whose
+    /// sync has not delivered the config yet.
+    #[error("no blob_store-config at {0}: not a store, or not synced yet")]
+    NoConfig(String),
+    /// The config names a sealed-key store but `blob_store-key` is absent:
+    /// a half-synced folder (the config arrived, the sidecar has not) or a
+    /// sidecar deleted from under the store.
+    #[error("blob_store-key missing at {0}: the sealed store key has not arrived")]
+    MissingSidecar(String),
     /// Reading before `unseal`.
     #[error("the store key has not been unsealed")]
     Locked,
+    /// A write on a store opened with `OpenOptions::read_only`.
+    #[error("the store was opened read-only")]
+    ReadOnly,
     /// No recipient of the sealed key could be opened.
     #[error("sealed store key: {0}")]
     Pigpen(#[from] piggy_pigpen::Error),
