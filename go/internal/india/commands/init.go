@@ -397,8 +397,10 @@ func (cmd *Init) Run(req futility.Request) {
 	// A remote store's -encryption lands in the blob_store-config at the
 	// remote root (ADR 0005), so a secret key there would sit beside the
 	// ciphertext it protects (madder#296). Refuse before anything is
-	// created on either side; -pigpen is the key-blind design.
-	if !isLocalStore {
+	// created on either side; -pigpen is the key-blind design. With
+	// -pigpen also given, the more specific "cannot be combined" refusal
+	// in MakeSealedKeyConfig speaks instead.
+	if !isLocalStore && cmd.pigpen == "" {
 		if secret, found := blob_store_configs.FirstSecretKey(cmd.encryption); found {
 			errors.ContextCancelWithBadRequestf(
 				req,
