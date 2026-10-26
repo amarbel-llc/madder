@@ -701,6 +701,25 @@ no bump is made here.
   stand, the order (piggy, madder, pigsty), each gate's must-show lines,
   and the failure modes. No pin moved.
 
+## A write into a vanished store (pigsty's finding, 2026-10-26)
+
+pigsty's failure-path tests removed the vault folder under an open
+session and found that `write_bytes` succeeded: `publish` mkdir-alls the
+blob's parent, which rebuilt the base around one blob with no config and
+no key (a skeleton a sync tool would then carry). Now `write` first checks
+that `blob_store-config` still exists and fails with `Error::NoConfig`
+otherwise; blobs already on disk are untouched, reads of a vanished store
+are `NotFound`. One `exists` call per write, beside two fsyncs.
+
+**Divergence from Go, on purpose.** Go's local store also mkdir-alls on
+publish and does not re-check its config, so the Go `madder write` into a
+removed base rebuilds the directories the same way. That is left as is:
+the Go CLI runs under a user who just ran `init`, while this crate runs
+under a sync tool that may remove or move the folder at any time, and a
+silent rebuild there is the hazard. Recorded here rather than changed in
+Go (the coordinator's call, 2026-10-26); if Go ever wants the same check it
+is one `exists` in `localBlobStore`'s write path.
+
 ## Plan of record (TDD per task, merge when green)
 
 1. Design doc (this file) + fixture binary + `codemod-rust-fixtures` +

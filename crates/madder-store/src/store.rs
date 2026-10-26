@@ -296,6 +296,14 @@ impl Store {
         if self.read_only {
             return Err(Error::ReadOnly);
         }
+        // A store whose config is gone (the folder removed or moved under
+        // the open handle) is not a store: publishing would rebuild its
+        // directories around a blob with no config and no key. Go's local
+        // store does rebuild them (its publish mkdir-alls too); this crate
+        // refuses, since a vault on a synced folder meets exactly this.
+        if !self.fs.exists(&self.base.join(FILE_NAME_CONFIG)) {
+            return Err(Error::NoConfig(self.base.display().to_string()));
+        }
         // Encryptor::new validates the recipient point.
         let recipient = self.config.encryption.recipient();
 

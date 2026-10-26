@@ -78,7 +78,11 @@ touched, no temp directory is created, and the folder keeps exactly the
 shape the sync tool left, so the reader leaves nothing for it to carry.
 The crate takes no lock in either mode; a writer and a read-only reader
 on one folder do not wait on each other, and the reader sees a published
-blob on its next read. **config()** carries
+blob on its next read. A write into a store whose **blob_store-config**
+has gone (the folder removed or moved under the open handle) is
+**Error::NoConfig** too, not a rebuilt skeleton of directories around one
+blob; this is where the crate deliberately differs from the Go local
+store, which recreates its directories on publish. **config()** carries
 the **ConfigVersion** and the **Encryption** (**None**, **Key** or
 **Sealed**). **sealed_recipients()** and **recipient_source()** are the
 read half of **madder key-status** and need no agent (empty and absent

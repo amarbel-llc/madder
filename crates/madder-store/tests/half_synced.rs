@@ -243,6 +243,49 @@ fn a_writable_store_opened_on_the_same_folder_is_unaffected_by_a_read_only_one()
 }
 
 #[test]
+fn a_write_into_a_vanished_store_is_refused_not_rebuilt() {
+    // The vault folder is removed (or moved) under an open handle. A write
+    // must not recreate the base around a blob with no config and no key.
+    let scratch = Scratch::new("vanished");
+    let base = scratch.path().join("vault");
+    let (identity, blobs) = sealed_store(&base);
+    let store = Store::open(&base).unwrap();
+    store
+        .unseal(&Unsealer {
+            oracle: None,
+            identities: &[identity],
+        })
+        .unwrap();
+
+    fs::remove_dir_all(&base).unwrap();
+    let err = store
+        .write_bytes(b"written after the folder went")
+        .unwrap_err();
+    assert!(matches!(err, Error::NoConfig(_)), "{err:?}");
+    assert!(
+        !base.exists(),
+        "the base was rebuilt: {:?}",
+        listing(scratch.path())
+    );
+    // Reads say what is missing; nothing panics.
+    assert!(matches!(store.read(&blobs[0].1), Err(Error::NotFound(_))));
+
+    // Only the config gone (the folder half-removed): the same refusal,
+    // and the blobs already there are left alone.
+    let base = scratch.path().join("vault2");
+    let (_, blobs) = sealed_store(&base);
+    let store = Store::open(&base).unwrap();
+    let before = listing(&base);
+    fs::remove_file(base.join("blob_store-config")).unwrap();
+    let err = store.write_bytes(b"another").unwrap_err();
+    assert!(matches!(err, Error::NoConfig(_)), "{err:?}");
+    let mut expected = before;
+    expected.retain(|p| p != "blob_store-config");
+    assert_eq!(listing(&base), expected);
+    assert!(store.has(&blobs[0].1));
+}
+
+#[test]
 fn the_error_kinds_a_vault_shows_are_distinct() {
     // The kinds a UI maps to messages: not a store yet, key not synced yet,
     // this entry not synced yet, store opened read-only. Each has its own
