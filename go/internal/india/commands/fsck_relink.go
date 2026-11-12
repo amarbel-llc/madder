@@ -42,6 +42,10 @@ type relinkSummary struct {
 	NativeInvalid    int    `json:"native_invalid"`
 	Unreadable       int    `json:"unreadable"`
 	ReclaimableBytes int64  `json:"reclaimable_bytes"`
+
+	// Error is set only when the store's listing failed before any object
+	// was checked; the counts are then zero.
+	Error string `json:"error,omitempty"`
 }
 
 // runRelinkReport is the read-only `fsck -relink-report` mode. For every
@@ -89,6 +93,16 @@ func (cmd Fsck) runRelinkReport(
 
 		for id, listErr := range store.AllBlobs() {
 			if listErr != nil {
+				// madder#312: a listing that dies part-way still leaves the
+				// consumer a closing record for this store, saying why.
+				if asJSON {
+					summary.Error = listErr.Error()
+
+					if encodeErr := encoder.Encode(summary); encodeErr != nil {
+						return mismatches, errors.Wrap(encodeErr)
+					}
+				}
+
 				return mismatches, errors.Wrapf(
 					listErr, "fsck -relink-report: listing %q", storeId,
 				)

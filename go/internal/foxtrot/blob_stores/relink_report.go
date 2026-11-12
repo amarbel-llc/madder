@@ -1,7 +1,9 @@
 package blob_stores
 
 import (
+	stderrors "errors"
 	"io"
+	"io/fs"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
@@ -124,6 +126,18 @@ func CheckRelinkCandidate(
 	record.Native, _ = markl.Clone(nativeId) //repool:owned
 	record.NativeExists = store.HasBlob(record.Native)
 
+	// HasBlob folds every failure into "absent". Before calling the native
+	// missing, ask a store that can tell the two apart (madder#312): a
+	// failed lookup is unreadable, not proof there is no native.
+	if !record.NativeExists {
+		if lookupErr := nativeLookupFailure(store, record.Native); lookupErr != nil {
+			record.State = RelinkUnreadable
+			record.Err = lookupErr
+
+			return record
+		}
+	}
+
 	// A native that exists only as a link, possibly a dangling one or one
 	// pointing back at the copy, is not a second copy of anything.
 	var nativeNotRegular error
@@ -186,6 +200,26 @@ func CheckRelinkCandidate(
 	}
 
 	return record
+}
+
+// nativeLookupFailure returns the error from asking store about native when
+// the answer is a failure other than "does not exist", and nil when the
+// store says the object is absent or cannot tell a failure from absence.
+func nativeLookupFailure(
+	store domain_interfaces.BlobStore,
+	native domain_interfaces.MarklId,
+) error {
+	reporter, ok := store.(RegularObjectReporter)
+	if !ok {
+		return nil
+	}
+
+	_, err := reporter.IsRegularObject(native)
+	if err == nil || stderrors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+
+	return err
 }
 
 // verifyNative reads native back through the store and checks that its bytes

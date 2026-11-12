@@ -898,6 +898,31 @@ function sftp_fsck_relink_report_is_read_only_and_names_duplicates { # @test
   assert_output --partial '"reclaimable_bytes":0'
 }
 
+function sftp_fsck_relink_report_writes_a_summary_when_the_listing_fails { # @test
+  # madder#312: a listing that fails still ends the store's NDJSON with a
+  # summary record carrying the reason. Unverified lane: written on a host
+  # where the net_cap lane could not be run; confirm that locking the
+  # remote root makes the listing (not the connect) fail.
+  [[ $EUID != 0 ]] || skip "root bypasses directory permissions"
+
+  local remote_root="$BATS_TEST_TMPDIR/sftp-remote"
+  init_sftp_test_store "$remote_root"
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "listing will fail" >"$blob"
+  run_madder write .sftp-test "$blob"
+  assert_success
+
+  chmod 000 "$remote_root"
+
+  run_madder fsck -relink-report -format ndjson .sftp-test
+  chmod 755 "$remote_root"
+  assert_failure
+  assert_output --partial '"type":"summary"'
+  assert_output --partial '"checked":0'
+  assert_output --partial '"error":"'
+}
+
 function sftp_write_record_has_contracted_fields { # @test
   export XDG_LOG_HOME="$BATS_TEST_TMPDIR/xdg-log"
   init_sftp_test_store

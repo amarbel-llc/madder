@@ -4,6 +4,7 @@ package blob_stores
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
@@ -84,6 +85,39 @@ func TestCheckRelinkCandidate(t *testing.T) {
 
 		if record.Native == nil {
 			t.Errorf("no native id reported for an intact object")
+		}
+	})
+
+	// madder#312: HasBlob folds a failed lookup into "absent"; a native whose
+	// directory cannot be searched must read as unreadable, not missing.
+	t.Run("native lookup fails", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root bypasses directory permissions")
+		}
+
+		lone := writeSftpTestBlobWith(t, store, markl.FormatHashSha256, "copy whose native dir is locked")
+
+		probe := CheckRelinkCandidate(store, lone, markl.FormatHashBlake2b256)
+		if probe.State != RelinkNativeMissing {
+			t.Fatalf("probe state = %s, want native_missing", probe.State)
+		}
+
+		nativeDir := filepath.Dir(store.remotePathForMerkleId(probe.Native))
+
+		if err := os.MkdirAll(nativeDir, 0o755); err != nil {
+			t.Fatalf("MkdirAll: %v", err)
+		}
+
+		if err := os.Chmod(nativeDir, 0o000); err != nil {
+			t.Fatalf("Chmod: %v", err)
+		}
+
+		t.Cleanup(func() { _ = os.Chmod(nativeDir, 0o755) })
+
+		record := CheckRelinkCandidate(store, lone, markl.FormatHashBlake2b256)
+
+		if record.State != RelinkUnreadable || record.Err == nil {
+			t.Fatalf("state = %s err=%v, want unreadable with an error", record.State, record.Err)
 		}
 	})
 

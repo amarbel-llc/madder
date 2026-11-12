@@ -841,6 +841,36 @@ release version:
 build-gomod2nix:
   cd go && gomod2nix
 
+# Usage: just debug-go-test ./internal/echo/env_dir/... -run TestName
+# Runs `go test -tags test` for the given packages/flags in the devShell;
+# a fast single-package loop (the nix lanes stay authoritative).
+#
+# run go test with the test tag on chosen packages in the devShell
+[group("debug")]
+debug-go-test *go_test_args:
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && go test -tags test {{go_test_args}}'
+
+# Reproduces madder#315: run `madder list` from an unreadable cwd (mode 000)
+# and from a cwd below an unsearchable parent, printing exit codes and output.
+#
+# run madder list from unreadable cwd variants (madder#315 repro)
+[group("debug")]
+debug-unreadable-cwd-repro:
+  #!/usr/bin/env bash
+  set -uo pipefail
+  just build >/dev/null
+  bin={{justfile_directory()}}/result/bin/madder
+  root="$(mktemp -d)"
+  export HOME="$root/home"; mkdir -p "$HOME"
+  export XDG_CONFIG_HOME= XDG_DATA_HOME= XDG_CACHE_HOME= XDG_STATE_HOME=
+  mkdir -p "$root/a/b" "$root/c"
+  echo "== variant 1: cwd itself mode 000"
+  (cd "$root/c" && chmod 000 "$root/c" && "$bin" list 2>&1 | head -30; echo "exit=${PIPESTATUS[0]}")
+  echo "== variant 2: cwd below unsearchable parent"
+  (cd "$root/a/b" && chmod 000 "$root/a" && "$bin" list 2>&1 | head -30; echo "exit=${PIPESTATUS[0]}")
+  chmod 755 "$root/a" "$root/c"
+  rm -rf "$root"
+
 # Print the version subcommand output from the nix-built binaries.
 # Used to verify -ldflags injection (see go/internal/0/buildinfo).
 #
