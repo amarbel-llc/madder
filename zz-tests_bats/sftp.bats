@@ -900,23 +900,42 @@ function sftp_fsck_relink_report_is_read_only_and_names_duplicates { # @test
 
 function sftp_fsck_relink_report_writes_a_summary_when_the_listing_fails { # @test
   # madder#312: a listing that fails still ends the store's NDJSON with a
-  # summary record carrying the reason. Unverified lane: written on a host
-  # where the net_cap lane could not be run; confirm that locking the
-  # remote root makes the listing (not the connect) fail.
+  # summary record carrying the reason. The store needs the multi-hash
+  # shape the relink report requires, so build it the way the test above
+  # does, then lock the blob directories (not the root, which would fail
+  # the connect and its config read instead of the listing).
   [[ $EUID != 0 ]] || skip "root bypasses directory permissions"
+
+  init_store # .default, blake2b256
+
+  run_madder init -hash_type-id sha256 -encryption none .legacy
+  assert_success
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "listing will fail" >"$blob"
+  run_madder write -format tap .legacy "$blob"
+  assert_success
+
+  run_madder sync -format ndjson .legacy .default
+  assert_success
 
   local remote_root="$BATS_TEST_TMPDIR/sftp-remote"
   init_sftp_test_store "$remote_root"
 
-  local blob="$BATS_TEST_TMPDIR/blob.txt"
-  echo "listing will fail" >"$blob"
-  run_madder write .sftp-test "$blob"
+  run_madder sync -format ndjson .default .sftp-test
   assert_success
 
-  chmod 000 "$remote_root"
+  local dir
+  for dir in "$remote_root"/*/; do
+    chmod 000 "$dir"
+  done
 
   run_madder fsck -relink-report -format ndjson .sftp-test
-  chmod 755 "$remote_root"
+
+  for dir in "$remote_root"/*/; do
+    chmod 755 "$dir"
+  done
+
   assert_failure
   assert_output --partial '"type":"summary"'
   assert_output --partial '"checked":0'
