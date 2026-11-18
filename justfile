@@ -850,6 +850,14 @@ build-gomod2nix:
 debug-go-test *go_test_args:
   nix develop {{justfile_directory()}} --command sh -c 'cd go && go test -tags test {{go_test_args}}'
 
+# Prints which tommy the devShell's go resolves and the go env that decides it,
+# for the devshell-only build failure in the tommy-generated blob_store_configs.
+#
+# print the devShell's resolved tommy module and go env
+[group("debug")]
+debug-tommy-resolution:
+  nix develop {{justfile_directory()}} --command sh -c 'cd go && go version && go list -m -f "{{ "{{.Path}} {{.Version}} {{.Dir}} replace={{.Replace}}" }}" code.linenisgreat.com/tommy && go env GOFLAGS GOMODCACHE GOWORK GOPROXY GOFLAGS && d="$(go list -m -f "{{ "{{.Dir}}" }}" code.linenisgreat.com/tommy)" && echo "ParseStrict in cached tommy:" && (grep -rn "func ParseStrict" "$d" || echo none) && grep -n "tommy" go.sum'
+
 # Reproduces madder#315: run `madder list` from an unreadable cwd (mode 000)
 # and from a cwd below an unsearchable parent, printing exit codes and output.
 #
