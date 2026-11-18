@@ -113,11 +113,20 @@ var BootstrapWebdavSealedKeyConfig = internal.BootstrapWebdavSealedKeyConfig
 // CheckRelinkCandidate reads id from store once, hashing the bytes under both
 // id's own hash type (through the store's reader) and nativeHash, then asks
 // whether the native object exists. It writes nothing.
+var CheckRelinkCandidate = internal.CheckRelinkCandidate
+
+// CheckRelinkCandidateWithin is CheckRelinkCandidate with a per-object time
+// limit (madder#312): a read stalled on a remote that stopped answering
+// cannot be cancelled through the store's reader, so the check runs on its
+// own goroutine and is abandoned when the limit passes, reported as
+// unreadable so the report goes on. The abandoned goroutine keeps running
+// until its read returns or the process exits. A limit of zero or less means
+// no limit.
 var (
-	CheckRelinkCandidate = internal.CheckRelinkCandidate
-	CopyBlobIfNecessary  = internal.CopyBlobIfNecessary
-	CopyReaderToWriter   = internal.CopyReaderToWriter
-	DiscoverRemoteConfig = internal.DiscoverRemoteConfig
+	CheckRelinkCandidateWithin = internal.CheckRelinkCandidateWithin
+	CopyBlobIfNecessary        = internal.CopyBlobIfNecessary
+	CopyReaderToWriter         = internal.CopyReaderToWriter
+	DiscoverRemoteConfig       = internal.DiscoverRemoteConfig
 )
 
 // ErrorText is err as one line a person can act on. A joined error's own

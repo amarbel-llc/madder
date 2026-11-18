@@ -32,6 +32,9 @@ type Fsck struct {
 	Format       output_format.Format
 	Limit        int
 	RelinkReport bool
+
+	// RelinkTimeoutSeconds bounds each object's check under -relink-report.
+	RelinkTimeoutSeconds int
 }
 
 var _ futility.CommandWithParams = (*Fsck)(nil)
@@ -98,6 +101,10 @@ func (cmd *Fsck) SetFlagDefinitions(
 			"replaced by an alias, with the bytes that would free. "+
 			"Reads every such copy; writes nothing. Exits non-zero if any "+
 			"copy is not cleanly relinkable.")
+	flagSet.IntVar(&cmd.RelinkTimeoutSeconds, "relink-timeout", 300,
+		"with -relink-report: give up on one object after this many "+
+			"seconds and report it unreadable, so a stalled remote does "+
+			"not hang the report (0 = no limit).")
 }
 
 func (cmd Fsck) Complete(

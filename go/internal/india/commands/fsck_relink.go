@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"code.linenisgreat.com/madder/go/internal/charlie/output_format"
 	"code.linenisgreat.com/madder/go/internal/foxtrot/blob_stores"
@@ -129,10 +130,11 @@ func (cmd Fsck) runRelinkReport(
 		for i, candidate := range candidates {
 			errors.ContextContinueOrPanic(envBlobStore)
 
-			record := blob_stores.CheckRelinkCandidate(
+			record := blob_stores.CheckRelinkCandidateWithin(
 				store,
 				candidate.Id,
 				markl.FormatHashBlake2b256,
+				time.Duration(cmd.RelinkTimeoutSeconds)*time.Second,
 			)
 
 			summary.Checked++

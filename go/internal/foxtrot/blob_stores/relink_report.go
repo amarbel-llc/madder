@@ -4,6 +4,7 @@ import (
 	stderrors "errors"
 	"io"
 	"io/fs"
+	"time"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/piggy/go/pkgs/markl"
@@ -200,6 +201,48 @@ func CheckRelinkCandidate(
 	}
 
 	return record
+}
+
+// CheckRelinkCandidateWithin is CheckRelinkCandidate with a per-object time
+// limit (madder#312): a read stalled on a remote that stopped answering
+// cannot be cancelled through the store's reader, so the check runs on its
+// own goroutine and is abandoned when the limit passes, reported as
+// unreadable so the report goes on. The abandoned goroutine keeps running
+// until its read returns or the process exits. A limit of zero or less means
+// no limit.
+func CheckRelinkCandidateWithin(
+	store domain_interfaces.BlobStore,
+	id domain_interfaces.MarklId,
+	nativeHash markl.FormatHash,
+	limit time.Duration,
+) RelinkRecord {
+	if limit <= 0 {
+		return CheckRelinkCandidate(store, id, nativeHash)
+	}
+
+	done := make(chan RelinkRecord, 1)
+
+	go func() {
+		done <- CheckRelinkCandidate(store, id, nativeHash)
+	}()
+
+	timer := time.NewTimer(limit)
+	defer timer.Stop()
+
+	select {
+	case record := <-done:
+		return record
+
+	case <-timer.C:
+		return RelinkRecord{
+			Id:          id,
+			StoredBytes: -1,
+			State:       RelinkUnreadable,
+			Err: errors.Errorf(
+				"timed out after %s checking %s", limit, id,
+			),
+		}
+	}
 }
 
 // nativeLookupFailure returns the error from asking store about native when
