@@ -269,6 +269,62 @@ function write_tap_override_on_pipe { # @test
   refute_output --partial '"id":'
 }
 
+# madder#293: a sibling store whose blob_store-config this madder cannot
+# decode (a newer or foreign config type) must not stop a command that
+# names a different store, nor an unnamed one that uses the default.
+make_undecodable_sibling_store() {
+  local dir=".madder/local/share/blob_stores/zz-foreign"
+  mkdir -p "$dir"
+  printf -- '---\n! toml-blob_store_config-zz-foreign-v0\n---\n' \
+    >"$dir/blob_store-config"
+}
+
+function write_to_named_store_despite_undecodable_sibling { # @test
+  init_store
+  make_undecodable_sibling_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'sibling is foreign\n' >"$blob"
+
+  run_madder write -format json .default "$blob"
+  assert_success
+  assert_line --regexp '^\{"id":"[^"]+","size":19,"source":"[^"]+blob\.txt","store":"\.default"\}$'
+}
+
+function write_to_default_store_warns_about_undecodable_sibling { # @test
+  init_store
+  make_undecodable_sibling_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'sibling is foreign\n' >"$blob"
+
+  run_madder write -format json "$blob"
+  assert_success
+  assert_output --partial 'zz-foreign'
+  assert_output --partial '"id":"'
+}
+
+function list_survives_undecodable_sibling { # @test
+  init_store
+  make_undecodable_sibling_store
+
+  run_madder list -format=tap
+  assert_success
+  assert_output --partial '.default'
+}
+
+function addressing_the_undecodable_sibling_still_fails { # @test
+  init_store
+  make_undecodable_sibling_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  printf 'sibling is foreign\n' >"$blob"
+
+  run_madder write -format json .zz-foreign "$blob"
+  assert_failure
+  assert_output --partial 'zz-foreign'
+}
+
 # bats test_tags=rust_cli
 function write_json_rejects_unknown_format { # @test
 

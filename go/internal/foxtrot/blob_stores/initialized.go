@@ -20,6 +20,21 @@ type BlobStoreInitialized struct {
 	BuildErr error
 }
 
+// GetBlobStoreDescription answers for a skipped store too: BlobStore is nil
+// when BuildErr is set, and the embedded method would dereference it, so a
+// command that lists every discovered store (madder#293) would panic on one.
+func (blobStoreInitialized BlobStoreInitialized) GetBlobStoreDescription() string {
+	if blobStoreInitialized.BlobStore == nil {
+		if blobStoreInitialized.BuildErr != nil {
+			return "unavailable: " + blobStoreInitialized.BuildErr.Error()
+		}
+
+		return "unavailable"
+	}
+
+	return blobStoreInitialized.BlobStore.GetBlobStoreDescription()
+}
+
 func (blobStoreInitialized BlobStoreInitialized) GetBlobStore() domain_interfaces.BlobStore {
 	return blobStoreInitialized.BlobStore
 }

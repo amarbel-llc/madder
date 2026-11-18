@@ -60,13 +60,17 @@ func makeBlobStoreConfigs(
 		if typedConfig, err := blob_store_configs.DecodeAndVerifyFromFile(
 			configPath,
 		); err != nil {
-			ctx.Cancel(errors.Wrapf(
+			// madder#293: a discovered store whose config this madder cannot
+			// decode (a newer or foreign type) is skipped with a stashed
+			// error, like one that fails to build, rather than aborting every
+			// command that merely loads the store set. The error surfaces
+			// when the store is explicitly addressed.
+			blobStore.BuildErr = errors.Wrapf(
 				err,
 				"blob store %q at %q",
 				blobStoreIdString,
 				configPath,
-			))
-			return blobStores
+			)
 		} else {
 			blobStore.Config = typedConfig
 		}
@@ -192,6 +196,10 @@ func MakeBlobStores(
 	// need their referenced loose blob store to be initialized first.
 	for blobStoreIdString := range blobStores {
 		blobStore := blobStores[blobStoreIdString]
+
+		if blobStore.BuildErr != nil {
+			continue // its config did not decode; nothing to build
+		}
 
 		if _, needsCrossRef := blobStore.Config.Blob.(blob_store_configs.ConfigInventoryArchive); needsCrossRef {
 			continue
