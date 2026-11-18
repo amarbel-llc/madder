@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"code.linenisgreat.com/madder/go/internal/0/domain_interfaces"
 	"code.linenisgreat.com/madder/go/internal/bravo/directory_layout"
@@ -60,17 +61,26 @@ func makeBlobStoreConfigs(
 		if typedConfig, err := blob_store_configs.DecodeAndVerifyFromFile(
 			configPath,
 		); err != nil {
-			// madder#293: a discovered store whose config this madder cannot
-			// decode (a newer or foreign type) is skipped with a stashed
-			// error, like one that fails to build, rather than aborting every
-			// command that merely loads the store set. The error surfaces
-			// when the store is explicitly addressed.
-			blobStore.BuildErr = errors.Wrapf(
+			wrapped := errors.Wrapf(
 				err,
 				"blob store %q at %q",
 				blobStoreIdString,
 				configPath,
 			)
+
+			// madder#293: a config of a type this madder has no decoder for
+			// (a newer or foreign store) is skipped with a stashed error,
+			// like a store that fails to build, rather than aborting every
+			// command that merely loads the store set. The error surfaces
+			// when the store is explicitly addressed. Every other failure,
+			// a digest mismatch (FDR-0008) or an invalid config, still
+			// aborts: skipping those would let a tampered config pass.
+			if !isUnknownConfigTypeError(err) {
+				ctx.Cancel(wrapped)
+				return blobStores
+			}
+
+			blobStore.BuildErr = wrapped
 		} else {
 			blobStore.Config = typedConfig
 		}
@@ -79,6 +89,16 @@ func makeBlobStoreConfigs(
 	}
 
 	return blobStores
+}
+
+// unknownConfigTypeMessage is the text hyphence's type-map decoder uses when
+// a config names a type nobody registered a coder for. hyphence returns it
+// as an untyped error, so the text is all there is to match; the bats test
+// write_to_named_store_despite_undecodable_sibling fails if it ever changes.
+const unknownConfigTypeMessage = "no coders available for type"
+
+func isUnknownConfigTypeError(err error) bool {
+	return strings.Contains(err.Error(), unknownConfigTypeMessage)
 }
 
 // Caller is responsible for the IsOverridden() guard — invoking this
