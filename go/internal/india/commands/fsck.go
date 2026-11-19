@@ -83,7 +83,12 @@ func (cmd Fsck) GetDescription() futility.Description {
 			"object: per object it reports the native id, whether it " +
 			"exists, whether the bytes hash to the object's own id, " +
 			"and the bytes a relink would free; a summary line per " +
-			"store totals them. It writes nothing.",
+			"store totals them. A summary line also carries an \"error\" " +
+			"field when the store's listing failed before every object " +
+			"was checked, and -relink-timeout gives up on one object " +
+			"after that many seconds (default 300, 0 for no limit) and " +
+			"reports it as unreadable, so a stalled remote does not hang " +
+			"the report. It writes nothing.",
 	}
 }
 
