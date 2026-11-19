@@ -858,6 +858,32 @@ debug-go-test *go_test_args:
 debug-tommy-resolution:
   nix develop {{justfile_directory()}} --command sh -c 'cd go && go version && go list -m -f "{{ "{{.Path}} {{.Version}} {{.Dir}} replace={{.Replace}}" }}" code.linenisgreat.com/tommy && go env GOFLAGS GOMODCACHE GOWORK GOPROXY GOFLAGS && d="$(go list -m -f "{{ "{{.Dir}}" }}" code.linenisgreat.com/tommy)" && echo "ParseStrict in cached tommy:" && (grep -rn "func ParseStrict" "$d" || echo none) && grep -n "tommy" go.sum'
 
+# Prints PSS (kB, from /proc/<pid>/smaps_rollup), RSS and the command line of
+# every running process whose executable or command line contains `pattern`
+# (default madder; e.g. `just debug-madder-pss nix-cache`), so the memory of
+# a process family can be read without ad hoc shell.
+#
+# print PSS and RSS of running processes matching a pattern
+[group("debug")]
+debug-madder-pss pattern="madder":
+  #!/usr/bin/env bash
+  set -uo pipefail
+  printf '%-9s %9s %9s  %s\n' PID PSS_kB RSS_kB CMDLINE
+  for dir in /proc/[0-9]*; do
+    pid="${dir#/proc/}"
+    cmd="$(tr '\0' ' ' <"$dir/cmdline" 2>/dev/null)" || continue
+    exe="$(readlink "$dir/exe" 2>/dev/null)" || exe=""
+    case "$exe $cmd" in
+      *{{pattern}}*) ;;
+      *) continue ;;
+    esac
+    rollup="$dir/smaps_rollup"
+    [ -r "$rollup" ] || { printf '%-9s %9s %9s  %s\n' "$pid" n/a n/a "$cmd"; continue; }
+    pss="$(awk '/^Pss:/ {print $2}' "$rollup")"
+    rss="$(awk '/^Rss:/ {print $2}' "$rollup")"
+    printf '%-9s %9s %9s  %.120s\n' "$pid" "$pss" "$rss" "$cmd"
+  done
+
 # Reproduces madder#315: run `madder list` from an unreadable cwd (mode 000)
 # and from a cwd below an unsearchable parent, printing exit codes and output.
 #
