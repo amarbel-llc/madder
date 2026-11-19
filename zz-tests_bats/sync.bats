@@ -210,6 +210,40 @@ function sync_carries_aliases_across_without_copying_the_bytes_again { # @test
   assert_output --partial "\"id\":\"$source_id\",\"dest_id\":\"$native_id\",\"size\":-1,\"state\":\"transferred\""
 }
 
+function sync_fails_for_a_dangling_alias_in_the_source { # @test
+
+  # madder#302: a foreign-digest alias whose native blob is gone cannot be
+  # read, so its bytes are not transferred. That is a failed blob, a
+  # `failed` record and a non-zero exit, not a `transferred` record.
+
+  init_store
+
+  local blob="$BATS_TEST_TMPDIR/blob.txt"
+  echo "native will vanish" >"$blob"
+  local source_id
+  source_id="$(write_blob_id "$blob")"
+
+  run_madder init -hash_type-id sha256 -encryption none .sha256
+  assert_success
+  run_madder sync -format ndjson .default .sha256
+  assert_success
+
+  # Leave only the alias: remove the native blob file behind it.
+  find ".madder/local/share/blob_stores/sha256" \
+    -type f ! -name 'blob_store-*' -delete
+  local links
+  links="$(find ".madder/local/share/blob_stores/sha256" -type l | wc -l | tr -d ' ')"
+  [[ $links == 1 ]] || fail "expected the alias to remain, found $links links"
+
+  run_madder init -hash_type-id sha256 -encryption none .onward
+  assert_success
+
+  run_madder sync -format ndjson .sha256 .onward
+  assert_failure
+  assert_output --partial '"state":"failed"'
+  refute_output --regexp "\"id\":\"$source_id\"[^}]*\"state\":\"transferred\""
+}
+
 function sync_same_hash_omits_dest_id { # @test
 
   # No rehash, so nothing to map: dest_id would only repeat id.

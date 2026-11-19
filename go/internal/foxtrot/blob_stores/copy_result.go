@@ -59,7 +59,11 @@ func (copyResult *CopyResult) setErrorAfterCopy(n int64, err error) {
 	} else if markl.IsErrNull(err) {
 		copyResult.SetBlobExistsLocallyAndRemotely()
 	} else if blob_io.IsErrBlobMissing(err) {
-		copyResult.SetBlobMissingLocally()
+		// madder#302: a source blob whose bytes cannot be read (a dangling
+		// foreign-digest alias, say) was not transferred. Recording it as
+		// MissingLocally with no error counted it a success.
+		copyResult.state = CopyResultStateError
+		copyResult.err = err
 	} else if err != nil {
 		copyResult.state = CopyResultStateError
 		copyResult.err = err
